@@ -92,8 +92,8 @@ export class Uri {
     }
 }
 
-export namespace workspace {
-    export function getConfiguration(section?: string): {
+export const workspace = {
+    getConfiguration(section?: string): {
         get<T>(key: string): T | undefined;
         get<T>(key: string, defaultValue: T): T;
     } {
@@ -114,50 +114,50 @@ export namespace workspace {
             },
         };
     }
-}
+};
 
-export namespace window {
-    export function showInformationMessage(
-        message: string,
-        ...items: string[]
+export const window = {
+    showInformationMessage(
+        _message: string,
+        ..._items: string[]
     ): Promise<string | undefined> {
         return Promise.resolve(undefined);
-    }
+    },
 
-    export function showErrorMessage(
-        message: string,
-        ...items: string[]
+    showErrorMessage(
+        _message: string,
+        ..._items: string[]
     ): Promise<string | undefined> {
         return Promise.resolve(undefined);
-    }
+    },
 
-    export function showInputBox(options?: {
+    showInputBox(_options?: {
         prompt?: string;
         value?: string;
     }): Promise<string | undefined> {
         return Promise.resolve(undefined);
-    }
+    },
 
-    export function showWarningMessage(
-        message: string,
-        ...items: string[]
+    showWarningMessage(
+        _message: string,
+        ..._items: string[]
     ): Promise<string | undefined> {
         return Promise.resolve(undefined);
-    }
+    },
 
-    export function registerWebviewViewProvider(
-        viewId: string,
-        provider: unknown
+    registerWebviewViewProvider(
+        _viewId: string,
+        _provider: unknown
     ): { dispose(): void } {
         return { dispose: () => { } };
     }
-}
+};
 
-export namespace commands {
-    export function registerCommand(
-        command: string,
-        callback: (...args: unknown[]) => unknown
+export const commands = {
+    registerCommand(
+        _command: string,
+        _callback: (...args: unknown[]) => unknown
     ): { dispose(): void } {
         return { dispose: () => { } };
     }
-}
+};

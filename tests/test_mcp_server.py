@@ -848,3 +848,226 @@ class TestServerHandlers:
                 await mcp_server._handle_start_run({})
         finally:
             mcp_server._handle_start_run = original_handler
+
+
+class TestDispatchTool:
+    """_dispatch_tool メソッドのテスト"""
+
+    @pytest.mark.asyncio
+    async def test_dispatch_start_run(self, mcp_server):
+        """start_run ツールをディスパッチする"""
+        # Act
+        result = await mcp_server._dispatch_tool("start_run", {"goal": "テスト"})
+
+        # Assert
+        assert result["status"] == "started"
+        assert "run_id" in result
+
+    @pytest.mark.asyncio
+    async def test_dispatch_get_run_status(self, mcp_server):
+        """get_run_status ツールをディスパッチする"""
+        # Arrange
+        await mcp_server._dispatch_tool("start_run", {"goal": "テスト"})
+
+        # Act
+        result = await mcp_server._dispatch_tool("get_run_status", {})
+
+        # Assert
+        assert result["goal"] == "テスト"
+        assert result["state"] == "running"
+
+    @pytest.mark.asyncio
+    async def test_dispatch_complete_run(self, mcp_server):
+        """complete_run ツールをディスパッチする"""
+        # Arrange
+        await mcp_server._dispatch_tool("start_run", {"goal": "テスト"})
+
+        # Act
+        result = await mcp_server._dispatch_tool("complete_run", {"summary": "完了"})
+
+        # Assert
+        assert result["status"] == "completed"
+
+    @pytest.mark.asyncio
+    async def test_dispatch_heartbeat(self, mcp_server):
+        """heartbeat ツールをディスパッチする"""
+        # Arrange
+        await mcp_server._dispatch_tool("start_run", {"goal": "テスト"})
+
+        # Act
+        result = await mcp_server._dispatch_tool("heartbeat", {"message": "生存確認"})
+
+        # Assert
+        assert result["status"] == "ok"
+
+    @pytest.mark.asyncio
+    async def test_dispatch_emergency_stop(self, mcp_server):
+        """emergency_stop ツールをディスパッチする"""
+        # Arrange
+        await mcp_server._dispatch_tool("start_run", {"goal": "テスト"})
+
+        # Act
+        result = await mcp_server._dispatch_tool("emergency_stop", {"reason": "緊急停止テスト"})
+
+        # Assert
+        assert result["status"] == "aborted"
+
+    @pytest.mark.asyncio
+    async def test_dispatch_create_task(self, mcp_server):
+        """create_task ツールをディスパッチする"""
+        # Arrange
+        await mcp_server._dispatch_tool("start_run", {"goal": "テスト"})
+
+        # Act
+        result = await mcp_server._dispatch_tool("create_task", {"title": "タスク1"})
+
+        # Assert
+        assert result["status"] == "created"
+        assert "task_id" in result
+
+    @pytest.mark.asyncio
+    async def test_dispatch_assign_task(self, mcp_server):
+        """assign_task ツールをディスパッチする"""
+        # Arrange
+        await mcp_server._dispatch_tool("start_run", {"goal": "テスト"})
+        create_result = await mcp_server._dispatch_tool("create_task", {"title": "タスク"})
+        task_id = create_result["task_id"]
+
+        # Act
+        result = await mcp_server._dispatch_tool("assign_task", {"task_id": task_id})
+
+        # Assert
+        assert result["status"] == "assigned"
+
+    @pytest.mark.asyncio
+    async def test_dispatch_report_progress(self, mcp_server):
+        """report_progress ツールをディスパッチする"""
+        # Arrange
+        await mcp_server._dispatch_tool("start_run", {"goal": "テスト"})
+        create_result = await mcp_server._dispatch_tool("create_task", {"title": "タスク"})
+        task_id = create_result["task_id"]
+
+        # Act
+        result = await mcp_server._dispatch_tool(
+            "report_progress", {"task_id": task_id, "progress": 50}
+        )
+
+        # Assert
+        assert result["status"] == "progressed"
+
+    @pytest.mark.asyncio
+    async def test_dispatch_complete_task(self, mcp_server):
+        """complete_task ツールをディスパッチする"""
+        # Arrange
+        await mcp_server._dispatch_tool("start_run", {"goal": "テスト"})
+        create_result = await mcp_server._dispatch_tool("create_task", {"title": "タスク"})
+        task_id = create_result["task_id"]
+
+        # Act
+        result = await mcp_server._dispatch_tool(
+            "complete_task", {"task_id": task_id, "result": "完了"}
+        )
+
+        # Assert
+        assert result["status"] == "completed"
+
+    @pytest.mark.asyncio
+    async def test_dispatch_fail_task(self, mcp_server):
+        """fail_task ツールをディスパッチする"""
+        # Arrange
+        await mcp_server._dispatch_tool("start_run", {"goal": "テスト"})
+        create_result = await mcp_server._dispatch_tool("create_task", {"title": "タスク"})
+        task_id = create_result["task_id"]
+
+        # Act
+        result = await mcp_server._dispatch_tool(
+            "fail_task", {"task_id": task_id, "error": "エラー"}
+        )
+
+        # Assert
+        assert result["status"] == "failed"
+
+    @pytest.mark.asyncio
+    async def test_dispatch_create_requirement(self, mcp_server):
+        """create_requirement ツールをディスパッチする"""
+        # Arrange
+        await mcp_server._dispatch_tool("start_run", {"goal": "テスト"})
+
+        # Act
+        result = await mcp_server._dispatch_tool("create_requirement", {"description": "確認事項"})
+
+        # Assert
+        assert result["status"] == "created"
+        assert "requirement_id" in result
+
+    @pytest.mark.asyncio
+    async def test_dispatch_get_lineage(self, mcp_server):
+        """get_lineage ツールをディスパッチする"""
+        # Arrange
+        start_result = await mcp_server._dispatch_tool("start_run", {"goal": "テスト"})
+        run_id = start_result["run_id"]
+        # イベントを取得
+        ar = mcp_server._get_ar()
+        events = list(ar.replay(run_id))
+        event_id = events[0].id  # Pydanticモデルなので属性アクセス
+
+        # Act
+        result = await mcp_server._dispatch_tool("get_lineage", {"event_id": event_id})
+
+        # Assert
+        assert "event_id" in result or "error" not in result
+
+    @pytest.mark.asyncio
+    async def test_dispatch_unknown_tool(self, mcp_server):
+        """未知のツールをディスパッチするとエラーを返す"""
+        # Act
+        result = await mcp_server._dispatch_tool("unknown_tool", {})
+
+        # Assert
+        assert "error" in result
+        assert "Unknown tool" in result["error"]
+
+
+class TestMCPToolDefinitions:
+    """MCP ツール定義のテスト"""
+
+    def test_get_tool_definitions_returns_list(self):
+        """get_tool_definitionsがToolのリストを返す"""
+        # Arrange
+        from hiveforge.mcp_server.tools import get_tool_definitions
+
+        # Act
+        tools = get_tool_definitions()
+
+        # Assert
+        assert isinstance(tools, list)
+        assert len(tools) > 0
+        for tool in tools:
+            assert hasattr(tool, "name")
+            assert hasattr(tool, "description")
+            assert hasattr(tool, "inputSchema")
+
+    def test_tool_definitions_include_required_tools(self):
+        """必須ツールが含まれている"""
+        # Arrange
+        from hiveforge.mcp_server.tools import get_tool_definitions
+
+        # Act
+        tools = get_tool_definitions()
+        tool_names = [t.name for t in tools]
+
+        # Assert
+        required_tools = [
+            "start_run",
+            "get_run_status",
+            "complete_run",
+            "create_task",
+            "complete_task",
+            "fail_task",
+            "heartbeat",
+            "emergency_stop",
+            "create_requirement",
+            "get_lineage",
+        ]
+        for required in required_tools:
+            assert required in tool_names, f"{required} should be in tool definitions"

@@ -8,11 +8,11 @@ import axios from "axios";
 import { HiveForgeClient } from "../client";
 
 describe("HiveForgeClient", () => {
-    let client: HiveForgeClient;
     let axiosStub: sinon.SinonStub;
 
     beforeEach(() => {
-        client = new HiveForgeClient("http://localhost:8000");
+        // クライアントインスタンスを作成してaxios.createが呼ばれることを確認
+        void new HiveForgeClient("http://localhost:8000");
         // axios.create が返すインスタンスをモック
         axiosStub = sinon.stub(axios, "create").returns({
             get: sinon.stub(),
@@ -28,7 +28,8 @@ describe("HiveForgeClient", () => {
     describe("constructor", () => {
         it("should create a client with the given server URL", () => {
             // Arrange & Act
-            const testClient = new HiveForgeClient("http://test:9000");
+            const _testClient = new HiveForgeClient("http://test:9000");
+            void _testClient; // 使用済みとしてマーク
 
             // Assert (constructor was called with correct URL)
             assert.ok(axiosStub.calledOnce);
