@@ -1,0 +1,13 @@
+services:
+  hiveforge-dev:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile.dev
+    volumes:
+      - ..:/workspace:cached
+      - hiveforge-venv:/workspace/.venv
+    command: sleep infinity
+    user: vscode
+
+volumes:
+  hiveforge-venv:
