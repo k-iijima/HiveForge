@@ -122,7 +122,7 @@ async function startRun() {
 }
 
 async function viewEvents(runId: string) {
-    eventsProvider.setRunId(runId);
+    client.setCurrentRunId(runId);
     eventsProvider.refresh();
 }
 
@@ -137,8 +137,8 @@ async function approveRequirement(requirementId: string) {
 }
 
 async function selectRun(runId: string) {
-    tasksProvider.setRunId(runId);
-    eventsProvider.setRunId(runId);
+    client.setCurrentRunId(runId);
     tasksProvider.refresh();
     eventsProvider.refresh();
+    requirementsProvider.refresh();
 }

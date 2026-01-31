@@ -9,13 +9,13 @@ RUN groupadd --gid $USER_GID $USERNAME \
     && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
-        git \
-        curl \
-        sudo \
-        make \
-        jq \
-        ca-certificates \
-        gnupg \
+    git \
+    curl \
+    sudo \
+    make \
+    jq \
+    ca-certificates \
+    gnupg \
     && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
     && chmod 0440 /etc/sudoers.d/$USERNAME \
     && apt-get clean \
@@ -28,8 +28,8 @@ RUN install -m 0755 -d /etc/apt/keyrings \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian bookworm stable" > /etc/apt/sources.list.d/docker.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
-        docker-ce-cli \
-        docker-compose-plugin \
+    docker-ce-cli \
+    docker-compose-plugin \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -39,6 +39,12 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | d
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends gh \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Node.jsのインストール（VS Code拡張開発用）
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
