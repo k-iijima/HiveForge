@@ -1,0 +1,34 @@
+# HiveForge 設定ファイル
+# 詳細はドキュメントを参照
+
+hive:
+  name: "poc-project"
+  vault_path: "./Vault"
+
+governance:
+  max_retries: 3
+  max_oscillations: 5
+  max_concurrent_tasks: 10
+  task_timeout_seconds: 300
+  heartbeat_interval_seconds: 30
+  approval_timeout_hours: 24
+  archive_after_days: 7
+
+llm:
+  provider: "openai"
+  model: "gpt-4o"
+  api_key_env: "OPENAI_API_KEY"
+  max_tokens: 4096
+  temperature: 0.2
+
+auth:
+  enabled: false
+  api_key_env: "HIVEFORGE_API_KEY"
+
+server:
+  host: "0.0.0.0"
+  port: 8000
+
+logging:
+  level: "INFO"
+  events_max_file_size_mb: 100

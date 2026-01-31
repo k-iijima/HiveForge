@@ -1,0 +1,103 @@
+{
+  "name": "hiveforge-dashboard",
+  "displayName": "HiveForge Dashboard",
+  "description": "HiveForge 自律型ソフトウェア組立システムのダッシュボード",
+  "version": "0.1.0",
+  "publisher": "hiveforge",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "hiveforge.showDashboard",
+        "title": "HiveForge: ダッシュボードを表示"
+      },
+      {
+        "command": "hiveforge.startRun",
+        "title": "HiveForge: 新しいRunを開始"
+      },
+      {
+        "command": "hiveforge.viewEvents",
+        "title": "HiveForge: イベントログを表示"
+      },
+      {
+        "command": "hiveforge.approveRequirement",
+        "title": "HiveForge: 要件を承認"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "hiveforge",
+          "title": "HiveForge",
+          "icon": "resources/hive-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "hiveforge": [
+        {
+          "id": "hiveforge.runs",
+          "name": "Runs"
+        },
+        {
+          "id": "hiveforge.tasks",
+          "name": "Tasks"
+        },
+        {
+          "id": "hiveforge.requirements",
+          "name": "要件確認"
+        },
+        {
+          "id": "hiveforge.events",
+          "name": "イベントログ"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "HiveForge",
+      "properties": {
+        "hiveforge.serverUrl": {
+          "type": "string",
+          "default": "http://localhost:8000",
+          "description": "HiveForge APIサーバーのURL"
+        },
+        "hiveforge.autoRefresh": {
+          "type": "boolean",
+          "default": true,
+          "description": "ダッシュボードを自動更新"
+        },
+        "hiveforge.refreshInterval": {
+          "type": "number",
+          "default": 5000,
+          "description": "自動更新の間隔（ミリ秒）"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "eslint": "^8.54.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "axios": "^1.6.0"
+  }
+}
