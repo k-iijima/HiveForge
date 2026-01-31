@@ -45,6 +45,87 @@ class AkashicRecord:
         """イベントファイルパスを取得"""
         return self._get_run_dir(run_id) / "events.jsonl"
 
+    @staticmethod
+    def _decode_utf8_safe(data: bytes) -> str:
+        """UTF-8バイト列を安全にデコード
+
+        ファイルの途中からバイナリで読み込んだ場合、先頭がUTF-8マルチバイト文字の
+        途中になっている可能性がある。その場合は先頭の不完全なバイトをスキップする。
+
+        Args:
+            data: UTF-8でエンコードされたバイト列（先頭が不完全な可能性あり）
+
+        Returns:
+            デコードされた文字列
+        """
+        # 先頭の継続バイト(10xxxxxx = 0x80-0xBF)をスキップ
+        start = 0
+        while start < len(data) and 0x80 <= data[start] <= 0xBF:
+            start += 1
+
+        # スキップ後にデコード
+        return data[start:].decode("utf-8", errors="replace")
+
+    def _find_last_hash_from_tail(
+        self, f, file_size: int, initial_chunk_size: int = 8192
+    ) -> str | None:
+        """ファイル末尾から最後のイベントのハッシュを取得
+
+        完全なJSONL行が見つかるまでチャンクサイズを拡張しながら読み込む。
+        これにより、非常に長い行（10KB超のペイロードを含むイベント）でも
+        正しくprev_hashを取得できる。
+
+        Args:
+            f: ファイルオブジェクト（バイナリモード）
+            file_size: ファイルサイズ
+            initial_chunk_size: 初期チャンクサイズ
+
+        Returns:
+            最後のイベントのハッシュ、または取得できない場合はNone
+        """
+        chunk_size = initial_chunk_size
+        max_chunk_size = min(file_size, 1024 * 1024)  # 最大1MB
+
+        while chunk_size <= max_chunk_size:
+            f.seek(max(0, file_size - chunk_size))
+            chunk_bytes = f.read()
+
+            # UTF-8としてデコード（先頭の不完全なマルチバイト文字はスキップ）
+            chunk = self._decode_utf8_safe(chunk_bytes)
+            lines = chunk.strip().split("\n")
+
+            # 末尾の非空行を探してパースを試みる
+            for line in reversed(lines):
+                line = line.strip()
+                if line:
+                    try:
+                        last_event = parse_event(line)
+                        return last_event.hash
+                    except Exception:
+                        # パースに失敗した場合、行が不完全な可能性がある
+                        # チャンクサイズを拡張して再試行
+                        break
+
+            # チャンクサイズを2倍に拡張
+            chunk_size *= 2
+
+        # 最終手段：ファイル全体を読み込む
+        if chunk_size > max_chunk_size and file_size > 0:
+            f.seek(0)
+            chunk_bytes = f.read()
+            chunk = chunk_bytes.decode("utf-8")
+            lines = chunk.strip().split("\n")
+
+            for line in reversed(lines):
+                line = line.strip()
+                if line:
+                    try:
+                        return parse_event(line).hash
+                    except Exception:
+                        pass
+
+        return None
+
     def append(self, event: BaseEvent, run_id: str | None = None) -> BaseEvent:
         """イベントを追記
 
@@ -66,7 +147,10 @@ class AkashicRecord:
 
         # ファイルロック付きで「末尾ハッシュ取得 → 追記」をアトミックに実行
         # これにより再起動や複数プロセスでも prev_hash の整合性を保証
-        with portalocker.Lock(events_file, mode="a+", encoding="utf-8", timeout=10) as f:
+        #
+        # 注意: バイナリモード(a+b)で開く必要がある。テキストモードでseek()すると
+        # UTF-8マルチバイト文字の途中にシークしてしまいUnicodeDecodeErrorが発生する。
+        with portalocker.Lock(events_file, mode="a+b", timeout=10) as f:
             # ファイル末尾から最後のイベントのハッシュを取得（末尾行のみ読む）
             f.seek(0, 2)  # ファイル末尾へ
             file_size = f.tell()
@@ -74,20 +158,8 @@ class AkashicRecord:
 
             if file_size > 0:
                 # 末尾からブロックを読んで最後の行を取得
-                chunk_size = min(4096, file_size)
-                f.seek(max(0, file_size - chunk_size))
-                chunk = f.read()
-                lines = chunk.strip().split("\n")
-                # 末尾の非空行を探す
-                for line in reversed(lines):
-                    line = line.strip()
-                    if line:
-                        try:
-                            last_event = parse_event(line)
-                            last_hash = last_event.hash
-                        except Exception:
-                            pass  # 不正な行はスキップ
-                        break
+                # 完全なJSONL行が取得できるまでチャンクサイズを拡張
+                last_hash = self._find_last_hash_from_tail(f, file_size)
 
             # prev_hashを設定した新しいイベントを作成（イミュータブルなので再作成）
             event_dict = event.model_dump()
@@ -97,7 +169,7 @@ class AkashicRecord:
 
             # 末尾に追記
             f.seek(0, 2)  # ファイル末尾へ移動
-            f.write(updated_event.to_jsonl() + "\n")
+            f.write((updated_event.to_jsonl() + "\n").encode("utf-8"))
 
         # キャッシュも更新（同一インスタンス内の最適化用）
         self._last_hash = updated_event.hash

@@ -8,6 +8,7 @@ from hiveforge.core.events import (
     RunStartedEvent,
     TaskCreatedEvent,
     TaskCompletedEvent,
+    parse_event,
 )
 
 
@@ -324,3 +325,330 @@ class TestAkashicRecordEdgeCases:
         # カウント
         count = ar.count_events(run_id)
         assert count == 3  # 空行は無視される
+
+    def test_append_with_japanese_multibyte_characters(self, temp_vault):
+        """日本語マルチバイト文字を含むイベントの追記とリプレイ
+
+        UTF-8マルチバイト文字（日本語）を含むpayloadでも正しく
+        追記・リプレイできることを確認。ファイル途中からの読み込みで
+        文字境界の問題が発生しないことを検証する。
+        """
+        # Arrange: 日本語を含むイベントを準備
+        ar = AkashicRecord(temp_vault)
+        run_id = "test-run-japanese"
+
+        japanese_goals = [
+            "テスト目標その1：日本語のテスト",
+            "セキュリティパッチを適用します。一時的にサービスが停止する可能性があります。",
+            "データベースのマイグレーションを実行します。既存データに影響がある可能性があります。",
+        ]
+
+        # Act: 複数の日本語イベントを追記
+        for i, goal in enumerate(japanese_goals):
+            event = TaskCreatedEvent(
+                run_id=run_id,
+                task_id=f"task-{i:03d}",
+                payload={"title": goal, "description": f"説明：{goal}"},
+            )
+            ar.append(event, run_id)
+
+        # Assert: リプレイで正しく取得できる
+        events = list(ar.replay(run_id))
+        assert len(events) == 3
+
+        for i, event in enumerate(events):
+            assert event.payload["title"] == japanese_goals[i]
+            assert event.payload["description"] == f"説明：{japanese_goals[i]}"
+
+        # チェーンも正しく構築されている
+        valid, error = ar.verify_chain(run_id)
+        assert valid is True
+        assert error is None
+
+    def test_decode_utf8_safe_skips_continuation_bytes(self, temp_vault):
+        """_decode_utf8_safeがUTF-8継続バイトを正しくスキップする
+
+        ファイル途中から読み込んだ場合、先頭がUTF-8マルチバイト文字の
+        途中（継続バイト 0x80-0xBF）になる可能性がある。
+        このメソッドはそれらをスキップして安全にデコードする。
+        """
+        # Arrange: 継続バイトが先頭にあるバイト列を準備
+        ar = AkashicRecord(temp_vault)
+
+        # "日本語" のUTF-8表現: \xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e
+        # 途中から読んだ場合（例：\xa5から）をシミュレート
+        incomplete_start = b"\xa5\xe6\x9c\xac\xe8\xaa\x9e test"  # \xa5は継続バイト
+
+        # Act: 安全にデコード
+        result = ar._decode_utf8_safe(incomplete_start)
+
+        # Assert: 継続バイトがスキップされ、残りがデコードされる
+        assert "test" in result
+        # 先頭の不完全な部分はスキップまたは置換される
+        assert "\ufffd" not in result or result.endswith("test")
+
+    def test_decode_utf8_safe_handles_valid_utf8(self, temp_vault):
+        """_decode_utf8_safeが正常なUTF-8を正しくデコードする"""
+        # Arrange
+        ar = AkashicRecord(temp_vault)
+        valid_utf8 = "日本語テスト".encode("utf-8")
+
+        # Act
+        result = ar._decode_utf8_safe(valid_utf8)
+
+        # Assert
+        assert result == "日本語テスト"
+
+    def test_decode_utf8_safe_handles_empty_bytes(self, temp_vault):
+        """_decode_utf8_safeが空バイト列を処理できる"""
+        # Arrange
+        ar = AkashicRecord(temp_vault)
+
+        # Act
+        result = ar._decode_utf8_safe(b"")
+
+        # Assert
+        assert result == ""
+
+    def test_append_creates_correct_prev_hash_chain_with_multibyte(self, temp_vault):
+        """マルチバイト文字を含むファイルでprev_hashチェーンが正しく構築される
+
+        ファイル末尾から読み込んでprev_hashを取得する際、UTF-8文字境界の
+        問題が発生してもチェーンが正しく構築されることを検証する。
+        """
+        # Arrange: 大量の日本語イベントを追記
+        ar = AkashicRecord(temp_vault)
+        run_id = "test-run-chain-multibyte"
+
+        # Act: 十分な量のイベントを追記してファイルサイズを大きくする
+        for i in range(20):
+            long_text = f"これは長い日本語テキストです。タスク番号{i}の説明文。" * 5
+            event = TaskCreatedEvent(
+                run_id=run_id,
+                task_id=f"task-{i:03d}",
+                payload={"title": f"タスク{i}", "description": long_text},
+            )
+            ar.append(event, run_id)
+
+        # Assert: チェーンが正しく構築されている
+        events = list(ar.replay(run_id))
+        assert len(events) == 20
+
+        # prev_hashチェーンを検証
+        for i in range(1, len(events)):
+            assert events[i].prev_hash == events[i - 1].hash
+
+        # チェーン全体の検証
+        valid, error = ar.verify_chain(run_id)
+        assert valid is True
+        assert error is None
+
+
+class TestAkashicRecordMultibyteOperations:
+    """マルチバイト文字を含む操作の包括的テスト
+
+    UTF-8マルチバイト文字（日本語、中国語、絵文字など）を含むイベントが
+    全てのAkashicRecord操作で正しく処理されることを検証する。
+    """
+
+    def test_replay_with_japanese_events(self, temp_vault):
+        """replay()が日本語を含むイベントを正しくリプレイする"""
+        # Arrange
+        ar = AkashicRecord(temp_vault)
+        run_id = "test-replay-japanese"
+        japanese_texts = [
+            "日本語テスト",
+            "セキュリティパッチを適用します",
+            "データベースマイグレーション実行中",
+        ]
+
+        for i, text in enumerate(japanese_texts):
+            event = TaskCreatedEvent(
+                run_id=run_id,
+                task_id=f"task-{i}",
+                payload={"title": text},
+            )
+            ar.append(event, run_id)
+
+        # Act
+        events = list(ar.replay(run_id))
+
+        # Assert
+        assert len(events) == 3
+        for i, event in enumerate(events):
+            assert event.payload["title"] == japanese_texts[i]
+
+    def test_get_last_event_with_japanese(self, temp_vault):
+        """get_last_event()が日本語を含む最終イベントを正しく取得する"""
+        # Arrange
+        ar = AkashicRecord(temp_vault)
+        run_id = "test-last-japanese"
+        final_text = "最終タスク：本番環境へのデプロイ完了"
+
+        for i in range(5):
+            event = TaskCreatedEvent(
+                run_id=run_id,
+                task_id=f"task-{i}",
+                payload={"title": f"タスク{i}" if i < 4 else final_text},
+            )
+            ar.append(event, run_id)
+
+        # Act
+        last_event = ar.get_last_event(run_id)
+
+        # Assert
+        assert last_event is not None
+        assert last_event.payload["title"] == final_text
+
+    def test_export_run_with_japanese(self, temp_vault):
+        """export_run()が日本語を含むイベントを正しくエクスポートする"""
+        # Arrange
+        ar = AkashicRecord(temp_vault)
+        run_id = "test-export-japanese"
+        japanese_titles = ["タスクA", "タスクB：データベース更新", "タスクC：完了"]
+
+        for i, title in enumerate(japanese_titles):
+            event = TaskCreatedEvent(
+                run_id=run_id,
+                task_id=f"task-{i}",
+                payload={"title": title},
+            )
+            ar.append(event, run_id)
+
+        # Act
+        output_path = temp_vault / "export_japanese.jsonl"
+        count = ar.export_run(run_id, output_path)
+
+        # Assert
+        assert count == 3
+        with open(output_path, encoding="utf-8") as f:
+            exported_lines = [line.strip() for line in f if line.strip()]
+
+        assert len(exported_lines) == 3
+        for i, line in enumerate(exported_lines):
+            event = parse_event(line)
+            assert event.payload["title"] == japanese_titles[i]
+
+    def test_count_events_with_japanese(self, temp_vault):
+        """count_events()が日本語を含むイベントを正しくカウントする"""
+        # Arrange
+        ar = AkashicRecord(temp_vault)
+        run_id = "test-count-japanese"
+
+        for i in range(7):
+            event = TaskCreatedEvent(
+                run_id=run_id,
+                task_id=f"task-{i}",
+                payload={"title": f"日本語タスク番号{i}"},
+            )
+            ar.append(event, run_id)
+
+        # Act
+        count = ar.count_events(run_id)
+
+        # Assert
+        assert count == 7
+
+    def test_verify_chain_with_japanese(self, temp_vault):
+        """verify_chain()が日本語を含むイベントチェーンを正しく検証する"""
+        # Arrange
+        ar = AkashicRecord(temp_vault)
+        run_id = "test-verify-japanese"
+
+        for i in range(10):
+            event = TaskCreatedEvent(
+                run_id=run_id,
+                task_id=f"task-{i}",
+                payload={"title": f"日本語タスク{i}", "description": "詳細説明" * 10},
+            )
+            ar.append(event, run_id)
+
+        # Act
+        valid, error = ar.verify_chain(run_id)
+
+        # Assert
+        assert valid is True
+        assert error is None
+
+    def test_mixed_language_events(self, temp_vault):
+        """複数言語（日本語、英語、中国語、絵文字）を含むイベントの処理"""
+        # Arrange
+        ar = AkashicRecord(temp_vault)
+        run_id = "test-mixed-languages"
+        mixed_texts = [
+            "English text",
+            "日本語テキスト",
+            "中文文本",
+            "Emoji 🚀🎉✨",
+            "Mixed: Hello世界🌍",
+        ]
+
+        for i, text in enumerate(mixed_texts):
+            event = TaskCreatedEvent(
+                run_id=run_id,
+                task_id=f"task-{i}",
+                payload={"title": text},
+            )
+            ar.append(event, run_id)
+
+        # Act
+        events = list(ar.replay(run_id))
+        last_event = ar.get_last_event(run_id)
+
+        # Assert
+        assert len(events) == 5
+        for i, event in enumerate(events):
+            assert event.payload["title"] == mixed_texts[i]
+        assert last_event.payload["title"] == "Mixed: Hello世界🌍"
+
+    def test_very_long_japanese_text(self, temp_vault):
+        """非常に長い日本語テキストを含むイベントの処理
+
+        チャンクサイズ(8192バイト)を超える長いテキストでも正しく処理されることを検証。
+        """
+        # Arrange
+        ar = AkashicRecord(temp_vault)
+        run_id = "test-long-japanese"
+
+        # 約10KB以上の日本語テキストを生成
+        long_text = "これは非常に長い日本語テキストです。" * 500
+
+        event = TaskCreatedEvent(
+            run_id=run_id,
+            task_id="task-long",
+            payload={"title": "長文タスク", "description": long_text},
+        )
+        ar.append(event, run_id)
+
+        # 追加イベントを追記（prev_hash取得時にチャンク読み込みが発生）
+        event2 = TaskCreatedEvent(
+            run_id=run_id,
+            task_id="task-after-long",
+            payload={"title": "長文後のタスク"},
+        )
+        ar.append(event2, run_id)
+
+        # Act
+        events = list(ar.replay(run_id))
+
+        # Assert
+        assert len(events) == 2
+        assert events[0].payload["description"] == long_text
+        assert events[1].prev_hash == events[0].hash
+
+    def test_decode_utf8_safe_with_various_continuation_bytes(self, temp_vault):
+        """_decode_utf8_safeが様々なUTF-8継続バイトパターンを処理する"""
+        ar = AkashicRecord(temp_vault)
+
+        # テストケース: 様々な不完全なUTF-8シーケンス
+        test_cases = [
+            # (入力バイト列, 期待される部分文字列)
+            (b"\x80\x81\x82hello", "hello"),  # 複数の継続バイト
+            (b"\xbfworld", "world"),  # 継続バイトの最大値
+            (b"normal text", "normal text"),  # 正常なASCII
+            (b"\xe6\x97\xa5\xe6\x9c\xac", "日本"),  # 完全なUTF-8
+        ]
+
+        for input_bytes, expected_substring in test_cases:
+            result = ar._decode_utf8_safe(input_bytes)
+            assert expected_substring in result, f"Failed for {input_bytes!r}"
