@@ -22,24 +22,39 @@
 > **カバレッジを通すことが目的ではない。そのパスが通る前提や状況を明らかにし、挙動を明確にすることが目的である。**
 
 各テストケースには以下を明記する：
-- **前提条件 (Given)**: どのような状態・データが存在するか
-- **操作 (When)**: 何をしたときに
-- **期待結果 (Then)**: どうなるべきか
+- **前提条件 (Arrange)**: どのような状態・データが存在するか
+- **操作 (Act)**: 何をしたときに
+- **期待結果 (Assert)**: どうなるべきか
+
+### AAAパターン (Arrange-Act-Assert)
+
+テストは**AAAパターン**で構造化し、各セクションをコメントで明示する：
 
 ```python
-# 良いテストの例
 def test_event_hash_excludes_hash_field():
     """hashフィールド自体はハッシュ計算から除外される
     
-    前提: hashフィールドを含むデータと含まないデータがある
-    操作: 両方のハッシュを計算する
-    期待: hashフィールドの有無に関わらず同じハッシュになる
+    hashフィールドを含むデータと含まないデータで同じハッシュが得られることを確認。
+    これにより、イベントのハッシュ値をイベント自体に含めても循環参照を避けられる。
     """
+    # Arrange: hashフィールドの有無が異なる2つのデータを用意
     data_without_hash = {"type": "test", "value": 1}
     data_with_hash = {"type": "test", "value": 1, "hash": "ignored"}
     
-    assert compute_hash(data_without_hash) == compute_hash(data_with_hash)
+    # Act: 両方のハッシュを計算
+    hash_without = compute_hash(data_without_hash)
+    hash_with = compute_hash(data_with_hash)
+    
+    # Assert: hashフィールドの有無に関わらず同じハッシュになる
+    assert hash_without == hash_with
 ```
+
+### テストの可読性ガイドライン
+
+1. **docstringで目的を説明**: テストが何を検証するのか、なぜ重要なのかを記述
+2. **Arrange/Act/Assertをコメントで明示**: 各セクションの境界を明確に
+3. **変数名は意図を表現**: `data1`, `data2`ではなく`data_without_hash`, `data_with_hash`
+4. **1テスト1検証**: 1つのテストで1つの振る舞いのみを検証
 
 ### 2. 細かいコミット
 

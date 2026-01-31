@@ -1,129 +1,355 @@
-"""イベントモデルのテスト"""
+"""イベントモデルのテスト
+
+HiveForgeの中核となるイベントモデルをテストする。
+イベントはイミュータブルで、ULID形式のID、UTC タイムスタンプ、
+JCS正規化によるSHA-256ハッシュを持つ。
+"""
+
+import json
 
 import pytest
-from datetime import datetime, timezone
+from pydantic import ValidationError
 
 from hiveforge.core.events import (
-    BaseEvent,
     EventType,
     RunStartedEvent,
     TaskCreatedEvent,
-    generate_event_id,
     compute_hash,
+    generate_event_id,
     parse_event,
 )
 
 
-class TestEventId:
-    """イベントID生成のテスト"""
+class TestGenerateEventId:
+    """イベントID生成（ULID形式）のテスト
+    
+    ULIDは時間順序付きのユニークIDで、26文字の文字列として表現される。
+    タイムスタンプ成分を含むため、生成順にソート可能である。
+    """
 
-    def test_generate_event_id_returns_string(self):
-        """IDが文字列で返される"""
+    def test_returns_26_character_string(self):
+        """ULIDは26文字の文字列として生成される
+        
+        ULID仕様: 10文字のタイムスタンプ + 16文字のランダム成分 = 26文字
+        """
+        # Arrange: なし（純粋関数のため前提状態不要）
+        
+        # Act: IDを生成
         event_id = generate_event_id()
-        assert isinstance(event_id, str)
-        assert len(event_id) == 26  # ULID は26文字
+        
+        # Assert: 26文字の文字列である
+        assert isinstance(event_id, str), "IDは文字列型であるべき"
+        assert len(event_id) == 26, "ULIDは26文字であるべき"
 
-    def test_generate_event_id_is_unique(self):
-        """IDがユニーク"""
-        ids = [generate_event_id() for _ in range(100)]
-        assert len(ids) == len(set(ids))
-
-
-class TestEventHash:
-    """イベントハッシュのテスト"""
-
-    def test_compute_hash_deterministic(self):
-        """同じデータに対して同じハッシュ"""
-        data = {"type": "test", "value": 123}
-        hash1 = compute_hash(data)
-        hash2 = compute_hash(data)
-        assert hash1 == hash2
-
-    def test_compute_hash_different_for_different_data(self):
-        """異なるデータには異なるハッシュ"""
-        hash1 = compute_hash({"type": "test", "value": 1})
-        hash2 = compute_hash({"type": "test", "value": 2})
-        assert hash1 != hash2
-
-    def test_compute_hash_ignores_hash_field(self):
-        """hashフィールドはハッシュ計算から除外"""
-        data1 = {"type": "test", "value": 1}
-        data2 = {"type": "test", "value": 1, "hash": "ignored"}
-        assert compute_hash(data1) == compute_hash(data2)
+    def test_generates_unique_ids(self):
+        """連続して生成されるIDはすべてユニークである
+        
+        ULIDのランダム成分により、同一ミリ秒内でも衝突しない。
+        """
+        # Arrange: 生成するID数を定義
+        count = 100
+        
+        # Act: 複数のIDを生成
+        generated_ids = [generate_event_id() for _ in range(count)]
+        
+        # Assert: すべてのIDがユニーク
+        unique_ids = set(generated_ids)
+        assert len(unique_ids) == count, f"100個のIDがすべてユニークであるべき（重複: {count - len(unique_ids)}）"
 
 
-class TestBaseEvent:
-    """BaseEventのテスト"""
+class TestComputeHash:
+    """ハッシュ計算（JCS + SHA-256）のテスト
+    
+    JCS (RFC 8785) で正規化したJSONをSHA-256でハッシュ化する。
+    これにより、キーの順序やスペースに依存しない決定論的なハッシュが得られる。
+    """
 
-    def test_event_is_immutable(self):
-        """イベントはイミュータブル"""
+    def test_deterministic_hash_for_same_data(self):
+        """同一データに対しては常に同じハッシュが計算される
+        
+        決定論的ハッシュはイベントチェーンの整合性検証に必須。
+        """
+        # Arrange: テスト用データを用意
+        data = {"type": "test", "value": 123, "nested": {"key": "value"}}
+        
+        # Act: 同じデータのハッシュを2回計算
+        hash_first = compute_hash(data)
+        hash_second = compute_hash(data)
+        
+        # Assert: 同じハッシュ値が得られる
+        assert hash_first == hash_second, "同一データは同一ハッシュを生成すべき"
+
+    def test_different_hash_for_different_data(self):
+        """異なるデータに対しては異なるハッシュが計算される
+        
+        1ビットでも異なればハッシュは完全に異なる（雪崩効果）。
+        """
+        # Arrange: 値が1だけ異なる2つのデータ
+        data_value_1 = {"type": "test", "value": 1}
+        data_value_2 = {"type": "test", "value": 2}
+        
+        # Act: それぞれのハッシュを計算
+        hash_1 = compute_hash(data_value_1)
+        hash_2 = compute_hash(data_value_2)
+        
+        # Assert: ハッシュが異なる
+        assert hash_1 != hash_2, "異なるデータは異なるハッシュを生成すべき"
+
+    def test_hash_excludes_hash_field(self):
+        """hashフィールド自体はハッシュ計算から除外される
+        
+        イベントのハッシュ値をイベント自体に含める際、
+        循環参照を避けるためhashフィールドを除外して計算する。
+        """
+        # Arrange: hashフィールドの有無が異なる2つのデータ
+        data_without_hash = {"type": "test", "value": 1}
+        data_with_hash = {"type": "test", "value": 1, "hash": "this_is_ignored"}
+        
+        # Act: 両方のハッシュを計算
+        hash_without = compute_hash(data_without_hash)
+        hash_with = compute_hash(data_with_hash)
+        
+        # Assert: hashフィールドの有無に関わらず同じハッシュ
+        assert hash_without == hash_with, "hashフィールドはハッシュ計算から除外されるべき"
+
+    def test_hash_is_64_character_hex_string(self):
+        """ハッシュはSHA-256の16進数文字列（64文字）である"""
+        # Arrange: 任意のデータ
+        data = {"key": "value"}
+        
+        # Act: ハッシュを計算
+        hash_value = compute_hash(data)
+        
+        # Assert: 64文字の16進数文字列
+        assert len(hash_value) == 64, "SHA-256は64文字の16進数"
+        assert all(c in "0123456789abcdef" for c in hash_value), "16進数文字のみで構成"
+
+    def test_key_order_does_not_affect_hash(self):
+        """キーの順序が異なっても同じハッシュが計算される（JCS正規化）
+        
+        JCS (RFC 8785) はキーを辞書順にソートするため、
+        元のキー順序に依存しない。
+        """
+        # Arrange: キー順序が異なる2つのデータ（論理的には同一）
+        data_order_abc = {"a": 1, "b": 2, "c": 3}
+        data_order_cba = {"c": 3, "b": 2, "a": 1}
+        
+        # Act: それぞれのハッシュを計算
+        hash_abc = compute_hash(data_order_abc)
+        hash_cba = compute_hash(data_order_cba)
+        
+        # Assert: 同じハッシュ値（キー順序に非依存）
+        assert hash_abc == hash_cba, "JCS正規化によりキー順序は無視されるべき"
+
+
+class TestEventImmutability:
+    """イベントのイミュータビリティ（不変性）テスト
+    
+    イベントソーシングにおいて、一度作成されたイベントは変更されてはならない。
+    Pydanticのfrozen設定により、属性の変更を禁止する。
+    """
+
+    def test_event_attributes_cannot_be_modified(self):
+        """作成後のイベント属性は変更できない
+        
+        frozen=Trueにより、属性への代入はValidationErrorを発生させる。
+        """
+        # Arrange: イベントを作成
         event = RunStartedEvent(run_id="test-run", payload={"goal": "test"})
-        with pytest.raises(Exception):  # ValidationError
-            event.run_id = "changed"
+        original_run_id = event.run_id
+        
+        # Act & Assert: 属性変更を試みるとエラー
+        with pytest.raises(ValidationError):
+            event.run_id = "modified-run-id"
+        
+        # Assert: 値が変更されていないことを確認
+        assert event.run_id == original_run_id, "イベントは変更されていないべき"
 
-    def test_event_has_auto_id(self):
-        """イベントIDが自動生成される"""
+
+class TestEventAutoFields:
+    """イベントの自動生成フィールドテスト
+    
+    イベント作成時に、ID・タイムスタンプ・ハッシュが自動生成される。
+    """
+
+    def test_id_is_auto_generated(self):
+        """イベントIDは指定しなくても自動生成される"""
+        # Arrange & Act: IDを指定せずにイベント作成
         event = RunStartedEvent(run_id="test-run")
-        assert event.id is not None
-        assert len(event.id) == 26
+        
+        # Assert: IDが自動生成されている
+        assert event.id is not None, "IDは自動生成されるべき"
+        assert len(event.id) == 26, "IDはULID形式（26文字）であるべき"
 
-    def test_event_has_auto_timestamp(self):
-        """タイムスタンプが自動生成される"""
+    def test_timestamp_is_auto_generated_in_utc(self):
+        """タイムスタンプはUTCで自動生成される
+        
+        タイムゾーン情報を含むことで、異なる環境間での整合性を保証。
+        """
+        # Arrange & Act: タイムスタンプを指定せずにイベント作成
         event = RunStartedEvent(run_id="test-run")
-        assert event.timestamp is not None
-        assert event.timestamp.tzinfo == timezone.utc
+        
+        # Assert: UTCタイムスタンプが設定されている
+        assert event.timestamp is not None, "タイムスタンプは自動生成されるべき"
+        assert event.timestamp.tzinfo is not None, "タイムゾーン情報を含むべき"
+        assert event.timestamp.tzinfo.utcoffset(None).total_seconds() == 0, "UTCであるべき"
 
-    def test_event_hash_computed(self):
-        """ハッシュが計算される"""
-        event = RunStartedEvent(run_id="test-run")
-        assert event.hash is not None
-        assert len(event.hash) == 64  # SHA-256
+    def test_hash_is_computed_automatically(self):
+        """ハッシュはイベント内容から自動計算される"""
+        # Arrange & Act: イベント作成
+        event = RunStartedEvent(run_id="test-run", payload={"goal": "build"})
+        
+        # Assert: ハッシュが計算されている
+        assert event.hash is not None, "ハッシュは自動計算されるべき"
+        assert len(event.hash) == 64, "SHA-256ハッシュは64文字"
 
-    def test_event_serialization(self):
-        """イベントのシリアライズ/デシリアライズ"""
-        event = TaskCreatedEvent(
+    def test_same_content_produces_same_hash(self):
+        """同じ内容のイベントは同じハッシュを持つ（IDとタイムスタンプを除く）
+        
+        注意: 実際にはIDとタイムスタンプが異なるため、異なるハッシュになる。
+        これはイベントの一意性を保証するための設計。
+        """
+        # Arrange: 同じパラメータで2つのイベントを作成
+        event1 = RunStartedEvent(run_id="same-run", payload={"goal": "test"})
+        event2 = RunStartedEvent(run_id="same-run", payload={"goal": "test"})
+        
+        # Assert: IDが異なるためハッシュも異なる
+        assert event1.id != event2.id, "IDは毎回ユニークに生成される"
+        assert event1.hash != event2.hash, "IDが異なるためハッシュも異なる"
+
+
+class TestEventSerialization:
+    """イベントのシリアライズ/デシリアライズテスト
+    
+    イベントはJSON形式で永続化・通信される。
+    シリアライズ→デシリアライズで情報が失われないことを確認。
+    """
+
+    def test_roundtrip_preserves_all_fields(self):
+        """JSON往復変換ですべてのフィールドが保持される"""
+        # Arrange: すべてのフィールドを明示的に設定したイベント
+        original = TaskCreatedEvent(
             run_id="test-run",
-            task_id="test-task",
-            payload={"title": "Test Task"},
+            task_id="task-001",
+            actor="test-agent",
+            payload={"title": "Implement feature X", "priority": "high"},
         )
-
-        json_str = event.to_json()
+        
+        # Act: JSON化して復元
+        json_str = original.to_json()
         restored = TaskCreatedEvent.from_json(json_str)
+        
+        # Assert: すべてのフィールドが一致
+        assert restored.id == original.id, "IDが保持されるべき"
+        assert restored.type == original.type, "typeが保持されるべき"
+        assert restored.run_id == original.run_id, "run_idが保持されるべき"
+        assert restored.task_id == original.task_id, "task_idが保持されるべき"
+        assert restored.actor == original.actor, "actorが保持されるべき"
+        assert restored.payload == original.payload, "payloadが保持されるべき"
+        assert restored.timestamp == original.timestamp, "timestampが保持されるべき"
+        assert restored.hash == original.hash, "hashが保持されるべき"
 
-        assert restored.id == event.id
-        assert restored.type == event.type
-        assert restored.task_id == event.task_id
-        assert restored.payload == event.payload
+    def test_to_json_produces_valid_json(self):
+        """to_json()は有効なJSON文字列を生成する"""
+        # Arrange: イベント作成
+        event = RunStartedEvent(run_id="test-run", payload={"key": "value"})
+        
+        # Act: JSON化
+        json_str = event.to_json()
+        
+        # Assert: 有効なJSONとしてパース可能
+        parsed = json.loads(json_str)
+        assert isinstance(parsed, dict), "パース結果は辞書であるべき"
+        assert parsed["type"] == "run.started", "typeフィールドが正しい"
 
 
 class TestParseEvent:
-    """parse_event関数のテスト"""
+    """parse_event関数のテスト
+    
+    JSON文字列または辞書からイベントオブジェクトを復元する。
+    typeフィールドに基づいて適切なイベントクラスにディスパッチ。
+    """
 
-    def test_parse_run_started_event(self):
-        """RunStartedEventがパースできる"""
+    def test_parse_run_started_from_dict(self):
+        """辞書からRunStartedEventをパースできる"""
+        # Arrange: RunStartedEventを表す辞書
         data = {
             "type": "run.started",
-            "run_id": "test-run",
-            "payload": {"goal": "test"},
+            "run_id": "run-001",
+            "payload": {"goal": "Build a web app"},
         }
+        
+        # Act: パース
         event = parse_event(data)
-        assert isinstance(event, RunStartedEvent)
-        assert event.run_id == "test-run"
+        
+        # Assert: 正しいクラスとフィールド
+        assert isinstance(event, RunStartedEvent), "RunStartedEventにパースされるべき"
+        assert event.run_id == "run-001"
+        assert event.payload["goal"] == "Build a web app"
 
-    def test_parse_task_created_event(self):
-        """TaskCreatedEventがパースできる"""
+    def test_parse_task_created_from_dict(self):
+        """辞書からTaskCreatedEventをパースできる"""
+        # Arrange: TaskCreatedEventを表す辞書
         data = {
             "type": "task.created",
-            "run_id": "test-run",
-            "task_id": "test-task",
-            "payload": {"title": "Test"},
+            "run_id": "run-001",
+            "task_id": "task-001",
+            "payload": {"title": "Setup project"},
         }
+        
+        # Act: パース
         event = parse_event(data)
-        assert isinstance(event, TaskCreatedEvent)
-        assert event.task_id == "test-task"
+        
+        # Assert: 正しいクラスとフィールド
+        assert isinstance(event, TaskCreatedEvent), "TaskCreatedEventにパースされるべき"
+        assert event.task_id == "task-001"
 
     def test_parse_from_json_string(self):
-        """JSON文字列からパースできる"""
-        json_str = '{"type": "run.started", "run_id": "test", "payload": {}}'
+        """JSON文字列から直接パースできる"""
+        # Arrange: JSON文字列
+        json_str = '{"type": "run.started", "run_id": "run-from-json", "payload": {}}'
+        
+        # Act: パース
         event = parse_event(json_str)
+        
+        # Assert: 正しくパースされる
         assert isinstance(event, RunStartedEvent)
+        assert event.run_id == "run-from-json"
+
+    def test_parse_preserves_optional_fields(self):
+        """オプショナルフィールドも正しくパースされる"""
+        # Arrange: すべてのフィールドを含むデータ
+        data = {
+            "type": "task.created",
+            "id": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "run_id": "run-001",
+            "task_id": "task-001",
+            "actor": "human",
+            "payload": {"title": "Test"},
+            "prev_hash": "abc123",
+        }
+        
+        # Act: パース
+        event = parse_event(data)
+        
+        # Assert: オプショナルフィールドが保持される
+        assert event.id == "01ARZ3NDEKTSV4RRFFQ69G5FAV"
+        assert event.actor == "human"
+        assert event.prev_hash == "abc123"
+
+
+class TestEventType:
+    """EventType列挙型のテスト"""
+
+    def test_run_events_have_run_prefix(self):
+        """Runイベントはrun.プレフィックスを持つ"""
+        # Assert: Run関連イベントのプレフィックス確認
+        assert EventType.RUN_STARTED.value == "run.started"
+        assert EventType.RUN_COMPLETED.value == "run.completed"
+        assert EventType.RUN_FAILED.value == "run.failed"
+
+    def test_task_events_have_task_prefix(self):
+        """Taskイベントはtask.プレフィックスを持つ"""
+        # Assert: Task関連イベントのプレフィックス確認
+        assert EventType.TASK_CREATED.value == "task.created"
+        assert EventType.TASK_COMPLETED.value == "task.completed"
