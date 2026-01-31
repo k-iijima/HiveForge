@@ -62,3 +62,4 @@ Thumbs.db
 # Logs
 *.log
 logs/
+tests/e2e/test_captures_e2e/

@@ -164,8 +164,10 @@ tests/              # テストコード（実装と1:1対応）
 
 ## テスト実行
 
+### ユニットテスト
+
 ```bash
-# 全テスト
+# 全テスト（E2E除く）
 pytest
 
 # 特定のテスト
@@ -173,6 +175,75 @@ pytest tests/test_events.py -v
 
 # カバレッジ付き
 pytest --cov=hiveforge --cov-report=html
+```
+
+### E2Eビジュアルテスト
+
+E2EテストはAgent UI + Playwright MCP + VLM(Ollama)を使用してUIをビジュアルに検証する。
+
+#### 前提条件
+
+devcontainerで以下のサービスが起動していること：
+
+| サービス | ポート | 用途 |
+|---------|-------|-----|
+| `hiveforge-playwright-mcp` | 8931 | ブラウザ操作 |
+| `hiveforge-dev-ollama` | 11434 | VLM画像解析 |
+| `hiveforge-code-server` | 8080 | テスト対象VS Code |
+
+```bash
+# サービス起動確認
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+```
+
+#### E2Eテスト実行
+
+```bash
+# 全E2Eテスト
+PLAYWRIGHT_MCP_URL="http://hiveforge-playwright-mcp:8931" \
+OLLAMA_BASE_URL="http://hiveforge-dev-ollama:11434" \
+VLM_HEADLESS="true" \
+pytest tests/e2e/test_hiveforge_visual.py -v -m e2e
+
+# 特定のテストのみ
+pytest tests/e2e/test_hiveforge_visual.py::TestHiveForgeExtensionVisual::test_can_capture_screen -v -m e2e
+```
+
+#### VS Codeタスクで実行
+
+コマンドパレット（`Ctrl+Shift+P`）から：
+- `Tasks: Run Test Task` → **E2E: ビジュアルテスト (pytest)**
+
+#### E2Eテストの構造
+
+```python
+@pytest.mark.asyncio
+async def test_vlm_recognizes_dashboard(self, agent_ui_server, demo_html_path):
+    """VLMがダッシュボードを認識できることを確認"""
+    # Arrange: ページに移動してキャプチャ
+    await agent_ui_server._handle_navigate({"url": demo_html_path})
+    await agent_ui_server._handle_capture_screen({})
+
+    # Act: VLMでページを分析
+    result = await agent_ui_server._handle_describe_page(
+        {"focus": "What sections are visible?"}
+    )
+
+    # Assert: 期待するキーワードが含まれる
+    analysis = get_text_from_result(result).lower()
+    assert any(word in analysis for word in ["dashboard", "runs", "tasks"])
+```
+
+### VS Code拡張テスト
+
+```bash
+cd vscode-extension
+
+# コンパイル（TypeScriptエラーチェック）
+npm run compile
+
+# Lint（ESLint）
+npm run lint
 ```
 
 ## 作業フロー

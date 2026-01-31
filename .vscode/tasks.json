@@ -1,0 +1,117 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "npm",
+            "script": "compile",
+            "path": "vscode-extension",
+            "group": "build",
+            "label": "npm: compile - vscode-extension",
+            "problemMatcher": "$tsc"
+        },
+        {
+            "type": "npm",
+            "script": "watch",
+            "path": "vscode-extension",
+            "isBackground": true,
+            "group": "build",
+            "label": "npm: watch - vscode-extension",
+            "problemMatcher": "$tsc-watch"
+        },
+        {
+            "label": "E2E: HiveForge拡張ビジュアルテスト",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "-m",
+                "pytest",
+                "tests/e2e/test_hiveforge_extension.py",
+                "-v",
+                "--tb=short"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": {
+                    "CODE_SERVER_URL": "http://hiveforge-code-server:8080",
+                    "OLLAMA_BASE_URL": "http://hiveforge-dev-ollama:11434",
+                    "VLM_HEADLESS": "true"
+                }
+            },
+            "group": "test",
+            "problemMatcher": []
+        },
+        {
+            "label": "E2E: 拡張テスト (直接実行)",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "tests/e2e/test_hiveforge_extension.py"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": {
+                    "CODE_SERVER_URL": "http://hiveforge-code-server:8080",
+                    "OLLAMA_BASE_URL": "http://hiveforge-dev-ollama:11434",
+                    "VLM_HEADLESS": "true"
+                }
+            },
+            "group": "test",
+            "problemMatcher": []
+        },
+        {
+            "label": "E2E: ビジュアルテスト (ヘッドあり)",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "tests/e2e/test_hiveforge_extension.py"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": {
+                    "CODE_SERVER_URL": "http://hiveforge-code-server:8080",
+                    "OLLAMA_BASE_URL": "http://hiveforge-dev-ollama:11434",
+                    "VLM_HEADLESS": "false"
+                }
+            },
+            "group": "test",
+            "problemMatcher": []
+        },
+        {
+            "label": "Lint: VS Code拡張",
+            "type": "npm",
+            "script": "lint",
+            "path": "vscode-extension",
+            "group": "test",
+            "problemMatcher": [
+                "$eslint-stylish"
+            ]
+        },
+        {
+            "label": "E2E: ビジュアルテスト (pytest)",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "-m",
+                "pytest",
+                "tests/e2e/test_hiveforge_visual.py",
+                "-v",
+                "--tb=short",
+                "-m",
+                "e2e"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": {
+                    "PLAYWRIGHT_MCP_URL": "http://hiveforge-playwright-mcp:8931",
+                    "OLLAMA_BASE_URL": "http://hiveforge-dev-ollama:11434",
+                    "VLM_HEADLESS": "true"
+                }
+            },
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        }
+    ]
+}
