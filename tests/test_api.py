@@ -238,6 +238,23 @@ class TestTasksEndpoints:
         # Assert
         assert response.status_code == 404
 
+    def test_list_tasks_completed_run(self, client):
+        """完了したRunのTask一覧も取得できる"""
+        # Arrange: Runを作成してタスクを追加し、Runを完了する
+        run_resp = client.post("/runs", json={"goal": "完了Run確認テスト"})
+        run_id = run_resp.json()["run_id"]
+        client.post(f"/runs/{run_id}/tasks", json={"title": "完了前タスク"})
+        client.post(f"/runs/{run_id}/complete")
+
+        # Act: 完了したRunのタスク一覧を取得
+        response = client.get(f"/runs/{run_id}/tasks")
+
+        # Assert: 200 OKでタスク一覧が返される
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["title"] == "完了前タスク"
+
     def test_complete_task(self, client):
         """Taskを完了できる"""
         # Arrange
@@ -740,6 +757,76 @@ class TestGetRunFromInactiveRun:
         data = response.json()
         assert data["run_id"] == run_id
         assert data["state"] == "completed"
+
+    def test_get_events_completed_run(self, client):
+        """完了したRunのイベント一覧も取得できる"""
+        # Arrange: Runを作成してタスクを追加し、Runを完了する
+        run_resp = client.post("/runs", json={"goal": "完了Runイベント確認"})
+        run_id = run_resp.json()["run_id"]
+        client.post(f"/runs/{run_id}/tasks", json={"title": "イベント確認用タスク"})
+        client.post(f"/runs/{run_id}/complete")
+
+        # Act: 完了したRunのイベント一覧を取得
+        response = client.get(f"/runs/{run_id}/events")
+
+        # Assert: 200 OKでイベント一覧が返される
+        assert response.status_code == 200
+        data = response.json()
+        # run.started, task.created, run.completed の3イベント
+        assert len(data) >= 3
+        types = [e["type"] for e in data]
+        assert "run.started" in types
+        assert "task.created" in types
+        assert "run.completed" in types
+
+    def test_get_requirements_completed_run(self, client):
+        """完了したRunの確認要請一覧も取得できる"""
+        # Arrange: Runを作成して確認要請を追加し、Runを完了する
+        run_resp = client.post("/runs", json={"goal": "完了Run確認要請確認"})
+        run_id = run_resp.json()["run_id"]
+        client.post(
+            f"/runs/{run_id}/requirements",
+            json={"description": "テスト確認要請", "options": ["A", "B"]},
+        )
+        client.post(f"/runs/{run_id}/complete")
+
+        # Act: 完了したRunの確認要請一覧を取得
+        response = client.get(f"/runs/{run_id}/requirements")
+
+        # Assert: 200 OKで確認要請一覧が返される
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["description"] == "テスト確認要請"
+
+    def test_create_task_on_completed_run_fails(self, client):
+        """完了したRunへのタスク作成は404を返す"""
+        # Arrange: Runを作成して完了する
+        run_resp = client.post("/runs", json={"goal": "完了Run書き込み拒否テスト"})
+        run_id = run_resp.json()["run_id"]
+        client.post(f"/runs/{run_id}/complete")
+
+        # Act: 完了したRunにタスクを作成しようとする
+        response = client.post(f"/runs/{run_id}/tasks", json={"title": "新タスク"})
+
+        # Assert: 404 Not Found（アクティブRunではないため）
+        assert response.status_code == 404
+
+    def test_create_requirement_on_completed_run_fails(self, client):
+        """完了したRunへの確認要請作成は404を返す"""
+        # Arrange: Runを作成して完了する
+        run_resp = client.post("/runs", json={"goal": "完了Run書き込み拒否テスト"})
+        run_id = run_resp.json()["run_id"]
+        client.post(f"/runs/{run_id}/complete")
+
+        # Act: 完了したRunに確認要請を作成しようとする
+        response = client.post(
+            f"/runs/{run_id}/requirements",
+            json={"description": "テスト"},
+        )
+
+        # Assert: 404 Not Found（アクティブRunではないため）
+        assert response.status_code == 404
 
 
 class TestListRunsEdgeCases:

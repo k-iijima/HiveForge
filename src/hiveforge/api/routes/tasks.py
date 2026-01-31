@@ -5,7 +5,7 @@ Task管理に関するエンドポイント。
 
 from fastapi import APIRouter, HTTPException, status
 
-from ...core import generate_event_id
+from ...core import build_run_projection, generate_event_id
 from ...core.events import (
     TaskAssignedEvent,
     TaskCompletedEvent,
@@ -68,10 +68,17 @@ async def create_task(run_id: str, request: CreateTaskRequest):
 async def list_tasks(run_id: str):
     """Task一覧を取得"""
     active_runs = get_active_runs()
-    if run_id not in active_runs:
-        raise HTTPException(status_code=404, detail=f"Active run {run_id} not found")
+    ar = get_ar()
 
-    proj = active_runs[run_id]
+    if run_id in active_runs:
+        proj = active_runs[run_id]
+    else:
+        # 完了済みRunはイベントからプロジェクションを再構築
+        events = list(ar.replay(run_id))
+        if not events:
+            raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
+        proj = build_run_projection(events, run_id)
+
     return [
         TaskResponse(
             task_id=task.id,
