@@ -11,15 +11,16 @@ import json
 from datetime import datetime, timezone
 from typing import Any
 
-from mcp.server import Server
+from mcp.server import Server, InitializationOptions
 from mcp.server.stdio import stdio_server
 from mcp.types import (
     CallToolResult,
     ListToolsResult,
+    ServerCapabilities,
     TextContent,
     Tool,
+    ToolsCapability,
 )
-from pydantic import AnyUrl
 
 from ..core import (
     AkashicRecord,
@@ -682,8 +683,15 @@ class HiveForgeMCPServer:
 
     async def run(self) -> None:  # pragma: no cover
         """サーバーを起動"""
+        init_options = InitializationOptions(
+            server_name="hiveforge",
+            server_version="0.1.0",
+            capabilities=ServerCapabilities(
+                tools=ToolsCapability(),
+            ),
+        )
         async with stdio_server() as (read_stream, write_stream):
-            await self.server.run(read_stream, write_stream)
+            await self.server.run(read_stream, write_stream, init_options)
 
 
 def main():  # pragma: no cover
