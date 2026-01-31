@@ -176,6 +176,22 @@ async def complete_run(run_id: str, request: CompleteRunRequest | None = None):
             apply_event_to_projection(run_id, fail_event)
             cancelled_task_ids.append(task.id)
 
+    # 強制完了時は未解決の確認要請も却下する
+    cancelled_requirement_ids = []
+    if force:
+        for req in proj.pending_requirements:
+            reject_event = RequirementRejectedEvent(
+                run_id=run_id,
+                actor="system",
+                payload={
+                    "requirement_id": req.id,
+                    "comment": "Runが強制完了されたため却下",
+                },
+            )
+            ar.append(reject_event, run_id)
+            apply_event_to_projection(run_id, reject_event)
+            cancelled_requirement_ids.append(req.id)
+
     event = RunCompletedEvent(run_id=run_id, actor="api")
     ar.append(event, run_id)
 
@@ -186,6 +202,8 @@ async def complete_run(run_id: str, request: CompleteRunRequest | None = None):
     result = {"status": "completed", "run_id": run_id}
     if cancelled_task_ids:
         result["cancelled_task_ids"] = cancelled_task_ids
+    if cancelled_requirement_ids:
+        result["cancelled_requirement_ids"] = cancelled_requirement_ids
     return result
 
 

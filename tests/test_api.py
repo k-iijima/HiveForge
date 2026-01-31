@@ -192,6 +192,27 @@ class TestRunsEndpoints:
         assert "cancelled_task_ids" in data
         assert task_id in data["cancelled_task_ids"]
 
+    def test_complete_run_force_rejects_pending_requirements(self, client):
+        """force=trueで未解決の確認要請も却下して完了できる"""
+        # Arrange: Runを開始して確認要請を作成
+        run_resp = client.post("/runs", json={"goal": "強制完了テスト"})
+        run_id = run_resp.json()["run_id"]
+        req_resp = client.post(
+            f"/runs/{run_id}/requirements",
+            json={"description": "未解決の確認要請", "options": ["承認", "却下"]},
+        )
+        req_id = req_resp.json()["id"]  # RequirementResponseのフィールド名
+
+        # Act: force=trueで強制完了
+        response = client.post(f"/runs/{run_id}/complete", json={"force": True})
+
+        # Assert: 確認要請も却下される
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "completed"
+        assert "cancelled_requirement_ids" in data
+        assert req_id in data["cancelled_requirement_ids"]
+
     def test_complete_run_not_found(self, client):
         """存在しないRunの完了で404を返す"""
         # Act
