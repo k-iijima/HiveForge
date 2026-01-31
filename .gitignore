@@ -27,10 +27,13 @@ ENV/
 
 # IDE
 .idea/
-.vscode/
 *.swp
 *.swo
 *~
+
+# Node.js
+node_modules/
+vscode-extension/out/
 
 # Environment
 .env
