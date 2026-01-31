@@ -180,15 +180,20 @@ app.add_middleware(
 @app.get("/health", response_model=HealthResponse, tags=["System"])
 async def health_check():
     """ヘルスチェック"""
-    from ..core import __version__ if hasattr(__import__("hiveforge.core"), "__version__") else "0.1.0"
+    try:
+        from ..core import __version__
+    except ImportError:
+        __version__ = "0.1.0"
     return HealthResponse(
         status="healthy",
-        version="0.1.0",
+        version=__version__,
         active_runs=len(_active_runs),
     )
 
 
-@app.post("/runs", response_model=StartRunResponse, status_code=status.HTTP_201_CREATED, tags=["Runs"])
+@app.post(
+    "/runs", response_model=StartRunResponse, status_code=status.HTTP_201_CREATED, tags=["Runs"]
+)
 async def start_run(request: StartRunRequest):
     """新しいRunを開始"""
     ar = get_ar()
@@ -241,7 +246,9 @@ async def list_runs(active_only: bool = True):
                     event_count=proj.event_count,
                     tasks_total=len(proj.tasks),
                     tasks_completed=len(proj.completed_tasks),
-                    tasks_failed=len([t for t in proj.tasks.values() if t.state == TaskState.FAILED]),
+                    tasks_failed=len(
+                        [t for t in proj.tasks.values() if t.state == TaskState.FAILED]
+                    ),
                     tasks_in_progress=len(proj.in_progress_tasks),
                     started_at=proj.started_at,
                     last_heartbeat=proj.last_heartbeat,
@@ -295,7 +302,12 @@ async def complete_run(run_id: str):
     return {"status": "completed", "run_id": run_id}
 
 
-@app.post("/runs/{run_id}/tasks", response_model=TaskResponse, status_code=status.HTTP_201_CREATED, tags=["Tasks"])
+@app.post(
+    "/runs/{run_id}/tasks",
+    response_model=TaskResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["Tasks"],
+)
 async def create_task(run_id: str, request: CreateTaskRequest):
     """Taskを作成"""
     if run_id not in _active_runs:
@@ -318,6 +330,7 @@ async def create_task(run_id: str, request: CreateTaskRequest):
 
     # 投影を更新
     from ..core.ar.projections import RunProjector
+
     projector = RunProjector(run_id)
     projector.projection = _active_runs[run_id]
     projector.apply(event)
@@ -373,6 +386,7 @@ async def complete_task(run_id: str, task_id: str, request: CompleteTaskRequest)
 
     # 投影を更新
     from ..core.ar.projections import RunProjector
+
     projector = RunProjector(run_id)
     projector.projection = proj
     projector.apply(event)
@@ -401,6 +415,7 @@ async def fail_task(run_id: str, task_id: str, request: FailTaskRequest):
 
     # 投影を更新
     from ..core.ar.projections import RunProjector
+
     projector = RunProjector(run_id)
     projector.projection = proj
     projector.apply(event)
