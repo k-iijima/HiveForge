@@ -19,6 +19,28 @@ services:
       timeout: 10s
       retries: 3
 
+  # Playwright MCP Server (公式Dockerイメージ使用)
+  playwright-mcp:
+    build:
+      context: https://github.com/microsoft/playwright-mcp.git
+      dockerfile: Dockerfile
+    ports:
+      - "8931:8931"
+    volumes:
+      - playwright_output:/tmp/playwright-output
+    environment:
+      - PLAYWRIGHT_MCP_HOST=0.0.0.0
+      - PLAYWRIGHT_MCP_PORT=8931
+    # 公式イメージはENTRYPOINTで--headless --browser chromium --no-sandbox設定済み
+    # --portでHTTPトランスポートを有効化
+    command: ["--port", "8931", "--host", "0.0.0.0"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8931/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   # オプション: Redis (将来のスケーリング用)
   # redis:
   #   image: redis:7-alpine
@@ -29,4 +51,5 @@ services:
 
 volumes:
   vault_data:
+  playwright_output:
   # redis_data:

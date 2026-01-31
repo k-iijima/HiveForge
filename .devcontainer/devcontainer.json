@@ -1,11 +1,21 @@
 {
-  "name": "HiveForge Dev",
+  "name": "HiveForge Dev (GPU)",
+  // Ubuntu WSL の Docker を使用（GPU サポート）
+  // 
+  // 使用方法:
+  // 1. PowerShell で実行: wsl -d Ubuntu -e sudo service docker start
+  // 2. VS Code で: Dev Containers: Reopen in Container
+  //
+  // または: scripts\start-wsl-docker.cmd を実行
   "dockerComposeFile": [
-    "../docker-compose.yml",
     "docker-compose.dev.yml"
   ],
   "service": "hiveforge-dev",
   "workspaceFolder": "/workspace/HiveForge",
+  // Windows から実行時に Ubuntu WSL の Docker を起動
+  "initializeCommand": {
+    "start-docker": "wsl -d Ubuntu -e sudo service docker start"
+  },
   "customizations": {
     "vscode": {
       "extensions": [
@@ -32,14 +42,22 @@
         "terminal.integrated.defaultProfile.linux": "bash",
         "terminal.integrated.automationProfile.linux": {
           "path": "/bin/bash"
+        },
+        "docker.host": "unix:///var/run/docker.sock",
+        "docker.environment": {
+          "DOCKER_HOST": "unix:///var/run/docker.sock"
         }
       }
     }
   },
   "postCreateCommand": "pip install -e '.[dev]' && mkdir -p /workspace/HiveForge/Vault && sudo chown -R vscode:vscode /workspace/HiveForge/Vault",
+  "postStartCommand": "sudo chown root:docker /var/run/docker.sock 2>/dev/null || true; bash .devcontainer/start-ollama.sh || true",
   "waitFor": "postCreateCommand",
   "remoteEnv": {
-    "PATH": "${containerEnv:PATH}:/home/vscode/.local/bin"
+    "PATH": "${containerEnv:PATH}:/home/vscode/.local/bin",
+    "OLLAMA_HOST": "http://ollama:11434",
+    "HIVEFORGE_GPU": "${localEnv:HIVEFORGE_GPU}",
+    "PLAYWRIGHT_MCP_URL": "http://playwright-mcp:8931"
   },
   "remoteUser": "vscode"
 }

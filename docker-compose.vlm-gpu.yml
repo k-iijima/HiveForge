@@ -1,0 +1,46 @@
+# ローカルVLMテスト環境 (GPU版)
+# GPU環境で高速なVLM推論を実行
+
+services:
+  # テスト対象: code-server（ブラウザVS Code）
+  code-server:
+    image: codercom/code-server:latest
+    container_name: hiveforge-code-server
+    ports:
+      - "8080:8080"
+    environment:
+      - PASSWORD=hiveforge
+    volumes:
+      - .:/workspace/HiveForge
+    command: ["--bind-addr", "0.0.0.0:8080", "--auth", "password", "/workspace/HiveForge"]
+    restart: unless-stopped
+    networks:
+      - hiveforge-net
+
+  # Ollama: ローカルVLM with GPU
+  ollama:
+    image: ollama/ollama:latest
+    container_name: hiveforge-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    restart: unless-stopped
+    networks:
+      - hiveforge-net
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  ollama_models:
+    name: hiveforge_ollama_models
+
+networks:
+  hiveforge-net:
+    name: hiveforge_default
+    external: true
