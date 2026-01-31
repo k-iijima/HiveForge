@@ -55,6 +55,22 @@ def generate_event_id() -> str:
     return str(ULID())
 
 
+def _serialize_value(value: Any) -> Any:
+    """JCSシリアライズ用に値を変換
+
+    datetime, enum等のJSONシリアライズ不可能な型を文字列に変換する。
+    """
+    if isinstance(value, datetime):
+        return value.isoformat()
+    elif isinstance(value, Enum):
+        return value.value
+    elif isinstance(value, dict):
+        return {k: _serialize_value(v) for k, v in value.items()}
+    elif isinstance(value, list):
+        return [_serialize_value(v) for v in value]
+    return value
+
+
 def compute_hash(data: dict[str, Any]) -> str:
     """JCS正規化JSONのSHA-256ハッシュを計算
 
@@ -66,6 +82,8 @@ def compute_hash(data: dict[str, Any]) -> str:
     """
     # hashフィールドを除外してコピー
     data_for_hash = {k: v for k, v in data.items() if k != "hash"}
+    # datetime, enum等をシリアライズ可能な形式に変換
+    data_for_hash = _serialize_value(data_for_hash)
     # JCS (RFC 8785) で正規化
     canonical = jcs.canonicalize(data_for_hash)
     return hashlib.sha256(canonical).hexdigest()
@@ -77,7 +95,10 @@ class BaseEvent(BaseModel):
     全てのイベントはイミュータブルで、生成時にIDとタイムスタンプが付与される。
     """
 
-    model_config = {"frozen": True}
+    model_config = {
+        "frozen": True,
+        "ser_json_timedelta": "iso8601",
+    }
 
     id: str = Field(default_factory=generate_event_id, description="イベントID (ULID)")
     type: EventType = Field(..., description="イベント種別")
