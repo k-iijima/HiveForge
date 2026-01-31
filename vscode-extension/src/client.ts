@@ -13,6 +13,8 @@ export interface Run {
     event_count: number;
     tasks_total: number;
     tasks_completed: number;
+    tasks_failed: number;
+    tasks_in_progress: number;
     pending_requirements_count: number;
 }
 

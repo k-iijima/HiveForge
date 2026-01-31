@@ -89,19 +89,19 @@ async function completeRun(item: RunItem, client: HiveForgeClient, refresh: () =
             // APIエラーの詳細を取得
             const axiosError = error as { response?: { status?: number; data?: { detail?: { message?: string; incomplete_task_ids?: string[]; hint?: string } | string } } };
             const detail = axiosError.response?.data?.detail;
-            
+
             if (axiosError.response?.status === 400 && detail && typeof detail === 'object') {
                 // 未完了タスクがある場合の詳細エラー
                 const taskCount = detail.incomplete_task_ids?.length || 0;
                 const message = `Run完了に失敗: 未完了タスクが ${taskCount} 件あります。\n\n` +
                     `すべてのタスクを完了/失敗にするか、緊急停止を使用してください。`;
-                
+
                 const action = await vscode.window.showErrorMessage(
                     message,
                     '強制完了する',
                     'キャンセル'
                 );
-                
+
                 if (action === '強制完了する') {
                     try {
                         await client.completeRunForce(item.run.run_id);
@@ -130,8 +130,24 @@ async function abortRun(item: RunItem, client: HiveForgeClient, refresh: () => v
         return;
     }
 
+    // タスクと確認要請の数を表示
+    const taskCount = item.run.tasks_total - item.run.tasks_completed - item.run.tasks_failed;
+    const reqCount = item.run.pending_requirements_count || 0;
+
+    let warningDetail = '';
+    if (taskCount > 0 || reqCount > 0) {
+        const parts = [];
+        if (taskCount > 0) {
+            parts.push(`未完了タスク ${taskCount} 件`);
+        }
+        if (reqCount > 0) {
+            parts.push(`未解決の確認要請 ${reqCount} 件`);
+        }
+        warningDetail = `\n\n※ ${parts.join('、')}は自動的にキャンセルされます`;
+    }
+
     const confirm = await vscode.window.showWarningMessage(
-        `Run "${item.run.goal}" を中止しますか？`,
+        `Run "${item.run.goal}" を中止しますか？${warningDetail}`,
         { modal: true },
         '中止する'
     );
@@ -139,7 +155,11 @@ async function abortRun(item: RunItem, client: HiveForgeClient, refresh: () => v
     if (confirm === '中止する') {
         try {
             await client.emergencyStop(item.run.run_id, reason);
-            vscode.window.showInformationMessage(`Run "${item.run.goal}" を中止しました`);
+            let message = `Run "${item.run.goal}" を中止しました`;
+            if (taskCount > 0) {
+                message += `（${taskCount} 件のタスクをキャンセル）`;
+            }
+            vscode.window.showInformationMessage(message);
             refresh();
         } catch (error) {
             vscode.window.showErrorMessage(`Run中止に失敗: ${error}`);
