@@ -123,6 +123,10 @@ export class HiveForgeClient {
         await this.client.post(`/runs/${runId}/complete`);
     }
 
+    async completeRunForce(runId: string): Promise<void> {
+        await this.client.post(`/runs/${runId}/complete`, { force: true });
+    }
+
     async emergencyStop(runId: string, reason: string, scope: 'run' | 'system' = 'run'): Promise<void> {
         await this.client.post(`/runs/${runId}/emergency-stop`, { reason, scope });
     }

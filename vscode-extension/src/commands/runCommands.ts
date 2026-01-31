@@ -85,8 +85,37 @@ async function completeRun(item: RunItem, client: HiveForgeClient, refresh: () =
             await client.completeRun(item.run.run_id);
             vscode.window.showInformationMessage(`Run "${item.run.goal}" を完了しました`);
             refresh();
-        } catch (error) {
-            vscode.window.showErrorMessage(`Run完了に失敗: ${error}`);
+        } catch (error: unknown) {
+            // APIエラーの詳細を取得
+            const axiosError = error as { response?: { status?: number; data?: { detail?: { message?: string; incomplete_task_ids?: string[]; hint?: string } | string } } };
+            const detail = axiosError.response?.data?.detail;
+            
+            if (axiosError.response?.status === 400 && detail && typeof detail === 'object') {
+                // 未完了タスクがある場合の詳細エラー
+                const taskCount = detail.incomplete_task_ids?.length || 0;
+                const message = `Run完了に失敗: 未完了タスクが ${taskCount} 件あります。\n\n` +
+                    `すべてのタスクを完了/失敗にするか、緊急停止を使用してください。`;
+                
+                const action = await vscode.window.showErrorMessage(
+                    message,
+                    '強制完了する',
+                    'キャンセル'
+                );
+                
+                if (action === '強制完了する') {
+                    try {
+                        await client.completeRunForce(item.run.run_id);
+                        vscode.window.showInformationMessage(
+                            `Run "${item.run.goal}" を強制完了しました（未完了タスクはキャンセルされました）`
+                        );
+                        refresh();
+                    } catch (forceError) {
+                        vscode.window.showErrorMessage(`強制完了に失敗: ${forceError}`);
+                    }
+                }
+            } else {
+                vscode.window.showErrorMessage(`Run完了に失敗: ${error}`);
+            }
         }
     }
 }
