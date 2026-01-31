@@ -5,20 +5,23 @@
 import axios, { AxiosInstance } from 'axios';
 
 export interface Run {
-    id: string;
+    run_id: string;
     goal: string;
     state: 'running' | 'completed' | 'failed' | 'aborted';
     started_at: string;
     completed_at?: string;
     event_count: number;
+    tasks_total: number;
+    tasks_completed: number;
+    pending_requirements_count: number;
 }
 
 export interface Task {
-    id: string;
+    task_id: string;
     title: string;
     state: 'pending' | 'assigned' | 'in_progress' | 'completed' | 'failed' | 'blocked';
     progress: number;
-    assignee?: string;
+    assignee?: string | null;
 }
 
 export interface Requirement {
@@ -26,6 +29,9 @@ export interface Requirement {
     description: string;
     state: 'pending' | 'approved' | 'rejected';
     options?: string[];
+    selected_option?: string;
+    comment?: string;
+    resolved_at?: string;
 }
 
 export interface HiveEvent {
@@ -93,8 +99,10 @@ export class HiveForgeClient {
     }
 
     // Runs
-    async getRuns(): Promise<Run[]> {
-        const response = await this.client.get<Run[]>('/runs');
+    async getRuns(activeOnly: boolean = true): Promise<Run[]> {
+        const response = await this.client.get<Run[]>('/runs', {
+            params: { active_only: activeOnly },
+        });
         return response.data;
     }
 
@@ -119,13 +127,8 @@ export class HiveForgeClient {
 
     // Tasks
     async getTasks(runId: string): Promise<Task[]> {
-        const status = await this.getRun(runId);
-        return [
-            ...status.tasks.pending,
-            ...status.tasks.in_progress,
-            ...status.tasks.completed,
-            ...status.tasks.blocked,
-        ];
+        const response = await this.client.get<Task[]>(`/runs/${runId}/tasks`);
+        return response.data;
     }
 
     async createTask(runId: string, title: string, description?: string): Promise<{ task_id: string }> {
@@ -137,25 +140,44 @@ export class HiveForgeClient {
     }
 
     async completeTask(runId: string, taskId: string, result?: string): Promise<void> {
-        await this.client.post(`/runs/${runId}/tasks/${taskId}/complete`, { result });
+        await this.client.post(`/runs/${runId}/tasks/${taskId}/complete`, {
+            result: result ? { message: result } : {},
+        });
     }
 
     async failTask(runId: string, taskId: string, error: string): Promise<void> {
         await this.client.post(`/runs/${runId}/tasks/${taskId}/fail`, { error });
     }
 
+    async assignTask(runId: string, taskId: string, assignee: string = 'user'): Promise<void> {
+        await this.client.post(`/runs/${runId}/tasks/${taskId}/assign`, { assignee });
+    }
+
+    async reportProgress(runId: string, taskId: string, progress: number, message?: string): Promise<void> {
+        await this.client.post(`/runs/${runId}/tasks/${taskId}/progress`, {
+            progress,
+            message: message || '',
+        });
+    }
+
     // Requirements
     async getRequirements(runId: string): Promise<Requirement[]> {
-        const status = await this.getRun(runId);
-        return status.pending_requirements;
+        const response = await this.client.get<Requirement[]>(`/runs/${runId}/requirements`);
+        return response.data;
     }
 
-    async approveRequirement(runId: string, requirementId: string, choice?: string): Promise<void> {
-        await this.client.post(`/runs/${runId}/requirements/${requirementId}/approve`, { choice });
-    }
-
-    async rejectRequirement(runId: string, requirementId: string, reason?: string): Promise<void> {
-        await this.client.post(`/runs/${runId}/requirements/${requirementId}/reject`, { reason });
+    async resolveRequirement(
+        runId: string,
+        requirementId: string,
+        approved: boolean,
+        selectedOption?: string,
+        comment?: string
+    ): Promise<void> {
+        await this.client.post(`/runs/${runId}/requirements/${requirementId}/resolve`, {
+            approved,
+            selected_option: selectedOption || null,
+            comment: comment || null,
+        });
     }
 
     // Events

@@ -12,9 +12,9 @@ export class TaskItem extends vscode.TreeItem {
     ) {
         super(task.title, collapsibleState);
 
-        this.id = task.id;
+        this.id = task.task_id;
         this.description = `${task.state} (${task.progress}%)`;
-        this.tooltip = `Task ID: ${task.id}\n状態: ${task.state}\n進捗: ${task.progress}%`;
+        this.tooltip = `Task ID: ${task.task_id}\n状態: ${task.state}\n進捗: ${task.progress}%`;
 
         // 状態に応じたアイコン
         switch (task.state) {
@@ -48,10 +48,22 @@ export class TasksProvider implements vscode.TreeDataProvider<TaskItem> {
     readonly onDidChangeTreeData: vscode.Event<TaskItem | undefined | null | void> =
         this._onDidChangeTreeData.event;
 
+    private showCompleted = false;
+
     constructor(private client: HiveForgeClient) { }
 
     refresh(): void {
         this._onDidChangeTreeData.fire();
+    }
+
+    toggleShowCompleted(): boolean {
+        this.showCompleted = !this.showCompleted;
+        this.refresh();
+        return this.showCompleted;
+    }
+
+    isShowingCompleted(): boolean {
+        return this.showCompleted;
     }
 
     getTreeItem(element: TaskItem): vscode.TreeItem {
@@ -70,7 +82,10 @@ export class TasksProvider implements vscode.TreeDataProvider<TaskItem> {
 
         try {
             const tasks = await this.client.getTasks(runId);
-            return tasks.map(task => new TaskItem(task, vscode.TreeItemCollapsibleState.None));
+            const filtered = this.showCompleted
+                ? tasks
+                : tasks.filter(task => task.state !== 'completed' && task.state !== 'failed');
+            return filtered.map(task => new TaskItem(task, vscode.TreeItemCollapsibleState.None));
         } catch (error) {
             console.error('Failed to get tasks:', error);
             return [];

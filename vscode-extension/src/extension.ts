@@ -1,7 +1,7 @@
 /**
  * HiveForge VS Code Extension
- *
- * ダッシュボード、イベントログ、要件承認UI
+ * 
+ * エントリポイント - 初期化と設定管理のみを担当
  */
 
 import * as vscode from 'vscode';
@@ -10,53 +10,40 @@ import { TasksProvider } from './providers/tasksProvider';
 import { RequirementsProvider } from './providers/requirementsProvider';
 import { EventsProvider } from './providers/eventsProvider';
 import { HiveForgeClient } from './client';
+import { registerRunCommands, registerRequirementCommands, registerFilterCommands, registerTaskCommands, Providers } from './commands';
 
 let client: HiveForgeClient;
-let runsProvider: RunsProvider;
-let tasksProvider: TasksProvider;
-let requirementsProvider: RequirementsProvider;
-let eventsProvider: EventsProvider;
+let providers: Providers;
 let refreshInterval: NodeJS.Timeout | undefined;
+let runsTreeView: vscode.TreeView<unknown>;
+let requirementsTreeView: vscode.TreeView<unknown>;
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('HiveForge Dashboard is now active');
 
-    // 設定を取得
+    // 初期化
     const config = vscode.workspace.getConfiguration('hiveforge');
     const serverUrl = config.get<string>('serverUrl', 'http://localhost:8000');
 
-    // クライアントを初期化
     client = new HiveForgeClient(serverUrl);
-
-    // プロバイダーを初期化
-    runsProvider = new RunsProvider(client);
-    tasksProvider = new TasksProvider(client);
-    requirementsProvider = new RequirementsProvider(client);
-    eventsProvider = new EventsProvider(client);
+    providers = {
+        runs: new RunsProvider(client),
+        tasks: new TasksProvider(client),
+        requirements: new RequirementsProvider(client),
+        events: new EventsProvider(client),
+    };
 
     // TreeViewを登録
-    context.subscriptions.push(
-        vscode.window.registerTreeDataProvider('hiveforge.runs', runsProvider),
-        vscode.window.registerTreeDataProvider('hiveforge.tasks', tasksProvider),
-        vscode.window.registerTreeDataProvider('hiveforge.requirements', requirementsProvider),
-        vscode.window.registerTreeDataProvider('hiveforge.events', eventsProvider)
-    );
+    registerTreeViews(context);
 
     // コマンドを登録
-    context.subscriptions.push(
-        vscode.commands.registerCommand('hiveforge.showDashboard', showDashboard),
-        vscode.commands.registerCommand('hiveforge.startRun', startRun),
-        vscode.commands.registerCommand('hiveforge.viewEvents', viewEvents),
-        vscode.commands.registerCommand('hiveforge.approveRequirement', approveRequirement),
-        vscode.commands.registerCommand('hiveforge.refresh', refresh),
-        vscode.commands.registerCommand('hiveforge.selectRun', selectRun)
-    );
+    registerRunCommands(context, client, providers, refresh);
+    registerRequirementCommands(context, client, refresh);
+    registerFilterCommands(context, providers);
+    registerTaskCommands(context, client, refresh);
 
     // 自動更新を設定
-    if (config.get<boolean>('autoRefresh', true)) {
-        const interval = config.get<number>('refreshInterval', 5000);
-        refreshInterval = setInterval(refresh, interval);
-    }
+    setupAutoRefresh(config);
 
     // 設定変更を監視
     context.subscriptions.push(
@@ -74,7 +61,31 @@ export function deactivate() {
     }
 }
 
-function updateConfiguration() {
+function registerTreeViews(context: vscode.ExtensionContext): void {
+    // TreeViewを作成（バッジ更新のため）
+    runsTreeView = vscode.window.createTreeView('hiveforge.runs', {
+        treeDataProvider: providers.runs,
+    });
+    requirementsTreeView = vscode.window.createTreeView('hiveforge.requirements', {
+        treeDataProvider: providers.requirements,
+    });
+
+    context.subscriptions.push(
+        runsTreeView,
+        requirementsTreeView,
+        vscode.window.registerTreeDataProvider('hiveforge.tasks', providers.tasks),
+        vscode.window.registerTreeDataProvider('hiveforge.events', providers.events)
+    );
+}
+
+function setupAutoRefresh(config: vscode.WorkspaceConfiguration): void {
+    if (config.get<boolean>('autoRefresh', true)) {
+        const interval = config.get<number>('refreshInterval', 5000);
+        refreshInterval = setInterval(refresh, interval);
+    }
+}
+
+function updateConfiguration(): void {
     const config = vscode.workspace.getConfiguration('hiveforge');
 
     // サーバーURLを更新
@@ -86,59 +97,47 @@ function updateConfiguration() {
         clearInterval(refreshInterval);
         refreshInterval = undefined;
     }
-
-    if (config.get<boolean>('autoRefresh', true)) {
-        const interval = config.get<number>('refreshInterval', 5000);
-        refreshInterval = setInterval(refresh, interval);
-    }
+    setupAutoRefresh(config);
 }
 
-async function refresh() {
-    runsProvider.refresh();
-    tasksProvider.refresh();
-    requirementsProvider.refresh();
-    eventsProvider.refresh();
-}
+async function refresh(): Promise<void> {
+    providers.runs.refresh();
+    providers.tasks.refresh();
+    providers.requirements.refresh();
+    providers.events.refresh();
 
-async function showDashboard() {
-    vscode.window.showInformationMessage('HiveForge ダッシュボード (開発中)');
-}
-
-async function startRun() {
-    const goal = await vscode.window.showInputBox({
-        prompt: 'Runの目標を入力してください',
-        placeHolder: '例: ユーザー認証機能を実装する',
-    });
-
-    if (goal) {
-        try {
-            const result = await client.startRun(goal);
-            vscode.window.showInformationMessage(`Run開始: ${result.run_id}`);
-            refresh();
-        } catch (error) {
-            vscode.window.showErrorMessage(`Run開始に失敗: ${error}`);
-        }
-    }
-}
-
-async function viewEvents(runId: string) {
-    client.setCurrentRunId(runId);
-    eventsProvider.refresh();
-}
-
-async function approveRequirement(requirementId: string) {
+    // バッジを更新
     try {
-        // TODO: 要件承認APIを呼び出し
-        vscode.window.showInformationMessage(`要件 ${requirementId} を承認しました`);
-        refresh();
-    } catch (error) {
-        vscode.window.showErrorMessage(`承認に失敗: ${error}`);
-    }
-}
+        const runs = await client.getRuns();
 
-async function selectRun(runId: string) {
-    client.setCurrentRunId(runId);
-    tasksProvider.refresh();
-    eventsProvider.refresh();
-    requirementsProvider.refresh();
+        // Runsペイン: 全Runの未解決要請数合計
+        const totalPendingRequirements = runs.reduce((sum, r) => sum + r.pending_requirements_count, 0);
+        runsTreeView.badge = totalPendingRequirements > 0
+            ? { value: totalPendingRequirements, tooltip: `${totalPendingRequirements}件の未承認要請` }
+            : undefined;
+
+        // 確認要請ペイン: 選択中Runの未解決要請数
+        const runId = client.getCurrentRunId();
+        if (runId) {
+            const requirements = await client.getRequirements(runId);
+            const pendingCount = requirements.filter(r => r.state === 'pending').length;
+            requirementsTreeView.badge = pendingCount > 0
+                ? { value: pendingCount, tooltip: `${pendingCount}件の未承認要請` }
+                : undefined;
+        }
+
+        // 現在のRunが選択されていない場合、最新のrunning状態のRunを自動選択
+        if (!client.getCurrentRunId()) {
+            const runningRun = runs.find(r => r.state === 'running');
+            if (runningRun) {
+                client.setCurrentRunId(runningRun.run_id);
+                // 選択後に依存ペインをリフレッシュ
+                providers.tasks.refresh();
+                providers.requirements.refresh();
+                providers.events.refresh();
+            }
+        }
+    } catch {
+        // ignore
+    }
 }

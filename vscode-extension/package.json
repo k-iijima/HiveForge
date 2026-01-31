@@ -22,7 +22,8 @@
       },
       {
         "command": "hiveforge.startRun",
-        "title": "HiveForge: 新しいRunを開始"
+        "title": "HiveForge: 新しいRunを開始",
+        "icon": "$(add)"
       },
       {
         "command": "hiveforge.viewEvents",
@@ -30,9 +31,170 @@
       },
       {
         "command": "hiveforge.approveRequirement",
-        "title": "HiveForge: 要件を承認"
+        "title": "承認",
+        "icon": "$(check)"
+      },
+      {
+        "command": "hiveforge.rejectRequirement",
+        "title": "却下",
+        "icon": "$(x)"
+      },
+      {
+        "command": "hiveforge.showRequirementDetail",
+        "title": "HiveForge: 確認要請の詳細を表示"
+      },
+      {
+        "command": "hiveforge.toggleRunsFilter",
+        "title": "完了済みを表示/非表示",
+        "icon": "$(eye-closed)"
+      },
+      {
+        "command": "hiveforge.toggleTasksFilter",
+        "title": "完了済みを表示/非表示",
+        "icon": "$(eye-closed)"
+      },
+      {
+        "command": "hiveforge.toggleRequirementsFilter",
+        "title": "解決済みを表示/非表示",
+        "icon": "$(eye-closed)"
+      },
+      {
+        "command": "hiveforge.toggleRunsFilterOn",
+        "title": "完了済みを非表示",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "hiveforge.toggleTasksFilterOn",
+        "title": "完了済みを非表示",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "hiveforge.toggleRequirementsFilterOn",
+        "title": "解決済みを非表示",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "hiveforge.completeRun",
+        "title": "Runを完了",
+        "icon": "$(check)"
+      },
+      {
+        "command": "hiveforge.abortRun",
+        "title": "Runを中止",
+        "icon": "$(stop)"
+      },
+      {
+        "command": "hiveforge.createTask",
+        "title": "タスクを作成",
+        "icon": "$(add)"
+      },
+      {
+        "command": "hiveforge.assignTask",
+        "title": "タスクを割り当て",
+        "icon": "$(account)"
+      },
+      {
+        "command": "hiveforge.updateProgress",
+        "title": "進捗を更新",
+        "icon": "$(dashboard)"
+      },
+      {
+        "command": "hiveforge.completeTask",
+        "title": "タスクを完了",
+        "icon": "$(check)"
+      },
+      {
+        "command": "hiveforge.failTask",
+        "title": "タスクを失敗",
+        "icon": "$(error)"
       }
     ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "hiveforge.startRun",
+          "when": "view == hiveforge.runs",
+          "group": "navigation@1"
+        },
+        {
+          "command": "hiveforge.toggleRunsFilter",
+          "when": "view == hiveforge.runs && !hiveforge.runsShowCompleted",
+          "group": "navigation@2"
+        },
+        {
+          "command": "hiveforge.toggleRunsFilterOn",
+          "when": "view == hiveforge.runs && hiveforge.runsShowCompleted",
+          "group": "navigation@2"
+        },
+        {
+          "command": "hiveforge.toggleTasksFilter",
+          "when": "view == hiveforge.tasks && !hiveforge.tasksShowCompleted",
+          "group": "navigation@2"
+        },
+        {
+          "command": "hiveforge.toggleTasksFilterOn",
+          "when": "view == hiveforge.tasks && hiveforge.tasksShowCompleted",
+          "group": "navigation@2"
+        },
+        {
+          "command": "hiveforge.createTask",
+          "when": "view == hiveforge.tasks",
+          "group": "navigation@1"
+        },
+        {
+          "command": "hiveforge.toggleRequirementsFilter",
+          "when": "view == hiveforge.requirements && !hiveforge.requirementsShowResolved",
+          "group": "navigation"
+        },
+        {
+          "command": "hiveforge.toggleRequirementsFilterOn",
+          "when": "view == hiveforge.requirements && hiveforge.requirementsShowResolved",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "hiveforge.approveRequirement",
+          "when": "view == hiveforge.requirements && viewItem == pendingRequirement",
+          "group": "inline@1"
+        },
+        {
+          "command": "hiveforge.rejectRequirement",
+          "when": "view == hiveforge.requirements && viewItem == pendingRequirement",
+          "group": "inline@2"
+        },
+        {
+          "command": "hiveforge.completeRun",
+          "when": "view == hiveforge.runs && viewItem == runningRun",
+          "group": "inline@1"
+        },
+        {
+          "command": "hiveforge.abortRun",
+          "when": "view == hiveforge.runs && viewItem == runningRun",
+          "group": "inline@2"
+        },
+        {
+          "command": "hiveforge.assignTask",
+          "when": "view == hiveforge.tasks && viewItem == pending",
+          "group": "inline@1"
+        },
+        {
+          "command": "hiveforge.updateProgress",
+          "when": "view == hiveforge.tasks && viewItem =~ /^(assigned|in_progress)$/",
+          "group": "inline@1"
+        },
+        {
+          "command": "hiveforge.completeTask",
+          "when": "view == hiveforge.tasks && viewItem =~ /^(assigned|in_progress)$/",
+          "group": "inline@2"
+        },
+        {
+          "command": "hiveforge.failTask",
+          "when": "view == hiveforge.tasks && viewItem =~ /^(assigned|in_progress)$/",
+          "group": "inline@3"
+        }
+      ]
+    },
     "viewsContainers": {
       "activitybar": [
         {
@@ -54,7 +216,7 @@
         },
         {
           "id": "hiveforge.requirements",
-          "name": "要件確認"
+          "name": "確認要請"
         },
         {
           "id": "hiveforge.events",
@@ -90,12 +252,14 @@
     "lint": "eslint src --ext ts"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.2",
     "@types/node": "^22.0.0",
     "@types/vscode": "^1.100.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "eslint": "^9.0.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.54.0"
   },
   "dependencies": {
     "axios": "^1.7.0"
