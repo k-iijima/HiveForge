@@ -75,6 +75,71 @@ def test_event_hash_excludes_hash_field():
 - **JCS (RFC 8785)**: 決定論的JSONシリアライズ
 - **SHA-256**: 暗号学的ハッシュによるイベントチェーン
 
+### 5. Pydanticによる厳格なスキーマ定義
+
+- **厳格な型検証**: `strict=True`でランタイム型チェックを強制
+- **OpenAPI仕様の自動生成**: FastAPIと連携してAPI仕様書を自動出力
+- **バリデーションエラーは明確に**: エラーメッセージが人間に読みやすいこと
+- **スキーマは単一責任**: 1つのモデルは1つの概念を表現
+
+```python
+from pydantic import BaseModel, Field, ConfigDict
+
+class TaskCreatedEvent(BaseModel):
+    """タスク作成イベント - OpenAPI仕様に出力される"""
+    model_config = ConfigDict(strict=True, frozen=True)
+    
+    task_id: str = Field(..., description="タスクの一意識別子", examples=["task-001"])
+    title: str = Field(..., min_length=1, max_length=200, description="タスクのタイトル")
+```
+
+### 6. ファイル分割の原則
+
+- **1ファイル200行以下を目安**: 超える場合は分割を検討
+- **1ファイル1責務**: 関連する機能をまとめつつ、肥大化を防ぐ
+- **循環importを避ける**: 依存関係は一方向に
+- **再利用可能な部品は独立**: 共通ユーティリティは専用モジュールに
+
+```
+# 良い例: 責務ごとに分割
+core/events/
+├── __init__.py      # 公開API
+├── base.py          # BaseEvent
+├── run.py           # Run関連イベント
+├── task.py          # Task関連イベント
+└── serialization.py # シリアライズ/デシリアライズ
+
+# 悪い例: 1ファイルに全部
+core/events.py  # 1000行超の巨大ファイル
+```
+
+## 開発環境
+
+### devcontainer（推奨）
+
+開発は**devcontainer**上で行う。これにより環境差異を排除し、再現可能なビルドを保証する。
+
+```bash
+# VS Codeでdevcontainerを開く
+# コマンドパレット > "Dev Containers: Reopen in Container"
+```
+
+devcontainerには以下が含まれる：
+- Python 3.12
+- 必要な依存関係（`pip install -e ".[dev]"`済み）
+- Ruff、pytest、mypy等の開発ツール
+- VS Code拡張機能（Python、Pylance、Ruff等）
+
+### ローカル開発（非推奨）
+
+devcontainerを使用できない場合のみ：
+
+```bash
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -e ".[dev]"
+```
+
 ## コードスタイル
 
 - Python 3.12+
