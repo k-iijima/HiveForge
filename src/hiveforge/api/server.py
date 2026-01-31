@@ -496,3 +496,95 @@ async def send_heartbeat(run_id: str):
     _active_runs[run_id].last_heartbeat = event.timestamp
 
     return {"status": "ok", "timestamp": event.timestamp}
+
+
+class LineageResponse(BaseModel):
+    """因果リンクレスポンス"""
+
+    event_id: str
+    ancestors: list[str] = Field(default_factory=list, description="祖先イベントID一覧")
+    descendants: list[str] = Field(default_factory=list, description="子孫イベントID一覧")
+    truncated: bool = Field(default=False, description="結果が切り詰められたか")
+
+
+@app.get(
+    "/runs/{run_id}/events/{event_id}/lineage",
+    response_model=LineageResponse,
+    tags=["Events"],
+)
+async def get_event_lineage(
+    run_id: str,
+    event_id: str,
+    direction: str = "both",
+    max_depth: int = 10,
+):
+    """イベントの因果リンクを取得
+
+    Args:
+        run_id: Run ID
+        event_id: 対象のイベントID
+        direction: 探索方向（ancestors, descendants, both）
+        max_depth: 最大探索深度
+    """
+    ar = get_ar()
+
+    # 全イベントを取得してインデックス化
+    all_events: dict[str, Any] = {}
+    for event in ar.replay(run_id):
+        all_events[event.id] = event
+
+    if event_id not in all_events:
+        raise HTTPException(status_code=404, detail=f"Event {event_id} not found")
+
+    ancestors: list[str] = []
+    descendants: list[str] = []
+    truncated = False
+
+    # 祖先を探索（親方向）
+    if direction in ("ancestors", "both"):
+        visited: set[str] = set()
+        queue = [(event_id, 0)]
+
+        while queue:
+            current_id, depth = queue.pop(0)
+            if depth >= max_depth:
+                truncated = True
+                continue
+
+            if current_id not in all_events:  # pragma: no cover (defensive check)
+                continue
+
+            current_event = all_events[current_id]
+            parents = getattr(current_event, "parents", [])
+
+            for parent_id in parents:
+                if parent_id not in visited and parent_id in all_events:
+                    visited.add(parent_id)
+                    ancestors.append(parent_id)
+                    queue.append((parent_id, depth + 1))
+
+    # 子孫を探索（子方向） - 全走査
+    if direction in ("descendants", "both"):
+        visited: set[str] = set()  # type: ignore[no-redef]
+        queue = [(event_id, 0)]
+
+        while queue:
+            current_id, depth = queue.pop(0)
+            if depth >= max_depth:
+                truncated = True
+                continue
+
+            # 全イベントを走査して、parentsに含むものを検索
+            for evt_id, evt in all_events.items():
+                parents = getattr(evt, "parents", [])
+                if current_id in parents and evt_id not in visited:
+                    visited.add(evt_id)
+                    descendants.append(evt_id)
+                    queue.append((evt_id, depth + 1))
+
+    return LineageResponse(
+        event_id=event_id,
+        ancestors=ancestors,
+        descendants=descendants,
+        truncated=truncated,
+    )

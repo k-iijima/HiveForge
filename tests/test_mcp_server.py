@@ -496,6 +496,288 @@ class TestHandleEmergencyStop:
         assert result["scope"] == "run"
 
 
+class TestHandleGetLineage:
+    """get_lineageハンドラのテスト"""
+
+    @pytest.mark.asyncio
+    async def test_get_lineage_no_active_run(self, mcp_server):
+        """アクティブなRunがない場合"""
+        # Act
+        result = await mcp_server._handle_get_lineage({"event_id": "test-id"})
+
+        # Assert
+        assert "error" in result
+
+    @pytest.mark.asyncio
+    async def test_get_lineage_event_id_required(self, mcp_server):
+        """event_idが必要"""
+        # Arrange
+        await mcp_server._handle_start_run({"goal": "テスト"})
+
+        # Act
+        result = await mcp_server._handle_get_lineage({})
+
+        # Assert
+        assert "error" in result
+        assert "event_id" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_get_lineage_event_not_found(self, mcp_server):
+        """存在しないイベントの場合"""
+        # Arrange
+        await mcp_server._handle_start_run({"goal": "テスト"})
+
+        # Act
+        result = await mcp_server._handle_get_lineage({"event_id": "nonexistent"})
+
+        # Assert
+        assert "error" in result
+        assert "not found" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_get_lineage_success(self, mcp_server):
+        """因果リンクを取得できる"""
+        # Arrange
+        start_result = await mcp_server._handle_start_run({"goal": "リネージュテスト"})
+        run_id = start_result["run_id"]
+
+        # タスクを作成してイベントを増やす
+        await mcp_server._handle_create_task({"title": "テストタスク"})
+
+        # 最初のイベントのIDを取得（start_run時のイベント）
+        ar = mcp_server._get_ar()
+        events = list(ar.replay(run_id))
+        event_id = events[0].id
+
+        # Act
+        result = await mcp_server._handle_get_lineage(
+            {
+                "event_id": event_id,
+                "direction": "both",
+                "max_depth": 5,
+            }
+        )
+
+        # Assert
+        assert result["event_id"] == event_id
+        assert "ancestors" in result
+        assert "descendants" in result
+        assert "truncated" in result
+
+    @pytest.mark.asyncio
+    async def test_get_lineage_ancestors_only(self, mcp_server):
+        """祖先のみを取得できる"""
+        # Arrange
+        await mcp_server._handle_start_run({"goal": "祖先テスト"})
+        run_id = mcp_server._current_run_id
+        ar = mcp_server._get_ar()
+        events = list(ar.replay(run_id))
+        event_id = events[0].id
+
+        # Act
+        result = await mcp_server._handle_get_lineage(
+            {
+                "event_id": event_id,
+                "direction": "ancestors",
+            }
+        )
+
+        # Assert
+        assert result["event_id"] == event_id
+        assert "ancestors" in result
+
+    @pytest.mark.asyncio
+    async def test_get_lineage_descendants_only(self, mcp_server):
+        """子孫のみを取得できる"""
+        # Arrange
+        await mcp_server._handle_start_run({"goal": "子孫テスト"})
+        run_id = mcp_server._current_run_id
+        ar = mcp_server._get_ar()
+        events = list(ar.replay(run_id))
+        event_id = events[0].id
+
+        # Act
+        result = await mcp_server._handle_get_lineage(
+            {
+                "event_id": event_id,
+                "direction": "descendants",
+            }
+        )
+
+        # Assert
+        assert result["event_id"] == event_id
+        assert "descendants" in result
+
+
+class TestGetLineageWithParents:
+    """parents付きイベントでのget_lineageテスト"""
+
+    @pytest.mark.asyncio
+    async def test_get_lineage_finds_ancestors(self, mcp_server):
+        """parentsを持つイベントの祖先を取得できる"""
+        from hiveforge.core.events import HeartbeatEvent
+
+        # Arrange
+        await mcp_server._handle_start_run({"goal": "祖先探索テスト"})
+        run_id = mcp_server._current_run_id
+        ar = mcp_server._get_ar()
+
+        events = list(ar.replay(run_id))
+        first_event_id = events[0].id
+
+        # parentsを持つイベントを追加
+        event2 = HeartbeatEvent(
+            run_id=run_id,
+            actor="test",
+            parents=[first_event_id],
+        )
+        ar.append(event2, run_id)
+
+        # Act
+        result = await mcp_server._handle_get_lineage(
+            {
+                "event_id": event2.id,
+                "direction": "ancestors",
+            }
+        )
+
+        # Assert
+        assert first_event_id in result["ancestors"]
+
+    @pytest.mark.asyncio
+    async def test_get_lineage_finds_descendants(self, mcp_server):
+        """子孫を取得できる"""
+        from hiveforge.core.events import HeartbeatEvent
+
+        # Arrange
+        await mcp_server._handle_start_run({"goal": "子孫探索テスト"})
+        run_id = mcp_server._current_run_id
+        ar = mcp_server._get_ar()
+
+        events = list(ar.replay(run_id))
+        first_event_id = events[0].id
+
+        # parentsを持つ子イベントを追加
+        child_event = HeartbeatEvent(
+            run_id=run_id,
+            actor="test",
+            parents=[first_event_id],
+        )
+        ar.append(child_event, run_id)
+
+        # Act
+        result = await mcp_server._handle_get_lineage(
+            {
+                "event_id": first_event_id,
+                "direction": "descendants",
+            }
+        )
+
+        # Assert
+        assert child_event.id in result["descendants"]
+
+    @pytest.mark.asyncio
+    async def test_get_lineage_truncated(self, mcp_server):
+        """深度制限を超えるとtruncatedになる"""
+        from hiveforge.core.events import HeartbeatEvent
+
+        # Arrange
+        await mcp_server._handle_start_run({"goal": "深度制限テスト"})
+        run_id = mcp_server._current_run_id
+        ar = mcp_server._get_ar()
+
+        events = list(ar.replay(run_id))
+        prev_id = events[0].id
+
+        # 深いチェーンを作成
+        for _ in range(5):
+            event = HeartbeatEvent(
+                run_id=run_id,
+                actor="test",
+                parents=[prev_id],
+            )
+            ar.append(event, run_id)
+            prev_id = event.id
+
+        # Act
+        result = await mcp_server._handle_get_lineage(
+            {
+                "event_id": prev_id,
+                "direction": "ancestors",
+                "max_depth": 2,
+            }
+        )
+
+        # Assert
+        assert result["truncated"] is True
+
+    @pytest.mark.asyncio
+    async def test_get_lineage_descendants_depth_truncated(self, mcp_server):
+        """子孫探索で深度制限を超えるとtruncatedになる"""
+        from hiveforge.core.events import HeartbeatEvent
+
+        # Arrange
+        await mcp_server._handle_start_run({"goal": "子孫深度テスト"})
+        run_id = mcp_server._current_run_id
+        ar = mcp_server._get_ar()
+
+        events = list(ar.replay(run_id))
+        first_event_id = events[0].id
+
+        # 深いチェーンを作成
+        prev_id = first_event_id
+        for _ in range(5):
+            event = HeartbeatEvent(
+                run_id=run_id,
+                actor="test",
+                parents=[prev_id],
+            )
+            ar.append(event, run_id)
+            prev_id = event.id
+
+        # Act
+        result = await mcp_server._handle_get_lineage(
+            {
+                "event_id": first_event_id,
+                "direction": "descendants",
+                "max_depth": 2,
+            }
+        )
+
+        # Assert
+        assert result["truncated"] is True
+
+    @pytest.mark.asyncio
+    async def test_get_lineage_with_nonexistent_parent(self, mcp_server):
+        """存在しない親を持つイベントでもエラーにならない"""
+        from hiveforge.core.events import HeartbeatEvent
+
+        # Arrange
+        await mcp_server._handle_start_run({"goal": "存在しない親テスト"})
+        run_id = mcp_server._current_run_id
+        ar = mcp_server._get_ar()
+
+        # 存在しない親を持つイベントを作成
+        event = HeartbeatEvent(
+            run_id=run_id,
+            actor="test",
+            parents=["nonexistent-parent-id"],
+        )
+        ar.append(event, run_id)
+
+        # Act
+        result = await mcp_server._handle_get_lineage(
+            {
+                "event_id": event.id,
+                "direction": "ancestors",
+            }
+        )
+
+        # Assert: エラーにならない（存在しない親はスキップ）
+        assert "error" not in result
+        assert result["event_id"] == event.id
+
+
 class TestMainFunction:
     """main関数のテスト"""
 

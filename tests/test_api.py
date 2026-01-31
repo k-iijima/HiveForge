@@ -363,6 +363,245 @@ class TestEventsEndpoint:
         assert len(data) == 3
 
 
+class TestLineageEndpoint:
+    """Lineage関連エンドポイントのテスト"""
+
+    def test_get_lineage_basic(self, client):
+        """因果リンクを取得できる"""
+        # Arrange: Runを開始してイベントを取得
+        run_resp = client.post("/runs", json={"goal": "リネージュテスト"})
+        run_id = run_resp.json()["run_id"]
+
+        # イベント一覧を取得
+        events_resp = client.get(f"/runs/{run_id}/events")
+        events = events_resp.json()
+        event_id = events[0]["id"]
+
+        # Act
+        response = client.get(f"/runs/{run_id}/events/{event_id}/lineage")
+
+        # Assert
+        assert response.status_code == 200
+        data = response.json()
+        assert data["event_id"] == event_id
+        assert "ancestors" in data
+        assert "descendants" in data
+        assert "truncated" in data
+
+    def test_get_lineage_event_not_found(self, client):
+        """存在しないイベントのlineageで404を返す"""
+        # Arrange
+        run_resp = client.post("/runs", json={"goal": "エラーテスト"})
+        run_id = run_resp.json()["run_id"]
+
+        # Act
+        response = client.get(f"/runs/{run_id}/events/nonexistent-event/lineage")
+
+        # Assert
+        assert response.status_code == 404
+
+    def test_get_lineage_with_direction(self, client):
+        """方向を指定してlineageを取得できる"""
+        # Arrange
+        run_resp = client.post("/runs", json={"goal": "方向テスト"})
+        run_id = run_resp.json()["run_id"]
+        events_resp = client.get(f"/runs/{run_id}/events")
+        event_id = events_resp.json()[0]["id"]
+
+        # Act
+        response = client.get(f"/runs/{run_id}/events/{event_id}/lineage?direction=ancestors")
+
+        # Assert
+        assert response.status_code == 200
+        data = response.json()
+        assert data["event_id"] == event_id
+
+    def test_get_lineage_with_max_depth(self, client):
+        """max_depthを指定してlineageを取得できる"""
+        # Arrange
+        run_resp = client.post("/runs", json={"goal": "深さテスト"})
+        run_id = run_resp.json()["run_id"]
+        events_resp = client.get(f"/runs/{run_id}/events")
+        event_id = events_resp.json()[0]["id"]
+
+        # Act
+        response = client.get(f"/runs/{run_id}/events/{event_id}/lineage?max_depth=5")
+
+        # Assert
+        assert response.status_code == 200
+
+
+class TestLineageWithParents:
+    """parents付きイベントでのlineageテスト"""
+
+    def test_lineage_finds_ancestors_with_parents(self, client, tmp_path):
+        """parentsを持つイベントの祖先を取得できる"""
+        # Arrange: Runを開始
+        run_resp = client.post("/runs", json={"goal": "祖先テスト"})
+        run_id = run_resp.json()["run_id"]
+
+        # イベント一覧を取得して最初のイベントIDを取得
+        events_resp = client.get(f"/runs/{run_id}/events")
+        first_event_id = events_resp.json()[0]["id"]
+
+        # parentsを持つイベントを直接追加
+        import hiveforge.api.server as server_module
+        from hiveforge.core.events import HeartbeatEvent
+
+        ar = server_module.get_ar()
+        # 2番目のイベント：最初のイベントを親に持つ
+        event2 = HeartbeatEvent(
+            run_id=run_id,
+            actor="test",
+            parents=[first_event_id],
+        )
+        ar.append(event2, run_id)
+
+        # 3番目のイベント：2番目のイベントを親に持つ
+        event3 = HeartbeatEvent(
+            run_id=run_id,
+            actor="test",
+            parents=[event2.id],
+        )
+        ar.append(event3, run_id)
+
+        # Act: 3番目のイベントの祖先を取得
+        response = client.get(f"/runs/{run_id}/events/{event3.id}/lineage?direction=ancestors")
+
+        # Assert: 祖先に2番目と1番目が含まれる
+        assert response.status_code == 200
+        data = response.json()
+        assert event2.id in data["ancestors"]
+        assert first_event_id in data["ancestors"]
+
+    def test_lineage_finds_descendants_with_parents(self, client, tmp_path):
+        """子孫を取得できる"""
+        # Arrange: Runを開始
+        run_resp = client.post("/runs", json={"goal": "子孫テスト"})
+        run_id = run_resp.json()["run_id"]
+
+        # イベント一覧を取得して最初のイベントIDを取得
+        events_resp = client.get(f"/runs/{run_id}/events")
+        first_event_id = events_resp.json()[0]["id"]
+
+        import hiveforge.api.server as server_module
+        from hiveforge.core.events import HeartbeatEvent
+
+        ar = server_module.get_ar()
+        # 子イベント：最初のイベントを親に持つ
+        child_event = HeartbeatEvent(
+            run_id=run_id,
+            actor="test",
+            parents=[first_event_id],
+        )
+        ar.append(child_event, run_id)
+
+        # Act: 最初のイベントの子孫を取得
+        response = client.get(
+            f"/runs/{run_id}/events/{first_event_id}/lineage?direction=descendants"
+        )
+
+        # Assert: 子孫に子イベントが含まれる
+        assert response.status_code == 200
+        data = response.json()
+        assert child_event.id in data["descendants"]
+
+    def test_lineage_truncated_when_depth_exceeded(self, client, tmp_path):
+        """深度制限を超えるとtruncatedになる"""
+        # Arrange: Runを開始
+        run_resp = client.post("/runs", json={"goal": "深度テスト"})
+        run_id = run_resp.json()["run_id"]
+
+        events_resp = client.get(f"/runs/{run_id}/events")
+        first_event_id = events_resp.json()[0]["id"]
+
+        import hiveforge.api.server as server_module
+        from hiveforge.core.events import HeartbeatEvent
+
+        ar = server_module.get_ar()
+
+        # 深いチェーンを作成
+        prev_id = first_event_id
+        for _ in range(5):
+            event = HeartbeatEvent(
+                run_id=run_id,
+                actor="test",
+                parents=[prev_id],
+            )
+            ar.append(event, run_id)
+            prev_id = event.id
+
+        # Act: 最後のイベントの祖先をmax_depth=2で取得
+        response = client.get(
+            f"/runs/{run_id}/events/{prev_id}/lineage?direction=ancestors&max_depth=2"
+        )
+
+        # Assert: truncatedがTrue
+        assert response.status_code == 200
+        data = response.json()
+        assert data["truncated"] is True
+
+    def test_lineage_descendants_depth_truncated(self, client, tmp_path):
+        """子孫探索で深度制限を超えるとtruncatedになる"""
+        # Arrange: Runを開始
+        run_resp = client.post("/runs", json={"goal": "子孫深度テスト"})
+        run_id = run_resp.json()["run_id"]
+
+        events_resp = client.get(f"/runs/{run_id}/events")
+        first_event_id = events_resp.json()[0]["id"]
+
+        import hiveforge.api.server as server_module
+        from hiveforge.core.events import HeartbeatEvent
+
+        ar = server_module.get_ar()
+
+        # 深いチェーンを作成（最初のイベントの子孫を作る）
+        prev_id = first_event_id
+        for _ in range(5):
+            event = HeartbeatEvent(
+                run_id=run_id,
+                actor="test",
+                parents=[prev_id],
+            )
+            ar.append(event, run_id)
+            prev_id = event.id
+
+        # Act: 最初のイベントの子孫をmax_depth=2で取得
+        response = client.get(
+            f"/runs/{run_id}/events/{first_event_id}/lineage?direction=descendants&max_depth=2"
+        )
+
+        # Assert: truncatedがTrue
+        assert response.status_code == 200
+        data = response.json()
+        assert data["truncated"] is True
+
+    def test_lineage_with_parent_not_in_run(self, client, tmp_path):
+        """存在しない親を持つイベントでもエラーにならない"""
+        # Arrange: Runを開始
+        run_resp = client.post("/runs", json={"goal": "存在しない親テスト"})
+        run_id = run_resp.json()["run_id"]
+
+        import hiveforge.api.server as server_module
+        from hiveforge.core.events import HeartbeatEvent
+
+        ar = server_module.get_ar()
+
+        # 存在しない親を持つイベントを作成
+        event = HeartbeatEvent(
+            run_id=run_id,
+            actor="test",
+            parents=["nonexistent-parent-id"],
+        )
+        ar.append(event, run_id)
+
+        # Act
+        response = client.get(f"/runs/{run_id}/events/{event.id}/lineage?direction=ancestors")
+
+        # Assert: エラーにならない（存在しない親はスキップされる）
+        assert response.status_code == 200
+
+
 class TestHeartbeatEndpoint:
     """ハートビートエンドポイントのテスト"""
 

@@ -269,6 +269,33 @@ class HiveForgeMCPServer:
                             "required": ["reason"],
                         },
                     ),
+                    Tool(
+                        name="get_lineage",
+                        description="イベントの因果リンクを取得します。任意の成果物から「なぜ」を遡及できます。",
+                        inputSchema={
+                            "type": "object",
+                            "properties": {
+                                "event_id": {
+                                    "type": "string",
+                                    "description": "対象のイベントID",
+                                },
+                                "direction": {
+                                    "type": "string",
+                                    "enum": ["ancestors", "descendants", "both"],
+                                    "description": "探索方向（ancestors: 祖先, descendants: 子孫, both: 両方）",
+                                    "default": "both",
+                                },
+                                "max_depth": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 100,
+                                    "description": "最大探索深度",
+                                    "default": 10,
+                                },
+                            },
+                            "required": ["event_id"],
+                        },
+                    ),
                 ]
             )
 
@@ -576,6 +603,81 @@ class HiveForgeMCPServer:
             "reason": reason,
             "scope": scope,
             "stopped_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+    async def _handle_get_lineage(self, args: dict[str, Any]) -> dict[str, Any]:
+        """因果リンクを取得"""
+        if not self._current_run_id:
+            return {"error": "No active run."}
+
+        ar = self._get_ar()
+        event_id = args.get("event_id")
+
+        if not event_id:
+            return {"error": "event_id is required"}
+
+        direction = args.get("direction", "both")
+        max_depth = args.get("max_depth", 10)
+
+        # 全イベントを取得してインデックス化
+        all_events: dict[str, Any] = {}
+        for event in ar.replay(self._current_run_id):
+            all_events[event.id] = event
+
+        if event_id not in all_events:
+            return {"error": f"Event {event_id} not found"}
+
+        ancestors: list[str] = []
+        descendants: list[str] = []
+        truncated = False
+
+        # 祖先を探索（親方向）
+        if direction in ("ancestors", "both"):
+            visited: set[str] = set()
+            queue = [(event_id, 0)]
+
+            while queue:
+                current_id, depth = queue.pop(0)
+                if depth >= max_depth:
+                    truncated = True
+                    continue
+
+                if current_id not in all_events:  # pragma: no cover (defensive check)
+                    continue
+
+                current_event = all_events[current_id]
+                parents = getattr(current_event, "parents", [])
+
+                for parent_id in parents:
+                    if parent_id not in visited and parent_id in all_events:
+                        visited.add(parent_id)
+                        ancestors.append(parent_id)
+                        queue.append((parent_id, depth + 1))
+
+        # 子孫を探索（子方向） - 全走査
+        if direction in ("descendants", "both"):
+            visited_desc: set[str] = set()
+            queue_desc = [(event_id, 0)]
+
+            while queue_desc:
+                current_id, depth = queue_desc.pop(0)
+                if depth >= max_depth:
+                    truncated = True
+                    continue
+
+                # 全イベントを走査して、parentsに含むものを検索
+                for evt_id, evt in all_events.items():
+                    parents = getattr(evt, "parents", [])
+                    if current_id in parents and evt_id not in visited_desc:
+                        visited_desc.add(evt_id)
+                        descendants.append(evt_id)
+                        queue_desc.append((evt_id, depth + 1))
+
+        return {
+            "event_id": event_id,
+            "ancestors": ancestors,
+            "descendants": descendants,
+            "truncated": truncated,
         }
 
     async def run(self) -> None:  # pragma: no cover

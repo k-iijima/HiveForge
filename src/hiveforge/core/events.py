@@ -112,6 +112,10 @@ class BaseEvent(BaseModel):
     actor: str = Field(default="system", description="イベント発生者")
     payload: dict[str, Any] = Field(default_factory=dict, description="イベントペイロード")
     prev_hash: str | None = Field(default=None, description="前イベントのハッシュ（チェーン用）")
+    parents: list[str] = Field(
+        default_factory=list,
+        description="親イベントのID（因果リンク用）",
+    )
 
     @computed_field
     @property
