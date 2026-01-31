@@ -45,6 +45,26 @@ pytest -v        # 詳細表示
 ### Devcontainer（推奨）
 コマンドパレット → `Dev Containers: Reopen in Container`
 
+### GPU サポート（Windows + NVIDIA）
+
+Rancher Desktop は GPU をサポートしていないため、Ubuntu WSL の Docker を使用します：
+
+```powershell
+# 1. Ubuntu WSL の Docker を起動
+wsl -d Ubuntu -e sudo service docker start
+
+# 2. GPU テスト
+wsl -d Ubuntu docker run --rm --gpus all nvidia/cuda:12.0.0-base-ubuntu22.04 nvidia-smi
+```
+
+または、スクリプトを使用：
+```powershell
+.\scripts\start-wsl-docker.cmd
+```
+
+> **Note:** 初回は `wsl -d Ubuntu` で入り、NVIDIA Container Toolkit をインストールしてください。
+> 詳細: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
+
 ### ローカル
 ```bash
 python -m venv .venv && source .venv/bin/activate

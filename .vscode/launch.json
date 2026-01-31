@@ -1,0 +1,80 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "HiveForge API Server",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "hiveforge.cli",
+            "args": [
+                "server",
+                "--reload"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            }
+        },
+        {
+            "name": "HiveForge MCP Server",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "hiveforge.cli",
+            "args": [
+                "mcp"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            }
+        },
+        {
+            "name": "Run Tests",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "-v"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "HiveForge Extension",
+            "type": "extensionHost",
+            "request": "launch",
+            "args": [
+                "${workspaceFolder}/tests",
+                "--extensionDevelopmentPath=${workspaceFolder}/vscode-extension"
+            ],
+            "outFiles": [
+                "${workspaceFolder}/vscode-extension/out/**/*.js"
+            ],
+            "preLaunchTask": "npm: compile - vscode-extension"
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Full Stack + Extension",
+            "configurations": [
+                "HiveForge API Server",
+                "HiveForge Extension"
+            ],
+            "presentation": {
+                "order": 1
+            }
+        },
+        {
+            "name": "Full Stack (API + MCP)",
+            "configurations": [
+                "HiveForge API Server",
+                "HiveForge MCP Server"
+            ],
+            "presentation": {
+                "order": 2
+            }
+        }
+    ]
+}

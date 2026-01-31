@@ -1,0 +1,30 @@
+{
+    "mcp": {
+        "servers": {
+            "hiveforge": {
+                "type": "stdio",
+                "command": "python",
+                "args": [
+                    "-m",
+                    "hiveforge.cli",
+                    "mcp"
+                ],
+                "cwd": "/workspace/HiveForge",
+                "env": {
+                    "PYTHONPATH": "/workspace/HiveForge/src"
+                }
+            }
+        }
+    },
+    "chat.mcp.access": "all",
+    // Ubuntu WSL の Docker を使用（GPU サポート）
+    // Dev Containers: WSL 内の Docker を使用
+    "dev.containers.executeInWSL": true,
+    "dev.containers.executeInWSLDistro": "Ubuntu",
+    // Docker 拡張機能: WSL の Docker API に接続
+    "docker.host": "tcp://localhost:2375",
+    "docker.context": "wsl-docker",
+    // Docker CLI のパスを明示的に指定（WSLラッパーではなくネイティブCLI）
+    "docker.dockerPath": "C:\\Users\\kiiji\\bin\\docker.exe",
+    "containers.containerCommand": "C:\\Users\\kiiji\\bin\\docker.exe"
+}

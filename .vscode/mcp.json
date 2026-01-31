@@ -1,0 +1,29 @@
+{
+  "servers": {
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest",
+        "--headless",
+        "--browser",
+        "chromium",
+        "--caps=vision"
+      ]
+    },
+    "agent-ui": {
+      "command": "hiveforge-agent-ui",
+      "args": [],
+      "env": {
+        "OLLAMA_BASE_URL": "http://hiveforge-dev-ollama:11434",
+        "VLM_HEADLESS": "true"
+      }
+    },
+    "hiveforge": {
+      "command": "hiveforge",
+      "args": [
+        "mcp"
+      ],
+      "env": {}
+    }
+  }
+}

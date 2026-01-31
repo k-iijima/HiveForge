@@ -20,7 +20,24 @@ HiveForgeは、LLMを活用した自律型ソフトウェア開発支援シス�
 - VS Code + GitHub Copilot拡張機能（推奨）
 - GitHub Copilotサブスクリプション
 
-### インストール
+### 開発環境 (devcontainer推奨)
+
+VS Codeのdevcontainerを使用すると、環境差異なく開発を開始できます。
+
+```bash
+# VS Codeでリポジトリを開く
+code hiveforge
+
+# コマンドパレット > "Dev Containers: Reopen in Container"
+```
+
+GPUの有無は自動検出されます：
+- **GPU搭載**: NVIDIA GPU対応のOllamaが自動起動、VLM機能が利用可能
+- **GPUなし**: CPU版Ollamaにフォールバック（低速だが動作）
+
+### ローカルインストール
+
+devcontainerを使用しない場合：
 
 ```bash
 # リポジトリをクローン
