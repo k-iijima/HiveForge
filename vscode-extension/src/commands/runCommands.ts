@@ -10,6 +10,7 @@ import { RequirementsProvider } from '../providers/requirementsProvider';
 import { EventsProvider } from '../providers/eventsProvider';
 
 import { RunItem } from '../providers/runsProvider';
+import { HiveEvent } from '../client';
 
 export interface Providers {
     runs: RunsProvider;
@@ -34,7 +35,8 @@ export function registerRunCommands(
         vscode.commands.registerCommand('hiveforge.refresh', refresh),
         vscode.commands.registerCommand('hiveforge.selectRun', (runId: string) => selectRun(runId, client, providers)),
         vscode.commands.registerCommand('hiveforge.completeRun', (item: RunItem) => completeRun(item, client, refresh)),
-        vscode.commands.registerCommand('hiveforge.abortRun', (item: RunItem) => abortRun(item, client, refresh))
+        vscode.commands.registerCommand('hiveforge.abortRun', (item: RunItem) => abortRun(item, client, refresh)),
+        vscode.commands.registerCommand('hiveforge.showEventDetails', (event: HiveEvent) => showEventDetails(event))
     );
 }
 
@@ -114,4 +116,27 @@ async function abortRun(item: RunItem, client: HiveForgeClient, refresh: () => v
             vscode.window.showErrorMessage(`Run中止に失敗: ${error}`);
         }
     }
+}
+
+async function showEventDetails(event: HiveEvent): Promise<void> {
+    const lines = [
+        `**Event ID:** ${event.id}`,
+        `**Type:** ${event.type}`,
+        `**Timestamp:** ${event.timestamp}`,
+        `**Actor:** ${event.actor}`,
+        `**Hash:** ${event.hash}`,
+        event.prev_hash ? `**Prev Hash:** ${event.prev_hash}` : null,
+        event.parents && event.parents.length > 0 ? `**Parents:** ${event.parents.join(', ')}` : null,
+        '',
+        '**Payload:**',
+        '```json',
+        JSON.stringify(event.payload, null, 2),
+        '```',
+    ].filter(Boolean).join('\n');
+
+    const doc = await vscode.workspace.openTextDocument({
+        content: lines,
+        language: 'markdown',
+    });
+    await vscode.window.showTextDocument(doc, { preview: true });
 }

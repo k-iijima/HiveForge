@@ -90,7 +90,9 @@ export class RequirementsProvider implements vscode.TreeDataProvider<Requirement
                 req => new RequirementItem(req, vscode.TreeItemCollapsibleState.None)
             );
         } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
             console.error('Failed to get requirements:', error);
+            vscode.window.showErrorMessage(`HiveForge: 確認要請一覧の取得に失敗しました: ${message}`);
             return [];
         }
     }

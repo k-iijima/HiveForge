@@ -19,7 +19,7 @@ export interface Run {
 export interface Task {
     task_id: string;
     title: string;
-    state: 'pending' | 'assigned' | 'in_progress' | 'completed' | 'failed' | 'blocked';
+    state: 'pending' | 'in_progress' | 'completed' | 'failed' | 'blocked';
     progress: number;
     assignee?: string | null;
 }
@@ -43,6 +43,8 @@ export interface HiveEvent {
     actor: string;
     payload: Record<string, unknown>;
     hash: string;
+    prev_hash?: string | null;
+    parents?: string[];
 }
 
 export interface RunStatus {

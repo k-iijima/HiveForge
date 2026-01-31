@@ -5,11 +5,12 @@ from unittest.mock import patch, MagicMock
 from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 
-from hiveforge.api.server import (
-    app,
+from hiveforge.api.server import app
+from hiveforge.api.helpers import (
     get_ar,
-    _active_runs,
-    _ar,
+    get_active_runs,
+    set_ar,
+    clear_active_runs,
 )
 
 
@@ -17,22 +18,24 @@ from hiveforge.api.server import (
 def client(tmp_path):
     """テスト用クライアント"""
     # グローバル状態をクリア
-    import hiveforge.api.server as server_module
+    set_ar(None)
+    clear_active_runs()
 
-    server_module._ar = None
-    server_module._active_runs = {}
+    # server.py と helpers.py の両方で使用される get_settings をモック
+    mock_s = MagicMock()
+    mock_s.get_vault_path.return_value = tmp_path / "Vault"
+    mock_s.server.cors.enabled = False
 
-    with patch("hiveforge.api.server.get_settings") as mock_settings:
-        mock_s = MagicMock()
-        mock_s.get_vault_path.return_value = tmp_path / "Vault"
-        mock_settings.return_value = mock_s
-
+    with (
+        patch("hiveforge.api.server.get_settings", return_value=mock_s),
+        patch("hiveforge.api.helpers.get_settings", return_value=mock_s),
+    ):
         with TestClient(app) as client:
             yield client
 
     # クリーンアップ
-    server_module._ar = None
-    server_module._active_runs = {}
+    set_ar(None)
+    clear_active_runs()
 
 
 class TestHealthEndpoint:
@@ -445,10 +448,10 @@ class TestLineageWithParents:
         first_event_id = events_resp.json()[0]["id"]
 
         # parentsを持つイベントを直接追加
-        import hiveforge.api.server as server_module
+        import hiveforge.api.helpers as helpers_module
         from hiveforge.core.events import HeartbeatEvent
 
-        ar = server_module.get_ar()
+        ar = helpers_module.get_ar()
         # 2番目のイベント：最初のイベントを親に持つ
         event2 = HeartbeatEvent(
             run_id=run_id,
@@ -484,10 +487,10 @@ class TestLineageWithParents:
         events_resp = client.get(f"/runs/{run_id}/events")
         first_event_id = events_resp.json()[0]["id"]
 
-        import hiveforge.api.server as server_module
+        import hiveforge.api.helpers as helpers_module
         from hiveforge.core.events import HeartbeatEvent
 
-        ar = server_module.get_ar()
+        ar = helpers_module.get_ar()
         # 子イベント：最初のイベントを親に持つ
         child_event = HeartbeatEvent(
             run_id=run_id,
@@ -515,10 +518,10 @@ class TestLineageWithParents:
         events_resp = client.get(f"/runs/{run_id}/events")
         first_event_id = events_resp.json()[0]["id"]
 
-        import hiveforge.api.server as server_module
+        import hiveforge.api.helpers as helpers_module
         from hiveforge.core.events import HeartbeatEvent
 
-        ar = server_module.get_ar()
+        ar = helpers_module.get_ar()
 
         # 深いチェーンを作成
         prev_id = first_event_id
@@ -550,10 +553,10 @@ class TestLineageWithParents:
         events_resp = client.get(f"/runs/{run_id}/events")
         first_event_id = events_resp.json()[0]["id"]
 
-        import hiveforge.api.server as server_module
+        import hiveforge.api.helpers as helpers_module
         from hiveforge.core.events import HeartbeatEvent
 
-        ar = server_module.get_ar()
+        ar = helpers_module.get_ar()
 
         # 深いチェーンを作成（最初のイベントの子孫を作る）
         prev_id = first_event_id
@@ -582,10 +585,10 @@ class TestLineageWithParents:
         run_resp = client.post("/runs", json={"goal": "存在しない親テスト"})
         run_id = run_resp.json()["run_id"]
 
-        import hiveforge.api.server as server_module
+        import hiveforge.api.helpers as helpers_module
         from hiveforge.core.events import HeartbeatEvent
 
-        ar = server_module.get_ar()
+        ar = helpers_module.get_ar()
 
         # 存在しない親を持つイベントを作成
         event = HeartbeatEvent(
@@ -635,11 +638,11 @@ class TestGetArFunction:
     def test_get_ar_creates_instance(self, tmp_path):
         """ARインスタンスを作成する"""
         # Arrange
-        import hiveforge.api.server as server_module
+        import hiveforge.api.helpers as helpers_module
 
-        server_module._ar = None
+        set_ar(None)
 
-        with patch("hiveforge.api.server.get_settings") as mock_settings:
+        with patch("hiveforge.api.helpers.get_settings") as mock_settings:
             mock_s = MagicMock()
             mock_s.get_vault_path.return_value = tmp_path / "Vault"
             mock_settings.return_value = mock_s
@@ -651,15 +654,15 @@ class TestGetArFunction:
             assert ar is not None
 
         # Cleanup
-        server_module._ar = None
+        set_ar(None)
 
     def test_get_ar_returns_existing(self, tmp_path):
         """既存のARインスタンスを返す"""
         # Arrange
-        import hiveforge.api.server as server_module
+        import hiveforge.api.helpers as helpers_module
 
         mock_ar = MagicMock()
-        server_module._ar = mock_ar
+        set_ar(mock_ar)
 
         # Act
         ar = get_ar()
@@ -668,7 +671,7 @@ class TestGetArFunction:
         assert ar is mock_ar
 
         # Cleanup
-        server_module._ar = None
+        set_ar(None)
 
 
 class TestLifespanRunRecovery:
@@ -676,8 +679,6 @@ class TestLifespanRunRecovery:
 
     def test_lifespan_recovers_running_runs(self, tmp_path):
         """起動時にRUNNING状態のRunを復元する"""
-        # Arrange
-        import hiveforge.api.server as server_module
         from hiveforge.core.ar.storage import AkashicRecord
         from hiveforge.core.events import RunStartedEvent
 
@@ -692,24 +693,28 @@ class TestLifespanRunRecovery:
         ar.append(event, "recovery-run-001")
 
         # グローバル状態をクリア
-        server_module._ar = None
-        server_module._active_runs = {}
+        set_ar(None)
+        clear_active_runs()
 
-        with patch("hiveforge.api.server.get_settings") as mock_settings:
-            mock_s = MagicMock()
-            mock_s.get_vault_path.return_value = vault_path
-            mock_settings.return_value = mock_s
+        # server.py と helpers.py の両方で使用される get_settings をモック
+        mock_s = MagicMock()
+        mock_s.get_vault_path.return_value = vault_path
+        mock_s.server.cors.enabled = False
 
+        with (
+            patch("hiveforge.api.server.get_settings", return_value=mock_s),
+            patch("hiveforge.api.helpers.get_settings", return_value=mock_s),
+        ):
             # Act
             with TestClient(app) as client:
                 # Assert: 復元されたRunがアクティブに追加されている
-                assert "recovery-run-001" in server_module._active_runs
-                proj = server_module._active_runs["recovery-run-001"]
+                assert "recovery-run-001" in get_active_runs()
+                proj = get_active_runs()["recovery-run-001"]
                 assert proj.goal == "Recovery test"
 
         # Cleanup
-        server_module._ar = None
-        server_module._active_runs = {}
+        set_ar(None)
+        clear_active_runs()
 
 
 class TestGetRunFromInactiveRun:
@@ -723,9 +728,9 @@ class TestGetRunFromInactiveRun:
         client.post(f"/runs/{run_id}/complete")
 
         # runを_active_runsから削除されていることを確認
-        import hiveforge.api.server as server_module
+        import hiveforge.api.helpers as helpers_module
 
-        assert run_id not in server_module._active_runs
+        assert run_id not in get_active_runs()
 
         # Act: 完了したRunを取得
         response = client.get(f"/runs/{run_id}")
@@ -742,9 +747,6 @@ class TestListRunsEdgeCases:
 
     def test_list_runs_with_empty_events_file(self, tmp_path):
         """空のevents.jsonlがあるRunがリストから除外される"""
-        # Arrange
-        import hiveforge.api.server as server_module
-
         vault_path = tmp_path / "Vault"
         vault_path.mkdir(parents=True, exist_ok=True)
 
@@ -753,14 +755,18 @@ class TestListRunsEdgeCases:
         runs_dir.mkdir(parents=True, exist_ok=True)
         (runs_dir / "events.jsonl").touch()  # 空のファイル
 
-        server_module._ar = None
-        server_module._active_runs = {}
+        set_ar(None)
+        clear_active_runs()
 
-        with patch("hiveforge.api.server.get_settings") as mock_settings:
-            mock_s = MagicMock()
-            mock_s.get_vault_path.return_value = vault_path
-            mock_settings.return_value = mock_s
+        # server.py と helpers.py の両方で使用される get_settings をモック
+        mock_s = MagicMock()
+        mock_s.get_vault_path.return_value = vault_path
+        mock_s.server.cors.enabled = False
 
+        with (
+            patch("hiveforge.api.server.get_settings", return_value=mock_s),
+            patch("hiveforge.api.helpers.get_settings", return_value=mock_s),
+        ):
             with TestClient(app) as client:
                 # Act: 全てのRunをリスト
                 response = client.get("/runs?active_only=false")
@@ -773,8 +779,8 @@ class TestListRunsEdgeCases:
                 assert "empty-run" not in run_ids
 
         # Cleanup
-        server_module._ar = None
-        server_module._active_runs = {}
+        set_ar(None)
+        clear_active_runs()
 
 
 class TestLifespanNoRuns:
@@ -782,34 +788,33 @@ class TestLifespanNoRuns:
 
     def test_lifespan_with_no_existing_runs(self, tmp_path):
         """既存のRunがない場合も正常に起動する"""
-        # Arrange
-        import hiveforge.api.server as server_module
-
         vault_path = tmp_path / "EmptyVault"
         vault_path.mkdir(parents=True, exist_ok=True)
 
-        server_module._ar = None
-        server_module._active_runs = {}
+        set_ar(None)
+        clear_active_runs()
 
-        with patch("hiveforge.api.server.get_settings") as mock_settings:
-            mock_s = MagicMock()
-            mock_s.get_vault_path.return_value = vault_path
-            mock_settings.return_value = mock_s
+        # server.py と helpers.py の両方で使用される get_settings をモック
+        mock_s = MagicMock()
+        mock_s.get_vault_path.return_value = vault_path
+        mock_s.server.cors.enabled = False
 
+        with (
+            patch("hiveforge.api.server.get_settings", return_value=mock_s),
+            patch("hiveforge.api.helpers.get_settings", return_value=mock_s),
+        ):
             # Act & Assert: エラーなく起動
             with TestClient(app) as client:
                 response = client.get("/health")
                 assert response.status_code == 200
-                assert len(server_module._active_runs) == 0
+                assert len(get_active_runs()) == 0
 
         # Cleanup
-        server_module._ar = None
-        server_module._active_runs = {}
+        set_ar(None)
+        clear_active_runs()
 
     def test_lifespan_with_completed_run_only(self, tmp_path):
         """COMPLETEDのRunのみの場合、アクティブに追加されない"""
-        # Arrange
-        import hiveforge.api.server as server_module
         from hiveforge.core.ar.storage import AkashicRecord
         from hiveforge.core.events import RunStartedEvent, RunCompletedEvent
 
@@ -831,22 +836,26 @@ class TestLifespanNoRuns:
         )
         ar.append(complete_event, run_id)
 
-        server_module._ar = None
-        server_module._active_runs = {}
+        set_ar(None)
+        clear_active_runs()
 
-        with patch("hiveforge.api.server.get_settings") as mock_settings:
-            mock_s = MagicMock()
-            mock_s.get_vault_path.return_value = vault_path
-            mock_settings.return_value = mock_s
+        # server.py と helpers.py の両方で使用される get_settings をモック
+        mock_s = MagicMock()
+        mock_s.get_vault_path.return_value = vault_path
+        mock_s.server.cors.enabled = False
 
+        with (
+            patch("hiveforge.api.server.get_settings", return_value=mock_s),
+            patch("hiveforge.api.helpers.get_settings", return_value=mock_s),
+        ):
             # Act
             with TestClient(app) as client:
                 # Assert: 完了済みRunはアクティブに追加されない
-                assert run_id not in server_module._active_runs
+                assert run_id not in get_active_runs()
 
         # Cleanup
-        server_module._ar = None
-        server_module._active_runs = {}
+        set_ar(None)
+        clear_active_runs()
 
 
 class TestAssignTaskEndpoint:

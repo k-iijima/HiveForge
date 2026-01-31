@@ -56,8 +56,10 @@
   "remoteEnv": {
     "PATH": "${containerEnv:PATH}:/home/vscode/.local/bin",
     "OLLAMA_HOST": "http://ollama:11434",
+    "OLLAMA_BASE_URL": "http://hiveforge-dev-ollama:11434",
     "HIVEFORGE_GPU": "${localEnv:HIVEFORGE_GPU}",
-    "PLAYWRIGHT_MCP_URL": "http://playwright-mcp:8931"
+    "PLAYWRIGHT_MCP_URL": "http://hiveforge-playwright-mcp:8931",
+    "VLM_HEADLESS": "true"
   },
   "remoteUser": "vscode"
 }

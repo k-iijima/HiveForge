@@ -29,7 +29,7 @@ devcontainer内で **F5キー** を押すとAPIサーバーが起動します。
 ## テスト
 
 ```bash
-pytest           # 全テスト（211件）
+pytest           # 全テスト（293件）
 pytest -v        # 詳細表示
 ```
 

@@ -17,6 +17,21 @@ def mcp_server(tmp_path):
         mock_settings.return_value = mock_s
 
         server = HiveForgeMCPServer()
+
+        # ハンドラーへのショートカットを追加（テスト互換性のため）
+        server._handle_start_run = server._run_handlers.handle_start_run
+        server._handle_get_run_status = server._run_handlers.handle_get_run_status
+        server._handle_complete_run = server._run_handlers.handle_complete_run
+        server._handle_heartbeat = server._run_handlers.handle_heartbeat
+        server._handle_emergency_stop = server._run_handlers.handle_emergency_stop
+        server._handle_create_task = server._task_handlers.handle_create_task
+        server._handle_assign_task = server._task_handlers.handle_assign_task
+        server._handle_report_progress = server._task_handlers.handle_report_progress
+        server._handle_complete_task = server._task_handlers.handle_complete_task
+        server._handle_fail_task = server._task_handlers.handle_fail_task
+        server._handle_create_requirement = server._requirement_handlers.handle_create_requirement
+        server._handle_get_lineage = server._lineage_handlers.handle_get_lineage
+
         yield server
 
 

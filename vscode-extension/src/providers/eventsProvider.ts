@@ -71,7 +71,9 @@ export class EventsProvider implements vscode.TreeDataProvider<EventItem> {
                 .reverse()
                 .map(event => new EventItem(event, vscode.TreeItemCollapsibleState.None));
         } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
             console.error('Failed to get events:', error);
+            vscode.window.showErrorMessage(`HiveForge: イベント一覧の取得に失敗しました: ${message}`);
             return [];
         }
     }

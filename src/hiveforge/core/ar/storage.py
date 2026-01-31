@@ -64,17 +64,42 @@ class AkashicRecord:
 
         events_file = self._get_events_file(actual_run_id)
 
-        # prev_hashを設定した新しいイベントを作成（イミュータブルなので再作成）
-        event_dict = event.model_dump()
-        event_dict["prev_hash"] = self._last_hash
-        event_dict["run_id"] = actual_run_id
-        updated_event = parse_event(event_dict)
+        # ファイルロック付きで「末尾ハッシュ取得 → 追記」をアトミックに実行
+        # これにより再起動や複数プロセスでも prev_hash の整合性を保証
+        with portalocker.Lock(events_file, mode="a+", encoding="utf-8", timeout=10) as f:
+            # ファイル末尾から最後のイベントのハッシュを取得（末尾行のみ読む）
+            f.seek(0, 2)  # ファイル末尾へ
+            file_size = f.tell()
+            last_hash = None
 
-        # ファイルロック付きで追記
-        with portalocker.Lock(events_file, mode="a", encoding="utf-8", timeout=10) as f:
+            if file_size > 0:
+                # 末尾からブロックを読んで最後の行を取得
+                chunk_size = min(4096, file_size)
+                f.seek(max(0, file_size - chunk_size))
+                chunk = f.read()
+                lines = chunk.strip().split("\n")
+                # 末尾の非空行を探す
+                for line in reversed(lines):
+                    line = line.strip()
+                    if line:
+                        try:
+                            last_event = parse_event(line)
+                            last_hash = last_event.hash
+                        except Exception:
+                            pass  # 不正な行はスキップ
+                        break
+
+            # prev_hashを設定した新しいイベントを作成（イミュータブルなので再作成）
+            event_dict = event.model_dump()
+            event_dict["prev_hash"] = last_hash
+            event_dict["run_id"] = actual_run_id
+            updated_event = parse_event(event_dict)
+
+            # 末尾に追記
+            f.seek(0, 2)  # ファイル末尾へ移動
             f.write(updated_event.to_jsonl() + "\n")
 
-        # 最後のハッシュを更新
+        # キャッシュも更新（同一インスタンス内の最適化用）
         self._last_hash = updated_event.hash
 
         return updated_event

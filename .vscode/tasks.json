@@ -112,6 +112,48 @@
                 "isDefault": true
             },
             "problemMatcher": []
+        },
+        {
+            "label": "全テスト: ユニット + E2E",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "-m",
+                "pytest",
+                "tests",
+                "-v",
+                "--tb=short",
+                "-o",
+                "addopts="
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": {
+                    "PLAYWRIGHT_MCP_URL": "http://hiveforge-playwright-mcp:8931",
+                    "OLLAMA_BASE_URL": "http://hiveforge-dev-ollama:11434",
+                    "VLM_HEADLESS": "true"
+                }
+            },
+            "group": "test",
+            "problemMatcher": []
+        },
+        {
+            "label": "全テスト: ユニットのみ",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "-m",
+                "pytest",
+                "tests",
+                "-v",
+                "--tb=short",
+                "--ignore=tests/e2e"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "problemMatcher": []
         }
     ]
 }

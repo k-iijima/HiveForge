@@ -34,6 +34,7 @@ services:
       hiveforge-dev-net:
         aliases:
           - ollama
+          - hiveforge-dev-ollama
     deploy:
       resources:
         reservations:
@@ -57,6 +58,7 @@ services:
       hiveforge-dev-net:
         aliases:
           - ollama
+          - hiveforge-dev-ollama
 
   # code-server: ブラウザ版VS Code（VLMテスト対象）
   code-server:
@@ -87,7 +89,10 @@ services:
     command: ["--port", "8931", "--host", "0.0.0.0", "--allowed-hosts", "*"]
     restart: unless-stopped
     networks:
-      - hiveforge-dev-net
+      hiveforge-dev-net:
+        aliases:
+          - playwright-mcp
+          - hiveforge-playwright-mcp
 
 volumes:
   hiveforge-venv:

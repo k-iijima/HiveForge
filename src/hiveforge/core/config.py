@@ -19,7 +19,9 @@ class GovernanceConfig(BaseModel):
     max_oscillations: int = Field(default=5, ge=1, le=20, description="振動検知しきい値")
     max_concurrent_tasks: int = Field(default=10, ge=1, le=100, description="最大同時タスク数")
     task_timeout_seconds: int = Field(default=300, ge=30, description="タスクタイムアウト秒")
-    heartbeat_interval_seconds: int = Field(default=30, ge=5, le=120, description="ハートビート間隔秒")
+    heartbeat_interval_seconds: int = Field(
+        default=30, ge=5, le=120, description="ハートビート間隔秒"
+    )
     approval_timeout_hours: int = Field(default=24, ge=1, description="承認タイムアウト時間")
     archive_after_days: int = Field(default=7, ge=1, description="アーカイブまでの日数")
 
@@ -41,11 +43,25 @@ class AuthConfig(BaseModel):
     api_key_env: str = Field(default="HIVEFORGE_API_KEY")
 
 
+class CORSConfig(BaseModel):
+    """CORS設定"""
+
+    enabled: bool = Field(default=True, description="CORSを有効にするか")
+    allow_origins: list[str] = Field(
+        default=["*"],
+        description="許可するオリジン（本番では具体的なオリジンを指定）",
+    )
+    allow_credentials: bool = Field(default=True)
+    allow_methods: list[str] = Field(default=["*"])
+    allow_headers: list[str] = Field(default=["*"])
+
+
 class ServerConfig(BaseModel):
     """サーバー設定"""
 
     host: str = Field(default="0.0.0.0")
     port: int = Field(default=8000, ge=1, le=65535)
+    cors: CORSConfig = Field(default_factory=CORSConfig)
 
 
 class LoggingConfig(BaseModel):

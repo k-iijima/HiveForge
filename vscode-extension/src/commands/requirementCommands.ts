@@ -74,7 +74,8 @@ async function rejectRequirement(
             placeHolder: '例: 要件が不明確です',
         });
 
-        await client.resolveRequirement(runId, requirement.id, false, reason);
+        // reasonはcomment引数に渡す（selected_optionではない）
+        await client.resolveRequirement(runId, requirement.id, false, undefined, reason);
         vscode.window.showInformationMessage(`要件を却下しました: ${requirement.description.substring(0, 30)}...`);
         refresh();
     } catch (error) {

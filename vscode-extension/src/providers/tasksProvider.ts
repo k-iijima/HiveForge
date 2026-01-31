@@ -21,9 +21,6 @@ export class TaskItem extends vscode.TreeItem {
             case 'pending':
                 this.iconPath = new vscode.ThemeIcon('circle-outline');
                 break;
-            case 'assigned':
-                this.iconPath = new vscode.ThemeIcon('account');
-                break;
             case 'in_progress':
                 this.iconPath = new vscode.ThemeIcon('sync~spin', new vscode.ThemeColor('charts.blue'));
                 break;
@@ -87,7 +84,9 @@ export class TasksProvider implements vscode.TreeDataProvider<TaskItem> {
                 : tasks.filter(task => task.state !== 'completed' && task.state !== 'failed');
             return filtered.map(task => new TaskItem(task, vscode.TreeItemCollapsibleState.None));
         } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
             console.error('Failed to get tasks:', error);
+            vscode.window.showErrorMessage(`HiveForge: Task一覧の取得に失敗しました: ${message}`);
             return [];
         }
     }

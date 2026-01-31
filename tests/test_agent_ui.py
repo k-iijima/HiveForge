@@ -19,64 +19,42 @@ class TestBrowserSession:
     def test_initial_state(self):
         """初期状態ではブラウザは起動していない"""
         # Arrange & Act
-        with patch.dict(os.environ, {}, clear=True):
-            session = BrowserSession()
+        session = BrowserSession()
 
         # Assert
-        assert session.page is None
+        assert session.mcp_client is None
 
     @pytest.mark.asyncio
-    async def test_ensure_browser_starts_browser_playwright_mode(self):
-        """ensure_browser()でPlaywrightモードでブラウザが起動する（MCP URL未設定時）"""
-        # Arrange
-        with patch.dict(os.environ, {"PLAYWRIGHT_MCP_URL": ""}, clear=False):
-            session = BrowserSession()
-            session._use_mcp = False  # 強制的にPlaywrightモード
-
-        # Act
-        with patch("playwright.async_api.async_playwright") as mock_pw:
-            mock_playwright = AsyncMock()
-            mock_pw.return_value.start = AsyncMock(return_value=mock_playwright)
-
-            mock_browser = AsyncMock()
-            mock_playwright.chromium.launch = AsyncMock(return_value=mock_browser)
-
-            mock_page = AsyncMock()
-            mock_browser.new_page = AsyncMock(return_value=mock_page)
-
-            await session.ensure_browser()
-
-            # Assert
-            assert session.page is not None
-
-    @pytest.mark.asyncio
-    async def test_ensure_browser_starts_mcp_mode(self):
-        """ensure_browser()でMCPモードでクライアントが初期化される"""
+    async def test_ensure_browser_creates_mcp_client(self):
+        """ensure_browser()でMCPクライアントが初期化される"""
         # Arrange
         session = BrowserSession()
-        session._use_mcp = True  # 強制的にMCPモード
 
         # Act
         await session.ensure_browser()
 
         # Assert
         assert session.mcp_client is not None
-        assert session.using_mcp is True
+        assert session._capture is not None
+        assert session._executor is not None
 
     @pytest.mark.asyncio
     async def test_close_resets_state(self):
         """close()で状態がリセットされる"""
         # Arrange
         session = BrowserSession()
-        session._page = MagicMock()
-        session._browser = AsyncMock()
-        session._playwright = AsyncMock()
+        session._mcp_client = MagicMock()
+        session._mcp_client.close = AsyncMock()
+        session._capture = MagicMock()
+        session._executor = MagicMock()
 
         # Act
         await session.close()
 
         # Assert
-        assert session.page is None
+        assert session.mcp_client is None
+        assert session._capture is None
+        assert session._executor is None
 
 
 class TestAgentUIMCPServer:
@@ -136,8 +114,8 @@ class TestAgentUITools:
     async def test_navigate(self, server):
         """navigate ツールがURLに移動する"""
         # Arrange
-        mock_page = AsyncMock()
-        server.session._page = mock_page
+        mock_mcp_client = AsyncMock()
+        server.session._mcp_client = mock_mcp_client
         server.session._capture = MagicMock()
         server.session._executor = MagicMock()
 
@@ -145,7 +123,7 @@ class TestAgentUITools:
         result = await server._handle_navigate({"url": "https://example.com"})
 
         # Assert
-        mock_page.goto.assert_called_once_with("https://example.com")
+        mock_mcp_client.navigate.assert_called_once_with("https://example.com")
         assert "example.com" in result[0].text
 
     @pytest.mark.asyncio
@@ -153,7 +131,7 @@ class TestAgentUITools:
         """type_text ツールがテキストを入力する"""
         # Arrange
         mock_executor = AsyncMock()
-        server.session._page = MagicMock()
+        server.session._mcp_client = MagicMock()
         server.session._capture = MagicMock()
         server.session._executor = mock_executor
 
@@ -170,7 +148,7 @@ class TestAgentUITools:
         """press_key ツールがキーを押す"""
         # Arrange
         mock_executor = AsyncMock()
-        server.session._page = MagicMock()
+        server.session._mcp_client = MagicMock()
         server.session._capture = MagicMock()
         server.session._executor = mock_executor
 
@@ -186,9 +164,9 @@ class TestAgentUITools:
         """scroll ツールがスクロールする"""
         # Arrange
         mock_executor = AsyncMock()
-        mock_page = MagicMock()
-        mock_page.viewport_size = {"width": 800, "height": 600}
-        server.session._page = mock_page
+        mock_mcp_client = MagicMock()
+        mock_mcp_client.get_viewport_size = MagicMock(return_value={"width": 800, "height": 600})
+        server.session._mcp_client = mock_mcp_client
         server.session._capture = MagicMock()
         server.session._executor = mock_executor
 
@@ -205,15 +183,17 @@ class TestAgentUITools:
     async def test_close_browser(self, server):
         """close_browser ツールがブラウザを閉じる"""
         # Arrange
-        server.session._browser = AsyncMock()
-        server.session._playwright = AsyncMock()
-        server.session._page = MagicMock()
+        mock_mcp_client = AsyncMock()
+        server.session._mcp_client = mock_mcp_client
+        server.session._capture = MagicMock()
+        server.session._executor = MagicMock()
 
         # Act
         result = await server._handle_close_browser({})
 
         # Assert
-        assert server.session.page is None
+        mock_mcp_client.close.assert_called_once()
+        assert server.session.mcp_client is None
         assert "閉じました" in result[0].text
 
     @pytest.mark.asyncio
@@ -245,8 +225,7 @@ class TestAgentUITools:
         """compare_with_previous は前回キャプチャがない場合エラーメッセージを返す"""
         # Arrange
         server._last_capture = None
-        # MCPモードに設定してブラウザ起動をスキップ
-        server.session._use_mcp = True
+        server.session._mcp_client = MagicMock()
         server.session._capture = MagicMock()
         server.session._capture.capture = AsyncMock(return_value=b"current_image")
         server.session._executor = MagicMock()

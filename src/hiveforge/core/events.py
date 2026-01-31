@@ -158,6 +158,12 @@ class RunFailedEvent(BaseEvent):
     type: Literal[EventType.RUN_FAILED] = EventType.RUN_FAILED
 
 
+class RunAbortedEvent(BaseEvent):
+    """Run中断イベント"""
+
+    type: Literal[EventType.RUN_ABORTED] = EventType.RUN_ABORTED
+
+
 class TaskCreatedEvent(BaseEvent):
     """Task作成イベント"""
 
@@ -192,6 +198,12 @@ class TaskBlockedEvent(BaseEvent):
     """Taskブロックイベント"""
 
     type: Literal[EventType.TASK_BLOCKED] = EventType.TASK_BLOCKED
+
+
+class TaskUnblockedEvent(BaseEvent):
+    """Taskブロック解除イベント"""
+
+    type: Literal[EventType.TASK_UNBLOCKED] = EventType.TASK_UNBLOCKED
 
 
 class RequirementCreatedEvent(BaseEvent):
@@ -241,12 +253,14 @@ EVENT_TYPE_MAP: dict[EventType, type[BaseEvent]] = {
     EventType.RUN_STARTED: RunStartedEvent,
     EventType.RUN_COMPLETED: RunCompletedEvent,
     EventType.RUN_FAILED: RunFailedEvent,
+    EventType.RUN_ABORTED: RunAbortedEvent,
     EventType.TASK_CREATED: TaskCreatedEvent,
     EventType.TASK_ASSIGNED: TaskAssignedEvent,
     EventType.TASK_PROGRESSED: TaskProgressedEvent,
     EventType.TASK_COMPLETED: TaskCompletedEvent,
     EventType.TASK_FAILED: TaskFailedEvent,
     EventType.TASK_BLOCKED: TaskBlockedEvent,
+    EventType.TASK_UNBLOCKED: TaskUnblockedEvent,
     EventType.REQUIREMENT_CREATED: RequirementCreatedEvent,
     EventType.REQUIREMENT_APPROVED: RequirementApprovedEvent,
     EventType.REQUIREMENT_REJECTED: RequirementRejectedEvent,

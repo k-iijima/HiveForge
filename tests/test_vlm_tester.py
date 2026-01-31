@@ -43,37 +43,35 @@ from hiveforge.vlm_tester.hybrid_analyzer import (
 class TestScreenCapture:
     """ScreenCapture クラスのテスト"""
 
-    def test_mode_detection_with_code_server_url(self):
-        """CODE_SERVER_URL環境変数がある場合はplaywrightモードになる"""
-        # Arrange: CODE_SERVER_URL環境変数を設定
-        with patch.dict(os.environ, {"CODE_SERVER_URL": "http://localhost:8080"}):
-            # Act: ScreenCaptureインスタンスを作成
-            capture = ScreenCapture()
+    def test_init_creates_instance(self):
+        """インスタンスが作成できる"""
+        # Arrange & Act
+        capture = ScreenCapture()
 
-            # Assert: playwrightモードになっている
-            assert capture.mode == "playwright"
+        # Assert: mcp_clientは未設定
+        assert capture._mcp_client is None
 
-    def test_mode_detection_with_display(self):
-        """DISPLAY環境変数がある場合はpyautoguiモードになる"""
-        # Arrange: CODE_SERVER_URLを削除し、DISPLAYを設定
-        env = {"DISPLAY": ":0"}
-        with patch.dict(os.environ, env, clear=False):
-            # CODE_SERVER_URLがない状態にする
-            with patch.object(ScreenCapture, "_detect_mode") as mock_detect:
-                mock_detect.return_value = "pyautogui"
-                # Act: ScreenCaptureインスタンスを作成
-                capture = ScreenCapture()
+    def test_set_mcp_client(self):
+        """MCPクライアントを設定できる"""
+        # Arrange
+        capture = ScreenCapture()
+        mock_client = MagicMock()
 
-                # Assert: pyautoguiモードになっている
-                assert capture.mode == "pyautogui"
+        # Act
+        capture.set_mcp_client(mock_client)
 
-    def test_explicit_mode_setting(self):
-        """明示的にモードを指定できる"""
-        # Arrange & Act: モードを明示的に指定
-        capture = ScreenCapture(mode="playwright")
+        # Assert
+        assert capture._mcp_client is mock_client
 
-        # Assert: 指定したモードになっている
-        assert capture.mode == "playwright"
+    @pytest.mark.asyncio
+    async def test_capture_without_client_raises_error(self):
+        """MCPクライアント未設定でcaptureするとエラー"""
+        # Arrange
+        capture = ScreenCapture()
+
+        # Act & Assert
+        with pytest.raises(RuntimeError, match="MCP client is not set"):
+            await capture.capture()
 
 
 # =============================================================================
@@ -149,152 +147,149 @@ class TestVLMClient:
 class TestActionExecutor:
     """ActionExecutor クラスのテスト"""
 
-    def test_mode_detection_with_code_server_url(self):
-        """CODE_SERVER_URL環境変数がある場合はplaywrightモードになる"""
-        # Arrange: CODE_SERVER_URL環境変数を設定
-        with patch.dict(os.environ, {"CODE_SERVER_URL": "http://localhost:8080"}):
-            # Act: ActionExecutorインスタンスを作成
-            executor = ActionExecutor()
+    def test_init_creates_instance(self):
+        """インスタンスが作成できる"""
+        # Arrange & Act
+        executor = ActionExecutor()
 
-            # Assert: playwrightモードになっている
-            assert executor.mode == "playwright"
+        # Assert: mcp_clientは未設定
+        assert executor._mcp_client is None
 
-    def test_explicit_mode_setting(self):
-        """明示的にモードを指定できる"""
-        # Arrange & Act: モードを明示的に指定
-        executor = ActionExecutor(mode="pyautogui")
+    def test_set_mcp_client(self):
+        """MCPクライアントを設定できる"""
+        # Arrange
+        executor = ActionExecutor()
+        mock_client = MagicMock()
 
-        # Assert: 指定したモードになっている
-        assert executor.mode == "pyautogui"
+        # Act
+        executor.set_mcp_client(mock_client)
+
+        # Assert
+        assert executor._mcp_client is mock_client
 
     @pytest.mark.asyncio
-    async def test_click_playwright_without_page_raises_error(self):
-        """Playwrightモードでpageが設定されていない場合エラー"""
-        # Arrange: Playwrightモードで作成
-        executor = ActionExecutor(mode="playwright")
+    async def test_click_without_client_raises_error(self):
+        """MCPクライアント未設定でclickするとエラー"""
+        # Arrange
+        executor = ActionExecutor()
 
-        # Act & Assert: pageが設定されていないのでエラー
-        with pytest.raises(RuntimeError, match="Page is not set"):
+        # Act & Assert
+        with pytest.raises(RuntimeError, match="MCP client is not set"):
             await executor.click(100, 100)
 
     @pytest.mark.asyncio
-    async def test_click_playwright_with_page(self):
-        """Playwrightモードでpageが設定されている場合クリックできる"""
-        # Arrange: モックのpageを設定
-        executor = ActionExecutor(mode="playwright")
-        mock_page = AsyncMock()
-        executor.set_page(mock_page)
+    async def test_click_with_mcp_client(self):
+        """MCPクライアント経由でクリックできる"""
+        # Arrange
+        executor = ActionExecutor()
+        mock_client = AsyncMock()
+        executor.set_mcp_client(mock_client)
 
-        # Act: クリック
+        # Act
         await executor.click(100, 200)
 
-        # Assert: mouse.clickが呼ばれた
-        mock_page.mouse.click.assert_called_once_with(100, 200)
+        # Assert
+        mock_client.click_coordinates.assert_called_once_with(100, 200)
 
     @pytest.mark.asyncio
-    async def test_double_click_playwright(self):
-        """Playwrightモードでダブルクリックできる"""
-        # Arrange: モックのpageを設定
-        executor = ActionExecutor(mode="playwright")
-        mock_page = AsyncMock()
-        executor.set_page(mock_page)
+    async def test_double_click(self):
+        """ダブルクリックできる"""
+        # Arrange
+        executor = ActionExecutor()
+        mock_client = AsyncMock()
+        executor.set_mcp_client(mock_client)
 
-        # Act: ダブルクリック
+        # Act
         await executor.click(100, 200, double_click=True)
 
-        # Assert: mouse.dblclickが呼ばれた
-        mock_page.mouse.dblclick.assert_called_once_with(100, 200)
+        # Assert: click_coordinatesが2回呼ばれた
+        assert mock_client.click_coordinates.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_type_text_playwright(self):
-        """Playwrightモードでテキスト入力できる"""
-        # Arrange: モックのpageを設定
-        executor = ActionExecutor(mode="playwright")
-        mock_page = AsyncMock()
-        executor.set_page(mock_page)
+    async def test_type_text(self):
+        """テキスト入力できる"""
+        # Arrange
+        executor = ActionExecutor()
+        mock_client = AsyncMock()
+        executor.set_mcp_client(mock_client)
 
-        # Act: テキスト入力
+        # Act
         await executor.type_text("Hello World")
 
-        # Assert: keyboard.typeが呼ばれた
-        mock_page.keyboard.type.assert_called_once_with("Hello World")
+        # Assert
+        mock_client.press_key.assert_called_once_with("Hello World")
 
     @pytest.mark.asyncio
     async def test_type_text_with_enter(self):
         """テキスト入力後にEnterを押せる"""
-        # Arrange: モックのpageを設定
-        executor = ActionExecutor(mode="playwright")
-        mock_page = AsyncMock()
-        executor.set_page(mock_page)
+        # Arrange
+        executor = ActionExecutor()
+        mock_client = AsyncMock()
+        executor.set_mcp_client(mock_client)
 
-        # Act: テキスト入力 + Enter
+        # Act
         await executor.type_text("search query", press_enter=True)
 
-        # Assert: keyboard.typeとkeyboard.pressが呼ばれた
-        mock_page.keyboard.type.assert_called_once_with("search query")
-        mock_page.keyboard.press.assert_called_once_with("Enter")
+        # Assert
+        assert mock_client.press_key.call_count == 2
+        mock_client.press_key.assert_any_call("search query")
+        mock_client.press_key.assert_any_call("Enter")
 
     @pytest.mark.asyncio
     async def test_press_key_simple(self):
         """単一キーを押せる"""
-        # Arrange: モックのpageを設定
-        executor = ActionExecutor(mode="playwright")
-        mock_page = AsyncMock()
-        executor.set_page(mock_page)
+        # Arrange
+        executor = ActionExecutor()
+        mock_client = AsyncMock()
+        executor.set_mcp_client(mock_client)
 
-        # Act: Escapeキーを押す
+        # Act
         await executor.press_key("escape")
 
-        # Assert: keyboard.pressが呼ばれた
-        mock_page.keyboard.press.assert_called_once_with("Escape")
+        # Assert
+        mock_client.press_key.assert_called_once_with("Escape")
 
     @pytest.mark.asyncio
     async def test_press_key_with_modifier(self):
         """修飾キー付きのキーを押せる"""
-        # Arrange: モックのpageを設定
-        executor = ActionExecutor(mode="playwright")
-        mock_page = AsyncMock()
-        executor.set_page(mock_page)
+        # Arrange
+        executor = ActionExecutor()
+        mock_client = AsyncMock()
+        executor.set_mcp_client(mock_client)
 
-        # Act: Ctrl+Sを押す
+        # Act
         await executor.press_key("ctrl+s")
 
-        # Assert: keyboard.down, press, upが呼ばれた
-        mock_page.keyboard.down.assert_called_with("Control")
-        mock_page.keyboard.press.assert_called()
-        mock_page.keyboard.up.assert_called_with("Control")
+        # Assert
+        mock_client.press_key.assert_called_once_with("Control+S")
 
     @pytest.mark.asyncio
-    async def test_scroll_playwright(self):
-        """Playwrightモードでスクロールできる"""
-        # Arrange: モックのpageを設定
-        executor = ActionExecutor(mode="playwright")
-        mock_page = AsyncMock()
-        executor.set_page(mock_page)
+    async def test_scroll(self):
+        """スクロールできる"""
+        # Arrange
+        executor = ActionExecutor()
+        mock_client = AsyncMock()
+        executor.set_mcp_client(mock_client)
 
-        # Act: スクロール
+        # Act
         await executor.scroll(100, 100, delta_y=300)
 
-        # Assert: mouse.moveとmouse.wheelが呼ばれた
-        mock_page.mouse.move.assert_called_once_with(100, 100)
-        mock_page.mouse.wheel.assert_called_once_with(0, 300)
+        # Assert
+        mock_client.scroll.assert_called_once_with(100, 100, delta_x=0, delta_y=300)
 
     @pytest.mark.asyncio
-    async def test_drag_playwright(self):
-        """Playwrightモードでドラッグできる"""
-        # Arrange: モックのpageを設定
-        executor = ActionExecutor(mode="playwright")
-        mock_page = AsyncMock()
-        executor.set_page(mock_page)
+    async def test_drag(self):
+        """ドラッグできる"""
+        # Arrange
+        executor = ActionExecutor()
+        mock_client = AsyncMock()
+        executor.set_mcp_client(mock_client)
 
-        # Act: ドラッグ
+        # Act
         await executor.drag(100, 100, 200, 200)
 
-        # Assert: mouse操作が正しく呼ばれた
-        mock_page.mouse.move.assert_any_call(100, 100)
-        mock_page.mouse.down.assert_called_once()
-        mock_page.mouse.move.assert_any_call(200, 200)
-        mock_page.mouse.up.assert_called_once()
+        # Assert
+        mock_client.drag.assert_called_once_with(100, 100, 200, 200)
 
 
 # =============================================================================
@@ -389,15 +384,19 @@ class TestVLMTesterMCPServer:
 class TestVLMTesterIntegration:
     """統合テスト"""
 
-    def test_screen_capture_and_action_executor_same_mode(self):
-        """ScreenCaptureとActionExecutorが同じモードで動作する"""
-        # Arrange: 同じ環境で両方のインスタンスを作成
-        with patch.dict(os.environ, {"CODE_SERVER_URL": "http://localhost:8080"}):
-            capture = ScreenCapture()
-            executor = ActionExecutor()
+    def test_screen_capture_and_action_executor_share_mcp_client(self):
+        """ScreenCaptureとActionExecutorが同じMCPクライアントを使える"""
+        # Arrange: 共通のMCPクライアントを作成
+        mock_client = MagicMock()
+        capture = ScreenCapture()
+        executor = ActionExecutor()
 
-            # Assert: 同じモードになっている
-            assert capture.mode == executor.mode == "playwright"
+        # Act: 同じクライアントを設定
+        capture.set_mcp_client(mock_client)
+        executor.set_mcp_client(mock_client)
+
+        # Assert: 同じクライアントが設定されている
+        assert capture._mcp_client is executor._mcp_client is mock_client
 
 
 # =============================================================================

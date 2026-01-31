@@ -95,18 +95,19 @@ User: @hiveforge 新しい要求を登録: Hello Worldアプリを作成
 ## プロジェクト構造
 
 ```
-hiveforge/
-├── src/hiveforge/
-│   ├── core/           # コアロジック
-│   │   ├── ar/         # Akashic Record
-│   │   ├── state/      # 状態機械
-│   │   └── orchestrator.py
-│   ├── api/            # FastAPI エンドポイント
-│   ├── mcp_server/     # MCP Server
-│   └── cli.py          # CLIエントリポイント
-├── tests/              # テスト
-├── Vault/              # イベントログ・投影 (gitignore)
-└── hiveforge.config.yaml
+src/hiveforge/
+├── core/           # コアロジック
+│   ├── ar/         # Akashic Record
+│   └── state/      # 状態機械
+├── api/            # FastAPI エンドポイント
+├── mcp_server/     # MCP Server
+├── agent_ui/       # Agent UI MCPサーバー
+├── vlm/            # VLM（画像解析）
+└── cli.py          # CLIエントリポイント
+
+vscode-extension/   # VS Code拡張
+tests/              # テスト
+Vault/              # イベントログ (gitignore)
 ```
 
 ## ドキュメント
@@ -132,7 +133,8 @@ hiveforge/
 
 ### テスト状況
 
-- **211テスト** 全てパス
+- **Python**: 293テスト 全てパス
+- **VS Code拡張**: 17テスト（Mocha）
 - **カバレッジ 100%** 
 
 ## ライセンス

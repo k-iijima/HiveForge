@@ -107,7 +107,9 @@ export class RunsProvider implements vscode.TreeDataProvider<RunItem> {
             const runs = await this.client.getRuns(!this.showCompleted);
             return runs.map(run => new RunItem(run, vscode.TreeItemCollapsibleState.None));
         } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
             console.error('Failed to get runs:', error);
+            vscode.window.showErrorMessage(`HiveForge: Run一覧の取得に失敗しました: ${message}`);
             return [];
         }
     }
