@@ -70,7 +70,7 @@ pip install -e ".[dev]"
 
 ## MCP ツール
 
-Copilot Chatから `@hiveforge` で使用:
+Copilot Chatで `@hiveforge` を使用（要: VS Code再読み込み）:
 
 | ツール | 説明 |
 |--------|------|
@@ -79,6 +79,8 @@ Copilot Chatから `@hiveforge` で使用:
 | `complete_task` | Task完了 |
 | `emergency_stop` | 緊急停止 |
 | `get_lineage` | 因果リンク取得 |
+
+> **Note:** `@hiveforge`が出ない場合は `Developer: Reload Window` を実行
 
 ---
 

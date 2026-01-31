@@ -36,7 +36,7 @@
       }
     }
   },
-  "postCreateCommand": "pip install -e '.[dev]'",
+  "postCreateCommand": "pip install -e '.[dev]' && mkdir -p /workspace/HiveForge/Vault && sudo chown -R vscode:vscode /workspace/HiveForge/Vault",
   "waitFor": "postCreateCommand",
   "remoteEnv": {
     "PATH": "${containerEnv:PATH}:/home/vscode/.local/bin"
