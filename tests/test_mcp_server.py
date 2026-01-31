@@ -415,7 +415,7 @@ class TestHandleCompleteRun:
 
     @pytest.mark.asyncio
     async def test_complete_run_success(self, mcp_server):
-        """Runを完了できる"""
+        """タスクがない場合、Runを完了できる"""
         # Arrange
         start_result = await mcp_server._handle_start_run({"goal": "完了テスト"})
         run_id = start_result["run_id"]
@@ -431,6 +431,56 @@ class TestHandleCompleteRun:
         assert result["status"] == "completed"
         assert result["run_id"] == run_id
         assert mcp_server._current_run_id is None
+
+    @pytest.mark.asyncio
+    async def test_complete_run_with_incomplete_tasks_fails(self, mcp_server):
+        """未完了タスクがある場合、エラーを返す"""
+        # Arrange: Runを開始してタスクを作成（未完了のまま）
+        await mcp_server._handle_start_run({"goal": "未完了タスクテスト"})
+        task_result = await mcp_server._handle_create_task({"title": "未完了タスク"})
+        task_id = task_result["task_id"]
+
+        # Act
+        result = await mcp_server._handle_complete_run({})
+
+        # Assert
+        assert "error" in result
+        assert "incomplete_task_ids" in result
+        assert task_id in result["incomplete_task_ids"]
+
+    @pytest.mark.asyncio
+    async def test_complete_run_force_cancels_tasks(self, mcp_server):
+        """force=trueで未完了タスクをキャンセルして完了できる"""
+        # Arrange: Runを開始してタスクを作成（未完了のまま）
+        start_result = await mcp_server._handle_start_run({"goal": "強制完了テスト"})
+        run_id = start_result["run_id"]
+        task_result = await mcp_server._handle_create_task({"title": "キャンセル対象"})
+        task_id = task_result["task_id"]
+
+        # Act
+        result = await mcp_server._handle_complete_run({"force": True})
+
+        # Assert
+        assert result["status"] == "completed"
+        assert run_id == result["run_id"]
+        assert "cancelled_task_ids" in result
+        assert task_id in result["cancelled_task_ids"]
+
+    @pytest.mark.asyncio
+    async def test_complete_run_with_completed_tasks(self, mcp_server):
+        """全タスクが完了している場合、Runを完了できる"""
+        # Arrange
+        await mcp_server._handle_start_run({"goal": "タスク完了済みテスト"})
+        task_result = await mcp_server._handle_create_task({"title": "完了タスク"})
+        task_id = task_result["task_id"]
+        await mcp_server._handle_complete_task({"task_id": task_id, "result": "Done"})
+
+        # Act
+        result = await mcp_server._handle_complete_run({"summary": "完了"})
+
+        # Assert
+        assert result["status"] == "completed"
+        assert "cancelled_task_ids" not in result
 
 
 class TestHandleHeartbeat:

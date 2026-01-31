@@ -44,6 +44,15 @@ class RunStatusResponse(BaseModel):
     last_heartbeat: datetime | None
 
 
+class CompleteRunRequest(BaseModel):
+    """完了リクエスト"""
+
+    force: bool = Field(
+        default=False,
+        description="未完了タスクがあっても強制的に完了するか。Trueの場合、未完了タスクは自動的にキャンセルされる",
+    )
+
+
 class EmergencyStopRequest(BaseModel):
     """緊急停止リクエスト"""
 

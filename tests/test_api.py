@@ -127,7 +127,7 @@ class TestRunsEndpoints:
         assert response.status_code == 404
 
     def test_complete_run(self, client):
-        """Runを完了できる"""
+        """タスクがない場合、Runを完了できる"""
         # Arrange
         run_resp = client.post("/runs", json={"goal": "完了テスト"})
         run_id = run_resp.json()["run_id"]
@@ -140,6 +140,57 @@ class TestRunsEndpoints:
         data = response.json()
         assert data["status"] == "completed"
         assert data["run_id"] == run_id
+
+    def test_complete_run_with_incomplete_tasks_fails(self, client):
+        """未完了タスクがある場合、Runを完了できない"""
+        # Arrange: タスクを作成して未完了のまま
+        run_resp = client.post("/runs", json={"goal": "未完了タスクテスト"})
+        run_id = run_resp.json()["run_id"]
+        task_resp = client.post(f"/runs/{run_id}/tasks", json={"title": "未完了タスク"})
+        task_id = task_resp.json()["task_id"]
+
+        # Act: 未完了タスクがある状態で完了を試みる
+        response = client.post(f"/runs/{run_id}/complete")
+
+        # Assert: 400 Bad Request
+        assert response.status_code == 400
+        data = response.json()
+        assert "incomplete_task_ids" in data["detail"]
+        assert task_id in data["detail"]["incomplete_task_ids"]
+
+    def test_complete_run_with_completed_tasks(self, client):
+        """全タスクが完了している場合、Runを完了できる"""
+        # Arrange: タスクを作成して完了させる
+        run_resp = client.post("/runs", json={"goal": "タスク完了済みテスト"})
+        run_id = run_resp.json()["run_id"]
+        task_resp = client.post(f"/runs/{run_id}/tasks", json={"title": "完了タスク"})
+        task_id = task_resp.json()["task_id"]
+        client.post(f"/runs/{run_id}/tasks/{task_id}/complete", json={})
+
+        # Act
+        response = client.post(f"/runs/{run_id}/complete")
+
+        # Assert
+        assert response.status_code == 200
+        assert response.json()["status"] == "completed"
+
+    def test_complete_run_force_cancels_incomplete_tasks(self, client):
+        """force=trueで未完了タスクを強制キャンセルして完了できる"""
+        # Arrange: タスクを作成して未完了のまま
+        run_resp = client.post("/runs", json={"goal": "強制完了テスト"})
+        run_id = run_resp.json()["run_id"]
+        task_resp = client.post(f"/runs/{run_id}/tasks", json={"title": "キャンセル対象タスク"})
+        task_id = task_resp.json()["task_id"]
+
+        # Act: force=trueで強制完了
+        response = client.post(f"/runs/{run_id}/complete", json={"force": True})
+
+        # Assert
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "completed"
+        assert "cancelled_task_ids" in data
+        assert task_id in data["cancelled_task_ids"]
 
     def test_complete_run_not_found(self, client):
         """存在しないRunの完了で404を返す"""
@@ -760,10 +811,12 @@ class TestGetRunFromInactiveRun:
 
     def test_get_events_completed_run(self, client):
         """完了したRunのイベント一覧も取得できる"""
-        # Arrange: Runを作成してタスクを追加し、Runを完了する
+        # Arrange: Runを作成してタスクを追加・完了し、Runを完了する
         run_resp = client.post("/runs", json={"goal": "完了Runイベント確認"})
         run_id = run_resp.json()["run_id"]
-        client.post(f"/runs/{run_id}/tasks", json={"title": "イベント確認用タスク"})
+        task_resp = client.post(f"/runs/{run_id}/tasks", json={"title": "イベント確認用タスク"})
+        task_id = task_resp.json()["task_id"]
+        client.post(f"/runs/{run_id}/tasks/{task_id}/complete", json={})
         client.post(f"/runs/{run_id}/complete")
 
         # Act: 完了したRunのイベント一覧を取得
@@ -772,8 +825,8 @@ class TestGetRunFromInactiveRun:
         # Assert: 200 OKでイベント一覧が返される
         assert response.status_code == 200
         data = response.json()
-        # run.started, task.created, run.completed の3イベント
-        assert len(data) >= 3
+        # run.started, task.created, task.completed, run.completed の4イベント
+        assert len(data) >= 4
         types = [e["type"] for e in data]
         assert "run.started" in types
         assert "task.created" in types

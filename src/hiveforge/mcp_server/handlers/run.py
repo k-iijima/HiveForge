@@ -14,7 +14,9 @@ from ...core.events import (
     EmergencyStopEvent,
     RunCompletedEvent,
     RunStartedEvent,
+    TaskFailedEvent,
 )
+from ...core.ar.projections import TaskState
 from .base import BaseHandler
 
 
@@ -84,27 +86,69 @@ class RunHandlers(BaseHandler):
         }
 
     async def handle_complete_run(self, args: dict[str, Any]) -> dict[str, Any]:
-        """Run完了"""
+        """Run完了
+
+        未完了タスクがある場合はエラーを返す。
+        force=trueで強制完了する場合、未完了タスクは自動的にキャンセルされる。
+        """
         if not self._current_run_id:
             return {"error": "No active run."}
 
         ar = self._get_ar()
+        run_id = self._current_run_id
+        force = args.get("force", False)
+
+        # プロジェクションを構築して未完了タスクをチェック
+        events = list(ar.replay(run_id))
+        proj = build_run_projection(events, run_id)
+
+        incomplete_tasks = [
+            task
+            for task in proj.tasks.values()
+            if task.state not in (TaskState.COMPLETED, TaskState.FAILED)
+        ]
+
+        if incomplete_tasks and not force:
+            task_ids = [t.id for t in incomplete_tasks]
+            return {
+                "error": "Cannot complete run with incomplete tasks",
+                "incomplete_task_ids": task_ids,
+                "hint": "強制完了する場合は force=true を指定してください",
+            }
+
+        cancelled_task_ids = []
+        if incomplete_tasks and force:
+            # 強制完了: 未完了タスクを自動的にキャンセル
+            for task in incomplete_tasks:
+                fail_event = TaskFailedEvent(
+                    run_id=run_id,
+                    task_id=task.id,
+                    actor="system",
+                    payload={
+                        "error": "Runが強制完了されたためキャンセル",
+                        "retryable": False,
+                    },
+                )
+                ar.append(fail_event, run_id)
+                cancelled_task_ids.append(task.id)
 
         event = RunCompletedEvent(
-            run_id=self._current_run_id,
+            run_id=run_id,
             actor="copilot",
             payload={"summary": args.get("summary", "")},
         )
-        ar.append(event, self._current_run_id)
+        ar.append(event, run_id)
 
-        run_id = self._current_run_id
         self._current_run_id = None
 
-        return {
+        result = {
             "status": "completed",
             "run_id": run_id,
             "summary": args.get("summary", ""),
         }
+        if cancelled_task_ids:
+            result["cancelled_task_ids"] = cancelled_task_ids
+        return result
 
     async def handle_heartbeat(self, args: dict[str, Any]) -> dict[str, Any]:
         """ハートビート"""

@@ -11,10 +11,12 @@ from ...core.events import (
     HeartbeatEvent,
     RunCompletedEvent,
     RunStartedEvent,
+    TaskFailedEvent,
 )
 from ...core.ar.projections import RunState, TaskState
 from ..helpers import apply_event_to_projection, get_active_runs, get_ar
 from ..models import (
+    CompleteRunRequest,
     EmergencyStopRequest,
     RunStatusResponse,
     StartRunRequest,
@@ -123,21 +125,67 @@ async def get_run(run_id: str):
 
 
 @router.post("/{run_id}/complete")
-async def complete_run(run_id: str):
-    """Runを完了"""
+async def complete_run(run_id: str, request: CompleteRunRequest | None = None):
+    """Runを完了
+
+    未完了タスクがある場合はエラーを返す。
+    force=trueで強制完了する場合、未完了タスクは自動的にキャンセルされる。
+    """
     active_runs = get_active_runs()
     if run_id not in active_runs:
         raise HTTPException(status_code=404, detail=f"Active run {run_id} not found")
 
     ar = get_ar()
+    proj = active_runs[run_id]
+    force = request.force if request else False
+
+    # 未完了タスクをチェック
+    incomplete_tasks = [
+        task
+        for task in proj.tasks.values()
+        if task.state not in (TaskState.COMPLETED, TaskState.FAILED)
+    ]
+
+    if incomplete_tasks and not force:
+        # 未完了タスクがある場合はエラー
+        task_ids = [t.id for t in incomplete_tasks]
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Cannot complete run with incomplete tasks",
+                "incomplete_task_ids": task_ids,
+                "hint": "強制完了する場合は force=true を指定してください",
+            },
+        )
+
+    cancelled_task_ids = []
+    if incomplete_tasks and force:
+        # 強制完了: 未完了タスクを自動的にキャンセル
+        for task in incomplete_tasks:
+            fail_event = TaskFailedEvent(
+                run_id=run_id,
+                task_id=task.id,
+                actor="system",
+                payload={
+                    "error": "Runが強制完了されたためキャンセル",
+                    "retryable": False,
+                },
+            )
+            ar.append(fail_event, run_id)
+            apply_event_to_projection(run_id, fail_event)
+            cancelled_task_ids.append(task.id)
+
     event = RunCompletedEvent(run_id=run_id, actor="api")
     ar.append(event, run_id)
 
-    proj = active_runs.pop(run_id)
+    active_runs.pop(run_id)
     proj.state = RunState.COMPLETED
     proj.completed_at = event.timestamp
 
-    return {"status": "completed", "run_id": run_id}
+    result = {"status": "completed", "run_id": run_id}
+    if cancelled_task_ids:
+        result["cancelled_task_ids"] = cancelled_task_ids
+    return result
 
 
 @router.post("/{run_id}/emergency-stop")
