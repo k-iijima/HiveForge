@@ -1,13 +1,14 @@
 # HiveForge Docker Image
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 
-# 依存関係をインストール
-COPY pyproject.toml ./
-RUN pip install --no-cache-dir .
+# curlをインストール（healthcheck用）
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# ソースコードをコピー
+# ソースコードとメタデータをコピー
+COPY pyproject.toml README.md ./
 COPY src/ ./src/
 COPY hiveforge.config.yaml ./
 
