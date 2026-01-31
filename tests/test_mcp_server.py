@@ -560,6 +560,42 @@ class TestHandleEmergencyStop:
         # Assert
         assert result["scope"] == "run"
 
+    @pytest.mark.asyncio
+    async def test_emergency_stop_cancels_tasks(self, mcp_server):
+        """緊急停止は未完了タスクをキャンセルする"""
+        # Arrange: Runを開始してタスクを作成
+        await mcp_server._handle_start_run({"goal": "緊急停止タスクテスト"})
+        task_result = await mcp_server._handle_create_task({"title": "進行中タスク"})
+        task_id = task_result["task_id"]
+
+        # Act: 緊急停止を実行
+        result = await mcp_server._handle_emergency_stop({"reason": "テスト停止"})
+
+        # Assert: タスクがキャンセルされている
+        assert result["status"] == "aborted"
+        assert "cancelled_task_ids" in result
+        assert task_id in result["cancelled_task_ids"]
+
+    @pytest.mark.asyncio
+    async def test_emergency_stop_rejects_pending_requirements(self, mcp_server):
+        """緊急停止は未解決の確認要請を却下する"""
+        # Arrange: Runを開始して確認要請を作成
+        await mcp_server._handle_start_run({"goal": "緊急停止確認要請テスト"})
+        req_result = await mcp_server._handle_create_requirement(
+            {
+                "description": "テスト確認要請",
+            }
+        )
+        req_id = req_result["requirement_id"]
+
+        # Act: 緊急停止を実行
+        result = await mcp_server._handle_emergency_stop({"reason": "テスト停止"})
+
+        # Assert: 確認要請が却下されている
+        assert result["status"] == "aborted"
+        assert "cancelled_requirement_ids" in result
+        assert req_id in result["cancelled_requirement_ids"]
+
 
 class TestHandleGetLineage:
     """get_lineageハンドラのテスト"""

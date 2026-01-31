@@ -12,6 +12,7 @@ from ...core import build_run_projection, generate_event_id
 from ...core.events import (
     HeartbeatEvent,
     EmergencyStopEvent,
+    RequirementRejectedEvent,
     RunCompletedEvent,
     RunStartedEvent,
     TaskFailedEvent,
@@ -170,28 +171,74 @@ class RunHandlers(BaseHandler):
         }
 
     async def handle_emergency_stop(self, args: dict[str, Any]) -> dict[str, Any]:
-        """緊急停止"""
+        """緊急停止
+
+        進行中の全タスクを中断し、未解決の確認要請を却下し、Runを即座に停止する。
+        """
         if not self._current_run_id:
             return {"error": "No active run."}
 
         ar = self._get_ar()
+        run_id = self._current_run_id
         reason = args.get("reason", "No reason provided")
         scope = args.get("scope", "run")
 
+        # プロジェクションを構築
+        events = list(ar.replay(run_id))
+        proj = build_run_projection(events, run_id)
+
+        # 未完了タスクを全て失敗にする
+        cancelled_task_ids = []
+        incomplete_tasks = [
+            task
+            for task in proj.tasks.values()
+            if task.state not in (TaskState.COMPLETED, TaskState.FAILED)
+        ]
+        for task in incomplete_tasks:
+            fail_event = TaskFailedEvent(
+                run_id=run_id,
+                task_id=task.id,
+                actor="system",
+                payload={
+                    "error": f"緊急停止: {reason}",
+                    "retryable": False,
+                },
+            )
+            ar.append(fail_event, run_id)
+            cancelled_task_ids.append(task.id)
+
+        # 未解決の確認要請を全て却下する
+        cancelled_requirement_ids = []
+        for req in proj.pending_requirements:
+            reject_event = RequirementRejectedEvent(
+                run_id=run_id,
+                actor="system",
+                payload={
+                    "requirement_id": req.id,
+                    "comment": f"緊急停止により却下: {reason}",
+                },
+            )
+            ar.append(reject_event, run_id)
+            cancelled_requirement_ids.append(req.id)
+
         event = EmergencyStopEvent(
-            run_id=self._current_run_id,
+            run_id=run_id,
             actor="copilot",
             payload={"reason": reason, "scope": scope},
         )
-        ar.append(event, self._current_run_id)
+        ar.append(event, run_id)
 
-        run_id = self._current_run_id
         self._current_run_id = None
 
-        return {
+        result = {
             "status": "aborted",
             "run_id": run_id,
             "reason": reason,
             "scope": scope,
             "stopped_at": datetime.now(timezone.utc).isoformat(),
         }
+        if cancelled_task_ids:
+            result["cancelled_task_ids"] = cancelled_task_ids
+        if cancelled_requirement_ids:
+            result["cancelled_requirement_ids"] = cancelled_requirement_ids
+        return result

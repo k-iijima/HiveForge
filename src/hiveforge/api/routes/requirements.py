@@ -11,7 +11,7 @@ from ...core.events import (
     RequirementCreatedEvent,
     RequirementRejectedEvent,
 )
-from ..helpers import get_active_runs, get_ar
+from ..helpers import apply_event_to_projection, get_active_runs, get_ar
 from ..models import (
     CreateRequirementRequest,
     RequirementResponse,
@@ -85,6 +85,9 @@ async def create_requirement(run_id: str, request: CreateRequirementRequest):
         },
     )
     ar.append(event, run_id)
+
+    # 投影を更新
+    apply_event_to_projection(run_id, event)
 
     return RequirementResponse(
         id=requirement_id,

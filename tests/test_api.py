@@ -231,6 +231,51 @@ class TestRunsEndpoints:
         # Assert
         assert response.status_code == 404
 
+    def test_emergency_stop_cancels_tasks(self, client):
+        """緊急停止は未完了タスクをキャンセルする"""
+        # Arrange: Runを開始してタスクを作成
+        run_resp = client.post("/runs", json={"goal": "緊急停止タスクテスト"})
+        run_id = run_resp.json()["run_id"]
+        task_resp = client.post(f"/runs/{run_id}/tasks", json={"title": "進行中タスク"})
+        task_id = task_resp.json()["task_id"]
+
+        # Act: 緊急停止を実行
+        response = client.post(
+            f"/runs/{run_id}/emergency-stop",
+            json={"reason": "テスト停止"},
+        )
+
+        # Assert: タスクがキャンセルされている
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "aborted"
+        assert "cancelled_task_ids" in data
+        assert task_id in data["cancelled_task_ids"]
+
+    def test_emergency_stop_rejects_pending_requirements(self, client):
+        """緊急停止は未解決の確認要請を却下する"""
+        # Arrange: Runを開始して確認要請を作成
+        run_resp = client.post("/runs", json={"goal": "緊急停止確認要請テスト"})
+        run_id = run_resp.json()["run_id"]
+        req_resp = client.post(
+            f"/runs/{run_id}/requirements",
+            json={"description": "テスト確認要請"},
+        )
+        req_id = req_resp.json()["id"]
+
+        # Act: 緊急停止を実行
+        response = client.post(
+            f"/runs/{run_id}/emergency-stop",
+            json={"reason": "テスト停止"},
+        )
+
+        # Assert: 確認要請が却下されている
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "aborted"
+        assert "cancelled_requirement_ids" in data
+        assert req_id in data["cancelled_requirement_ids"]
+
 
 class TestTasksEndpoints:
     """Tasks関連エンドポイントのテスト"""

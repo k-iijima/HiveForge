@@ -9,6 +9,7 @@ from ...core import RunProjection, build_run_projection, generate_event_id
 from ...core.events import (
     EmergencyStopEvent,
     HeartbeatEvent,
+    RequirementRejectedEvent,
     RunCompletedEvent,
     RunStartedEvent,
     TaskFailedEvent,
@@ -190,15 +191,53 @@ async def complete_run(run_id: str, request: CompleteRunRequest | None = None):
 
 @router.post("/{run_id}/emergency-stop")
 async def emergency_stop(run_id: str, request: EmergencyStopRequest):
-    """Runを緊急停止する
+    """緊急停止
 
-    進行中の全タスクを中断し、Runを即座に停止する。
+    進行中の全タスクを中断し、未解決の確認要請を却下し、Runを即座に停止する。
     """
     active_runs = get_active_runs()
     if run_id not in active_runs:
         raise HTTPException(status_code=404, detail=f"Active run {run_id} not found")
 
     ar = get_ar()
+    proj = active_runs[run_id]
+
+    # 未完了タスクを全て失敗にする
+    cancelled_task_ids = []
+    incomplete_tasks = [
+        task
+        for task in proj.tasks.values()
+        if task.state not in (TaskState.COMPLETED, TaskState.FAILED)
+    ]
+    for task in incomplete_tasks:
+        fail_event = TaskFailedEvent(
+            run_id=run_id,
+            task_id=task.id,
+            actor="system",
+            payload={
+                "error": f"緊急停止: {request.reason}",
+                "retryable": False,
+            },
+        )
+        ar.append(fail_event, run_id)
+        apply_event_to_projection(run_id, fail_event)
+        cancelled_task_ids.append(task.id)
+
+    # 未解決の確認要請を全て却下する
+    cancelled_requirement_ids = []
+    for req in proj.pending_requirements:
+        reject_event = RequirementRejectedEvent(
+            run_id=run_id,
+            actor="system",
+            payload={
+                "requirement_id": req.id,
+                "comment": f"緊急停止により却下: {request.reason}",
+            },
+        )
+        ar.append(reject_event, run_id)
+        apply_event_to_projection(run_id, reject_event)
+        cancelled_requirement_ids.append(req.id)
+
     event = EmergencyStopEvent(
         run_id=run_id,
         actor="api",
@@ -206,16 +245,21 @@ async def emergency_stop(run_id: str, request: EmergencyStopRequest):
     )
     ar.append(event, run_id)
 
-    proj = active_runs.pop(run_id)
+    active_runs.pop(run_id)
     proj.state = RunState.ABORTED
     proj.completed_at = event.timestamp
 
-    return {
+    result = {
         "status": "aborted",
         "run_id": run_id,
         "reason": request.reason,
         "stopped_at": event.timestamp.isoformat(),
     }
+    if cancelled_task_ids:
+        result["cancelled_task_ids"] = cancelled_task_ids
+    if cancelled_requirement_ids:
+        result["cancelled_requirement_ids"] = cancelled_requirement_ids
+    return result
 
 
 @router.post("/{run_id}/heartbeat")
