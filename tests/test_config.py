@@ -1,0 +1,181 @@
+"""設定管理モジュールのテスト"""
+
+import pytest
+from pathlib import Path
+import os
+import tempfile
+
+from hiveforge.core.config import (
+    HiveForgeSettings,
+    GovernanceConfig,
+    LLMConfig,
+    get_settings,
+    reload_settings,
+)
+
+
+class TestHiveForgeSettings:
+    """HiveForgeSettingsのテスト"""
+
+    def test_default_values(self):
+        """デフォルト値が正しく設定される"""
+        # Arrange & Act: デフォルト設定を作成
+        settings = HiveForgeSettings()
+
+        # Assert: デフォルト値が設定されている
+        assert settings.governance.max_retries == 3
+        assert settings.governance.max_oscillations == 5
+        assert settings.llm.provider == "openai"
+        assert settings.server.port == 8000
+
+    def test_from_yaml_with_valid_file(self, tmp_path):
+        """有効なYAMLファイルから設定を読み込む"""
+        # Arrange: YAMLファイルを作成
+        config_file = tmp_path / "hiveforge.config.yaml"
+        config_file.write_text("""
+hive:
+  name: test-hive
+  vault_path: /custom/vault
+governance:
+  max_retries: 5
+  max_oscillations: 10
+""")
+
+        # Act: YAMLから読み込み
+        settings = HiveForgeSettings.from_yaml(config_file)
+
+        # Assert: カスタム値が設定されている
+        assert settings.hive.name == "test-hive"
+        assert settings.hive.vault_path == "/custom/vault"
+        assert settings.governance.max_retries == 5
+        assert settings.governance.max_oscillations == 10
+
+    def test_from_yaml_with_nonexistent_file(self):
+        """存在しないファイルパスを指定した場合はデフォルト値"""
+        # Arrange: 存在しないパス
+        nonexistent_path = Path("/nonexistent/config.yaml")
+
+        # Act: 読み込み試行
+        settings = HiveForgeSettings.from_yaml(nonexistent_path)
+
+        # Assert: デフォルト値が使用される
+        assert settings.governance.max_retries == 3
+
+    def test_from_yaml_with_none_and_no_default_files(self, tmp_path, monkeypatch):
+        """config_pathがNoneでデフォルトファイルも存在しない場合"""
+        # Arrange: デフォルト探索パスに何もない状態にする
+        # ワーキングディレクトリを空の一時ディレクトリに変更
+        monkeypatch.chdir(tmp_path)
+
+        # Act: Noneで読み込み
+        settings = HiveForgeSettings.from_yaml(None)
+
+        # Assert: デフォルト値が使用される
+        assert settings.governance.max_retries == 3
+
+    def test_from_yaml_finds_default_config_file(self, tmp_path, monkeypatch):
+        """デフォルトパスの設定ファイルを自動検出する"""
+        # Arrange: デフォルトパスに設定ファイルを作成
+        config_file = tmp_path / "hiveforge.config.yaml"
+        config_file.write_text("""
+hive:
+  name: auto-detected
+""")
+        monkeypatch.chdir(tmp_path)
+
+        # Act: config_path=None で読み込み
+        settings = HiveForgeSettings.from_yaml(None)
+
+        # Assert: 自動検出された設定が使用される
+        assert settings.hive.name == "auto-detected"
+
+    def test_from_yaml_finds_yml_extension(self, tmp_path, monkeypatch):
+        """hiveforge.config.yml も自動検出する"""
+        # Arrange: .yml 拡張子の設定ファイルを作成
+        config_file = tmp_path / "hiveforge.config.yml"
+        config_file.write_text("""
+hive:
+  name: yml-detected
+""")
+        monkeypatch.chdir(tmp_path)
+
+        # Act: config_path=None で読み込み
+        settings = HiveForgeSettings.from_yaml(None)
+
+        # Assert: .yml ファイルが検出される
+        assert settings.hive.name == "yml-detected"
+
+
+class TestGetVaultPath:
+    """get_vault_path メソッドのテスト"""
+
+    def test_absolute_path_unchanged(self):
+        """絶対パスはそのまま返される"""
+        # Arrange: 絶対パスを設定
+        settings = HiveForgeSettings.model_validate(
+            {"hive": {"vault_path": "/absolute/vault/path"}}
+        )
+
+        # Act: パスを取得
+        vault_path = settings.get_vault_path()
+
+        # Assert: 絶対パスがそのまま返される
+        assert vault_path == Path("/absolute/vault/path")
+        assert vault_path.is_absolute()
+
+    def test_relative_path_resolved_to_absolute(self, tmp_path, monkeypatch):
+        """相対パスは現在のディレクトリからの絶対パスに解決される"""
+        # Arrange: 相対パスを設定
+        monkeypatch.chdir(tmp_path)
+        settings = HiveForgeSettings.model_validate({"hive": {"vault_path": "./relative/vault"}})
+
+        # Act: パスを取得
+        vault_path = settings.get_vault_path()
+
+        # Assert: 絶対パスに解決される
+        assert vault_path.is_absolute()
+        assert vault_path == (tmp_path / "relative" / "vault").resolve()
+
+
+class TestSettingsSingleton:
+    """設定シングルトンのテスト"""
+
+    def test_get_settings_returns_instance(self, tmp_path, monkeypatch):
+        """get_settings はインスタンスを返す"""
+        # Arrange: 設定ファイルがない状態にする
+        monkeypatch.chdir(tmp_path)
+        # シングルトンをリセット
+        import hiveforge.core.config as config_module
+
+        config_module._settings = None
+
+        # Act: 設定を取得
+        settings = get_settings()
+
+        # Assert: インスタンスが返される
+        assert isinstance(settings, HiveForgeSettings)
+
+    def test_reload_settings_updates_singleton(self, tmp_path, monkeypatch):
+        """reload_settings はシングルトンを更新する"""
+        # Arrange: カスタム設定ファイルを作成
+        config_file = tmp_path / "custom.yaml"
+        config_file.write_text("""
+hive:
+  name: reloaded-hive
+""")
+        monkeypatch.chdir(tmp_path)
+
+        # シングルトンをリセット
+        import hiveforge.core.config as config_module
+
+        config_module._settings = None
+
+        # Act: 設定を再読み込み
+        settings = reload_settings(config_file)
+
+        # Assert: 新しい設定が反映される
+        assert settings.hive.name == "reloaded-hive"
+
+        # 再度 get_settings を呼ぶと同じインスタンスが返される
+        same_settings = get_settings()
+        assert same_settings.hive.name == "reloaded-hive"
