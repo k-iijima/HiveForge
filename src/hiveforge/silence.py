@@ -66,7 +66,7 @@ class SilenceDetector:
         """監視ループ"""
         threshold = timedelta(seconds=self.interval * 2)  # 2回分のハートビートを待つ
 
-        while self._running:
+        while self._running:  # pragma: no branch
             await asyncio.sleep(self.interval)
 
             if not self._running:

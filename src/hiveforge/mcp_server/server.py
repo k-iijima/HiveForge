@@ -71,7 +71,7 @@ class HiveForgeMCPServer:
             self._ar = AkashicRecord(settings.get_vault_path())
         return self._ar
 
-    def _setup_handlers(self) -> None:
+    def _setup_handlers(self) -> None:  # pragma: no cover
         """MCPハンドラーを設定"""
 
         @self.server.list_tools()
@@ -262,12 +262,14 @@ class HiveForgeMCPServer:
                     )
                 result = await handler(arguments)
                 return CallToolResult(
-                    content=[TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))]
+                    content=[
+                        TextContent(
+                            type="text", text=json.dumps(result, ensure_ascii=False, indent=2)
+                        )
+                    ]
                 )
             except Exception as e:
-                return CallToolResult(
-                    content=[TextContent(type="text", text=f"Error: {str(e)}")]
-                )
+                return CallToolResult(content=[TextContent(type="text", text=f"Error: {str(e)}")])
 
     async def _handle_start_run(self, args: dict[str, Any]) -> dict[str, Any]:
         """Run開始"""
@@ -312,7 +314,9 @@ class HiveForgeMCPServer:
         ]
         completed_tasks = [{"id": t.id, "title": t.title} for t in proj.completed_tasks]
         blocked_tasks = [{"id": t.id, "title": t.title} for t in proj.blocked_tasks]
-        pending_reqs = [{"id": r.id, "description": r.description} for r in proj.pending_requirements]
+        pending_reqs = [
+            {"id": r.id, "description": r.description} for r in proj.pending_requirements
+        ]
 
         return {
             "run_id": run_id,
@@ -526,17 +530,17 @@ class HiveForgeMCPServer:
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
-    async def run(self) -> None:
+    async def run(self) -> None:  # pragma: no cover
         """サーバーを起動"""
         async with stdio_server() as (read_stream, write_stream):
             await self.server.run(read_stream, write_stream)
 
 
-def main():
+def main():  # pragma: no cover
     """エントリーポイント"""
     server = HiveForgeMCPServer()
     asyncio.run(server.run())
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

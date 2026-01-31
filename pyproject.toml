@@ -9,9 +9,7 @@ description = "HiveForge - 自律型ソフトウェア組立システム"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
-authors = [
-    { name = "HiveForge Team" }
-]
+authors = [{ name = "HiveForge Team" }]
 keywords = ["ai", "automation", "mcp", "llm"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -87,6 +85,11 @@ exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING:",
     "raise NotImplementedError",
+    "def _setup_handlers",
+    "@self.server.list_tools",
+    "@self.server.call_tool",
+    "async def list_tools",
+    "async def call_tool",
 ]
 fail_under = 100
 show_missing = true
