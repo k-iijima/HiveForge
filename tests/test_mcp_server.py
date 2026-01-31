@@ -487,6 +487,22 @@ class TestHandleCompleteRun:
         assert req_id in result["cancelled_requirement_ids"]
 
     @pytest.mark.asyncio
+    async def test_complete_run_with_pending_requirements_fails(self, mcp_server):
+        """未解決の確認要請がある場合はRun完了できない"""
+        # Arrange: Runを開始して確認要請を作成（タスクなし）
+        await mcp_server._handle_start_run({"goal": "確認要請テスト"})
+        await mcp_server._handle_create_requirement(
+            {"description": "未解決の確認要請", "options": ["承認", "却下"]}
+        )
+
+        # Act: 通常完了を試みる
+        result = await mcp_server._handle_complete_run({})
+
+        # Assert: エラーになる
+        assert "error" in result
+        assert "pending_requirement_ids" in result
+
+    @pytest.mark.asyncio
     async def test_complete_run_with_completed_tasks(self, mcp_server):
         """全タスクが完了している場合、Runを完了できる"""
         # Arrange

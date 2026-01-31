@@ -109,13 +109,19 @@ class RunHandlers(BaseHandler):
             if task.state not in (TaskState.COMPLETED, TaskState.FAILED)
         ]
 
-        if incomplete_tasks and not force:
-            task_ids = [t.id for t in incomplete_tasks]
-            return {
-                "error": "Cannot complete run with incomplete tasks",
-                "incomplete_task_ids": task_ids,
+        # 未解決の確認要請をチェック
+        pending_requirements = list(proj.pending_requirements)
+
+        if (incomplete_tasks or pending_requirements) and not force:
+            result = {
+                "error": "Cannot complete run with incomplete tasks or pending requirements",
                 "hint": "強制完了する場合は force=true を指定してください",
             }
+            if incomplete_tasks:
+                result["incomplete_task_ids"] = [t.id for t in incomplete_tasks]
+            if pending_requirements:
+                result["pending_requirement_ids"] = [r.id for r in pending_requirements]
+            return result
 
         cancelled_task_ids = []
         if incomplete_tasks and force:
@@ -136,7 +142,7 @@ class RunHandlers(BaseHandler):
         # 強制完了時は未解決の確認要請も却下する
         cancelled_requirement_ids = []
         if force:
-            for req in proj.pending_requirements:
+            for req in pending_requirements:
                 reject_event = RequirementRejectedEvent(
                     run_id=run_id,
                     actor="system",
