@@ -448,6 +448,54 @@ class TestHandleHeartbeat:
         assert "timestamp" in result
 
 
+class TestHandleEmergencyStop:
+    """emergency_stopハンドラのテスト"""
+
+    @pytest.mark.asyncio
+    async def test_emergency_stop_no_active_run(self, mcp_server):
+        """アクティブなRunがない場合"""
+        # Act
+        result = await mcp_server._handle_emergency_stop({"reason": "テスト"})
+
+        # Assert
+        assert "error" in result
+
+    @pytest.mark.asyncio
+    async def test_emergency_stop_success(self, mcp_server):
+        """Runを緊急停止できる"""
+        # Arrange
+        start_result = await mcp_server._handle_start_run({"goal": "緊急停止テスト"})
+        run_id = start_result["run_id"]
+
+        # Act
+        result = await mcp_server._handle_emergency_stop(
+            {
+                "reason": "危険な操作を検知",
+                "scope": "run",
+            }
+        )
+
+        # Assert
+        assert result["status"] == "aborted"
+        assert result["run_id"] == run_id
+        assert result["reason"] == "危険な操作を検知"
+        assert result["scope"] == "run"
+        assert "stopped_at" in result
+        assert mcp_server._current_run_id is None
+
+    @pytest.mark.asyncio
+    async def test_emergency_stop_default_scope(self, mcp_server):
+        """スコープのデフォルト値がrunになる"""
+        # Arrange
+        await mcp_server._handle_start_run({"goal": "スコープテスト"})
+
+        # Act
+        result = await mcp_server._handle_emergency_stop({"reason": "理由なし"})
+
+        # Assert
+        assert result["scope"] == "run"
+
+
 class TestMainFunction:
     """main関数のテスト"""
 

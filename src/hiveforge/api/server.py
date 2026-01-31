@@ -27,6 +27,7 @@ from ..core.events import (
     TaskCompletedEvent,
     TaskFailedEvent,
     HeartbeatEvent,
+    EmergencyStopEvent,
     parse_event,
 )
 from ..core.ar.projections import RunState, TaskState
@@ -300,6 +301,42 @@ async def complete_run(run_id: str):
     proj.completed_at = event.timestamp
 
     return {"status": "completed", "run_id": run_id}
+
+
+class EmergencyStopRequest(BaseModel):
+    """緊急停止リクエスト"""
+
+    reason: str = Field(..., description="停止理由")
+    scope: str = Field(default="run", description="停止スコープ（run/system）")
+
+
+@app.post("/runs/{run_id}/emergency-stop", tags=["Runs"])
+async def emergency_stop(run_id: str, request: EmergencyStopRequest):
+    """Runを緊急停止する
+
+    進行中の全タスクを中断し、Runを即座に停止する。
+    """
+    if run_id not in _active_runs:
+        raise HTTPException(status_code=404, detail=f"Active run {run_id} not found")
+
+    ar = get_ar()
+    event = EmergencyStopEvent(
+        run_id=run_id,
+        actor="api",
+        payload={"reason": request.reason, "scope": request.scope},
+    )
+    ar.append(event, run_id)
+
+    proj = _active_runs.pop(run_id)
+    proj.state = RunState.ABORTED
+    proj.completed_at = event.timestamp
+
+    return {
+        "status": "aborted",
+        "run_id": run_id,
+        "reason": request.reason,
+        "stopped_at": event.timestamp.isoformat(),
+    }
 
 
 @app.post(

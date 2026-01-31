@@ -58,9 +58,7 @@ class StateMachine:
 
     def __init__(self, initial_state: Enum, transitions: list[Transition]):
         self.current_state = initial_state
-        self._transitions = {
-            (t.from_state, t.event_type): t for t in transitions
-        }
+        self._transitions = {(t.from_state, t.event_type): t for t in transitions}
 
     def can_transition(self, event_type: EventType) -> bool:
         """指定イベントで遷移可能か確認"""
@@ -92,8 +90,7 @@ class StateMachine:
         if not transition:
             valid = self.get_valid_events()
             raise TransitionError(
-                f"Invalid transition: {self.current_state} + {event.type}. "
-                f"Valid events: {valid}"
+                f"Invalid transition: {self.current_state} + {event.type}. Valid events: {valid}"
             )
 
         if transition.guard and not transition.guard(event):
@@ -109,7 +106,7 @@ class RunStateMachine(StateMachine):
     状態遷移:
     - RUNNING -> COMPLETED (全タスク完了時)
     - RUNNING -> FAILED (致命的エラー時)
-    - RUNNING -> ABORTED (ユーザー中断時)
+    - RUNNING -> ABORTED (ユーザー中断時または緊急停止時)
     """
 
     def __init__(self):
@@ -117,6 +114,7 @@ class RunStateMachine(StateMachine):
             Transition(RunState.RUNNING, RunState.COMPLETED, EventType.RUN_COMPLETED),
             Transition(RunState.RUNNING, RunState.FAILED, EventType.RUN_FAILED),
             Transition(RunState.RUNNING, RunState.ABORTED, EventType.RUN_ABORTED),
+            Transition(RunState.RUNNING, RunState.ABORTED, EventType.EMERGENCY_STOP),
         ]
         super().__init__(RunState.RUNNING, transitions)
 
@@ -147,7 +145,9 @@ class TaskStateMachine(StateMachine):
             Transition(TaskState.IN_PROGRESS, TaskState.FAILED, EventType.TASK_FAILED),
             Transition(TaskState.BLOCKED, TaskState.IN_PROGRESS, EventType.TASK_UNBLOCKED),
             # リトライ: FAILED -> PENDING (ガード付き)
-            Transition(TaskState.FAILED, TaskState.PENDING, EventType.TASK_CREATED, guard=retry_guard),
+            Transition(
+                TaskState.FAILED, TaskState.PENDING, EventType.TASK_CREATED, guard=retry_guard
+            ),
         ]
         super().__init__(TaskState.PENDING, transitions)
 
@@ -177,8 +177,12 @@ class RequirementStateMachine(StateMachine):
 
     def __init__(self):
         transitions = [
-            Transition(RequirementState.PENDING, RequirementState.APPROVED, EventType.REQUIREMENT_APPROVED),
-            Transition(RequirementState.PENDING, RequirementState.REJECTED, EventType.REQUIREMENT_REJECTED),
+            Transition(
+                RequirementState.PENDING, RequirementState.APPROVED, EventType.REQUIREMENT_APPROVED
+            ),
+            Transition(
+                RequirementState.PENDING, RequirementState.REJECTED, EventType.REQUIREMENT_REJECTED
+            ),
         ]
         super().__init__(RequirementState.PENDING, transitions)
 
@@ -211,8 +215,8 @@ class OscillationDetector:
             return True
 
         # 直近の状態で振動パターンを検出
-        recent = self._state_history[-(self.max_oscillations * 2):]
-        
+        recent = self._state_history[-(self.max_oscillations * 2) :]
+
         # A-B-A-B... のようなパターンを検出
         if len(set(recent)) == 2:
             # 2つの状態が交互に出現していればエラー
@@ -220,8 +224,7 @@ class OscillationDetector:
             pattern_b = recent[1::2]  # 奇数インデックス
             if len(set(pattern_a)) == 1 and len(set(pattern_b)) == 1:
                 raise GovernanceError(
-                    f"Oscillation detected: {recent}. "
-                    f"Threshold: {self.max_oscillations}"
+                    f"Oscillation detected: {recent}. Threshold: {self.max_oscillations}"
                 )
 
         return True

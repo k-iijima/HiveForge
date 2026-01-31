@@ -38,6 +38,7 @@ from ..core.events import (
     TaskFailedEvent,
     HeartbeatEvent,
     RequirementCreatedEvent,
+    EmergencyStopEvent,
 )
 from ..core.ar.projections import RunState, TaskState
 
@@ -246,6 +247,26 @@ class HiveForgeMCPServer:
                                     "description": "現在の状況",
                                 },
                             },
+                        },
+                    ),
+                    Tool(
+                        name="emergency_stop",
+                        description="Runを緊急停止します。危険な操作や問題が発生した場合に呼び出してください。",
+                        inputSchema={
+                            "type": "object",
+                            "properties": {
+                                "reason": {
+                                    "type": "string",
+                                    "description": "停止理由",
+                                },
+                                "scope": {
+                                    "type": "string",
+                                    "enum": ["run", "system"],
+                                    "description": "停止スコープ（run: 現在のRunのみ, system: システム全体）",
+                                    "default": "run",
+                                },
+                            },
+                            "required": ["reason"],
                         },
                     ),
                 ]
@@ -528,6 +549,33 @@ class HiveForgeMCPServer:
         return {
             "status": "ok",
             "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
+    async def _handle_emergency_stop(self, args: dict[str, Any]) -> dict[str, Any]:
+        """緊急停止"""
+        if not self._current_run_id:
+            return {"error": "No active run."}
+
+        ar = self._get_ar()
+        reason = args.get("reason", "No reason provided")
+        scope = args.get("scope", "run")
+
+        event = EmergencyStopEvent(
+            run_id=self._current_run_id,
+            actor="copilot",
+            payload={"reason": reason, "scope": scope},
+        )
+        ar.append(event, self._current_run_id)
+
+        run_id = self._current_run_id
+        self._current_run_id = None
+
+        return {
+            "status": "aborted",
+            "run_id": run_id,
+            "reason": reason,
+            "scope": scope,
+            "stopped_at": datetime.now(timezone.utc).isoformat(),
         }
 
     async def run(self) -> None:  # pragma: no cover

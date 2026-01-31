@@ -48,6 +48,7 @@ class EventType(str, Enum):
     HEARTBEAT = "system.heartbeat"
     ERROR = "system.error"
     SILENCE_DETECTED = "system.silence_detected"
+    EMERGENCY_STOP = "system.emergency_stop"
 
 
 def generate_event_id() -> str:
@@ -225,6 +226,12 @@ class SilenceDetectedEvent(BaseEvent):
     type: Literal[EventType.SILENCE_DETECTED] = EventType.SILENCE_DETECTED
 
 
+class EmergencyStopEvent(BaseEvent):
+    """緊急停止イベント"""
+
+    type: Literal[EventType.EMERGENCY_STOP] = EventType.EMERGENCY_STOP
+
+
 # イベントタイプからクラスへのマッピング
 EVENT_TYPE_MAP: dict[EventType, type[BaseEvent]] = {
     EventType.RUN_STARTED: RunStartedEvent,
@@ -242,6 +249,7 @@ EVENT_TYPE_MAP: dict[EventType, type[BaseEvent]] = {
     EventType.HEARTBEAT: HeartbeatEvent,
     EventType.ERROR: ErrorEvent,
     EventType.SILENCE_DETECTED: SilenceDetectedEvent,
+    EventType.EMERGENCY_STOP: EmergencyStopEvent,
 }
 
 

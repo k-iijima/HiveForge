@@ -146,6 +146,37 @@ class TestRunsEndpoints:
         # Assert
         assert response.status_code == 404
 
+    def test_emergency_stop(self, client):
+        """Runを緊急停止できる"""
+        # Arrange: Runを開始
+        run_resp = client.post("/runs", json={"goal": "緊急停止テスト"})
+        run_id = run_resp.json()["run_id"]
+
+        # Act: 緊急停止を実行
+        response = client.post(
+            f"/runs/{run_id}/emergency-stop",
+            json={"reason": "テスト停止", "scope": "run"},
+        )
+
+        # Assert: 停止が成功
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "aborted"
+        assert data["run_id"] == run_id
+        assert data["reason"] == "テスト停止"
+        assert "stopped_at" in data
+
+    def test_emergency_stop_not_found(self, client):
+        """存在しないRunの緊急停止で404を返す"""
+        # Act
+        response = client.post(
+            "/runs/nonexistent/emergency-stop",
+            json={"reason": "テスト"},
+        )
+
+        # Assert
+        assert response.status_code == 404
+
 
 class TestTasksEndpoints:
     """Tasks関連エンドポイントのテスト"""
