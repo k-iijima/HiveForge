@@ -2,15 +2,98 @@ services:
   hiveforge-dev:
     build:
       context: ..
-      dockerfile: HiveForge/.devcontainer/Dockerfile.dev
+      dockerfile: .devcontainer/Dockerfile.dev
     volumes:
-      - ../HiveForge:/workspace/HiveForge:cached
+      # WSL Ubuntu内のパスでワークスペースをマウント
+      - /mnt/d/projects/biz/HiveForge:/workspace/HiveForge:cached
       - hiveforge-venv:/workspace/HiveForge/.venv
       - /var/run/docker.sock:/var/run/docker.sock
     command: sleep infinity
     user: vscode
     group_add:
       - docker
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    networks:
+      - hiveforge-dev-net
+
+  # GPU対応Ollama（GPUがある場合のみ起動）
+  ollama:
+    image: ollama/ollama:latest
+    container_name: hiveforge-dev-ollama
+    profiles:
+      - gpu
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    restart: unless-stopped
+    networks:
+      hiveforge-dev-net:
+        aliases:
+          - ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # CPU版Ollama（GPUがない場合のフォールバック）
+  ollama-cpu:
+    image: ollama/ollama:latest
+    container_name: hiveforge-dev-ollama-cpu
+    profiles:
+      - cpu
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    restart: unless-stopped
+    networks:
+      hiveforge-dev-net:
+        aliases:
+          - ollama
+
+  # code-server: ブラウザ版VS Code（VLMテスト対象）
+  code-server:
+    image: codercom/code-server:latest
+    container_name: hiveforge-code-server
+    ports:
+      - "8080:8080"
+    environment:
+      - PASSWORD=hiveforge
+    volumes:
+      - /mnt/d/projects/biz/HiveForge:/workspace/HiveForge
+    command: ["--bind-addr", "0.0.0.0:8080", "--auth", "password", "/workspace/HiveForge"]
+    restart: unless-stopped
+    networks:
+      - hiveforge-dev-net
+
+  # Playwright MCP Server（公式Dockerイメージ使用）
+  # ローカルにPlaywrightをインストールせずにMCP経由でブラウザ操作可能
+  playwright-mcp:
+    build:
+      context: https://github.com/microsoft/playwright-mcp.git
+      dockerfile: Dockerfile
+    container_name: hiveforge-playwright-mcp
+    ports:
+      - "8931:8931"
+    tmpfs:
+      - /tmp/playwright-output:mode=1777
+    command: ["--port", "8931", "--host", "0.0.0.0", "--allowed-hosts", "*"]
+    restart: unless-stopped
+    networks:
+      - hiveforge-dev-net
 
 volumes:
   hiveforge-venv:
+  ollama_models:
+    name: hiveforge_ollama_models
+
+networks:
+  hiveforge-dev-net:
+    name: hiveforge-dev-network
