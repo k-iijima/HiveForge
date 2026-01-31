@@ -100,6 +100,28 @@ class TestTaskStateMachine:
         sm.current_state = TaskState.FAILED
         assert not sm.can_retry()
 
+    def test_retry_guard_prevents_transition_when_limit_exceeded(self):
+        """リトライ上限を超えるとガード条件で遷移が拒否される
+
+        max_retriesに達した後のリトライはTransitionErrorを発生させる。
+        """
+        # Arrange: max_retries=1の状態機械でリトライ上限に達する
+        sm = TaskStateMachine(max_retries=1)
+        sm.current_state = TaskState.FAILED
+        sm.retry_count = 0
+
+        # 最初のリトライは成功
+        event = TaskCreatedEvent(run_id="test", task_id="task-001")
+        sm.transition(event)
+        assert sm.retry_count == 1
+
+        # 再度失敗状態にする
+        sm.current_state = TaskState.FAILED
+
+        # Act & Assert: 2回目のリトライはガード条件により拒否される
+        with pytest.raises(TransitionError, match="Guard condition failed"):
+            sm.transition(TaskCreatedEvent(run_id="test", task_id="task-001"))
+
     def test_get_valid_events(self):
         """有効なイベント一覧の取得"""
         sm = TaskStateMachine()
@@ -151,3 +173,66 @@ class TestOscillationDetector:
 
         with pytest.raises(GovernanceError):
             detector.check()
+
+    def test_no_oscillation_with_three_or_more_states(self):
+        """3種類以上の状態がある場合は振動とみなさない
+
+        A-B-A-B パターンではなく A-B-C-D のようなパターンは
+        十分なデータがあっても振動ではない。
+        """
+        # Arrange: max_oscillationsの2倍以上の状態を記録
+        detector = OscillationDetector(max_oscillations=3)
+
+        # Act: 3種類以上の状態を含むパターン
+        states = [
+            TaskState.PENDING,
+            TaskState.IN_PROGRESS,
+            TaskState.BLOCKED,
+            TaskState.IN_PROGRESS,
+            TaskState.COMPLETED,
+            TaskState.FAILED,
+        ]
+        for state in states:
+            detector.record(state)
+
+        # Assert: 振動とはみなされない
+        assert detector.check() is True
+
+    def test_two_states_not_alternating_pattern(self):
+        """2種類の状態でも交互パターンでなければ振動ではない
+
+        例: A-A-B-B-A-B のように、連続した同じ状態が含まれる場合は
+        厳密な交互パターン(A-B-A-B...)ではないため振動とみなさない。
+        """
+        # Arrange: max_oscillations=2の検出器
+        detector = OscillationDetector(max_oscillations=2)
+
+        # Act: 2種類の状態だが、交互パターンではない
+        # A-A-B-B (4要素で max_oscillations*2 = 4)
+        detector.record(TaskState.IN_PROGRESS)  # A
+        detector.record(TaskState.IN_PROGRESS)  # A (連続)
+        detector.record(TaskState.BLOCKED)  # B
+        detector.record(TaskState.BLOCKED)  # B (連続)
+
+        # Assert: 交互パターンではないので振動ではない
+        assert detector.check() is True
+
+
+class TestStateMachineCanTransition:
+    """StateMachineのcan_transitionメソッドのテスト"""
+
+    def test_can_transition_returns_true_for_valid_event(self):
+        """有効なイベントに対してcan_transitionはTrueを返す"""
+        # Arrange: RUNNING状態のRun状態機械
+        sm = RunStateMachine()
+
+        # Act & Assert: RUN_COMPLETEDは有効な遷移
+        assert sm.can_transition(EventType.RUN_COMPLETED) is True
+
+    def test_can_transition_returns_false_for_invalid_event(self):
+        """無効なイベントに対してcan_transitionはFalseを返す"""
+        # Arrange: RUNNING状態のRun状態機械
+        sm = RunStateMachine()
+
+        # Act & Assert: TASK_CREATEDはRunの遷移には無効
+        assert sm.can_transition(EventType.TASK_CREATED) is False
