@@ -33,6 +33,10 @@ dependencies = [
     "mcp>=1.0.0",
     "python-dotenv>=1.0.0",
     "pyyaml>=6.0.0",
+    "anthropic>=0.18.0",
+    "playwright>=1.41.0",
+    "pillow>=10.0.0",
+    "numpy>=1.24.0",
 ]
 
 [project.optional-dependencies]
@@ -43,10 +47,15 @@ dev = [
     "ruff>=0.1.0",
     "mypy>=1.8.0",
     "types-PyYAML>=6.0.0",
+    "pyautogui>=0.9.54",
 ]
+
+vlm = ["anthropic>=0.18.0", "playwright>=1.41.0", "pyautogui>=0.9.54"]
 
 [project.scripts]
 hiveforge = "hiveforge.cli:main"
+hiveforge-vlm = "hiveforge.vlm_tester.server:main"
+hiveforge-agent-ui = "hiveforge.agent_ui.server:main"
 
 [project.urls]
 Homepage = "https://github.com/your-org/hiveforge"
@@ -73,12 +82,15 @@ plugins = ["pydantic.mypy"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = "-v --tb=short"
+addopts = "-v --tb=short -m 'not e2e'"
+markers = [
+    "e2e: marks tests as end-to-end tests (requires Playwright browser or MCP container)",
+]
 
 [tool.coverage.run]
 branch = true
 source = ["src/hiveforge"]
-omit = ["*/__pycache__/*", "*/tests/*"]
+omit = ["*/__pycache__/*", "*/tests/*", "*/vlm_tester/*"]
 
 [tool.coverage.report]
 exclude_lines = [

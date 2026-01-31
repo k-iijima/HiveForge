@@ -847,3 +847,282 @@ class TestLifespanNoRuns:
         # Cleanup
         server_module._ar = None
         server_module._active_runs = {}
+
+
+class TestAssignTaskEndpoint:
+    """Task割り当てエンドポイントのテスト"""
+
+    def test_assign_task(self, client):
+        """Taskを担当者に割り当てできる"""
+        # Arrange
+        run_resp = client.post("/runs", json={"goal": "割り当てテスト"})
+        run_id = run_resp.json()["run_id"]
+        task_resp = client.post(f"/runs/{run_id}/tasks", json={"title": "タスク1"})
+        task_id = task_resp.json()["task_id"]
+
+        # Act
+        response = client.post(
+            f"/runs/{run_id}/tasks/{task_id}/assign",
+            json={"assignee": "agent-001"},
+        )
+
+        # Assert
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "assigned"
+        assert data["task_id"] == task_id
+        assert data["assignee"] == "agent-001"
+
+    def test_assign_task_run_not_found(self, client):
+        """存在しないRunのTask割り当てで404を返す"""
+        # Act
+        response = client.post(
+            "/runs/nonexistent/tasks/task-123/assign",
+            json={"assignee": "agent-001"},
+        )
+
+        # Assert
+        assert response.status_code == 404
+
+    def test_assign_task_not_found(self, client):
+        """存在しないTaskの割り当てで404を返す"""
+        # Arrange
+        run_resp = client.post("/runs", json={"goal": "テスト"})
+        run_id = run_resp.json()["run_id"]
+
+        # Act
+        response = client.post(
+            f"/runs/{run_id}/tasks/nonexistent-task/assign",
+            json={"assignee": "agent-001"},
+        )
+
+        # Assert
+        assert response.status_code == 404
+
+
+class TestReportProgressEndpoint:
+    """進捗報告エンドポイントのテスト"""
+
+    def test_report_progress(self, client):
+        """Taskの進捗を報告できる"""
+        # Arrange
+        run_resp = client.post("/runs", json={"goal": "進捗テスト"})
+        run_id = run_resp.json()["run_id"]
+        task_resp = client.post(f"/runs/{run_id}/tasks", json={"title": "タスク1"})
+        task_id = task_resp.json()["task_id"]
+
+        # Act
+        response = client.post(
+            f"/runs/{run_id}/tasks/{task_id}/progress",
+            json={"progress": 50, "message": "半分完了"},
+        )
+
+        # Assert
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "updated"
+        assert data["task_id"] == task_id
+        assert data["progress"] == 50
+
+    def test_report_progress_run_not_found(self, client):
+        """存在しないRunの進捗報告で404を返す"""
+        # Act
+        response = client.post(
+            "/runs/nonexistent/tasks/task-123/progress",
+            json={"progress": 50},
+        )
+
+        # Assert
+        assert response.status_code == 404
+
+    def test_report_progress_task_not_found(self, client):
+        """存在しないTaskの進捗報告で404を返す"""
+        # Arrange
+        run_resp = client.post("/runs", json={"goal": "テスト"})
+        run_id = run_resp.json()["run_id"]
+
+        # Act
+        response = client.post(
+            f"/runs/{run_id}/tasks/nonexistent-task/progress",
+            json={"progress": 50},
+        )
+
+        # Assert
+        assert response.status_code == 404
+
+
+class TestRequirementsEndpoint:
+    """Requirements関連エンドポイントのテスト"""
+
+    def test_create_requirement(self, client):
+        """確認要請を作成できる"""
+        # Arrange
+        run_resp = client.post("/runs", json={"goal": "確認テスト"})
+        run_id = run_resp.json()["run_id"]
+
+        # Act
+        response = client.post(
+            f"/runs/{run_id}/requirements",
+            json={"description": "この変更を承認しますか？", "options": ["はい", "いいえ"]},
+        )
+
+        # Assert
+        assert response.status_code == 201
+        data = response.json()
+        assert data["description"] == "この変更を承認しますか？"
+        assert data["state"] == "pending"
+        assert data["options"] == ["はい", "いいえ"]
+
+    def test_create_requirement_run_not_found(self, client):
+        """存在しないRunの確認要請作成で404を返す"""
+        # Act
+        response = client.post(
+            "/runs/nonexistent/requirements",
+            json={"description": "テスト"},
+        )
+
+        # Assert
+        assert response.status_code == 404
+
+    def test_get_requirements(self, client):
+        """確認要請一覧を取得できる"""
+        # Arrange
+        run_resp = client.post("/runs", json={"goal": "確認テスト"})
+        run_id = run_resp.json()["run_id"]
+        client.post(
+            f"/runs/{run_id}/requirements",
+            json={"description": "要請1"},
+        )
+
+        # Act
+        response = client.get(f"/runs/{run_id}/requirements")
+
+        # Assert
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["description"] == "要請1"
+        assert data[0]["state"] == "pending"
+
+    def test_get_requirements_run_not_found(self, client):
+        """存在しないRunの確認要請一覧取得で404を返す"""
+        # Act
+        response = client.get("/runs/nonexistent-run/requirements")
+
+        # Assert
+        assert response.status_code == 404
+
+    def test_get_requirements_pending_only(self, client):
+        """pending_only=trueで保留中のみ取得できる"""
+        # Arrange
+        run_resp = client.post("/runs", json={"goal": "確認テスト"})
+        run_id = run_resp.json()["run_id"]
+        req_resp = client.post(
+            f"/runs/{run_id}/requirements",
+            json={"description": "要請1"},
+        )
+        req_id = req_resp.json()["id"]
+
+        # 1つ承認
+        client.post(
+            f"/runs/{run_id}/requirements/{req_id}/resolve",
+            json={"approved": True},
+        )
+
+        # もう1つ作成
+        client.post(
+            f"/runs/{run_id}/requirements",
+            json={"description": "要請2"},
+        )
+
+        # Act
+        response = client.get(f"/runs/{run_id}/requirements?pending_only=true")
+
+        # Assert
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["description"] == "要請2"
+
+    def test_get_requirements_includes_resolved(self, client):
+        """pending_only=falseで解決済みも含めて取得できる"""
+        # Arrange
+        run_resp = client.post("/runs", json={"goal": "確認テスト"})
+        run_id = run_resp.json()["run_id"]
+        req_resp = client.post(
+            f"/runs/{run_id}/requirements",
+            json={"description": "要請1"},
+        )
+        req_id = req_resp.json()["id"]
+
+        # 承認
+        client.post(
+            f"/runs/{run_id}/requirements/{req_id}/resolve",
+            json={"approved": True, "comment": "承認コメント"},
+        )
+
+        # Act
+        response = client.get(f"/runs/{run_id}/requirements")
+
+        # Assert
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["description"] == "要請1"
+        assert data[0]["state"] == "approved"
+        assert data[0]["comment"] == "承認コメント"
+
+    def test_resolve_requirement_approve(self, client):
+        """確認要請を承認できる"""
+        # Arrange
+        run_resp = client.post("/runs", json={"goal": "承認テスト"})
+        run_id = run_resp.json()["run_id"]
+        req_resp = client.post(
+            f"/runs/{run_id}/requirements",
+            json={"description": "承認しますか？", "options": ["オプション1", "オプション2"]},
+        )
+        req_id = req_resp.json()["id"]
+
+        # Act
+        response = client.post(
+            f"/runs/{run_id}/requirements/{req_id}/resolve",
+            json={"approved": True, "selected_option": "オプション1", "comment": "承認します"},
+        )
+
+        # Assert
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "resolved"
+
+    def test_resolve_requirement_reject(self, client):
+        """確認要請を却下できる"""
+        # Arrange
+        run_resp = client.post("/runs", json={"goal": "却下テスト"})
+        run_id = run_resp.json()["run_id"]
+        req_resp = client.post(
+            f"/runs/{run_id}/requirements",
+            json={"description": "承認しますか？"},
+        )
+        req_id = req_resp.json()["id"]
+
+        # Act
+        response = client.post(
+            f"/runs/{run_id}/requirements/{req_id}/resolve",
+            json={"approved": False, "comment": "却下します"},
+        )
+
+        # Assert
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "resolved"
+
+    def test_resolve_requirement_run_not_found(self, client):
+        """存在しないRunの確認要請解決で404を返す"""
+        # Act
+        response = client.post(
+            "/runs/nonexistent/requirements/req-123/resolve",
+            json={"approved": True},
+        )
+
+        # Assert
+        assert response.status_code == 404

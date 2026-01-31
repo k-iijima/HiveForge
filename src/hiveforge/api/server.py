@@ -24,10 +24,15 @@ from ..core.events import (
     RunStartedEvent,
     RunCompletedEvent,
     TaskCreatedEvent,
+    TaskAssignedEvent,
+    TaskProgressedEvent,
     TaskCompletedEvent,
     TaskFailedEvent,
     HeartbeatEvent,
     EmergencyStopEvent,
+    RequirementCreatedEvent,
+    RequirementApprovedEvent,
+    RequirementRejectedEvent,
     parse_event,
 )
 from ..core.ar.projections import RunState, TaskState
@@ -97,6 +102,19 @@ class FailTaskRequest(BaseModel):
     retryable: bool = True
 
 
+class AssignTaskRequest(BaseModel):
+    """Task割り当てリクエスト"""
+
+    assignee: str = Field(default="user", description="担当者名")
+
+
+class ReportProgressRequest(BaseModel):
+    """Task進捗報告リクエスト"""
+
+    progress: int = Field(..., ge=0, le=100, description="進捗率(0-100)")
+    message: str = Field(default="", description="進捗メッセージ")
+
+
 class RunStatusResponse(BaseModel):
     """Run状態レスポンス"""
 
@@ -108,6 +126,7 @@ class RunStatusResponse(BaseModel):
     tasks_completed: int
     tasks_failed: int
     tasks_in_progress: int
+    pending_requirements_count: int = 0
     started_at: datetime | None
     last_heartbeat: datetime | None
 
@@ -128,6 +147,34 @@ class HealthResponse(BaseModel):
     status: str
     version: str
     active_runs: int
+
+
+class RequirementResponse(BaseModel):
+    """確認要請レスポンス"""
+
+    id: str
+    description: str
+    state: str
+    options: list[str] | None = None
+    created_at: datetime
+    selected_option: str | None = None
+    comment: str | None = None
+    resolved_at: datetime | None = None
+
+
+class CreateRequirementRequest(BaseModel):
+    """確認要請作成リクエスト"""
+
+    description: str = Field(..., min_length=1)
+    options: list[str] | None = None
+
+
+class ResolveRequirementRequest(BaseModel):
+    """確認要請解決リクエスト"""
+
+    approved: bool
+    selected_option: str | None = None
+    comment: str | None = None
 
 
 # --- ライフサイクル ---
@@ -251,6 +298,7 @@ async def list_runs(active_only: bool = True):
                         [t for t in proj.tasks.values() if t.state == TaskState.FAILED]
                     ),
                     tasks_in_progress=len(proj.in_progress_tasks),
+                    pending_requirements_count=len(proj.pending_requirements),
                     started_at=proj.started_at,
                     last_heartbeat=proj.last_heartbeat,
                 )
@@ -281,6 +329,7 @@ async def get_run(run_id: str):
         tasks_completed=len(proj.completed_tasks),
         tasks_failed=len([t for t in proj.tasks.values() if t.state == TaskState.FAILED]),
         tasks_in_progress=len(proj.in_progress_tasks),
+        pending_requirements_count=len(proj.pending_requirements),
         started_at=proj.started_at,
         last_heartbeat=proj.last_heartbeat,
     )
@@ -460,6 +509,69 @@ async def fail_task(run_id: str, task_id: str, request: FailTaskRequest):
     return {"status": "failed", "task_id": task_id}
 
 
+@app.post("/runs/{run_id}/tasks/{task_id}/assign", tags=["Tasks"])
+async def assign_task(run_id: str, task_id: str, request: AssignTaskRequest):
+    """Taskを担当者に割り当て"""
+    if run_id not in _active_runs:
+        raise HTTPException(status_code=404, detail=f"Active run {run_id} not found")
+
+    proj = _active_runs[run_id]
+    if task_id not in proj.tasks:
+        raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+
+    ar = get_ar()
+    event = TaskAssignedEvent(
+        run_id=run_id,
+        task_id=task_id,
+        actor="api",
+        payload={"assignee": request.assignee},
+    )
+    ar.append(event, run_id)
+
+    # 投影を更新
+    from ..core.ar.projections import RunProjector
+
+    projector = RunProjector(run_id)
+    projector.projection = proj
+    projector.apply(event)
+
+    return {"status": "assigned", "task_id": task_id, "assignee": request.assignee}
+
+
+@app.post("/runs/{run_id}/tasks/{task_id}/progress", tags=["Tasks"])
+async def report_progress(run_id: str, task_id: str, request: ReportProgressRequest):
+    """Taskの進捗を報告"""
+    if run_id not in _active_runs:
+        raise HTTPException(status_code=404, detail=f"Active run {run_id} not found")
+
+    proj = _active_runs[run_id]
+    if task_id not in proj.tasks:
+        raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+
+    ar = get_ar()
+    event = TaskProgressedEvent(
+        run_id=run_id,
+        task_id=task_id,
+        actor="api",
+        payload={"progress": request.progress, "message": request.message},
+    )
+    ar.append(event, run_id)
+
+    # 投影を更新
+    from ..core.ar.projections import RunProjector
+
+    projector = RunProjector(run_id)
+    projector.projection = proj
+    projector.apply(event)
+
+    task = proj.tasks[task_id]
+    return {
+        "status": "updated",
+        "task_id": task_id,
+        "progress": task.progress,
+    }
+
+
 @app.get("/runs/{run_id}/events", response_model=list[EventResponse], tags=["Events"])
 async def get_events(run_id: str, since: datetime | None = None, limit: int = 100):
     """イベント一覧を取得"""
@@ -496,6 +608,128 @@ async def send_heartbeat(run_id: str):
     _active_runs[run_id].last_heartbeat = event.timestamp
 
     return {"status": "ok", "timestamp": event.timestamp}
+
+
+# --- 確認要請エンドポイント ---
+
+
+@app.get(
+    "/runs/{run_id}/requirements",
+    response_model=list[RequirementResponse],
+    tags=["Requirements"],
+)
+async def get_requirements(run_id: str, pending_only: bool = False):
+    """確認要請一覧を取得"""
+    ar = get_ar()
+    events = list(ar.replay(run_id))
+    if not events:
+        raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
+
+    projection = build_run_projection(events, run_id)
+
+    requirements = []
+    for req in projection.pending_requirements:
+        requirements.append(
+            RequirementResponse(
+                id=req.id,
+                description=req.description,
+                state="pending",
+                options=req.metadata.get("options") if req.metadata else None,
+                created_at=req.created_at if req.created_at else projection.started_at,
+                selected_option=None,
+                comment=None,
+                resolved_at=None,
+            )
+        )
+
+    if not pending_only:
+        for req in projection.resolved_requirements:
+            requirements.append(
+                RequirementResponse(
+                    id=req.id,
+                    description=req.description,
+                    state=req.state.value,
+                    options=req.metadata.get("options") if req.metadata else None,
+                    created_at=req.created_at if req.created_at else projection.started_at,
+                    selected_option=req.selected_option,
+                    comment=req.comment,
+                    resolved_at=req.decided_at,
+                )
+            )
+
+    return requirements
+
+
+@app.post(
+    "/runs/{run_id}/requirements",
+    response_model=RequirementResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["Requirements"],
+)
+async def create_requirement(run_id: str, request: CreateRequirementRequest):
+    """確認要請を作成"""
+    if run_id not in _active_runs:
+        raise HTTPException(status_code=404, detail=f"Active run {run_id} not found")
+
+    ar = get_ar()
+    requirement_id = generate_event_id()
+
+    event = RequirementCreatedEvent(
+        run_id=run_id,
+        actor="api",
+        payload={
+            "requirement_id": requirement_id,
+            "description": request.description,
+            "options": request.options,
+        },
+    )
+    ar.append(event, run_id)
+
+    return RequirementResponse(
+        id=requirement_id,
+        description=request.description,
+        state="pending",
+        options=request.options,
+        created_at=event.timestamp,
+    )
+
+
+@app.post("/runs/{run_id}/requirements/{requirement_id}/resolve", tags=["Requirements"])
+async def resolve_requirement(run_id: str, requirement_id: str, request: ResolveRequirementRequest):
+    """確認要請を解決（承認/却下）"""
+    if run_id not in _active_runs:
+        raise HTTPException(status_code=404, detail=f"Active run {run_id} not found")
+
+    ar = get_ar()
+
+    if request.approved:
+        event = RequirementApprovedEvent(
+            run_id=run_id,
+            actor="user",
+            payload={
+                "requirement_id": requirement_id,
+                "selected_option": request.selected_option,
+                "comment": request.comment,
+            },
+        )
+    else:
+        event = RequirementRejectedEvent(
+            run_id=run_id,
+            actor="user",
+            payload={
+                "requirement_id": requirement_id,
+                "selected_option": request.selected_option,
+                "comment": request.comment,
+            },
+        )
+
+    ar.append(event, run_id)
+
+    return {
+        "status": "resolved",
+        "requirement_id": requirement_id,
+        "approved": request.approved,
+    }
 
 
 class LineageResponse(BaseModel):

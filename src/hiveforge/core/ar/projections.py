@@ -66,6 +66,8 @@ class RequirementProjection:
     created_at: datetime | None = None
     decided_at: datetime | None = None
     decided_by: str | None = None
+    selected_option: str | None = None
+    comment: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -108,6 +110,11 @@ class RunProjection:
     def pending_requirements(self) -> list[RequirementProjection]:
         """未決定の要件を取得"""
         return [r for r in self.requirements.values() if r.state == RequirementState.PENDING]
+
+    @property
+    def resolved_requirements(self) -> list[RequirementProjection]:
+        """決定済みの要件を取得"""
+        return [r for r in self.requirements.values() if r.state != RequirementState.PENDING]
 
 
 class RunProjector:
@@ -215,6 +222,7 @@ class RunProjector:
                 description=event.payload.get("description", ""),
                 state=RequirementState.PENDING,
                 created_at=event.timestamp,
+                metadata={"options": event.payload.get("options")},
             )
 
     def _handle_requirement_approved(self, event: BaseEvent) -> None:
@@ -224,6 +232,8 @@ class RunProjector:
             req.state = RequirementState.APPROVED
             req.decided_at = event.timestamp
             req.decided_by = event.actor
+            req.selected_option = event.payload.get("selected_option")
+            req.comment = event.payload.get("comment")
 
     def _handle_requirement_rejected(self, event: BaseEvent) -> None:
         req_id = event.payload.get("requirement_id")
@@ -232,6 +242,8 @@ class RunProjector:
             req.state = RequirementState.REJECTED
             req.decided_at = event.timestamp
             req.decided_by = event.actor
+            req.selected_option = event.payload.get("selected_option")
+            req.comment = event.payload.get("comment")
 
     def _handle_system_heartbeat(self, event: BaseEvent) -> None:
         self.projection.last_heartbeat = event.timestamp
