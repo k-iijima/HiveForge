@@ -121,14 +121,26 @@ export class HiveForgeClient {
         return response.data;
     }
 
+    /**
+     * Runを完了する
+     * 未完了タスクがある場合は400エラー
+     */
     async completeRun(runId: string): Promise<void> {
         await this.client.post(`/runs/${runId}/complete`);
     }
 
+    /**
+     * Runを強制完了する
+     * 未完了タスクを自動キャンセル、未解決の確認要請を自動却下
+     */
     async completeRunForce(runId: string): Promise<void> {
         await this.client.post(`/runs/${runId}/complete`, { force: true });
     }
 
+    /**
+     * 緊急停止
+     * 未完了タスクを全て失敗状態に、未解決の確認要請を全て却下
+     */
     async emergencyStop(runId: string, reason: string, scope: 'run' | 'system' = 'run'): Promise<void> {
         await this.client.post(`/runs/${runId}/emergency-stop`, { reason, scope });
     }

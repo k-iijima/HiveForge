@@ -243,6 +243,38 @@ class TaskProjection:
 | POST | `/runs/{run_id}/emergency-stop` | 緊急停止 |
 | POST | `/runs/{run_id}/heartbeat` | ハートビート送信 |
 
+##### Run完了の詳細
+
+`POST /runs/{run_id}/complete` は未完了タスクがある場合は400エラーを返します。
+
+**リクエストボディ:**
+```json
+{ "force": true }  // オプション
+```
+
+**動作:**
+- `force=false`（デフォルト）: 未完了タスクがあればエラー
+- `force=true`: 未完了タスクを自動キャンセル、未解決の確認要請を自動却下
+
+**レスポンス例:**
+```json
+{
+  "status": "completed",
+  "run_id": "01HZZ...",
+  "cancelled_task_ids": ["01HZZ..."],
+  "cancelled_requirement_ids": ["01HZZ..."]
+}
+```
+
+##### 緊急停止の詳細
+
+`POST /runs/{run_id}/emergency-stop` はRunを即座に停止します。
+
+**動作:**
+- 未完了タスクを全て失敗状態に
+- 未解決の確認要請を全て却下
+- Runを`ABORTED`状態に遷移
+
 #### Tasks
 
 | Method | Path | 説明 |
@@ -271,7 +303,7 @@ class TaskProjection:
 | `complete_task` | Task完了 | `task_id`, `result?` |
 | `fail_task` | Task失敗 | `task_id`, `error`, `retryable?` |
 | `create_requirement` | 要件作成 | `description`, `options?` |
-| `complete_run` | Run完了 | `summary?` |
+| `complete_run` | Run完了 | `summary?`, `force?` |
 | `heartbeat` | ハートビート | `message?` |
 | `emergency_stop` | 緊急停止 | `reason`, `scope?` |
 | `get_lineage` | 因果リンク取得 | `event_id`, `direction?`, `max_depth?` |
@@ -469,7 +501,7 @@ HiveForge/
 │       ├── playwright_mcp_client.py
 │       ├── vlm_client.py
 │       └── hybrid_analyzer.py
-├── tests/                   # Pythonテスト（293件）
+├── tests/                   # Pythonテスト（401件）
 │   ├── conftest.py
 │   ├── test_events.py
 │   ├── test_ar.py

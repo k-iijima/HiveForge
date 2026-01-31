@@ -23,13 +23,15 @@ devcontainer内で **F5キー** を押すとAPIサーバーが起動します。
    - `POST /runs/{id}/tasks` → Task作成  
    - `GET /runs/{id}` → 状態確認
    - `POST /runs/{id}/complete` → 完了
+     - 未完了タスクがあるとエラー
+     - `{"force": true}` で強制完了（タスク・確認要請自動キャンセル）
 
 ---
 
 ## テスト
 
 ```bash
-pytest           # 全テスト（293件）
+pytest           # 全テスト（401件）
 pytest -v        # 詳細表示
 ```
 
