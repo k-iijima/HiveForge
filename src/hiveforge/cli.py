@@ -33,6 +33,16 @@ def main():
     status_parser = subparsers.add_parser("status", help="Runの状態を表示")
     status_parser.add_argument("--run-id", help="Run ID（省略時は最新のRun）")
 
+    # run コマンド（ワンパス実行）
+    run_parser = subparsers.add_parser("run", help="タスクをLLMで実行")
+    run_parser.add_argument("task", help="実行するタスク（自然言語）")
+    run_parser.add_argument(
+        "--agent",
+        default="worker_bee",
+        choices=["worker_bee", "queen_bee", "beekeeper"],
+        help="使用するエージェント",
+    )
+
     # record-decision コマンド
     decision_parser = subparsers.add_parser(
         "record-decision",
@@ -91,6 +101,8 @@ def main():
         run_init(args)
     elif args.command == "status":
         run_status(args)
+    elif args.command == "run":
+        run_task(args)
     elif args.command == "record-decision":
         run_record_decision(args)
     else:
@@ -169,6 +181,43 @@ def run_status(args):
         print(f"\n⚠ 承認待ちの要件: {len(proj.pending_requirements)}件")
         for req in proj.pending_requirements:
             print(f"  - {req.description}")
+
+
+def run_task(args):
+    """タスクをLLMで実行（ワンパス）"""
+    import asyncio
+    
+    async def _run():
+        from .llm.client import LLMClient
+        from .llm.runner import AgentRunner
+        from .llm.tools import get_basic_tools
+        
+        print(f"🐝 {args.agent} がタスクを実行します...")
+        print(f"📝 タスク: {args.task}")
+        print("-" * 50)
+        
+        # クライアント初期化
+        client = LLMClient()
+        runner = AgentRunner(client, agent_type=args.agent)
+        
+        # 基本ツールを登録
+        for tool in get_basic_tools():
+            runner.register_tool(tool)
+        
+        try:
+            # 実行
+            result = await runner.run(args.task)
+            
+            print("-" * 50)
+            if result.success:
+                print(f"✅ 完了（ツール呼び出し: {result.tool_calls_made}回）")
+                print(f"\n{result.output}")
+            else:
+                print(f"❌ エラー: {result.error}")
+        finally:
+            await client.close()
+    
+    asyncio.run(_run())
 
 
 def run_record_decision(args):
