@@ -26,6 +26,7 @@ from .handlers import (
     ConferenceHandlers,
     DecisionHandlers,
     HiveHandlers,
+    InterventionHandlers,
     LineageHandlers,
     RequirementHandlers,
     RunHandlers,
@@ -64,6 +65,7 @@ class HiveForgeMCPServer:
         self._lineage_handlers = LineageHandlers(self)
         self._decision_handlers = DecisionHandlers(self)
         self._conference_handlers = ConferenceHandlers(self)
+        self._intervention_handlers = InterventionHandlers(self)
 
         self._setup_handlers()
 
@@ -157,6 +159,17 @@ class HiveForgeMCPServer:
             return await self._conference_handlers.handle_list_conferences(arguments)
         elif name == "get_conference":
             return await self._conference_handlers.handle_get_conference(arguments)
+        # Direct Intervention関連
+        elif name == "user_intervene":
+            return await self._intervention_handlers.handle_user_intervene(arguments)
+        elif name == "queen_escalate":
+            return await self._intervention_handlers.handle_queen_escalate(arguments)
+        elif name == "beekeeper_feedback":
+            return await self._intervention_handlers.handle_beekeeper_feedback(arguments)
+        elif name == "list_escalations":
+            return await self._intervention_handlers.handle_list_escalations(arguments)
+        elif name == "get_escalation":
+            return await self._intervention_handlers.handle_get_escalation(arguments)
         else:
             return {"error": f"Unknown tool: {name}"}
 

@@ -18,6 +18,7 @@ from .routes import (
     events_router,
     hive_colonies_router,
     hives_router,
+    interventions_router,
     requirements_router,
     runs_router,
     system_router,
@@ -78,6 +79,7 @@ app.include_router(hives_router)
 app.include_router(hive_colonies_router)
 app.include_router(colonies_router)
 app.include_router(conferences_router)
+app.include_router(interventions_router)
 app.include_router(runs_router)
 app.include_router(tasks_router)
 app.include_router(requirements_router)

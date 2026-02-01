@@ -7,6 +7,7 @@ from .colony import ColonyHandlers
 from .conference import ConferenceHandlers
 from .decision import DecisionHandlers
 from .hive import HiveHandlers
+from .intervention import InterventionHandlers
 from .lineage import LineageHandlers
 from .requirement import RequirementHandlers
 from .run import RunHandlers
@@ -16,6 +17,7 @@ __all__ = [
     "HiveHandlers",
     "ColonyHandlers",
     "ConferenceHandlers",
+    "InterventionHandlers",
     "RunHandlers",
     "TaskHandlers",
     "RequirementHandlers",

@@ -11,7 +11,11 @@ from .ar import AkashicRecord, RunProjection, build_run_projection
 from .config import HiveForgeSettings, get_settings, reload_settings
 from .events import (
     BaseEvent,
+    BeekeeperFeedbackEvent,
+    EscalationType,
     EventType,
+    QueenEscalationEvent,
+    UserDirectInterventionEvent,
     generate_event_id,
     parse_event,
 )
@@ -30,6 +34,10 @@ __all__ = [
     # Events
     "BaseEvent",
     "EventType",
+    "EscalationType",
+    "UserDirectInterventionEvent",
+    "QueenEscalationEvent",
+    "BeekeeperFeedbackEvent",
     "generate_event_id",
     "parse_event",
     # AR

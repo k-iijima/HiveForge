@@ -70,6 +70,11 @@ class EventType(str, Enum):
     OPERATION_TIMEOUT = "operation.timeout"  # タイムアウト
     OPERATION_FAILED = "operation.failed"  # 失敗
 
+    # Direct Intervention（直接介入、v5.2追加）
+    USER_DIRECT_INTERVENTION = "intervention.user_direct"  # ユーザー直接介入
+    QUEEN_ESCALATION = "intervention.queen_escalation"  # Queen直訴
+    BEEKEEPER_FEEDBACK = "intervention.beekeeper_feedback"  # Beekeeper改善フィードバック
+
     # LLM イベント
     LLM_REQUEST = "llm.request"
     LLM_RESPONSE = "llm.response"
@@ -104,6 +109,20 @@ class ConflictSeverity(str, Enum):
     MEDIUM = "medium"  # 中程度: 1-2日以内に解決必要
     HIGH = "high"  # 重大: 即座に解決必要
     BLOCKER = "blocker"  # 阻害: 解決するまで作業停止
+
+
+class EscalationType(str, Enum):
+    """エスカレーション種別（v5.2追加）
+
+    Queen Beeからの直訴の種類。
+    """
+
+    BEEKEEPER_CONFLICT = "beekeeper_conflict"  # Beekeeperとの見解の相違
+    RESOURCE_SHORTAGE = "resource_shortage"  # リソース不足
+    TECHNICAL_BLOCKER = "technical_blocker"  # 技術的な阻害要因
+    SCOPE_CLARIFICATION = "scope_clarification"  # スコープ明確化の必要
+    PRIORITY_DISPUTE = "priority_dispute"  # 優先順位の不一致
+    EXTERNAL_DEPENDENCY = "external_dependency"  # 外部依存の問題
 
 
 class DecisionScope(str, Enum):
@@ -546,6 +565,61 @@ class OperationFailedEvent(BaseEvent):
     type: Literal[EventType.OPERATION_FAILED] = EventType.OPERATION_FAILED
 
 
+# ============================================================================
+# Direct Intervention イベント (v5.2)
+# ============================================================================
+
+
+class UserDirectInterventionEvent(BaseEvent):
+    """ユーザー直接介入イベント
+
+    ユーザーがBeekeeperをバイパスしてQueen Beeに直接指示を出す場合に発行。
+
+    payload:
+        colony_id: 対象Colony ID
+        instruction: 直接指示内容
+        reason: 介入理由
+        bypass_beekeeper: Beekeeperをバイパスしたか（デフォルトTrue）
+        share_with_beekeeper: Beekeeperにも共有するか（デフォルトTrue推奨）
+    """
+
+    type: Literal[EventType.USER_DIRECT_INTERVENTION] = EventType.USER_DIRECT_INTERVENTION
+
+
+class QueenEscalationEvent(BaseEvent):
+    """Queen Bee直訴イベント
+
+    Queen BeeがBeekeeperとの調整で解決できない問題を
+    ユーザーに直接エスカレーションする場合に発行。
+
+    payload:
+        colony_id: Queen BeeのColony ID
+        escalation_type: エスカレーション種別（EscalationType値）
+        summary: 問題の要約
+        details: 詳細説明
+        suggested_actions: 提案するアクションのリスト
+        beekeeper_context: Beekeeperとのやり取り経緯（任意）
+    """
+
+    type: Literal[EventType.QUEEN_ESCALATION] = EventType.QUEEN_ESCALATION
+
+
+class BeekeeperFeedbackEvent(BaseEvent):
+    """Beekeeper改善フィードバックイベント
+
+    直接介入やエスカレーションの解決後、
+    Beekeeperの運用を改善するためのフィードバックを記録。
+
+    payload:
+        escalation_id: 対応したエスカレーション/介入のイベントID
+        resolution: 解決方法の説明
+        beekeeper_adjustment: Beekeeperへの調整内容（設定変更等）
+        lesson_learned: 学んだ教訓（任意）
+    """
+
+    type: Literal[EventType.BEEKEEPER_FEEDBACK] = EventType.BEEKEEPER_FEEDBACK
+
+
 class HeartbeatEvent(BaseEvent):
     """ハートビートイベント"""
 
@@ -609,6 +683,10 @@ EVENT_TYPE_MAP: dict[EventType, type[BaseEvent]] = {
     # Operation Failure/Timeout (v5.1)
     EventType.OPERATION_TIMEOUT: OperationTimeoutEvent,
     EventType.OPERATION_FAILED: OperationFailedEvent,
+    # Direct Intervention (v5.2)
+    EventType.USER_DIRECT_INTERVENTION: UserDirectInterventionEvent,
+    EventType.QUEEN_ESCALATION: QueenEscalationEvent,
+    EventType.BEEKEEPER_FEEDBACK: BeekeeperFeedbackEvent,
     EventType.HEARTBEAT: HeartbeatEvent,
     EventType.ERROR: ErrorEvent,
     EventType.SILENCE_DETECTED: SilenceDetectedEvent,
