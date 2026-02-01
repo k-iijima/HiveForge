@@ -28,7 +28,8 @@ def client(tmp_path):
 
     with (
         patch("hiveforge.api.server.get_settings", return_value=mock_s),
-        patch("hiveforge.api.helpers.get_settings", return_value=mock_s),TestClient(app) as client
+        patch("hiveforge.api.helpers.get_settings", return_value=mock_s),
+        TestClient(app) as client,
     ):
         yield client
 
@@ -604,6 +605,106 @@ class TestRunCompletionAutoParents:
             e for e in ar.replay(run_id) if e.type == EventType.RUN_COMPLETED
         )
         assert run_completed_event.parents == ["p1"]
+
+
+class TestRequirementAutoParents:
+    """Requirement関連イベントのauto-parentsテスト"""
+
+    def test_requirement_created_auto_parents_defaults_to_run_started(self, client):
+        """requirement.created は明示指定がなければ run.started をparentsに持つ
+
+        Issue #001 のルール: requirement.created -> run.started
+        """
+        # Arrange
+        from hiveforge.core.events import EventType
+
+        run_resp = client.post("/runs", json={"goal": "auto parents requirement"})
+        run_id = run_resp.json()["run_id"]
+
+        ar = get_ar()
+        run_started_id = next(e.id for e in ar.replay(run_id) if e.type == EventType.RUN_STARTED)
+
+        # Act
+        client.post(
+            f"/runs/{run_id}/requirements",
+            json={"description": "確認お願いします", "options": ["A", "B"]},
+        )
+
+        # Assert
+        req_event = next(e for e in ar.replay(run_id) if e.type == EventType.REQUIREMENT_CREATED)
+        assert req_event.parents == [run_started_id]
+
+    def test_requirement_approved_auto_parents_defaults_to_requirement_created(self, client):
+        """requirement.approved は対応する requirement.created をparentsに持つ"""
+        # Arrange
+        from hiveforge.core.events import EventType
+
+        run_resp = client.post("/runs", json={"goal": "auto parents requirement"})
+        run_id = run_resp.json()["run_id"]
+        req_resp = client.post(
+            f"/runs/{run_id}/requirements",
+            json={"description": "承認してください"},
+        )
+        requirement_id = req_resp.json()["id"]
+
+        ar = get_ar()
+        req_created_id = next(
+            e.id
+            for e in ar.replay(run_id)
+            if e.type == EventType.REQUIREMENT_CREATED
+            and e.payload.get("requirement_id") == requirement_id
+        )
+
+        # Act
+        client.post(
+            f"/runs/{run_id}/requirements/{requirement_id}/resolve",
+            json={"approved": True},
+        )
+
+        # Assert
+        approved_event = next(
+            e
+            for e in ar.replay(run_id)
+            if e.type == EventType.REQUIREMENT_APPROVED
+            and e.payload.get("requirement_id") == requirement_id
+        )
+        assert approved_event.parents == [req_created_id]
+
+    def test_requirement_rejected_auto_parents_defaults_to_requirement_created(self, client):
+        """requirement.rejected は対応する requirement.created をparentsに持つ"""
+        # Arrange
+        from hiveforge.core.events import EventType
+
+        run_resp = client.post("/runs", json={"goal": "auto parents requirement"})
+        run_id = run_resp.json()["run_id"]
+        req_resp = client.post(
+            f"/runs/{run_id}/requirements",
+            json={"description": "却下してください"},
+        )
+        requirement_id = req_resp.json()["id"]
+
+        ar = get_ar()
+        req_created_id = next(
+            e.id
+            for e in ar.replay(run_id)
+            if e.type == EventType.REQUIREMENT_CREATED
+            and e.payload.get("requirement_id") == requirement_id
+        )
+
+        # Act
+        client.post(
+            f"/runs/{run_id}/requirements/{requirement_id}/resolve",
+            json={"approved": False, "comment": "却下理由"},
+        )
+
+        # Assert
+        rejected_event = next(
+            e
+            for e in ar.replay(run_id)
+            if e.type == EventType.REQUIREMENT_REJECTED
+            and e.payload.get("requirement_id") == requirement_id
+        )
+        assert rejected_event.parents == [req_created_id]
 
 
 class TestEventsEndpoint:

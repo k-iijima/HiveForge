@@ -480,6 +480,36 @@ class TestHandleCreateRequirement:
         assert "requirement_id" in result
         assert result["description"] == "本当に実行しますか？"
 
+    @pytest.mark.asyncio
+    async def test_create_requirement_auto_parents_defaults_to_run_started(self, mcp_server):
+        """requirement.created は run.started をparentsに持つ
+
+        Issue #001 のルール: requirement.created -> run.started
+        """
+        # Arrange
+        from hiveforge.core.events import EventType
+
+        start_result = await mcp_server._handle_start_run(
+            {"goal": "auto parents requirement"}
+        )
+        run_id = start_result["run_id"]
+
+        ar = mcp_server._get_ar()
+        run_started_id = next(
+            e.id for e in ar.replay(run_id) if e.type == EventType.RUN_STARTED
+        )
+
+        # Act
+        await mcp_server._handle_create_requirement(
+            {"description": "確認してください"}
+        )
+
+        # Assert
+        req_event = next(
+            e for e in ar.replay(run_id) if e.type == EventType.REQUIREMENT_CREATED
+        )
+        assert req_event.parents == [run_started_id]
+
 
 class TestHandleCompleteRun:
     """complete_runハンドラのテスト"""
