@@ -678,3 +678,365 @@ class TestRetryStateManagement:
 
         manager.record_failure("task-1", "worker-1", "Error")
         assert manager.is_exhausted("task-1") is True
+
+
+# Colony Scheduler テスト
+from hiveforge.queen_bee.scheduler import (
+    ColonyScheduler,
+    ColonyConfig,
+    ColonyPriority,
+    ResourceAllocation,
+)
+
+
+class TestColonyScheduler:
+    """ColonySchedulerの基本テスト"""
+
+    def test_register_colony(self):
+        """Colonyを登録"""
+        scheduler = ColonyScheduler()
+        scheduler.register_colony("colony-1", priority=ColonyPriority.HIGH)
+
+        colony = scheduler.get_colony("colony-1")
+        assert colony is not None
+        assert colony.priority == ColonyPriority.HIGH
+
+    def test_unregister_colony(self):
+        """Colonyを登録解除"""
+        scheduler = ColonyScheduler()
+        scheduler.register_colony("colony-1")
+        scheduler.unregister_colony("colony-1")
+
+        assert scheduler.get_colony("colony-1") is None
+
+    def test_set_priority(self):
+        """優先度を変更"""
+        scheduler = ColonyScheduler()
+        scheduler.register_colony("colony-1", priority=ColonyPriority.NORMAL)
+
+        result = scheduler.set_priority("colony-1", ColonyPriority.CRITICAL)
+
+        assert result is True
+        assert scheduler.get_colony("colony-1").priority == ColonyPriority.CRITICAL
+
+    def test_set_priority_nonexistent(self):
+        """存在しないColonyの優先度変更はFalse"""
+        scheduler = ColonyScheduler()
+        result = scheduler.set_priority("nonexistent", ColonyPriority.HIGH)
+        assert result is False
+
+
+class TestColonyEnableDisable:
+    """Colony有効/無効のテスト"""
+
+    def test_enable_colony(self):
+        """Colonyを有効化"""
+        scheduler = ColonyScheduler()
+        scheduler.register_colony("colony-1")
+        scheduler.disable_colony("colony-1")
+
+        result = scheduler.enable_colony("colony-1")
+
+        assert result is True
+        assert scheduler.get_colony("colony-1").enabled is True
+
+    def test_disable_colony(self):
+        """Colonyを無効化"""
+        scheduler = ColonyScheduler()
+        scheduler.register_colony("colony-1")
+
+        result = scheduler.disable_colony("colony-1")
+
+        assert result is True
+        assert scheduler.get_colony("colony-1").enabled is False
+
+    def test_get_active_colonies(self):
+        """有効なColonyのみ取得"""
+        scheduler = ColonyScheduler()
+        scheduler.register_colony("colony-1")
+        scheduler.register_colony("colony-2")
+        scheduler.disable_colony("colony-2")
+
+        active = scheduler.get_active_colonies()
+
+        assert len(active) == 1
+        assert active[0].colony_id == "colony-1"
+
+
+class TestWorkerAllocation:
+    """Worker配分のテスト"""
+
+    def test_allocate_single_colony(self):
+        """単一Colonyへの配分"""
+        scheduler = ColonyScheduler(total_workers=10)
+        scheduler.register_colony("colony-1", max_workers=5)
+
+        allocations = scheduler.allocate_workers()
+
+        assert len(allocations) == 1
+        assert allocations[0].colony_id == "colony-1"
+        assert allocations[0].allocated_workers >= 1
+
+    def test_allocate_multiple_colonies(self):
+        """複数Colonyへの配分"""
+        scheduler = ColonyScheduler(total_workers=10)
+        scheduler.register_colony("colony-1", priority=ColonyPriority.HIGH)
+        scheduler.register_colony("colony-2", priority=ColonyPriority.LOW)
+
+        allocations = scheduler.allocate_workers()
+
+        assert len(allocations) == 2
+        # 高優先度が多くWorkerを得る
+        high_alloc = next(a for a in allocations if a.colony_id == "colony-1")
+        low_alloc = next(a for a in allocations if a.colony_id == "colony-2")
+        assert high_alloc.allocated_workers >= low_alloc.allocated_workers
+
+    def test_allocate_no_colonies(self):
+        """Colony無しの場合は空"""
+        scheduler = ColonyScheduler()
+        allocations = scheduler.allocate_workers()
+        assert allocations == []
+
+    def test_allocate_respects_max_workers(self):
+        """max_workersを超えない"""
+        scheduler = ColonyScheduler(total_workers=100)
+        scheduler.register_colony("colony-1", max_workers=3)
+
+        allocations = scheduler.allocate_workers()
+
+        assert allocations[0].allocated_workers <= 3
+
+
+class TestExecutionOrder:
+    """実行順序のテスト"""
+
+    def test_execution_order_by_priority(self):
+        """優先度順に並ぶ"""
+        scheduler = ColonyScheduler()
+        scheduler.register_colony("low", priority=ColonyPriority.LOW)
+        scheduler.register_colony("critical", priority=ColonyPriority.CRITICAL)
+        scheduler.register_colony("normal", priority=ColonyPriority.NORMAL)
+
+        order = scheduler.get_execution_order()
+
+        assert order[0] == "critical"
+        assert order[-1] == "low"
+
+
+class TestPreemption:
+    """プリエンプションのテスト"""
+
+    def test_should_preempt_higher_priority(self):
+        """高優先度が待機中ならプリエンプト"""
+        scheduler = ColonyScheduler()
+        scheduler.register_colony("running", priority=ColonyPriority.LOW)
+        scheduler.register_colony("waiting", priority=ColonyPriority.CRITICAL)
+
+        result = scheduler.should_preempt("running", "waiting")
+
+        assert result is True
+
+    def test_should_not_preempt_lower_priority(self):
+        """低優先度が待機中ならプリエンプトしない"""
+        scheduler = ColonyScheduler()
+        scheduler.register_colony("running", priority=ColonyPriority.CRITICAL)
+        scheduler.register_colony("waiting", priority=ColonyPriority.LOW)
+
+        result = scheduler.should_preempt("running", "waiting")
+
+        assert result is False
+
+    def test_should_preempt_nonexistent(self):
+        """存在しないColonyはFalse"""
+        scheduler = ColonyScheduler()
+        result = scheduler.should_preempt("nonexistent1", "nonexistent2")
+        assert result is False
+
+
+# Colony Communication テスト
+from hiveforge.queen_bee.communication import (
+    ColonyMessenger,
+    MessageType,
+    MessagePriority,
+    ResourceConflict,
+)
+
+
+class TestColonyMessenger:
+    """ColonyMessengerの基本テスト"""
+
+    def test_register_and_send(self):
+        """Colonyを登録してメッセージ送信"""
+        messenger = ColonyMessenger()
+        messenger.register_colony("colony-1")
+        messenger.register_colony("colony-2")
+
+        message_id = messenger.send(
+            from_colony="colony-1",
+            to_colony="colony-2",
+            message_type=MessageType.NOTIFICATION,
+            payload={"data": "test"},
+        )
+
+        assert message_id is not None
+        assert messenger.pending_count("colony-2") == 1
+
+    def test_receive(self):
+        """メッセージを受信"""
+        messenger = ColonyMessenger()
+        messenger.register_colony("colony-1")
+        messenger.register_colony("colony-2")
+        messenger.send(
+            from_colony="colony-1",
+            to_colony="colony-2",
+            message_type=MessageType.NOTIFICATION,
+            payload={"data": "hello"},
+        )
+
+        msg = messenger.receive("colony-2")
+
+        assert msg is not None
+        assert msg.from_colony == "colony-1"
+        assert msg.payload == {"data": "hello"}
+        assert messenger.pending_count("colony-2") == 0
+
+    def test_broadcast(self):
+        """全Colonyにブロードキャスト"""
+        messenger = ColonyMessenger()
+        messenger.register_colony("sender")
+        messenger.register_colony("receiver-1")
+        messenger.register_colony("receiver-2")
+
+        messenger.broadcast(
+            from_colony="sender",
+            message_type=MessageType.BROADCAST,
+            payload={"event": "shutdown"},
+        )
+
+        assert messenger.pending_count("receiver-1") == 1
+        assert messenger.pending_count("receiver-2") == 1
+        assert messenger.pending_count("sender") == 0
+
+    def test_priority_ordering(self):
+        """優先度順にメッセージを取得"""
+        messenger = ColonyMessenger()
+        messenger.register_colony("sender")
+        messenger.register_colony("receiver")
+
+        # 低優先度を先に送信
+        messenger.send(
+            from_colony="sender",
+            to_colony="receiver",
+            message_type=MessageType.NOTIFICATION,
+            payload={"order": "low"},
+            priority=MessagePriority.LOW,
+        )
+        # 高優先度を後に送信
+        messenger.send(
+            from_colony="sender",
+            to_colony="receiver",
+            message_type=MessageType.NOTIFICATION,
+            payload={"order": "urgent"},
+            priority=MessagePriority.URGENT,
+        )
+
+        # 高優先度が先に来る
+        msg1 = messenger.receive("receiver")
+        msg2 = messenger.receive("receiver")
+
+        assert msg1.payload["order"] == "urgent"
+        assert msg2.payload["order"] == "low"
+
+
+class TestRequestResponse:
+    """リクエスト-レスポンスパターンのテスト"""
+
+    def test_request_and_respond(self):
+        """リクエストに対してレスポンス"""
+        messenger = ColonyMessenger()
+        messenger.register_colony("client")
+        messenger.register_colony("server")
+
+        # リクエスト送信
+        messenger.request(
+            from_colony="client",
+            to_colony="server",
+            payload={"query": "status"},
+        )
+
+        # サーバーがリクエストを受信
+        request = messenger.receive("server")
+        assert request.message_type == MessageType.REQUEST
+
+        # レスポンス送信
+        messenger.respond(request, {"status": "ok"})
+
+        # クライアントがレスポンスを受信
+        response = messenger.receive("client")
+        assert response.message_type == MessageType.RESPONSE
+        assert response.correlation_id == request.message_id
+        assert response.payload == {"status": "ok"}
+
+
+class TestResourceConflict:
+    """リソース競合のテスト"""
+
+    def test_acquire_resource(self):
+        """リソースを取得"""
+        conflict = ResourceConflict()
+
+        result = conflict.try_acquire("file-1", "colony-1")
+
+        assert result is True
+        assert conflict.get_holder("file-1") == "colony-1"
+
+    def test_acquire_already_held(self):
+        """既に保持されているリソースは取得失敗"""
+        conflict = ResourceConflict()
+        conflict.try_acquire("file-1", "colony-1")
+
+        result = conflict.try_acquire("file-1", "colony-2")
+
+        assert result is False
+        assert conflict.get_holder("file-1") == "colony-1"
+
+    def test_release_and_transfer(self):
+        """解放後に待機Colonyへ転送"""
+        conflict = ResourceConflict()
+        conflict.try_acquire("file-1", "colony-1")
+        conflict.wait_for("file-1", "colony-2")
+
+        next_holder = conflict.release("file-1", "colony-1")
+
+        assert next_holder == "colony-2"
+        assert conflict.get_holder("file-1") == "colony-2"
+
+
+class TestDeadlockDetection:
+    """デッドロック検出のテスト"""
+
+    def test_no_deadlock(self):
+        """デッドロックなし"""
+        conflict = ResourceConflict()
+        conflict.try_acquire("file-1", "colony-1")
+        conflict.wait_for("file-1", "colony-2")
+
+        result = conflict.is_deadlock(["colony-1", "colony-2"])
+
+        assert result is False
+
+    def test_deadlock_detected(self):
+        """相互待ちのデッドロック検出"""
+        conflict = ResourceConflict()
+        # colony-1がfile-1を保持
+        conflict.try_acquire("file-1", "colony-1")
+        # colony-2がfile-2を保持
+        conflict.try_acquire("file-2", "colony-2")
+        # colony-1がfile-2を待機
+        conflict.wait_for("file-2", "colony-1")
+        # colony-2がfile-1を待機
+        conflict.wait_for("file-1", "colony-2")
+
+        result = conflict.is_deadlock(["colony-1", "colony-2"])
+
+        assert result is True
