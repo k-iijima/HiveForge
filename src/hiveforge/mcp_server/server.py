@@ -22,7 +22,9 @@ from mcp.types import (
 
 from ..core import AkashicRecord, get_settings
 from .handlers import (
+    ColonyHandlers,
     DecisionHandlers,
+    HiveHandlers,
     LineageHandlers,
     RequirementHandlers,
     RunHandlers,
@@ -53,6 +55,8 @@ class HiveForgeMCPServer:
         self._current_run_id: str | None = None
 
         # ハンドラーを初期化
+        self._hive_handlers = HiveHandlers(self)
+        self._colony_handlers = ColonyHandlers(self)
         self._run_handlers = RunHandlers(self)
         self._task_handlers = TaskHandlers(self)
         self._requirement_handlers = RequirementHandlers(self)
@@ -93,8 +97,26 @@ class HiveForgeMCPServer:
 
     async def _dispatch_tool(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         """ツール名に応じてハンドラーにディスパッチ"""
+        # Hive関連
+        if name == "create_hive":
+            return await self._hive_handlers.handle_create_hive(arguments)
+        elif name == "list_hives":
+            return await self._hive_handlers.handle_list_hives(arguments)
+        elif name == "get_hive":
+            return await self._hive_handlers.handle_get_hive(arguments)
+        elif name == "close_hive":
+            return await self._hive_handlers.handle_close_hive(arguments)
+        # Colony関連
+        elif name == "create_colony":
+            return await self._colony_handlers.handle_create_colony(arguments)
+        elif name == "list_colonies":
+            return await self._colony_handlers.handle_list_colonies(arguments)
+        elif name == "start_colony":
+            return await self._colony_handlers.handle_start_colony(arguments)
+        elif name == "complete_colony":
+            return await self._colony_handlers.handle_complete_colony(arguments)
         # Run関連
-        if name == "start_run":
+        elif name == "start_run":
             return await self._run_handlers.handle_start_run(arguments)
         elif name == "get_run_status":
             return await self._run_handlers.handle_get_run_status(arguments)

@@ -9,6 +9,127 @@ from mcp.types import Tool
 def get_tool_definitions() -> list[Tool]:
     """利用可能なツール一覧を取得"""
     return [
+        # Hive関連
+        Tool(
+            name="create_hive",
+            description="新しいHiveを作成します。Hiveは複数のColonyをまとめる最上位の単位です。",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Hiveの名前",
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Hiveの説明",
+                    },
+                },
+                "required": ["name"],
+            },
+        ),
+        Tool(
+            name="list_hives",
+            description="Hive一覧を取得します。",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+            },
+        ),
+        Tool(
+            name="get_hive",
+            description="Hiveの詳細情報を取得します。",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "hive_id": {
+                        "type": "string",
+                        "description": "HiveのID",
+                    },
+                },
+                "required": ["hive_id"],
+            },
+        ),
+        Tool(
+            name="close_hive",
+            description="Hiveを終了します。",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "hive_id": {
+                        "type": "string",
+                        "description": "HiveのID",
+                    },
+                },
+                "required": ["hive_id"],
+            },
+        ),
+        # Colony関連
+        Tool(
+            name="create_colony",
+            description="新しいColonyを作成します。ColonyはHive配下のタスクグループです。",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "hive_id": {
+                        "type": "string",
+                        "description": "親HiveのID",
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Colonyの名前",
+                    },
+                    "goal": {
+                        "type": "string",
+                        "description": "Colonyの目標",
+                    },
+                },
+                "required": ["hive_id", "name"],
+            },
+        ),
+        Tool(
+            name="list_colonies",
+            description="Hive配下のColony一覧を取得します。",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "hive_id": {
+                        "type": "string",
+                        "description": "HiveのID",
+                    },
+                },
+                "required": ["hive_id"],
+            },
+        ),
+        Tool(
+            name="start_colony",
+            description="Colonyを開始します。",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "colony_id": {
+                        "type": "string",
+                        "description": "ColonyのID",
+                    },
+                },
+                "required": ["colony_id"],
+            },
+        ),
+        Tool(
+            name="complete_colony",
+            description="Colonyを完了します。",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "colony_id": {
+                        "type": "string",
+                        "description": "ColonyのID",
+                    },
+                },
+                "required": ["colony_id"],
+            },
+        ),
+        # Run関連
         Tool(
             name="start_run",
             description="新しいRunを開始します。goalには達成したい目標を記述してください。",

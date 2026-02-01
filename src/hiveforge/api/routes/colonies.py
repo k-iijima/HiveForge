@@ -111,9 +111,7 @@ async def list_colonies(hive_id: str) -> list[ColonyResponse]:
         raise HTTPException(status_code=404, detail=f"Hive {hive_id} not found")
 
     colony_ids = _hives[hive_id]["colonies"]
-    return [
-        ColonyResponse(**_colonies[cid]) for cid in colony_ids if cid in _colonies
-    ]
+    return [ColonyResponse(**_colonies[cid]) for cid in colony_ids if cid in _colonies]
 
 
 @hive_colonies_router.get("/{colony_id}", response_model=ColonyResponse)
