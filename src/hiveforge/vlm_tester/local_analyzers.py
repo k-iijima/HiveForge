@@ -144,8 +144,8 @@ class DiffAnalyzer:
             比較結果
         """
         try:
-            from PIL import Image
             import numpy as np
+            from PIL import Image
 
             img1 = Image.open(io.BytesIO(image1)).convert("RGB")
             img2 = Image.open(io.BytesIO(image2)).convert("RGB")

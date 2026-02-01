@@ -10,8 +10,8 @@ from enum import Enum
 from typing import Any
 
 from hiveforge.vlm_tester.local_analyzers import (
-    LocalAnalyzerPipeline,
     AnalysisResult,
+    LocalAnalyzerPipeline,
 )
 from hiveforge.vlm_tester.vlm_providers import (
     MultiProviderVLMClient,

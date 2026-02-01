@@ -2,12 +2,13 @@
 ローカルVLM解析モジュールのテスト
 """
 
-import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
 import base64
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
+from hiveforge.vlm.analyzer import AnalysisResult, LocalVLMAnalyzer
 from hiveforge.vlm.ollama_client import OllamaClient, VLMResponse
-from hiveforge.vlm.analyzer import LocalVLMAnalyzer, AnalysisResult
 
 
 class TestOllamaClient:
@@ -410,7 +411,7 @@ class TestOllamaClientExtended:
             )
 
             # Act
-            result = await client.analyze_image(b"image", "prompt", model="custom:7b")
+            await client.analyze_image(b"image", "prompt", model="custom:7b")
 
             # Assert
             call_args = mock_client.return_value.__aenter__.return_value.post.call_args
@@ -431,7 +432,7 @@ class TestOllamaClientExtended:
             )
 
             # Act
-            result = await client.analyze_screenshot(b"screenshot", context="VS Code editor")
+            await client.analyze_screenshot(b"screenshot", context="VS Code editor")
 
             # Assert
             call_args = mock_client.return_value.__aenter__.return_value.post.call_args
@@ -454,7 +455,7 @@ class TestOllamaClientExtended:
             )
 
             # Act
-            result = await client.analyze_screenshot(b"screenshot")
+            await client.analyze_screenshot(b"screenshot")
 
             # Assert
             call_args = mock_client.return_value.__aenter__.return_value.post.call_args
@@ -518,7 +519,7 @@ class TestLocalVLMAnalyzerExtended:
         analyzer.client.analyze_image = AsyncMock(return_value=mock_response)
 
         # Act
-        result = await analyzer.analyze(b"image", prompt="Custom prompt")
+        await analyzer.analyze(b"image", prompt="Custom prompt")
 
         # Assert
         analyzer.client.analyze_image.assert_called_once()

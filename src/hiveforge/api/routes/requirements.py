@@ -18,7 +18,6 @@ from ..models import (
     ResolveRequirementRequest,
 )
 
-
 router = APIRouter(prefix="/runs/{run_id}/requirements", tags=["Requirements"])
 
 

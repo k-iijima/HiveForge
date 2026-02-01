@@ -4,18 +4,17 @@
 Playwright MCPのスクリーンショットをローカルVLMで解析する。
 """
 
-import asyncio
 from pathlib import Path
-from typing import Optional
+
 from pydantic import BaseModel, Field
 
-from .ollama_client import OllamaClient, VLMResponse
+from .ollama_client import OllamaClient
 
 
 class AnalysisResult(BaseModel):
     """UI解析結果"""
 
-    screenshot_path: Optional[str] = None
+    screenshot_path: str | None = None
     analysis: str = Field(..., description="VLM解析結果テキスト")
     model: str = Field(..., description="使用したモデル")
     duration_ms: int = Field(0, description="解析時間（ミリ秒）")
@@ -60,7 +59,7 @@ class LocalVLMAnalyzer:
     async def analyze(
         self,
         image: bytes | str | Path,
-        prompt: Optional[str] = None,
+        prompt: str | None = None,
     ) -> AnalysisResult:
         """画像を解析
 

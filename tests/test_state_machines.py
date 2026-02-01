@@ -2,23 +2,23 @@
 
 import pytest
 
-from hiveforge.core.state import (
-    RunStateMachine,
-    TaskStateMachine,
-    RequirementStateMachine,
-    OscillationDetector,
-    TransitionError,
-    GovernanceError,
-)
-from hiveforge.core.ar.projections import RunState, TaskState, RequirementState
+from hiveforge.core.ar.projections import RequirementState, RunState, TaskState
 from hiveforge.core.events import (
     EventType,
+    RequirementApprovedEvent,
     RunCompletedEvent,
     TaskAssignedEvent,
     TaskCompletedEvent,
-    TaskFailedEvent,
     TaskCreatedEvent,
-    RequirementApprovedEvent,
+    TaskFailedEvent,
+)
+from hiveforge.core.state import (
+    GovernanceError,
+    OscillationDetector,
+    RequirementStateMachine,
+    RunStateMachine,
+    TaskStateMachine,
+    TransitionError,
 )
 
 

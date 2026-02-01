@@ -6,28 +6,15 @@ Run, Task, Requirement の状態遷移を管理。
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable
 
 from ..ar.projections import RequirementState, RunState, TaskState
 from ..config import get_settings
 from ..events import (
     BaseEvent,
     EventType,
-    RunCompletedEvent,
-    RunFailedEvent,
-    RunStartedEvent,
-    TaskAssignedEvent,
-    TaskBlockedEvent,
-    TaskCompletedEvent,
-    TaskCreatedEvent,
-    TaskFailedEvent,
-    TaskProgressedEvent,
-    RequirementApprovedEvent,
-    RequirementCreatedEvent,
-    RequirementRejectedEvent,
-    generate_event_id,
 )
 
 
@@ -68,7 +55,7 @@ class StateMachine:
         """現在の状態から遷移可能なイベント一覧を取得"""
         return [
             event_type
-            for (state, event_type) in self._transitions.keys()
+            for (state, event_type) in self._transitions
             if state == self.current_state
         ]
 

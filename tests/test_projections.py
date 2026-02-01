@@ -1,34 +1,32 @@
 """投影 (Projections) のテスト"""
 
-import pytest
-from datetime import datetime, timezone
 
 from hiveforge.core.ar.projections import (
-    RunProjection,
-    TaskProjection,
     RequirementProjection,
-    RunProjector,
-    build_run_projection,
-    RunState,
-    TaskState,
     RequirementState,
+    RunProjection,
+    RunProjector,
+    RunState,
+    TaskProjection,
+    TaskState,
+    build_run_projection,
 )
 from hiveforge.core.events import (
-    RunStartedEvent,
+    EventType,
+    HeartbeatEvent,
+    RequirementApprovedEvent,
+    RequirementCreatedEvent,
+    RequirementRejectedEvent,
     RunCompletedEvent,
     RunFailedEvent,
-    TaskCreatedEvent,
+    RunStartedEvent,
     TaskAssignedEvent,
-    TaskProgressedEvent,
-    TaskCompletedEvent,
-    TaskFailedEvent,
     TaskBlockedEvent,
-    RequirementCreatedEvent,
-    RequirementApprovedEvent,
-    RequirementRejectedEvent,
-    HeartbeatEvent,
+    TaskCompletedEvent,
+    TaskCreatedEvent,
+    TaskFailedEvent,
+    TaskProgressedEvent,
 )
-from hiveforge.core.events import EventType
 
 
 class TestRunProjector:
@@ -188,7 +186,7 @@ class TestRunProjector:
         projector.apply(RunStartedEvent(run_id="run-001", payload={"goal": "Test"}))
 
         # Act: 中断イベント (RUN_ABORTEDイベント)
-        from hiveforge.core.events import BaseEvent, EventType
+        from hiveforge.core.events import BaseEvent
 
         abort_event = BaseEvent(type=EventType.RUN_ABORTED, run_id="run-001")
         projector.apply(abort_event)
@@ -242,7 +240,7 @@ class TestRunProjector:
         assert task.state == TaskState.BLOCKED
 
         # Act: アンブロックイベント (TASK_UNBLOCKEDイベントを手動で作成)
-        from hiveforge.core.events import BaseEvent, EventType
+        from hiveforge.core.events import BaseEvent
 
         unblock_event = BaseEvent(
             type=EventType.TASK_UNBLOCKED, run_id="run-001", task_id="task-001"
@@ -298,7 +296,7 @@ class TestRunProjector:
         initial_count = projector.projection.event_count
 
         # Act: LLM_REQUESTなど、ハンドラがないイベントを適用
-        from hiveforge.core.events import BaseEvent, EventType
+        from hiveforge.core.events import BaseEvent
 
         unknown_event = BaseEvent(type=EventType.LLM_REQUEST, run_id="run-001")
         projector.apply(unknown_event)
@@ -388,7 +386,7 @@ class TestRunProjector:
         projector = RunProjector("run-001")
 
         # Act: 存在しないタスクへのアンブロックイベント
-        from hiveforge.core.events import BaseEvent, EventType
+        from hiveforge.core.events import BaseEvent
 
         event = BaseEvent(type=EventType.TASK_UNBLOCKED, run_id="run-001", task_id="nonexistent")
         projector.apply(event)

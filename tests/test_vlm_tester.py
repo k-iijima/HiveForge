@@ -13,27 +13,23 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from hiveforge.vlm_tester.server import VLMTesterMCPServer
-from hiveforge.vlm_tester.screen_capture import ScreenCapture
-from hiveforge.vlm_tester.vlm_client import VLMClient
 from hiveforge.vlm_tester.action_executor import ActionExecutor
-from hiveforge.vlm_tester.vlm_providers import (
-    OllamaProvider,
-    AnthropicProvider,
-    MultiProviderVLMClient,
+from hiveforge.vlm_tester.hybrid_analyzer import (
+    AnalysisLevel,
+    HybridAnalyzer,
 )
 from hiveforge.vlm_tester.local_analyzers import (
-    OCRAnalyzer,
     DiffAnalyzer,
-    LocalAnalyzerPipeline,
-    AnalysisResult,
+    OCRAnalyzer,
 )
-from hiveforge.vlm_tester.hybrid_analyzer import (
-    HybridAnalyzer,
-    AnalysisLevel,
-    HybridAnalysisResult,
+from hiveforge.vlm_tester.screen_capture import ScreenCapture
+from hiveforge.vlm_tester.server import VLMTesterMCPServer
+from hiveforge.vlm_tester.vlm_client import VLMClient
+from hiveforge.vlm_tester.vlm_providers import (
+    AnthropicProvider,
+    MultiProviderVLMClient,
+    OllamaProvider,
 )
-
 
 # =============================================================================
 # ScreenCapture Tests
@@ -136,7 +132,7 @@ class TestVLMClient:
                 client = VLMClient()
 
                 # Act: 画像を分析
-                result = await client.analyze(b"fake-image-data", "画面を説明してください")
+                await client.analyze(b"fake-image-data", "画面を説明してください")
 
 
 # =============================================================================
@@ -305,7 +301,7 @@ class TestVLMTesterMCPServer:
         # Arrange & Act: 一時ディレクトリでサーバーを初期化
         with tempfile.TemporaryDirectory() as tmpdir:
             captures_dir = Path(tmpdir) / "captures"
-            server = VLMTesterMCPServer(captures_dir=str(captures_dir))
+            VLMTesterMCPServer(captures_dir=str(captures_dir))
 
             # Assert: ディレクトリが作成されている
             assert captures_dir.exists()
@@ -513,7 +509,7 @@ class TestOCRAnalyzer:
         # モジュールのインポートを失敗させる
         with patch.dict("sys.modules", {"easyocr": None, "pytesseract": None}):
             # 新しいインスタンスでテスト
-            analyzer2 = OCRAnalyzer()
+            OCRAnalyzer()
             # 直接_detect_modeを呼ぶ代わりにextract_textで確認
 
         # 実際の環境ではどちらかがインストールされている可能性があるので
@@ -529,8 +525,9 @@ class TestDiffAnalyzer:
     async def test_compare_identical_images(self):
         """同一画像の比較で差分なしを返す"""
         # Arrange: 同一の画像を作成
-        from PIL import Image
         import io
+
+        from PIL import Image
 
         img = Image.new("RGB", (100, 100), color="red")
         buffer = io.BytesIO()
@@ -550,8 +547,9 @@ class TestDiffAnalyzer:
     async def test_compare_different_images(self):
         """異なる画像の比較で差分ありを返す"""
         # Arrange: 異なる画像を作成
-        from PIL import Image
         import io
+
+        from PIL import Image
 
         img1 = Image.new("RGB", (100, 100), color="red")
         buffer1 = io.BytesIO()
@@ -615,8 +613,9 @@ class TestHybridAnalyzer:
     async def test_analyze_local_only_mode(self):
         """LOCAL_ONLYモードでローカル分析のみ実行"""
         # Arrange: 画像を作成
-        from PIL import Image
         import io
+
+        from PIL import Image
 
         img = Image.new("RGB", (100, 100), color="white")
         buffer = io.BytesIO()

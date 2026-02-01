@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ...core import AkashicRecord, get_settings
+from ...core import AkashicRecord
 
 if TYPE_CHECKING:
     from ..server import HiveForgeMCPServer
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 class BaseHandler:
     """ハンドラー基底クラス"""
 
-    def __init__(self, server: "HiveForgeMCPServer"):
+    def __init__(self, server: HiveForgeMCPServer):
         self._server = server
 
     def _get_ar(self) -> AkashicRecord:

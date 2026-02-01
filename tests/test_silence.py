@@ -1,12 +1,11 @@
 """沈黙検出器 (Silence Detector) のテスト"""
 
-import pytest
 import asyncio
-from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock
+from datetime import UTC, datetime, timedelta
 
-from hiveforge.silence import SilenceDetector, HeartbeatManager
-from hiveforge.core.events import SilenceDetectedEvent
+import pytest
+
+from hiveforge.silence import HeartbeatManager, SilenceDetector
 
 
 class TestSilenceDetector:
@@ -21,7 +20,7 @@ class TestSilenceDetector:
         detector = SilenceDetector(ar=ar, run_id="run-001", interval_seconds=10)
 
         # Act
-        timestamp = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        timestamp = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
         detector.record_activity(timestamp)
 
         # Assert
@@ -36,9 +35,9 @@ class TestSilenceDetector:
         detector = SilenceDetector(ar=ar, run_id="run-001", interval_seconds=10)
 
         # Act
-        before = datetime.now(timezone.utc)
+        before = datetime.now(UTC)
         detector.record_activity()
-        after = datetime.now(timezone.utc)
+        after = datetime.now(UTC)
 
         # Assert
         assert detector._last_activity is not None
@@ -88,7 +87,7 @@ class TestSilenceDetector:
         )
 
         # 過去のアクティビティを設定（沈黙状態を作る）
-        detector._last_activity = datetime.now(timezone.utc) - timedelta(seconds=10)
+        detector._last_activity = datetime.now(UTC) - timedelta(seconds=10)
 
         # Act: 開始
         await detector.start()
@@ -118,10 +117,10 @@ class TestSilenceDetector:
         )
 
         # 過去のアクティビティを設定
-        detector._last_activity = datetime.now(timezone.utc) - timedelta(seconds=10)
+        detector._last_activity = datetime.now(UTC) - timedelta(seconds=10)
 
         # Act: 沈黙を処理
-        detected_at = datetime.now(timezone.utc)
+        detected_at = datetime.now(UTC)
         await detector._handle_silence(detected_at)
 
         # Assert: イベントが記録されている
@@ -283,7 +282,7 @@ class TestHeartbeatManager:
         manager._detectors["run-001"] = detector
 
         # Act
-        timestamp = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        timestamp = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
         manager.record_heartbeat("run-001", timestamp)
 
         # Assert
@@ -346,8 +345,8 @@ class TestHeartbeatManager:
 
         # 検出器の沈黙ハンドラを直接テスト
         detector = manager._detectors["run-001"]
-        detector._last_activity = datetime.now(timezone.utc) - timedelta(seconds=100)
-        await detector._handle_silence(datetime.now(timezone.utc))
+        detector._last_activity = datetime.now(UTC) - timedelta(seconds=100)
+        await detector._handle_silence(datetime.now(UTC))
 
         await manager.stop_all()
 

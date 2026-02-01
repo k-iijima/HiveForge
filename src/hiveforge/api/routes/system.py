@@ -8,7 +8,6 @@ from fastapi import APIRouter
 from ..helpers import get_active_runs
 from ..models import HealthResponse
 
-
 router = APIRouter(tags=["System"])
 
 

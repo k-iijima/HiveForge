@@ -222,7 +222,7 @@ class PlaywrightMCPClient:
             await self._streams_cm.__aexit__(None, None, None)
             self._streams_cm = None
 
-    async def __aenter__(self) -> "PlaywrightMCPClient":
+    async def __aenter__(self) -> PlaywrightMCPClient:
         return self
 
     async def __aexit__(self, *args: Any) -> None:

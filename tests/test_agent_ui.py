@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import json
-import os
 import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -65,7 +64,7 @@ class TestAgentUIMCPServer:
         # Arrange & Act
         with tempfile.TemporaryDirectory() as tmpdir:
             captures_dir = Path(tmpdir) / "captures"
-            server = AgentUIMCPServer(captures_dir=str(captures_dir))
+            AgentUIMCPServer(captures_dir=str(captures_dir))
 
             # Assert
             assert captures_dir.exists()
@@ -600,7 +599,7 @@ class TestAgentUIHandlers:
         handlers, mock_session, _, _ = handlers_with_mocks
 
         # Act
-        result = await handlers.handle_scroll({"direction": "up"})
+        await handlers.handle_scroll({"direction": "up"})
 
         # Assert
         call_kwargs = mock_session.executor.scroll.call_args.kwargs
@@ -613,7 +612,7 @@ class TestAgentUIHandlers:
         handlers, mock_session, _, _ = handlers_with_mocks
 
         # Act
-        result = await handlers.handle_scroll({"direction": "right", "amount": 200})
+        await handlers.handle_scroll({"direction": "right", "amount": 200})
 
         # Assert
         call_kwargs = mock_session.executor.scroll.call_args.kwargs
@@ -626,7 +625,7 @@ class TestAgentUIHandlers:
         handlers, mock_session, _, _ = handlers_with_mocks
 
         # Act
-        result = await handlers.handle_scroll({"direction": "left", "amount": 100})
+        await handlers.handle_scroll({"direction": "left", "amount": 100})
 
         # Assert
         call_kwargs = mock_session.executor.scroll.call_args.kwargs

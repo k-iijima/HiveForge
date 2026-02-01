@@ -117,7 +117,8 @@ Vault/              # イベントログ (gitignore)
 | [docs/QUICKSTART.md](docs/QUICKSTART.md) | 動作確認手順書 |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | アーキテクチャ設計書 |
 | [AGENTS.md](AGENTS.md) | AI開発ガイドライン |
-| [コンセプト_v3.md](コンセプト_v3.md) | 完全な設計仕様 |
+| [docs/コンセプト_v4.md](docs/%E3%82%B3%E3%83%B3%E3%82%BB%E3%83%97%E3%83%88_v4.md) | コンセプト（作業用仕様・最新版） |
+| [docs/コンセプト_v3.md](docs/%E3%82%B3%E3%83%B3%E3%82%BB%E3%83%97%E3%83%88_v3.md) | コンセプト（v3・ベースライン） |
 
 ## 現在の実装状況
 

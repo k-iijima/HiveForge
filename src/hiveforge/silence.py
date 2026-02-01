@@ -6,10 +6,11 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta, timezone
-from typing import Callable, Awaitable
+import contextlib
+from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime, timedelta
 
-from .core import get_settings, AkashicRecord
+from .core import AkashicRecord, get_settings
 from .core.events import SilenceDetectedEvent
 
 
@@ -44,12 +45,12 @@ class SilenceDetector:
 
     def record_activity(self, timestamp: datetime | None = None) -> None:
         """アクティビティを記録"""
-        self._last_activity = timestamp or datetime.now(timezone.utc)
+        self._last_activity = timestamp or datetime.now(UTC)
 
     async def start(self) -> None:
         """検出器を開始"""
         self._running = True
-        self._last_activity = datetime.now(timezone.utc)
+        self._last_activity = datetime.now(UTC)
         self._task = asyncio.create_task(self._monitor_loop())
 
     async def stop(self) -> None:
@@ -57,10 +58,8 @@ class SilenceDetector:
         self._running = False
         if self._task:
             self._task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._task
-            except asyncio.CancelledError:
-                pass
 
     async def _monitor_loop(self) -> None:
         """監視ループ"""
@@ -72,7 +71,7 @@ class SilenceDetector:
             if not self._running:
                 break
 
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
 
             if self._last_activity and (now - self._last_activity) > threshold:
                 # 沈黙を検出

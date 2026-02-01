@@ -1,13 +1,14 @@
 """Akashic Record ストレージのテスト"""
 
+
+from datetime import UTC
+
 import pytest
-from pathlib import Path
 
 from hiveforge.core.ar import AkashicRecord
 from hiveforge.core.events import (
     RunStartedEvent,
     TaskCreatedEvent,
-    TaskCompletedEvent,
     parse_event,
 )
 
@@ -157,7 +158,7 @@ class TestAkashicRecordEdgeCases:
 
     def test_replay_with_since_filter(self, temp_vault):
         """since パラメータによる時刻フィルタリング"""
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta
 
         ar = AkashicRecord(temp_vault)
         run_id = "test-run-since"
@@ -180,7 +181,7 @@ class TestAkashicRecordEdgeCases:
         assert len(filtered) == 5  # 全て取得
 
         # 未来の時刻を使うと何も取得されない
-        future_time = datetime.now(timezone.utc) + timedelta(hours=1)
+        future_time = datetime.now(UTC) + timedelta(hours=1)
         filtered = list(ar.replay(run_id, since=future_time))
         assert len(filtered) == 0
 
@@ -212,7 +213,7 @@ class TestAkashicRecordEdgeCases:
 
         # ファイルを直接改ざん
         events_file = temp_vault / run_id / "events.jsonl"
-        with open(events_file, "r") as f:
+        with open(events_file) as f:
             lines = f.readlines()
 
         # 2行目のprev_hashを改ざん
@@ -314,7 +315,7 @@ class TestAkashicRecordEdgeCases:
 
         # 空行を挿入
         events_file = temp_vault / run_id / "events.jsonl"
-        with open(events_file, "r") as f:
+        with open(events_file) as f:
             content = f.read()
         # 途中に空行を挿入
         lines = content.split("\n")
@@ -391,7 +392,7 @@ class TestAkashicRecordEdgeCases:
         """_decode_utf8_safeが正常なUTF-8を正しくデコードする"""
         # Arrange
         ar = AkashicRecord(temp_vault)
-        valid_utf8 = "日本語テスト".encode("utf-8")
+        valid_utf8 = "日本語テスト".encode()
 
         # Act
         result = ar._decode_utf8_safe(valid_utf8)

@@ -12,11 +12,12 @@ Agent UIを使用してHiveForgeのUI要素をVLMで検証します。
 """
 
 import asyncio
+import contextlib
 import os
-import pytest
+from collections.abc import Generator
 from pathlib import Path
-from typing import Generator
 
+import pytest
 
 # テスト環境設定
 os.environ.setdefault("OLLAMA_BASE_URL", "http://hiveforge-dev-ollama:11434")
@@ -70,10 +71,8 @@ async def agent_ui_server():
     yield server
 
     # クリーンアップ: ブラウザを閉じる
-    try:
+    with contextlib.suppress(Exception):
         await server._handle_close_browser({})
-    except Exception:
-        pass
 
 
 def get_text_from_result(result: list) -> str:

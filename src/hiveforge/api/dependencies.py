@@ -6,7 +6,6 @@ FastAPIの依存性注入パターンでグローバル状態を管理。
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends
@@ -23,14 +22,14 @@ class AppState:
     テスト時は reset() でリセット可能。
     """
 
-    _instance: "AppState | None" = None
+    _instance: AppState | None = None
 
     def __init__(self) -> None:
         self._ar: AkashicRecord | None = None
         self._active_runs: dict[str, RunProjection] = {}
 
     @classmethod
-    def get_instance(cls) -> "AppState":
+    def get_instance(cls) -> AppState:
         """シングルトンインスタンスを取得"""
         if cls._instance is None:
             cls._instance = cls()

@@ -10,7 +10,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from ..events import BaseEvent, EventType
+from ..events import BaseEvent
 
 
 class TaskState(str, Enum):

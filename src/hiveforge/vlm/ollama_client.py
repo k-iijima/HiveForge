@@ -5,9 +5,9 @@ Ollama VLMクライアント
 """
 
 import base64
-import httpx
 from pathlib import Path
-from typing import Optional
+
+import httpx
 from pydantic import BaseModel, Field
 
 
@@ -61,7 +61,7 @@ class OllamaClient:
         except Exception:
             return []
 
-    async def pull_model(self, model: Optional[str] = None) -> bool:
+    async def pull_model(self, model: str | None = None) -> bool:
         """モデルをダウンロード"""
         model = model or self.model
         try:
@@ -78,7 +78,7 @@ class OllamaClient:
         self,
         image: bytes | str | Path,
         prompt: str,
-        model: Optional[str] = None,
+        model: str | None = None,
     ) -> VLMResponse:
         """画像をVLMで解析
 

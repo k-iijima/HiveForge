@@ -7,8 +7,8 @@ code-serverまたはVS Code (headless) を起動して、PlaywrightでUIを操�
 
 import asyncio
 import os
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 # 環境設定
 os.environ["OLLAMA_BASE_URL"] = "http://hiveforge-dev-ollama:11434"
@@ -45,7 +45,6 @@ class HiveForgeExtensionTest:
                 filepath = r.text.split(": ")[1] if ": " in r.text else None
 
         # VLMで分析
-        prompt = f"Describe this VS Code screenshot. {description}"
         describe_result = await self.server._handle_describe_page({"focus": description})
 
         vlm_response = ""

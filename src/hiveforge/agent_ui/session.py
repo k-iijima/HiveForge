@@ -5,9 +5,9 @@ Playwright MCP経由でブラウザを操作。
 
 from __future__ import annotations
 
-from hiveforge.vlm_tester.screen_capture import ScreenCapture
 from hiveforge.vlm_tester.action_executor import ActionExecutor
 from hiveforge.vlm_tester.playwright_mcp_client import PlaywrightMCPClient
+from hiveforge.vlm_tester.screen_capture import ScreenCapture
 
 
 class BrowserSession:

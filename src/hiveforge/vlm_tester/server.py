@@ -6,17 +6,17 @@ VLM TesterをMCPサーバーとして公開します。
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import Tool, TextContent
+from mcp.types import TextContent, Tool
 
-from hiveforge.vlm_tester.screen_capture import ScreenCapture
 from hiveforge.vlm_tester.action_executor import ActionExecutor
-from hiveforge.vlm_tester.hybrid_analyzer import HybridAnalyzer, AnalysisLevel
+from hiveforge.vlm_tester.hybrid_analyzer import AnalysisLevel, HybridAnalyzer
+from hiveforge.vlm_tester.screen_capture import ScreenCapture
 
 
 class VLMTesterMCPServer:
@@ -248,7 +248,7 @@ class VLMTesterMCPServer:
         Returns:
             保存したファイルのパス
         """
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
+        timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S_%f")
 
         # 画像を保存
         image_path = self.captures_dir / f"{timestamp}.png"

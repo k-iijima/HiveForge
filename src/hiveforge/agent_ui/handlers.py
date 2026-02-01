@@ -8,13 +8,13 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from mcp.types import TextContent, ImageContent
+from mcp.types import ImageContent, TextContent
 
-from hiveforge.vlm_tester.hybrid_analyzer import HybridAnalyzer, AnalysisLevel
+from hiveforge.vlm_tester.hybrid_analyzer import AnalysisLevel, HybridAnalyzer
 from hiveforge.vlm_tester.local_analyzers import DiffAnalyzer
 
 if TYPE_CHECKING:
@@ -29,7 +29,7 @@ class AgentUIHandlers:
 
     def __init__(
         self,
-        session: "BrowserSession",
+        session: BrowserSession,
         captures_dir: Path,
         analyzer: HybridAnalyzer | None = None,
         diff_analyzer: DiffAnalyzer | None = None,
@@ -315,7 +315,7 @@ class AgentUIHandlers:
 
     def _save_capture(self, image_data: bytes, metadata: dict[str, Any]) -> str:
         """キャプチャを保存"""
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
+        timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S_%f")
 
         image_path = self.captures_dir / f"{timestamp}.png"
         image_path.write_bytes(image_data)

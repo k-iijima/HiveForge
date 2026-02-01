@@ -536,7 +536,8 @@ HiveForge/
 │   └── ARCHITECTURE.md
 ├── Vault/                   # イベントログ（gitignore）
 ├── AGENTS.md                # AI開発ガイドライン
-├── コンセプト_v3.md          # 完全な設計仕様
+├── docs/コンセプト_v4.md      # コンセプト（作業用仕様・最新版）
+├── docs/コンセプト_v3.md      # コンセプト（v3・ベースライン）
 ├── pyproject.toml           # Pythonプロジェクト設定
 ├── hiveforge.config.yaml    # 実行時設定
 ├── docker-compose.yml       # Docker設定
@@ -628,4 +629,5 @@ logging:
 
 - [QUICKSTART.md](QUICKSTART.md) - 動作確認手順
 - [AGENTS.md](../AGENTS.md) - AI開発ガイドライン
-- [コンセプト_v3.md](../コンセプト_v3.md) - 完全な設計仕様
+- [コンセプト_v4.md](%E3%82%B3%E3%83%B3%E3%82%BB%E3%83%97%E3%83%88_v4.md) - コンセプト（作業用仕様・最新版）
+- [コンセプト_v3.md](%E3%82%B3%E3%83%B3%E3%82%BB%E3%83%97%E3%83%88_v3.md) - コンセプト（v3・ベースライン）

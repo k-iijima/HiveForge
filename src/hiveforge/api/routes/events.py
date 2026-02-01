@@ -11,7 +11,6 @@ from fastapi import APIRouter, HTTPException
 from ..helpers import get_ar
 from ..models import EventResponse, LineageResponse
 
-
 router = APIRouter(prefix="/runs/{run_id}/events", tags=["Events"])
 
 

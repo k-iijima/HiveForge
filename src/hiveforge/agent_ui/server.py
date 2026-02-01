@@ -10,11 +10,11 @@ from typing import Any
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import TextContent, ImageContent
+from mcp.types import ImageContent, TextContent
 
+from .handlers import AgentUIHandlers
 from .session import BrowserSession
 from .tools import get_tool_definitions
-from .handlers import AgentUIHandlers
 
 
 class AgentUIMCPServer:
