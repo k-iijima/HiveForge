@@ -800,3 +800,112 @@ class TestHiveAggregate:
         # 実際には PENDING と IN_PROGRESS の両方がアクティブ
         assert len(active) == 1
         assert active[0].colony_id == "colony-002"
+
+
+class TestRunColonyProjectionNullHandling:
+    """RunColonyProjection のNull分岐テスト"""
+
+    def test_apply_non_run_started_ignored(self):
+        """RUN_STARTED以外のイベントは無視される"""
+        from hiveforge.core.events import TaskCreatedEvent
+        from hiveforge.core.state.projections import RunColonyProjection
+
+        proj = RunColonyProjection()
+        event = TaskCreatedEvent(
+            run_id="run-001",
+            task_id="task-001",
+            payload={"title": "Test"},
+        )
+
+        # Act
+        proj.apply(event)
+
+        # Assert: 何も変わらない
+        assert len(proj.orphan_runs) == 0
+        assert len(proj.colony_runs) == 0
+
+    def test_apply_run_started_with_none_run_id_ignored(self):
+        """run_id=NoneのRUN_STARTEDは無視される"""
+        from hiveforge.core.events import RunStartedEvent
+        from hiveforge.core.state.projections import RunColonyProjection
+
+        proj = RunColonyProjection()
+        event = RunStartedEvent(
+            run_id=None,  # type: ignore
+            colony_id="colony-001",
+            payload={"goal": "Test"},
+        )
+
+        # Act
+        proj.apply(event)
+
+        # Assert
+        assert len(proj.orphan_runs) == 0
+        assert len(proj.colony_runs) == 0
+
+    def test_apply_run_started_without_colony_id_added_to_orphans(self):
+        """colony_id=NoneのRunはorphan_runsに追加される"""
+        from hiveforge.core.events import RunStartedEvent
+        from hiveforge.core.state.projections import RunColonyProjection
+
+        proj = RunColonyProjection()
+        event = RunStartedEvent(
+            run_id="run-001",
+            colony_id=None,
+            payload={"goal": "Test"},
+        )
+
+        # Act
+        proj.apply(event)
+
+        # Assert
+        assert "run-001" in proj.orphan_runs
+        assert len(proj.colony_runs) == 0
+
+    def test_apply_run_started_with_colony_id_added_to_colony_runs(self):
+        """colony_id付きRunはcolony_runsに追加される"""
+        from hiveforge.core.events import RunStartedEvent
+        from hiveforge.core.state.projections import RunColonyProjection
+
+        proj = RunColonyProjection()
+        event = RunStartedEvent(
+            run_id="run-001",
+            colony_id="colony-001",
+            payload={"goal": "Test"},
+        )
+
+        # Act
+        proj.apply(event)
+
+        # Assert
+        assert "run-001" in proj.colony_runs["colony-001"]
+
+    def test_duplicate_run_not_added_twice_to_orphans(self):
+        """同じrunが2回orphansに追加されない"""
+        from hiveforge.core.events import RunStartedEvent
+        from hiveforge.core.state.projections import RunColonyProjection
+
+        proj = RunColonyProjection()
+        event = RunStartedEvent(run_id="run-001", colony_id=None, payload={"goal": "Test"})
+
+        # Act
+        proj.apply(event)
+        proj.apply(event)  # 2回目
+
+        # Assert
+        assert proj.orphan_runs.count("run-001") == 1
+
+    def test_duplicate_run_not_added_twice_to_colony_runs(self):
+        """同じrunが2回colony_runsに追加されない"""
+        from hiveforge.core.events import RunStartedEvent
+        from hiveforge.core.state.projections import RunColonyProjection
+
+        proj = RunColonyProjection()
+        event = RunStartedEvent(run_id="run-001", colony_id="col-001", payload={"goal": "Test"})
+
+        # Act
+        proj.apply(event)
+        proj.apply(event)
+
+        # Assert
+        assert proj.colony_runs["col-001"].count("run-001") == 1
