@@ -6,11 +6,29 @@ HiveForgeは、LLMを活用した自律型ソフトウェア開発支援シス�
 
 ## 特徴
 
+- **Hive/Colony階層**: 複数Runを組織化する階層構造
 - **Akashic Record (AR)**: 全イベントを追記保存する不変ログ
 - **因果追跡**: 任意の成果物から「なぜ」を遡及可能
-- **状態機械**: Task/Run/Requirement の厳密な状態管理
+- **状態機械**: Hive/Colony/Task/Run/Requirement の厳密な状態管理
 - **MCP対応**: GitHub Copilot Chat から直接操作可能
 - **VS Code統合**: 拡張機能でダッシュボード・イベントログ表示
+
+## 概念モデル
+
+```
+Hive（組織単位）
+ ├── Colony（作業チーム）
+ │    ├── Run（実行単位）
+ │    │    ├── Task（タスク）
+ │    │    └── Requirement（確認要請）
+ │    └── Run
+ └── Colony
+```
+
+- **Hive**: プロジェクト全体を管理する最上位単位
+- **Colony**: 特定の目標を持つ作業グループ（複数Runを含む）
+- **Run**: 具体的な実行単位（タスクの集合）
+- **Task**: 個別の作業項目
 
 ## クイックスタート
 

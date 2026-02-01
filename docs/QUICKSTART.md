@@ -90,9 +90,70 @@ pip install -e ".[dev]"
 
 ---
 
+## Hive/Colony操作（v5.2新機能）
+
+Hive/Colonyは複数のRunを組織化する階層構造です。
+
+### Hive（プロジェクト単位）
+
+```bash
+# Hive作成
+curl -X POST http://localhost:8000/hives \
+  -H "Content-Type: application/json" \
+  -d '{"name": "My Project", "description": "プロジェクト説明"}'
+
+# Hive一覧
+curl http://localhost:8000/hives
+
+# Hive終了
+curl -X POST http://localhost:8000/hives/{hive_id}/close
+```
+
+### Colony（作業グループ）
+
+```bash
+# Colony作成
+curl -X POST http://localhost:8000/hives/{hive_id}/colonies \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Feature A", "goal": "機能Aを実装"}'
+
+# Colony一覧
+curl http://localhost:8000/hives/{hive_id}/colonies
+
+# Colony開始
+curl -X POST http://localhost:8000/colonies/{colony_id}/start
+
+# Colony完了
+curl -X POST http://localhost:8000/colonies/{colony_id}/complete
+```
+
+### VS Code拡張でのHive操作
+
+- **Hives TreeView**: サイドバーに階層表示
+- **Hive作成**: TreeViewのツールバーから「+」ボタン
+- **Colony作成**: Hive項目を右クリック → Colony作成
+- **自動完了**: Colony内の全Runが完了すると自動的にColonyも完了
+
+---
+
 ## MCP ツール
 
 Copilot Chatで `@hiveforge` を使用（要: VS Code再読み込み）:
+
+### Hive/Colony操作
+
+| ツール | 説明 |
+|--------|------|
+| `create_hive` | Hive作成 |
+| `list_hives` | Hive一覧 |
+| `get_hive` | Hive詳細 |
+| `close_hive` | Hive終了 |
+| `create_colony` | Colony作成 |
+| `list_colonies` | Colony一覧 |
+| `start_colony` | Colony開始 |
+| `complete_colony` | Colony完了 |
+
+### Run/Task操作
 
 | ツール | 説明 |
 |--------|------|

@@ -8,15 +8,16 @@
 
 1. [システム概要](#1-システム概要)
 2. [コンポーネント構成](#2-コンポーネント構成)
-3. [データモデル](#3-データモデル)
-4. [API仕様](#4-api仕様)
-5. [状態機械](#5-状態機械)
-6. [イベントシステム](#6-イベントシステム)
-7. [因果リンク（Lineage）](#7-因果リンクlineage)
-8. [ディレクトリ構造](#8-ディレクトリ構造)
-9. [設定](#9-設定)
-10. [フェーズゲート条件](#10-フェーズゲート条件)
-11. [今後の拡張](#11-今後の拡張)
+3. [階層モデル（Hive/Colony）](#3-階層モデルhivecolony)
+4. [データモデル](#4-データモデル)
+5. [API仕様](#5-api仕様)
+6. [状態機械](#6-状態機械)
+7. [イベントシステム](#7-イベントシステム)
+8. [因果リンク（Lineage）](#8-因果リンクlineage)
+9. [ディレクトリ構造](#9-ディレクトリ構造)
+10. [設定](#10-設定)
+11. [フェーズゲート条件](#11-フェーズゲート条件)
+12. [今後の拡張](#12-今後の拡張)
 
 ---
 
@@ -141,9 +142,96 @@ hiveforge/
 
 ---
 
-## 3. データモデル
+## 3. 階層モデル（Hive/Colony）
 
-### 3.1 BaseEvent（イベント基底クラス）
+### 12.1 概念
+
+HiveForgeは4層の階層構造でプロジェクトを管理します：
+
+```
+Hive（組織単位・プロジェクト）
+ ├── Colony（作業チーム・目標単位）
+ │    ├── Run（実行単位）
+ │    │    ├── Task（タスク）
+ │    │    └── Requirement（確認要請）
+ │    └── Run
+ └── Colony
+```
+
+### 12.2 Hive（巣）
+
+**定義**: プロジェクト全体を管理する最上位の組織単位
+
+| 属性 | 型 | 説明 |
+|------|-----|------|
+| `hive_id` | string | 一意識別子（ULID） |
+| `name` | string | Hive名 |
+| `description` | string? | 説明 |
+| `status` | string | `active` \| `closed` |
+
+**状態遷移**:
+```
+created → active → closed
+```
+
+**APIエンドポイント**:
+- `POST /hives` - Hive作成
+- `GET /hives` - Hive一覧
+- `GET /hives/{hive_id}` - Hive詳細
+- `POST /hives/{hive_id}/close` - Hive終了
+
+**MCPツール**:
+- `create_hive` - Hive作成
+- `list_hives` - Hive一覧
+- `get_hive` - Hive詳細
+- `close_hive` - Hive終了
+
+### 12.3 Colony（コロニー）
+
+**定義**: 特定の目標を持つ作業グループ。複数のRunを含む。
+
+| 属性 | 型 | 説明 |
+|------|-----|------|
+| `colony_id` | string | 一意識別子（ULID） |
+| `hive_id` | string | 所属Hive ID |
+| `name` | string | Colony名 |
+| `goal` | string? | 目標説明 |
+| `status` | string | `created` \| `running` \| `completed` \| `failed` |
+
+**状態遷移**:
+```
+created → running → completed
+                 └→ failed
+```
+
+**APIエンドポイント**:
+- `POST /hives/{hive_id}/colonies` - Colony作成
+- `GET /hives/{hive_id}/colonies` - Colony一覧
+- `POST /colonies/{colony_id}/start` - Colony開始
+- `POST /colonies/{colony_id}/complete` - Colony完了
+
+**MCPツール**:
+- `create_colony` - Colony作成
+- `list_colonies` - Colony一覧
+- `start_colony` - Colony開始
+- `complete_colony` - Colony完了
+
+### 12.4 Run-Colony紐付け
+
+イベントには`colony_id`フィールドがあり、RunをColonyに紐付けます：
+
+```python
+class BaseEvent(BaseModel):
+    colony_id: str | None = None  # 所属Colony ID
+```
+
+`RunColonyProjection`がColony→Runのマッピングを管理し、`ColonyProgressTracker`がRun完了時にColonyの自動完了判定を行います。
+
+---
+
+## 4. データモデル
+
+### 12.1 BaseEvent（イベント基底クラス）
 
 すべてのイベントの基底となるイミュータブルなモデル:
 
@@ -166,7 +254,7 @@ class BaseEvent(BaseModel):
         ...
 ```
 
-### 3.2 イベント型一覧
+### 12.2 イベント型一覧
 
 | カテゴリ | イベント型 | 説明 |
 |----------|------------|------|
@@ -191,7 +279,7 @@ class BaseEvent(BaseModel):
 | | `system.silence_detected` | 沈黙検出 |
 | | `system.emergency_stop` | 緊急停止 |
 
-### 3.3 RunProjection（状態投影）
+### 12.3 RunProjection（状態投影）
 
 イベントから導出される現在状態:
 
@@ -208,7 +296,7 @@ class RunProjection:
     last_heartbeat: datetime | None   # 最終ハートビート
 ```
 
-### 3.4 TaskProjection
+### 12.4 TaskProjection
 
 ```python
 class TaskProjection:
@@ -225,7 +313,7 @@ class TaskProjection:
 
 ## 4. API仕様
 
-### 4.1 REST API エンドポイント
+### 12.1 REST API エンドポイント
 
 #### System
 
@@ -292,7 +380,7 @@ class TaskProjection:
 | GET | `/runs/{run_id}/events` | イベント一覧取得 |
 | GET | `/runs/{run_id}/events/{event_id}/lineage` | 因果リンク取得 |
 
-### 4.2 MCP ツール一覧
+### 12.2 MCP ツール一覧
 
 | ツール | 説明 | パラメータ |
 |--------|------|------------|
@@ -313,7 +401,7 @@ class TaskProjection:
 
 ## 5. 状態機械
 
-### 5.1 RunStateMachine
+### 12.1 RunStateMachine
 
 ```
               ┌───────────────────┐
@@ -334,7 +422,7 @@ class TaskProjection:
 | RUNNING | FAILED | `run.failed` |
 | RUNNING | ABORTED | `run.aborted`, `system.emergency_stop` |
 
-### 5.2 TaskStateMachine
+### 12.2 TaskStateMachine
 
 ```
 ┌─────────┐                          
@@ -364,7 +452,7 @@ class TaskProjection:
             └──────────┘
 ```
 
-### 5.3 RequirementStateMachine
+### 12.3 RequirementStateMachine
 
 ```
 ┌─────────┐
@@ -383,7 +471,7 @@ class TaskProjection:
 
 ## 6. イベントシステム
 
-### 6.1 イベント永続化
+### 12.1 イベント永続化
 
 イベントはJSONL形式でファイルに追記保存:
 
@@ -393,7 +481,7 @@ Vault/
     └── events.jsonl    # 1行1イベント
 ```
 
-### 6.2 ハッシュ連鎖
+### 12.2 ハッシュ連鎖
 
 各イベントは前のイベントのハッシュを保持し、改ざん検知を可能に:
 
@@ -403,7 +491,7 @@ event[0] ─hash─▶ event[1] ─hash─▶ event[2] ─hash─▶ ...
         prev_hash      prev_hash      prev_hash
 ```
 
-### 6.3 ハッシュ計算
+### 12.3 ハッシュ計算
 
 1. イベントデータから`hash`フィールドを除外
 2. JCS (RFC 8785) で正規化
@@ -421,7 +509,7 @@ def compute_hash(data: dict[str, Any]) -> str:
 
 ## 7. 因果リンク（Lineage）
 
-### 7.1 概要
+### 12.1 概要
 
 各イベントは`parents`フィールドで親イベントを参照し、因果関係を記録:
 
@@ -430,7 +518,7 @@ class TaskCreatedEvent(BaseEvent):
     parents: list[str] = ["run_started_event_id"]  # 親イベントのID
 ```
 
-### 7.2 探索方向
+### 12.2 探索方向
 
 | 方向 | 説明 | 実装方式 |
 |------|------|----------|
@@ -438,7 +526,7 @@ class TaskCreatedEvent(BaseEvent):
 | `descendants` | 子孫（子方向） | 全イベント走査 |
 | `both` | 両方向 | 上記の組み合わせ |
 
-### 7.3 APIレスポンス例
+### 12.3 APIレスポンス例
 
 ```json
 {
@@ -449,7 +537,7 @@ class TaskCreatedEvent(BaseEvent):
 }
 ```
 
-### 7.4 制限
+### 12.4 制限
 
 - `max_depth`: 探索深度制限（デフォルト: 10）
 - `truncated`: 制限により切り詰められた場合`true`
@@ -458,7 +546,7 @@ class TaskCreatedEvent(BaseEvent):
 
 ## 8. ディレクトリ構造
 
-### 8.1 プロジェクト構造
+### 12.1 プロジェクト構造
 
 ```
 HiveForge/
@@ -545,7 +633,7 @@ HiveForge/
 └── Dockerfile
 ```
 
-### 8.2 Vault構造
+### 12.2 Vault構造
 
 ```
 Vault/
@@ -558,7 +646,7 @@ Vault/
 
 ## 9. 設定
 
-### 9.1 hiveforge.config.yaml
+### 12.1 hiveforge.config.yaml
 
 ```yaml
 hive:
@@ -594,7 +682,7 @@ logging:
   events_max_file_size_mb: 100
 ```
 
-### 9.2 環境変数
+### 12.2 環境変数
 
 | 変数名 | 説明 | デフォルト |
 |--------|------|------------|
@@ -606,11 +694,11 @@ logging:
 
 ## 10. フェーズゲート条件
 
-### 10.1 概要
+### 12.1 概要
 
 HiveForge の開発はフェーズに分かれており、各フェーズを完了するためには「ゲート条件」を満たす必要があります。これにより、早期フェーズの成果物が安定していることを確認してから次のフェーズに進むことができます。
 
-### 10.2 フェーズ一覧
+### 12.2 フェーズ一覧
 
 | フェーズ | 名称 | 主な成果物 |
 |----------|------|------------|
@@ -622,7 +710,7 @@ HiveForge の開発はフェーズに分かれており、各フェーズを完�
 | Phase 6 | 自律運用 | 自動並列実行、障害回復 |
 | Phase 7 | 継続改善 | 回顧・提案・承認サイクル |
 
-### 10.3 ゲート条件詳細
+### 12.3 ゲート条件詳細
 
 #### Phase 6 ゲート条件（自律運用への移行）
 
@@ -650,7 +738,7 @@ Phase 6 完了後、Phase 7 に進むための必須条件:
 | G7-04 | 因果リンクで決定を遡及可能 | `parents` フィールドによるリンク |
 | G7-05 | 全ての失敗がイベント化 | `OPERATION_FAILED` + 理由コード |
 
-### 10.4 現在のステータス（v5.1）
+### 12.4 現在のステータス（v5.1）
 
 Phase 1.5（フィードバック対応）の完了状況:
 
@@ -669,19 +757,19 @@ Phase 1.5（フィードバック対応）の完了状況:
 
 ## 11. 今後の拡張
 
-### 11.1 主要な計画
+### 12.1 主要な計画
 
 - [ ] LLM Orchestrator: 自律的なタスク分解・実行
 - [ ] Artifact管理: 成果物の保存と参照
 - [ ] 因果リンクの自動設定（[Issue #001](issues/001-lineage-auto-parents.md)）
 - [ ] イベント署名: 改ざん者の特定
 
-### 11.2 VS Code拡張の拡充
+### 12.2 VS Code拡張の拡充
 
 - [ ] 因果グラフ可視化（Webview）
 - [ ] リアルタイムイベントストリーム
 
-### 11.3 スケーラビリティ
+### 12.3 スケーラビリティ
 
 - [ ] エンティティ別チェーン（並列書き込み対応）
 - [ ] イベントアーカイブ
