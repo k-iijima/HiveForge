@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any, Literal
 
@@ -39,6 +39,9 @@ class EventType(str, Enum):
     REQUIREMENT_CREATED = "requirement.created"
     REQUIREMENT_APPROVED = "requirement.approved"
     REQUIREMENT_REJECTED = "requirement.rejected"
+
+    # Decision イベント（仕様変更・合意事項の記録など）
+    DECISION_RECORDED = "decision.recorded"
 
     # LLM イベント
     LLM_REQUEST = "llm.request"
@@ -104,7 +107,7 @@ class BaseEvent(BaseModel):
     id: str = Field(default_factory=generate_event_id, description="イベントID (ULID)")
     type: EventType = Field(..., description="イベント種別")
     timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="イベント発生時刻 (UTC)",
     )
     run_id: str | None = Field(default=None, description="関連するRunのID")
@@ -128,7 +131,7 @@ class BaseEvent(BaseModel):
         return self.model_dump_json(indent=2)
 
     @classmethod
-    def from_json(cls, json_str: str) -> "BaseEvent":
+    def from_json(cls, json_str: str) -> BaseEvent:
         """JSON文字列からデシリアライズ"""
         return cls.model_validate_json(json_str)
 
@@ -224,6 +227,16 @@ class RequirementRejectedEvent(BaseEvent):
     type: Literal[EventType.REQUIREMENT_REJECTED] = EventType.REQUIREMENT_REJECTED
 
 
+class DecisionRecordedEvent(BaseEvent):
+    """Decision記録イベント
+
+    仕様変更や判断事項（Decision）をイベントとして永続化する。
+    具体的な内容は payload に保持する。
+    """
+
+    type: Literal[EventType.DECISION_RECORDED] = EventType.DECISION_RECORDED
+
+
 class HeartbeatEvent(BaseEvent):
     """ハートビートイベント"""
 
@@ -264,6 +277,7 @@ EVENT_TYPE_MAP: dict[EventType, type[BaseEvent]] = {
     EventType.REQUIREMENT_CREATED: RequirementCreatedEvent,
     EventType.REQUIREMENT_APPROVED: RequirementApprovedEvent,
     EventType.REQUIREMENT_REJECTED: RequirementRejectedEvent,
+    EventType.DECISION_RECORDED: DecisionRecordedEvent,
     EventType.HEARTBEAT: HeartbeatEvent,
     EventType.ERROR: ErrorEvent,
     EventType.SILENCE_DETECTED: SilenceDetectedEvent,

@@ -6,11 +6,13 @@ JCS正規化によるSHA-256ハッシュを持つ。
 """
 
 import json
+from datetime import UTC
 
 import pytest
 from pydantic import ValidationError
 
 from hiveforge.core.events import (
+    DecisionRecordedEvent,
     EventType,
     RunStartedEvent,
     TaskCreatedEvent,
@@ -148,11 +150,12 @@ class TestComputeHash:
 
         _serialize_value関数はリスト内のdatetime/enumも再帰的に処理する。
         """
-        from datetime import datetime, timezone
+        from datetime import datetime
+
         from hiveforge.core.events import _serialize_value
 
         # Arrange: datetimeを含むリスト
-        dt = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        dt = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
         data_with_list = [dt, "string", {"nested": dt}]
 
         # Act: シリアライズ
@@ -337,6 +340,32 @@ class TestParseEvent:
         # Assert: 正しくパースされる
         assert isinstance(event, RunStartedEvent)
         assert event.run_id == "run-from-json"
+
+    def test_parse_decision_recorded_from_dict(self):
+        """辞書からDecisionRecordedEventをパースできる
+
+        Decisionは仕様変更や判断事項をイベントとして残すための汎用イベント。
+        """
+        # Arrange: DecisionRecordedEventを表す辞書
+        data = {
+            "type": "decision.recorded",
+            "run_id": "run-001",
+            "actor": "copilot",
+            "payload": {
+                "decision_id": "dec-001",
+                "key": "D3",
+                "title": "Requirementを2階層に分割",
+                "selected": "C",
+            },
+        }
+
+        # Act
+        event = parse_event(data)
+
+        # Assert
+        assert isinstance(event, DecisionRecordedEvent)
+        assert event.type == EventType.DECISION_RECORDED
+        assert event.payload["key"] == "D3"
 
     def test_parse_preserves_optional_fields(self):
         """オプショナルフィールドも正しくパースされる"""
