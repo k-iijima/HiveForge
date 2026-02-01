@@ -41,9 +41,7 @@ class WorkerProjection:
     error_message: str | None = None
 
 
-def build_worker_projection(
-    events: list[BaseEvent], worker_id: str
-) -> WorkerProjection:
+def build_worker_projection(events: list[BaseEvent], worker_id: str) -> WorkerProjection:
     """イベントからWorker Projectionを構築
 
     Args:
