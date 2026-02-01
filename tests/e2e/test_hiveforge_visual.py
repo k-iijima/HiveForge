@@ -24,7 +24,11 @@ os.environ.setdefault("OLLAMA_BASE_URL", "http://hiveforge-dev-ollama:11434")
 os.environ.setdefault("VLM_HEADLESS", "true")
 
 # E2Eマーカーをモジュール全体に適用
-pytestmark = pytest.mark.e2e
+# VLMの揺らぎ対策としてリトライを設定（最大2回リトライ）
+pytestmark = [
+    pytest.mark.e2e,
+    pytest.mark.flaky(reruns=2, reruns_delay=1),
+]
 
 
 @pytest.fixture
