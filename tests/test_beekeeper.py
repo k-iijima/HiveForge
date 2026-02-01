@@ -832,3 +832,273 @@ class TestConflictDetector:
         # 最後のregister_claimで衝突が返る
         assert conflict is not None
         assert conflict.severity == ConflictSeverity.HIGH
+
+
+# Conflict Resolver テスト
+from hiveforge.beekeeper.resolver import (
+    ResolutionStrategy,
+    ResolutionStatus,
+    ResolutionResult,
+    MergeRule,
+    ConflictResolver,
+)
+
+
+class TestResolutionResult:
+    """ResolutionResultの基本テスト"""
+
+    def test_create_result(self):
+        """解決結果を作成"""
+        result = ResolutionResult(
+            conflict_id="conflict-1",
+            strategy=ResolutionStrategy.FIRST_COME,
+        )
+
+        assert result.resolution_id is not None
+        assert result.status == ResolutionStatus.PENDING
+
+
+class TestConflictResolver:
+    """ConflictResolverのテスト"""
+
+    def test_resolve_first_come(self):
+        """先着優先で解決"""
+        detector = ConflictDetector()
+        resolver = ConflictResolver()
+
+        claim1 = ResourceClaim(
+            colony_id="colony-1", resource_type="file", resource_id="/file.py", operation="write"
+        )
+        claim2 = ResourceClaim(
+            colony_id="colony-2", resource_type="file", resource_id="/file.py", operation="write"
+        )
+
+        detector.register_claim(claim1)
+        conflict = detector.register_claim(claim2)
+
+        result = resolver.resolve(conflict, ResolutionStrategy.FIRST_COME)
+
+        assert result.status == ResolutionStatus.RESOLVED
+        assert result.winner_colony_id == "colony-1"
+
+    def test_resolve_priority_based(self):
+        """優先度ベースで解決"""
+        detector = ConflictDetector()
+        resolver = ConflictResolver()
+        resolver.set_colony_priority("colony-1", 10)
+        resolver.set_colony_priority("colony-2", 20)
+
+        claim1 = ResourceClaim(
+            colony_id="colony-1", resource_type="file", resource_id="/file.py", operation="write"
+        )
+        claim2 = ResourceClaim(
+            colony_id="colony-2", resource_type="file", resource_id="/file.py", operation="write"
+        )
+
+        detector.register_claim(claim1)
+        conflict = detector.register_claim(claim2)
+
+        result = resolver.resolve(conflict, ResolutionStrategy.PRIORITY_BASED)
+
+        assert result.status == ResolutionStatus.RESOLVED
+        assert result.winner_colony_id == "colony-2"  # 優先度が高い
+
+    def test_resolve_abort_all(self):
+        """全キャンセル"""
+        detector = ConflictDetector()
+        resolver = ConflictResolver()
+
+        claim1 = ResourceClaim(
+            colony_id="colony-1", resource_type="file", resource_id="/file.py", operation="write"
+        )
+        claim2 = ResourceClaim(
+            colony_id="colony-2", resource_type="file", resource_id="/file.py", operation="write"
+        )
+
+        detector.register_claim(claim1)
+        conflict = detector.register_claim(claim2)
+
+        result = resolver.resolve(conflict, ResolutionStrategy.ABORT_ALL)
+
+        assert result.status == ResolutionStatus.RESOLVED
+        assert "aborted_colonies" in result.metadata
+
+    def test_resolve_lock_and_queue(self):
+        """ロック＆キュー"""
+        detector = ConflictDetector()
+        resolver = ConflictResolver()
+
+        claim1 = ResourceClaim(
+            colony_id="colony-1", resource_type="file", resource_id="/file.py", operation="write"
+        )
+        claim2 = ResourceClaim(
+            colony_id="colony-2", resource_type="file", resource_id="/file.py", operation="write"
+        )
+
+        detector.register_claim(claim1)
+        conflict = detector.register_claim(claim2)
+
+        result = resolver.resolve(conflict, ResolutionStrategy.LOCK_AND_QUEUE)
+
+        assert result.status == ResolutionStatus.RESOLVED
+        assert result.winner_colony_id == "colony-1"
+        assert "queued_colonies" in result.metadata
+
+    def test_resolve_manual(self):
+        """手動解決"""
+        detector = ConflictDetector()
+        resolver = ConflictResolver()
+
+        claim1 = ResourceClaim(
+            colony_id="colony-1", resource_type="file", resource_id="/file.py", operation="write"
+        )
+        claim2 = ResourceClaim(
+            colony_id="colony-2", resource_type="file", resource_id="/file.py", operation="write"
+        )
+
+        detector.register_claim(claim1)
+        conflict = detector.register_claim(claim2)
+
+        result = resolver.resolve(conflict, ResolutionStrategy.MANUAL)
+
+        assert result.status == ResolutionStatus.ESCALATED
+
+    def test_resolve_merge_no_rule(self):
+        """マージルールなし"""
+        detector = ConflictDetector()
+        resolver = ConflictResolver()
+
+        claim1 = ResourceClaim(
+            colony_id="colony-1", resource_type="file", resource_id="/file.py", operation="write"
+        )
+        claim2 = ResourceClaim(
+            colony_id="colony-2", resource_type="file", resource_id="/file.py", operation="write"
+        )
+
+        detector.register_claim(claim1)
+        conflict = detector.register_claim(claim2)
+
+        result = resolver.resolve(conflict, ResolutionStrategy.MERGE)
+
+        assert result.status == ResolutionStatus.ESCALATED
+
+    def test_resolve_merge_with_rule(self):
+        """マージルールあり"""
+        detector = ConflictDetector()
+        resolver = ConflictResolver()
+        resolver.add_merge_rule(MergeRule(resource_type="file", merge_function="append"))
+
+        claim1 = ResourceClaim(
+            colony_id="colony-1", resource_type="file", resource_id="/file.py", operation="write"
+        )
+        claim2 = ResourceClaim(
+            colony_id="colony-2", resource_type="file", resource_id="/file.py", operation="write"
+        )
+
+        detector.register_claim(claim1)
+        conflict = detector.register_claim(claim2)
+
+        result = resolver.resolve(conflict, ResolutionStrategy.MERGE)
+
+        assert result.status == ResolutionStatus.RESOLVED
+
+    def test_resolve_retry_later(self):
+        """リトライ"""
+        detector = ConflictDetector()
+        resolver = ConflictResolver()
+
+        claim1 = ResourceClaim(
+            colony_id="colony-1", resource_type="file", resource_id="/file.py", operation="write"
+        )
+        claim2 = ResourceClaim(
+            colony_id="colony-2", resource_type="file", resource_id="/file.py", operation="write"
+        )
+
+        detector.register_claim(claim1)
+        conflict = detector.register_claim(claim2)
+
+        result = resolver.resolve(conflict, ResolutionStrategy.RETRY_LATER)
+
+        assert result.status == ResolutionStatus.PENDING
+
+    def test_set_strategy(self):
+        """デフォルト戦略設定"""
+        resolver = ConflictResolver()
+        resolver.set_strategy(ConflictType.FILE_CONFLICT, ResolutionStrategy.MANUAL)
+
+        detector = ConflictDetector()
+        claim1 = ResourceClaim(
+            colony_id="colony-1", resource_type="file", resource_id="/file.py", operation="write"
+        )
+        claim2 = ResourceClaim(
+            colony_id="colony-2", resource_type="file", resource_id="/file.py", operation="write"
+        )
+
+        detector.register_claim(claim1)
+        conflict = detector.register_claim(claim2)
+
+        result = resolver.resolve(conflict)  # strategy指定なし
+
+        assert result.strategy == ResolutionStrategy.MANUAL
+
+    def test_resolution_listener(self):
+        """解決リスナー"""
+        resolved = []
+        resolver = ConflictResolver()
+        resolver.add_resolution_listener(lambda r: resolved.append(r))
+
+        detector = ConflictDetector()
+        claim1 = ResourceClaim(
+            colony_id="colony-1", resource_type="file", resource_id="/file.py", operation="write"
+        )
+        claim2 = ResourceClaim(
+            colony_id="colony-2", resource_type="file", resource_id="/file.py", operation="write"
+        )
+
+        detector.register_claim(claim1)
+        conflict = detector.register_claim(claim2)
+
+        resolver.resolve(conflict)
+
+        assert len(resolved) == 1
+
+    def test_get_stats(self):
+        """統計情報"""
+        detector = ConflictDetector()
+        resolver = ConflictResolver()
+
+        claim1 = ResourceClaim(
+            colony_id="colony-1", resource_type="file", resource_id="/file.py", operation="write"
+        )
+        claim2 = ResourceClaim(
+            colony_id="colony-2", resource_type="file", resource_id="/file.py", operation="write"
+        )
+
+        detector.register_claim(claim1)
+        conflict = detector.register_claim(claim2)
+
+        resolver.resolve(conflict, ResolutionStrategy.FIRST_COME)
+
+        stats = resolver.get_stats()
+        assert stats["total"] == 1
+        assert stats["resolved"] == 1
+
+    def test_get_pending_resolutions(self):
+        """未解決一覧"""
+        detector = ConflictDetector()
+        resolver = ConflictResolver()
+
+        claim1 = ResourceClaim(
+            colony_id="colony-1", resource_type="file", resource_id="/file.py", operation="write"
+        )
+        claim2 = ResourceClaim(
+            colony_id="colony-2", resource_type="file", resource_id="/file.py", operation="write"
+        )
+
+        detector.register_claim(claim1)
+        conflict = detector.register_claim(claim2)
+
+        resolver.resolve(conflict, ResolutionStrategy.MANUAL)
+
+        pending = resolver.get_pending_resolutions()
+        assert len(pending) == 1  # ESCALATEDも含む
