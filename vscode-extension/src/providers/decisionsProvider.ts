@@ -63,18 +63,36 @@ export class DecisionsProvider implements vscode.TreeDataProvider<DecisionItem> 
     readonly onDidChangeTreeData: vscode.Event<DecisionItem | undefined | null | void> =
         this._onDidChangeTreeData.event;
 
+    private fixedRunId: string | null = null;
+
     constructor(
         private client: HiveForgeClient,
-        private runId: string
-    ) { }
+        decisionsRunId?: string
+    ) {
+        // 設定で固定Run IDが指定されていれば保持（空文字の場合はnull扱い）
+        this.fixedRunId = decisionsRunId && decisionsRunId.trim() !== '' ? decisionsRunId : null;
+    }
 
     setRunId(runId: string): void {
-        this.runId = runId;
+        // 設定から固定Run IDを更新（空の場合はnull）
+        this.fixedRunId = runId && runId.trim() !== '' ? runId : null;
         this.refresh();
     }
 
     refresh(): void {
         this._onDidChangeTreeData.fire();
+    }
+
+    /**
+     * 使用するRun IDを決定する
+     * 1. 固定Run IDが設定されていればそれを使用
+     * 2. そうでなければ選択中のRunを使用
+     */
+    private getEffectiveRunId(): string | null {
+        if (this.fixedRunId) {
+            return this.fixedRunId;
+        }
+        return this.client.getCurrentRunId() ?? null;
     }
 
     getTreeItem(element: DecisionItem): vscode.TreeItem {
@@ -86,12 +104,13 @@ export class DecisionsProvider implements vscode.TreeDataProvider<DecisionItem> 
             return [];
         }
 
-        if (!this.runId) {
+        const runId = this.getEffectiveRunId();
+        if (!runId) {
             return [];
         }
 
         try {
-            const events = await this.client.getEvents(this.runId);
+            const events = await this.client.getEvents(runId);
             return events
                 .filter(e => e.type === 'decision.recorded')
                 .reverse()
