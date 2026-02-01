@@ -15,7 +15,8 @@
 7. [因果リンク（Lineage）](#7-因果リンクlineage)
 8. [ディレクトリ構造](#8-ディレクトリ構造)
 9. [設定](#9-設定)
-10. [今後の拡張](#10-今後の拡張)
+10. [フェーズゲート条件](#10-フェーズゲート条件)
+11. [今後の拡張](#11-今後の拡張)
 
 ---
 
@@ -603,21 +604,84 @@ logging:
 
 ---
 
-## 10. 今後の拡張
+## 10. フェーズゲート条件
 
-### 10.1 主要な計画
+### 10.1 概要
+
+HiveForge の開発はフェーズに分かれており、各フェーズを完了するためには「ゲート条件」を満たす必要があります。これにより、早期フェーズの成果物が安定していることを確認してから次のフェーズに進むことができます。
+
+### 10.2 フェーズ一覧
+
+| フェーズ | 名称 | 主な成果物 |
+|----------|------|------------|
+| Phase 1 | 基盤構築 | イベントソーシング、AR、状態機械 |
+| Phase 2 | Hive構造 | Hive/Colony階層、Colony状態機械 |
+| Phase 3 | Queen Bee | Colony代表エージェント、Opinion集約 |
+| Phase 4 | Beekeeper | 横断調整、Conferenceモード |
+| Phase 5 | Worker Bee | 実タスク実行、ツール連携 |
+| Phase 6 | 自律運用 | 自動並列実行、障害回復 |
+| Phase 7 | 継続改善 | 回顧・提案・承認サイクル |
+
+### 10.3 ゲート条件詳細
+
+#### Phase 6 ゲート条件（自律運用への移行）
+
+Phase 5 完了後、Phase 6 に進むための必須条件:
+
+| ID | 条件 | 検証方法 |
+|----|------|----------|
+| G6-01 | Colony間衝突検出機能が実装済み | `CONFLICT_DETECTED` イベントが発行可能 |
+| G6-02 | 衝突解決プロトコルが定義済み | `CONFLICT_RESOLVED` イベントとマージルール |
+| G6-03 | 標準失敗理由の分類が完了 | `FailureReason` enum の使用 |
+| G6-04 | タイムアウト検出が実装済み | `OPERATION_TIMEOUT` イベント発行 |
+| G6-05 | Action Classが実装済み | `ActionClass`, `TrustLevel` による分類 |
+| G6-06 | 確認要求マトリクスが定義済み | `requires_confirmation()` 関数 |
+| G6-07 | Conference モードが動作 | `CONFERENCE_STARTED/ENDED` イベント |
+
+#### Phase 7 ゲート条件（継続改善への移行）
+
+Phase 6 完了後、Phase 7 に進むための必須条件:
+
+| ID | 条件 | 検証方法 |
+|----|------|----------|
+| G7-01 | Decision Protocolが実装済み | `PROPOSAL_CREATED`, `DECISION_APPLIED` イベント |
+| G7-02 | 決定の上書き履歴が追跡可能 | `DECISION_SUPERSEDED` イベント |
+| G7-03 | ProjectContractが定義済み | 目標・制約・非目標・決定の構造化共有 |
+| G7-04 | 因果リンクで決定を遡及可能 | `parents` フィールドによるリンク |
+| G7-05 | 全ての失敗がイベント化 | `OPERATION_FAILED` + 理由コード |
+
+### 10.4 現在のステータス（v5.1）
+
+Phase 1.5（フィードバック対応）の完了状況:
+
+| 要件 | ステータス | 実装 |
+|------|----------|------|
+| Decision Protocol イベント | ✅ 完了 | `events.py` |
+| Conference イベント | ✅ 完了 | `events.py` |
+| ProjectContract スキーマ | ✅ 完了 | `models/project_contract.py` |
+| Action Class 定義 | ✅ 完了 | `models/action_class.py` |
+| Conflict Detection イベント | ✅ 完了 | `events.py` |
+| Failure/Timeout イベント | ✅ 完了 | `events.py` |
+
+これにより、Phase 6/7 へのゲート条件を満たすための基盤が整いました。
+
+---
+
+## 11. 今後の拡張
+
+### 11.1 主要な計画
 
 - [ ] LLM Orchestrator: 自律的なタスク分解・実行
 - [ ] Artifact管理: 成果物の保存と参照
 - [ ] 因果リンクの自動設定（[Issue #001](issues/001-lineage-auto-parents.md)）
 - [ ] イベント署名: 改ざん者の特定
 
-### 10.2 VS Code拡張の拡充
+### 11.2 VS Code拡張の拡充
 
 - [ ] 因果グラフ可視化（Webview）
 - [ ] リアルタイムイベントストリーム
 
-### 10.3 スケーラビリティ
+### 11.3 スケーラビリティ
 
 - [ ] エンティティ別チェーン（並列書き込み対応）
 - [ ] イベントアーカイブ
