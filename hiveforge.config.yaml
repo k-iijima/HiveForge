@@ -1,65 +1,124 @@
+# =============================================================================
 # HiveForge 設定ファイル
-# 詳細はドキュメントを参照
+# =============================================================================
+# 
+# このファイルはHiveForgeの動作を制御します。
+# 環境変数で上書き可能: HIVEFORGE_<セクション>__<キー> (例: HIVEFORGE_SERVER__PORT=9000)
+#
+# ドキュメント: docs/ARCHITECTURE.md
 
+# -----------------------------------------------------------------------------
+# Hive基本設定
+# -----------------------------------------------------------------------------
 hive:
-  name: "poc-project"
-  vault_path: "./Vault"
+  name: "poc-project"        # プロジェクト名（Hive識別用）
+  vault_path: "./Vault"      # イベントログ保存ディレクトリ
 
+# -----------------------------------------------------------------------------
+# ガバナンス設定
+# エージェントの動作制限とタイムアウト
+# -----------------------------------------------------------------------------
 governance:
-  max_retries: 3
-  max_oscillations: 5
-  max_concurrent_tasks: 10
-  task_timeout_seconds: 300
-  heartbeat_interval_seconds: 30
-  approval_timeout_hours: 24
-  archive_after_days: 7
+  max_retries: 3                    # タスク失敗時の最大リトライ回数
+  max_oscillations: 5               # 状態振動（ループ）検知しきい値
+  max_concurrent_tasks: 10          # 同時実行可能なタスク数
+  task_timeout_seconds: 300         # タスクタイムアウト（秒）
+  heartbeat_interval_seconds: 30    # ハートビート間隔（秒）
+  approval_timeout_hours: 24        # ユーザー承認待ちタイムアウト（時間）
+  archive_after_days: 7             # 完了Runをアーカイブするまでの日数
 
+# -----------------------------------------------------------------------------
+# LLM設定
+# 使用するLLMプロバイダーとモデル
+# -----------------------------------------------------------------------------
 llm:
-  provider: "openai"
-  model: "gpt-4o"
-  api_key_env: "OPENAI_API_KEY"
-  max_tokens: 4096
-  temperature: 0.2
+  provider: "openai"              # openai | azure | anthropic
+  model: "gpt-4o"                 # 使用モデル名
+  api_key_env: "OPENAI_API_KEY"   # APIキーを格納する環境変数名
+  max_tokens: 4096                # 最大トークン数
+  temperature: 0.2                # 生成温度（0.0-2.0、低いほど決定的）
 
+# -----------------------------------------------------------------------------
+# 認証設定
+# API/MCPアクセス制御
+# -----------------------------------------------------------------------------
 auth:
-  enabled: false
-  api_key_env: "HIVEFORGE_API_KEY"
+  enabled: false                  # 認証を有効にするか
+  api_key_env: "HIVEFORGE_API_KEY"  # APIキーを格納する環境変数名
 
+# -----------------------------------------------------------------------------
+# サーバー設定
+# REST APIサーバー
+# -----------------------------------------------------------------------------
 server:
-  host: "0.0.0.0"
-  port: 8000
+  host: "0.0.0.0"                 # バインドホスト
+  port: 8000                      # リッスンポート
 
+# -----------------------------------------------------------------------------
+# ロギング設定
+# -----------------------------------------------------------------------------
 logging:
-  level: "INFO"
-  events_max_file_size_mb: 100
+  level: "INFO"                   # DEBUG | INFO | WARNING | ERROR
+  events_max_file_size_mb: 100    # イベントログファイル最大サイズ（MB）
 
+# =============================================================================
 # エージェント設定
+# Beekeeper / Queen Bee / Worker Bee の動作制御
+# =============================================================================
 agents:
+  # ---------------------------------------------------------------------------
+  # Beekeeper（養蜂家）
+  # ユーザーとの対話窓口、Colony間の調整役
+  # ---------------------------------------------------------------------------
   beekeeper:
-    enabled: true
-    max_colonies: 10
-    session_timeout_minutes: 60
+    enabled: true                     # Beekeeperを有効にするか
+    max_colonies: 10                  # 管理可能な最大Colony数
+    session_timeout_minutes: 60       # セッションタイムアウト（分）
 
+  # ---------------------------------------------------------------------------
+  # Queen Bee（女王蜂）
+  # Colonyの統括、Worker Beeへのタスク割り当て
+  # ---------------------------------------------------------------------------
   queen_bee:
-    enabled: true
-    max_workers_per_colony: 5
-    task_assignment_strategy: "round_robin"  # round_robin, priority, load_balanced
+    enabled: true                     # Queen Beeを有効にするか
+    max_workers_per_colony: 5         # Colony当たり最大Worker数
+    task_assignment_strategy: "round_robin"  
+    # タスク割り当て戦略:
+    #   round_robin    - 順番に割り当て
+    #   priority       - 優先度ベース
+    #   load_balanced  - 負荷分散
 
+  # ---------------------------------------------------------------------------
+  # Worker Bee（働き蜂）
+  # 実務を担当する専門エージェント
+  # ---------------------------------------------------------------------------
   worker_bee:
-    enabled: true
-    tool_timeout_seconds: 60
-    max_retries: 3
-    trust_level_default: "standard"  # untrusted, limited, standard, elevated, full
+    enabled: true                     # Worker Beeを有効にするか
+    tool_timeout_seconds: 60          # ツール実行タイムアウト（秒）
+    max_retries: 3                    # ツール実行リトライ回数
+    trust_level_default: "standard"
+    # デフォルト信頼レベル:
+    #   untrusted  - 読み取り専用のみ許可
+    #   limited    - 軽微な変更まで許可
+    #   standard   - 通常操作許可（危険操作は確認必要）
+    #   elevated   - 危険操作も自動承認
+    #   full       - 全操作自動承認
 
-# 衝突検出・解決
+# =============================================================================
+# 衝突検出・解決設定
+# 複数Colony間のリソース競合を管理
+# =============================================================================
 conflict:
-  detection_enabled: true
-  auto_resolve_low_severity: true
-  escalation_timeout_minutes: 30
+  detection_enabled: true             # 衝突検出を有効にするか
+  auto_resolve_low_severity: true     # 低深刻度の衝突を自動解決するか
+  escalation_timeout_minutes: 30      # エスカレーションタイムアウト（分）
 
+# =============================================================================
 # Conference設定
+# 複数Colonyが参加する会議機能
+# =============================================================================
 conference:
-  enabled: true
-  max_participants: 10
-  voting_timeout_minutes: 15
-  quorum_percentage: 50
+  enabled: true                       # Conferenceを有効にするか
+  max_participants: 10                # 最大参加Colony数
+  voting_timeout_minutes: 15          # 投票タイムアウト（分）
+  quorum_percentage: 50               # 定足数（%）- 議決に必要な参加率
