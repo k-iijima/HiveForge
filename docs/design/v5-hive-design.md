@@ -1314,7 +1314,237 @@ def parse_event(data: dict[str, Any] | str) -> BaseEvent:
 
 ---
 
-## 11. 決定事項ログ
+## 11. マルチエージェント並列開発運用ガイド
+
+> Phase 1.7以降、複数エージェント（Queen Bee）が並列で開発を進める際の運用原則
+
+並列でエージェント開発を回して破綻しないためには、以下の2つが必須:
+1. **「何を作っていて、何が決まっているか」の単一の真実（Single Source of Truth）**
+2. **衝突を防ぐ調整プロトコル**（API/スキーマ/ストレージ変更の競合を制御）
+
+### 11.1 契約先行原則（Contract-First）
+
+開発を **契約レーン（調整優先）** と **実装レーン（並列可）** の2レーンに分離する。
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    契約レーン（勝手に変えない）                    │
+│  - Project Contract（Goals/Constraints/Decisions/Open questions）│
+│  - API仕様（OpenAPI / エンドポイント一覧）                        │
+│  - EventTypeとpayloadの形（core/events.py）                      │
+│  - ストレージ配置のルール（Vault構造）                            │
+│  - Action Class + Policy Gate ルール                            │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼ 契約に従う
+┌─────────────────────────────────────────────────────────────────┐
+│                    実装レーン（並列OK）                          │
+│  - 各エージェントが契約に従って並列実装                          │
+│  - 契約を雑に変えるのは禁止                                      │
+│  - 変更が必要な場合は ContractLockEvent で調整                   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**運用ルール**: 実装は速くていいが、契約を雑に変えるのは禁止。
+
+#### 契約ロックイベント
+
+```python
+class ContractLockEvent(BaseEvent):
+    """契約ロック - 一定期間の変更禁止を宣言"""
+    type: Literal[EventType.CONTRACT_LOCKED] = EventType.CONTRACT_LOCKED
+    # payload: {
+    #   scope: "events_schema" | "api_spec" | "storage" | "policy",
+    #   holder: "core-queen" | "api-queen" | "beekeeper",
+    #   duration_hours: 2,
+    #   reason: "Phase 1.7-A 実装中のため",
+    # }
+```
+
+### 11.2 合流ゲート設計（Choke Points）
+
+並列で壊れるのは、みんなが同じ重要ファイルをいじるとき。
+以下のファイルは「合流ゲート」として短時間ロックを導入する。
+
+| ゲート | 管理者 | 変更プロセス |
+|--------|-------|------------|
+| `core/events.py` | Core Queen | 提案 → Beekeeper承認 → 適用 |
+| `core/ar/*` | Core Queen | 提案 → Beekeeper承認 → 適用 |
+| `api/models.py` | API Queen | 提案 → Core Queen確認 → 適用 |
+| `api/routes/*` | API Queen | 直接編集可（テスト必須） |
+| VS Code `src/types/*` | UI Queen | 提案 → API Queen確認 → 適用 |
+| `mcp_server/tools.py` | MCP Queen | 直接編集可（テスト必須） |
+
+**短時間ロック運用**:
+```
+例: LOCK: events_schema を Core Queen が2時間保持
+→ 他のエージェントは「提案」はできるが直接編集しない
+→ ロック解除後に提案をレビュー・マージ
+```
+
+### 11.3 縦スライス並列化（Vertical Slice）
+
+#### やりがち（層別分担）→ 結合時に地獄
+
+```
+フロント担当 ──→ バック担当 ──→ インフラ担当
+     │               │               │
+     └───────────────┴───────────────┘
+              結合時に不整合発覚
+```
+
+#### おすすめ（縦スライス）→ 結合コスト最小
+
+```
+スライスA: Colony作成（API + AR + MCP + 最小TreeView）
+スライスB: Run開始（API + event + projection + UI表示）
+スライスC: 直接介入（event + API + 最小UIコマンド）
+     │               │               │
+     └───────────────┴───────────────┘
+      各スライスが独立動作可能
+```
+
+**1機能 = 最小のエンドツーエンド（縦スライス）** にする。
+
+#### Phase 1.7 スライス定義（例）
+
+| スライス | 内容 | 担当Queen |
+|---------|------|----------|
+| 1.7-A | Hive CRUD: `HiveCreatedEvent` + `/hives` API + TreeView表示 | Core + API + UI |
+| 1.7-B | Colony CRUD: `ColonyCreatedEvent` + `/colonies` API + TreeView | Core + API + UI |
+| 1.7-C | Conference: `ConferenceStartedEvent` + 意見収集 + 決定記録 | Core + MCP |
+| 1.7-D | Direct Intervention: `UserDirectInterventionEvent` + コマンド + UI | Core + UI |
+
+### 11.4 Beekeeper/Queen運用リズム
+
+#### 役割分担
+
+| 役割 | v5エンティティ | 責務 |
+|------|---------------|------|
+| **Beekeeper** | Beekeeper | 全体計画、マージ、衝突解消、決定ログ |
+| **Core Queen** | Queen Bee (Core Colony) | `events.py`, `ar/*`, `state/*`, `policy_gate.py` |
+| **API Queen** | Queen Bee (API Colony) | `routes/`, `models/`, OpenAPI |
+| **UI Queen** | Queen Bee (UI Colony) | VS Code拡張 (`providers/`, `commands/`) |
+| **MCP Queen** | Queen Bee (MCP Colony) | MCPツール (`handlers/`) |
+| **QA Queen** | Queen Bee (QA Colony) | テスト、CI、カバレッジ |
+
+#### 毎日の最小ループ
+
+```
+1. Beekeeperが「今日の契約スナップショット」を発行（DailyContractSnapshotEvent）
+   → 「今日はここ固定、ここは変更可」を明示
+   
+2. 各Queenが「今日やるスライスとリスク」を報告
+   → 競合する場合はこの時点で調整
+   
+3. Workerが実装を進め、PR/差分/テスト/契約影響(Yes/No)を報告
+   → 契約影響Yesの場合はBeekeeper確認待ち
+   
+4. Beekeeperが衝突解決しDecisionを記録
+   → 翌日の契約スナップショットに反映
+```
+
+#### 日次契約スナップショット
+
+```python
+class DailyContractSnapshotEvent(BaseEvent):
+    """日次契約スナップショット"""
+    type: Literal[EventType.DAILY_SNAPSHOT] = EventType.DAILY_SNAPSHOT
+    # payload: {
+    #   snapshot_date: "2026-02-01",
+    #   frozen_schemas: ["events", "api"],      # 今日は変更禁止
+    #   open_for_change: ["ui_components"],     # 今日は変更可
+    #   todays_slices: ["1.7-A", "1.7-B"],      # 今日作業するスライス
+    #   blocked_by: [],                          # ブロッカーがあれば記載
+    # }
+```
+
+### 11.5 Policy Gateの開発適用
+
+コード変更も「アクション」として扱い、Policy Gateで一括判定する。
+
+| 操作 | Action Class | 理由 |
+|------|-------------|------|
+| `core/events.py` 変更 | IRREVERSIBLE | ログ互換を壊す可能性 |
+| `core/ar/*` 変更 | IRREVERSIBLE | ストレージ構造変更 |
+| `api/models.py` 変更 | REVERSIBLE | Git管理下で戻せる |
+| `api/routes/*` 追加 | REVERSIBLE | 新規追加は安全 |
+| UI追加 | REVERSIBLE | 戻せる |
+| UI既存変更 | REVERSIBLE | 戻せる |
+| クラウド/インフラ変更 | IRREVERSIBLE | 環境破壊リスク |
+| テスト追加 | READ_ONLY | 副作用なし |
+
+**Policy Gate判定フロー**:
+```python
+decision = policy_gate(
+    actor="api-queen",
+    action_class=classify_code_change("api/models.py"),  # REVERSIBLE
+    trust_level=current_trust_level,                      # PROPOSE_CONFIRM
+    scope="colony",
+    scope_id="api-colony",
+    context={"file": "api/models.py", "change_type": "add_field"},
+)
+# → ALLOW / REQUIRE_APPROVAL / DENY
+```
+
+### 11.6 Git worktree運用
+
+#### スライスごとのブランチ + worktree
+
+```bash
+# メインリポジトリ
+cd /workspace/HiveForge
+
+# スライスごとにworktreeを作成（物理的に並列作業可能）
+git worktree add ../hiveforge-1.7-A feature/1.7-A-hive-crud
+git worktree add ../hiveforge-1.7-B feature/1.7-B-colony-crud
+git worktree add ../hiveforge-1.7-C feature/1.7-C-conference
+git worktree add ../hiveforge-1.7-D feature/1.7-D-direct-intervention
+
+# 各Queenは自分のworktreeで作業
+# Core Queen: ../hiveforge-1.7-A/src/hiveforge/core/
+# API Queen:  ../hiveforge-1.7-A/src/hiveforge/api/
+```
+
+#### 運用ルール
+
+1. **`develop` へのマージはBeekeeper（人間）のみ**
+   - Queenは勝手にdevelopに入れない
+   - PR経由でマージ要求
+
+2. **1スライス = 1ブランチ**
+   - `feature/1.7-A-hive-crud`
+   - `feature/1.7-B-colony-crud`
+
+3. **契約変更を含むPRは特別扱い**
+   - `[CONTRACT]` プレフィックスを付ける
+   - 他のQueenに通知
+   - Beekeeperが優先レビュー
+
+4. **マージ順序**
+   - 契約変更を含むPRを先にマージ
+   - 実装PRは契約マージ後にリベース
+
+```
+feature/1.7-A ──PR──→ develop ←──PR── feature/1.7-B
+                 ↑
+            Beekeeperがマージ順序を制御
+```
+
+### 11.7 並列開発チェックリスト
+
+新しいPhaseを開始する前に確認:
+
+- [ ] 縦スライスが定義されている（1機能 = E2E）
+- [ ] 各スライスの担当Queenが決まっている
+- [ ] 契約（events/API/storage）が固定されている
+- [ ] 合流ゲートの管理者が決まっている
+- [ ] Git worktreeが準備されている
+- [ ] DailyContractSnapshotの運用が開始されている
+
+---
+
+## 13. 決定事項ログ
 
 | 日付 | 決定 | 理由 |
 |------|------|------|
@@ -1338,10 +1568,16 @@ def parse_event(data: dict[str, Any] | str) -> BaseEvent:
 | 2026-02-01 | Conflict に category/severity 追加 | 外部フィードバック対応: 優先順位付け |
 | 2026-02-01 | Policy Gate（中央集権的判定）導入 | 外部フィードバック対応: 判定ロジック散在防止 |
 | 2026-02-01 | UnknownEvent 前方互換導入 | 外部フィードバック対応: ログ永続性への対応 |
+| 2026-02-01 | マルチエージェント並列開発運用ガイド策定 | 並列開発時の競合防止・縦スライス並列化 |
+| 2026-02-01 | 契約先行原則（Contract-First）採用 | 契約レーンと実装レーンの分離 |
+| 2026-02-01 | 合流ゲート設計導入 | 重要ファイルへの競合アクセス制御 |
+| 2026-02-01 | 縦スライス並列化採用 | 層別分担ではなくE2E機能単位で並列化 |
+| 2026-02-01 | Beekeeper/Queen運用リズム定義 | 日次契約スナップショットによる調整 |
+| 2026-02-01 | Git worktree運用ガイド策定 | スライスごとの物理的並列作業 |
 
 ---
 
-## 12. 未決定事項
+## 14. 未決定事項
 
 | 項目 | 選択肢 | 決定予定 |
 |------|--------|----------|
@@ -1352,11 +1588,11 @@ def parse_event(data: dict[str, Any] | str) -> BaseEvent:
 
 ---
 
-## 13. Phase 6-7 ゲート条件
+## 15. Phase 6-7 ゲート条件
 
 > ⚠️ フィードバック対応: スコープ爆発リスク軽減のため、Phase 6-7開始にはゲート条件を設定
 
-### 13.1 Phase 6（会議Bot）開始条件
+### 15.1 Phase 6（会議Bot）開始条件
 
 Phase 6を開始する前に、以下が**安定稼働**していること:
 
@@ -1367,7 +1603,7 @@ Phase 6を開始する前に、以下が**安定稼働**していること:
 | 基本メトリクス収集が動作 | イベント数、レイテンシ、エラー率が取得可能 | Core Team |
 | Phase 5（委任システム）完了 | 全テストパス、ドキュメント更新済み | PM |
 
-### 13.2 Phase 7（Requirements Discovery）開始条件
+### 15.2 Phase 7（Requirements Discovery）開始条件
 
 Phase 7を開始する前に、以下が**安定稼働**していること:
 
@@ -1377,7 +1613,7 @@ Phase 7を開始する前に、以下が**安定稼働**していること:
 | Project Contract スキーマが実運用でテスト済み | 実プロジェクトで2週間以上使用 | PM |
 | Discovery Tree データモデルの設計レビュー完了 | 設計ドキュメント承認済み | Architect |
 
-### 13.3 ゲート判定プロセス
+### 15.3 ゲート判定プロセス
 
 ```
 1. 前Phaseの全タスク完了
