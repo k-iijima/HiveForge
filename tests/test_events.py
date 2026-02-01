@@ -16,6 +16,11 @@ from hiveforge.core.events import (
     EventType,
     RunStartedEvent,
     TaskCreatedEvent,
+    WorkerAssignedEvent,
+    WorkerCompletedEvent,
+    WorkerFailedEvent,
+    WorkerProgressEvent,
+    WorkerStartedEvent,
     compute_hash,
     generate_event_id,
     parse_event,
@@ -584,3 +589,117 @@ class TestColonyEvents:
             assert isinstance(event, expected_class), (
                 f"{data['type']} should parse to {expected_class.__name__}"
             )
+
+
+class TestWorkerBeeEvents:
+    """Worker Beeイベントのテスト"""
+
+    def test_worker_assigned_event(self):
+        """WorkerAssignedEventが正しく作成される"""
+        # Arrange & Act
+        event = WorkerAssignedEvent(
+            run_id="run-1",
+            task_id="task-1",
+            worker_id="worker-1",
+            actor="queen",
+            payload={"goal": "Implement feature X"},
+        )
+
+        # Assert
+        assert event.type == EventType.WORKER_ASSIGNED
+        assert event.worker_id == "worker-1"
+        assert event.task_id == "task-1"
+
+    def test_worker_started_event(self):
+        """WorkerStartedEventが正しく作成される"""
+        # Arrange & Act
+        event = WorkerStartedEvent(
+            run_id="run-1",
+            task_id="task-1",
+            worker_id="worker-1",
+            actor="worker-1",
+            payload={},
+        )
+
+        # Assert
+        assert event.type == EventType.WORKER_STARTED
+        assert event.worker_id == "worker-1"
+
+    def test_worker_progress_event(self):
+        """WorkerProgressEventが正しく作成される"""
+        # Arrange & Act
+        event = WorkerProgressEvent(
+            run_id="run-1",
+            task_id="task-1",
+            worker_id="worker-1",
+            actor="worker-1",
+            progress=50,
+            payload={"message": "halfway done"},
+        )
+
+        # Assert
+        assert event.type == EventType.WORKER_PROGRESS
+        assert event.progress == 50
+
+    def test_worker_progress_validates_range(self):
+        """progressは0-100の範囲のみ許容"""
+        # Assert: 範囲外はエラー
+        with pytest.raises(ValueError):
+            WorkerProgressEvent(
+                run_id="run-1",
+                task_id="task-1",
+                worker_id="worker-1",
+                actor="worker-1",
+                progress=101,
+                payload={},
+            )
+
+    def test_worker_completed_event(self):
+        """WorkerCompletedEventが正しく作成される"""
+        # Arrange & Act
+        event = WorkerCompletedEvent(
+            run_id="run-1",
+            task_id="task-1",
+            worker_id="worker-1",
+            actor="worker-1",
+            payload={"result": "Success"},
+        )
+
+        # Assert
+        assert event.type == EventType.WORKER_COMPLETED
+        assert event.worker_id == "worker-1"
+
+    def test_worker_failed_event(self):
+        """WorkerFailedEventが正しく作成される"""
+        # Arrange & Act
+        event = WorkerFailedEvent(
+            run_id="run-1",
+            task_id="task-1",
+            worker_id="worker-1",
+            actor="worker-1",
+            reason="Connection timeout",
+            payload={},
+        )
+
+        # Assert
+        assert event.type == EventType.WORKER_FAILED
+        assert event.reason == "Connection timeout"
+
+    def test_worker_events_serialization(self):
+        """Worker Beeイベントがシリアライズ可能"""
+        # Arrange
+        event = WorkerAssignedEvent(
+            run_id="run-1",
+            task_id="task-1",
+            worker_id="worker-1",
+            actor="queen",
+            payload={},
+        )
+
+        # Act
+        json_str = event.to_json()
+        parsed = parse_event(json_str)
+
+        # Assert
+        assert isinstance(parsed, WorkerAssignedEvent)
+        assert parsed.worker_id == "worker-1"

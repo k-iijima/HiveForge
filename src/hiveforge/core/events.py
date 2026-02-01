@@ -75,6 +75,13 @@ class EventType(str, Enum):
     QUEEN_ESCALATION = "intervention.queen_escalation"  # Queen直訴
     BEEKEEPER_FEEDBACK = "intervention.beekeeper_feedback"  # Beekeeper改善フィードバック
 
+    # Worker Bee イベント（Phase 2追加）
+    WORKER_ASSIGNED = "worker.assigned"  # Worker Beeにタスク割り当て
+    WORKER_STARTED = "worker.started"  # Worker Bee作業開始
+    WORKER_PROGRESS = "worker.progress"  # Worker Bee進捗報告
+    WORKER_COMPLETED = "worker.completed"  # Worker Bee作業完了
+    WORKER_FAILED = "worker.failed"  # Worker Bee作業失敗
+
     # LLM イベント
     LLM_REQUEST = "llm.request"
     LLM_RESPONSE = "llm.response"
@@ -644,6 +651,60 @@ class EmergencyStopEvent(BaseEvent):
     type: Literal[EventType.EMERGENCY_STOP] = EventType.EMERGENCY_STOP
 
 
+# Worker Bee イベント (Phase 2)
+class WorkerAssignedEvent(BaseEvent):
+    """Worker Beeにタスク割り当てイベント
+
+    Queen BeeがWorker Beeにタスクを割り当てた際に発行。
+    worker_idはPayloadに含まれる。
+    """
+
+    type: Literal[EventType.WORKER_ASSIGNED] = EventType.WORKER_ASSIGNED
+    worker_id: str = Field(..., description="割り当て先Worker BeeのID")
+
+
+class WorkerStartedEvent(BaseEvent):
+    """Worker Bee作業開始イベント
+
+    Worker Beeがタスクの作業を開始した際に発行。
+    """
+
+    type: Literal[EventType.WORKER_STARTED] = EventType.WORKER_STARTED
+    worker_id: str = Field(..., description="Worker BeeのID")
+
+
+class WorkerProgressEvent(BaseEvent):
+    """Worker Bee進捗報告イベント
+
+    Worker Beeが作業中の進捗を報告する際に発行。
+    """
+
+    type: Literal[EventType.WORKER_PROGRESS] = EventType.WORKER_PROGRESS
+    worker_id: str = Field(..., description="Worker BeeのID")
+    progress: int = Field(..., ge=0, le=100, description="進捗率 (0-100)")
+
+
+class WorkerCompletedEvent(BaseEvent):
+    """Worker Bee作業完了イベント
+
+    Worker Beeがタスクを正常に完了した際に発行。
+    """
+
+    type: Literal[EventType.WORKER_COMPLETED] = EventType.WORKER_COMPLETED
+    worker_id: str = Field(..., description="Worker BeeのID")
+
+
+class WorkerFailedEvent(BaseEvent):
+    """Worker Bee作業失敗イベント
+
+    Worker Beeがタスクに失敗した際に発行。
+    """
+
+    type: Literal[EventType.WORKER_FAILED] = EventType.WORKER_FAILED
+    worker_id: str = Field(..., description="Worker BeeのID")
+    reason: str = Field(default="", description="失敗理由")
+
+
 # イベントタイプからクラスへのマッピング
 EVENT_TYPE_MAP: dict[EventType, type[BaseEvent]] = {
     # Hive
@@ -691,6 +752,12 @@ EVENT_TYPE_MAP: dict[EventType, type[BaseEvent]] = {
     EventType.ERROR: ErrorEvent,
     EventType.SILENCE_DETECTED: SilenceDetectedEvent,
     EventType.EMERGENCY_STOP: EmergencyStopEvent,
+    # Worker Bee (Phase 2)
+    EventType.WORKER_ASSIGNED: WorkerAssignedEvent,
+    EventType.WORKER_STARTED: WorkerStartedEvent,
+    EventType.WORKER_PROGRESS: WorkerProgressEvent,
+    EventType.WORKER_COMPLETED: WorkerCompletedEvent,
+    EventType.WORKER_FAILED: WorkerFailedEvent,
 }
 
 
