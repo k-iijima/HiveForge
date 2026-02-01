@@ -872,3 +872,241 @@ class TestWorkerProcessManager:
         manager = WorkerProcessManager()
         healthy = await manager.check_health("nonexistent")
         assert healthy is False
+
+
+# Tool Executor テスト
+from hiveforge.worker_bee.tools import (
+    ToolDefinition,
+    ToolCategory,
+    ToolStatus,
+    ToolResult,
+    ToolExecutor,
+    create_builtin_tools,
+)
+import pytest
+
+
+class TestToolDefinition:
+    """ToolDefinitionの基本テスト"""
+
+    def test_create_definition(self):
+        """ツール定義作成"""
+        tool = ToolDefinition(
+            name="test_tool",
+            description="テストツール",
+            category=ToolCategory.SHELL,
+        )
+
+        assert tool.tool_id is not None
+        assert tool.name == "test_tool"
+        assert tool.sandbox is True
+
+    def test_default_timeout(self):
+        """デフォルトタイムアウト"""
+        tool = ToolDefinition(name="test")
+        assert tool.timeout_seconds == 30.0
+
+
+class TestToolResult:
+    """ToolResultの基本テスト"""
+
+    def test_is_success(self):
+        """成功判定"""
+        result = ToolResult(status=ToolStatus.COMPLETED)
+        assert result.is_success()
+
+        result.status = ToolStatus.FAILED
+        assert not result.is_success()
+
+    def test_is_error(self):
+        """エラー判定"""
+        result = ToolResult(status=ToolStatus.FAILED)
+        assert result.is_error()
+
+        result.status = ToolStatus.TIMEOUT
+        assert result.is_error()
+
+
+class TestToolExecutor:
+    """ToolExecutorのテスト"""
+
+    @pytest.mark.asyncio
+    async def test_register_and_execute(self):
+        """ツール登録と実行"""
+        executor = ToolExecutor()
+
+        tool = ToolDefinition(name="greet", category=ToolCategory.CUSTOM)
+        executor.register_tool(tool, lambda name: f"Hello, {name}!")
+
+        result = await executor.execute(tool.tool_id, {"name": "World"})
+
+        assert result.is_success()
+        assert result.output == "Hello, World!"
+
+    @pytest.mark.asyncio
+    async def test_execute_async_handler(self):
+        """非同期ハンドラ実行"""
+        executor = ToolExecutor()
+
+        async def async_handler(x: int) -> int:
+            return x * 2
+
+        tool = ToolDefinition(name="double", category=ToolCategory.CUSTOM)
+        executor.register_tool(tool, async_handler)
+
+        result = await executor.execute(tool.tool_id, {"x": 5})
+
+        assert result.is_success()
+        assert result.output == 10
+
+    @pytest.mark.asyncio
+    async def test_execute_not_found(self):
+        """存在しないツール実行"""
+        executor = ToolExecutor()
+
+        result = await executor.execute("nonexistent", {})
+
+        assert result.status == ToolStatus.FAILED
+        assert "not found" in result.error
+
+    @pytest.mark.asyncio
+    async def test_execute_no_handler(self):
+        """ハンドラなしで実行"""
+        executor = ToolExecutor()
+
+        tool = ToolDefinition(name="no_handler")
+        executor.register_tool(tool)  # ハンドラなし
+
+        result = await executor.execute(tool.tool_id, {})
+
+        assert result.status == ToolStatus.FAILED
+        assert "No handler" in result.error
+
+    @pytest.mark.asyncio
+    async def test_execute_timeout(self):
+        """タイムアウト"""
+        import asyncio
+
+        executor = ToolExecutor()
+
+        async def slow_handler():
+            await asyncio.sleep(10)
+            return "done"
+
+        tool = ToolDefinition(name="slow", timeout_seconds=0.1)
+        executor.register_tool(tool, slow_handler)
+
+        result = await executor.execute(tool.tool_id, {})
+
+        assert result.status == ToolStatus.TIMEOUT
+
+    @pytest.mark.asyncio
+    async def test_execute_error(self):
+        """例外発生"""
+        executor = ToolExecutor()
+
+        def error_handler():
+            raise ValueError("Something went wrong")
+
+        tool = ToolDefinition(name="error")
+        executor.register_tool(tool, error_handler)
+
+        result = await executor.execute(tool.tool_id, {})
+
+        assert result.status == ToolStatus.FAILED
+        assert "Something went wrong" in result.error
+
+    def test_unregister_tool(self):
+        """ツール登録解除"""
+        executor = ToolExecutor()
+
+        tool = ToolDefinition(name="temp")
+        executor.register_tool(tool)
+
+        result = executor.unregister_tool(tool.tool_id)
+        assert result is True
+
+        result2 = executor.unregister_tool(tool.tool_id)
+        assert result2 is False
+
+    def test_list_tools(self):
+        """ツール一覧"""
+        executor = ToolExecutor()
+
+        executor.register_tool(ToolDefinition(name="t1", category=ToolCategory.SHELL))
+        executor.register_tool(ToolDefinition(name="t2", category=ToolCategory.HTTP))
+        executor.register_tool(ToolDefinition(name="t3", category=ToolCategory.SHELL))
+
+        all_tools = executor.list_tools()
+        assert len(all_tools) == 3
+
+        shell_tools = executor.list_tools(category=ToolCategory.SHELL)
+        assert len(shell_tools) == 2
+
+    def test_get_tool_by_name(self):
+        """名前でツール取得"""
+        executor = ToolExecutor()
+
+        tool = ToolDefinition(name="find_me")
+        executor.register_tool(tool)
+
+        found = executor.get_tool_by_name("find_me")
+        assert found is not None
+        assert found.tool_id == tool.tool_id
+
+    @pytest.mark.asyncio
+    async def test_execute_by_name(self):
+        """名前でツール実行"""
+        executor = ToolExecutor()
+
+        tool = ToolDefinition(name="greet")
+        executor.register_tool(tool, lambda: "Hello!")
+
+        result = await executor.execute_by_name("greet", {})
+
+        assert result.is_success()
+        assert result.output == "Hello!"
+
+    @pytest.mark.asyncio
+    async def test_listeners(self):
+        """リスナー"""
+        started = []
+        completed = []
+        executor = ToolExecutor()
+        executor.add_listener(
+            on_started=lambda i: started.append(i),
+            on_completed=lambda r: completed.append(r),
+        )
+
+        tool = ToolDefinition(name="test")
+        executor.register_tool(tool, lambda: "done")
+
+        await executor.execute(tool.tool_id, {})
+
+        assert len(started) == 1
+        assert len(completed) == 1
+
+    @pytest.mark.asyncio
+    async def test_get_stats(self):
+        """統計情報"""
+        executor = ToolExecutor()
+
+        tool = ToolDefinition(name="test")
+        executor.register_tool(tool, lambda: "ok")
+
+        await executor.execute(tool.tool_id, {})
+        await executor.execute(tool.tool_id, {})
+
+        stats = executor.get_stats()
+        assert stats["total_tools"] == 1
+        assert stats["total_executions"] == 2
+        assert stats["completed"] == 2
+
+    def test_create_builtin_tools(self):
+        """組み込みツール作成"""
+        builtins = create_builtin_tools()
+        assert len(builtins) == 2
+
+        names = [t[0].name for t in builtins]
+        assert "echo" in names
+        assert "sleep" in names
