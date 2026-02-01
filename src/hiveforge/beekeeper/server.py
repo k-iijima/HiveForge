@@ -463,11 +463,22 @@ class BeekeeperMCPServer:
         if result.get("status") == "completed":
             tasks_completed = result.get("tasks_completed", 0)
             tasks_total = result.get("tasks_total", 0)
-            return f"タスク完了 ({tasks_completed}/{tasks_total}): {task}"
+            # 各タスクの結果からLLM出力を取得
+            outputs = []
+            for task_result in result.get("results", []):
+                if task_result.get("llm_output"):
+                    outputs.append(task_result["llm_output"])
+            output_text = "\n".join(outputs) if outputs else ""
+            return f"タスク完了 ({tasks_completed}/{tasks_total})\n{output_text}"
         elif result.get("status") == "partial":
             tasks_completed = result.get("tasks_completed", 0)
             tasks_total = result.get("tasks_total", 0)
-            return f"一部タスク完了 ({tasks_completed}/{tasks_total}): {task}"
+            outputs = []
+            for task_result in result.get("results", []):
+                if task_result.get("llm_output"):
+                    outputs.append(task_result["llm_output"])
+            output_text = "\n".join(outputs) if outputs else ""
+            return f"一部タスク完了 ({tasks_completed}/{tasks_total})\n{output_text}"
         else:
             error = result.get("error", "Unknown error")
             return f"タスク失敗: {error}"
