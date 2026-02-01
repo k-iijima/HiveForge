@@ -248,6 +248,11 @@ class RunProjector:
     def _handle_system_heartbeat(self, event: BaseEvent) -> None:
         self.projection.last_heartbeat = event.timestamp
 
+    def _handle_system_emergency_stop(self, event: BaseEvent) -> None:
+        """緊急停止イベントの処理"""
+        self.projection.state = RunState.ABORTED
+        self.projection.completed_at = event.timestamp
+
 
 def build_run_projection(events: list[BaseEvent], run_id: str, goal: str = "") -> RunProjection:
     """イベントリストからRun投影を構築

@@ -1,6 +1,5 @@
 """投影 (Projections) のテスト"""
 
-
 from hiveforge.core.ar.projections import (
     RequirementProjection,
     RequirementState,
@@ -194,6 +193,31 @@ class TestRunProjector:
         # Assert: 状態がABORTEDに
         assert projector.projection.state == RunState.ABORTED
         assert projector.projection.completed_at == abort_event.timestamp
+
+    def test_emergency_stop(self):
+        """緊急停止イベントの適用
+
+        system.emergency_stopイベントが発行されたとき、
+        RunはABORTED状態になることを確認。
+        """
+        # Arrange: 開始済みのRun
+        projector = RunProjector("run-001")
+        projector.apply(RunStartedEvent(run_id="run-001", payload={"goal": "Test"}))
+        assert projector.projection.state == RunState.RUNNING
+
+        # Act: 緊急停止イベント
+        from hiveforge.core.events import EmergencyStopEvent
+
+        stop_event = EmergencyStopEvent(
+            run_id="run-001",
+            actor="api",
+            payload={"reason": "ユーザーによる緊急停止", "scope": "run"},
+        )
+        projector.apply(stop_event)
+
+        # Assert: 状態がABORTEDに、完了時刻が記録される
+        assert projector.projection.state == RunState.ABORTED
+        assert projector.projection.completed_at == stop_event.timestamp
 
     def test_task_progressed(self):
         """タスク進捗イベントの適用"""
