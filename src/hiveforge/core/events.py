@@ -20,6 +20,16 @@ from ulid import ULID
 class EventType(str, Enum):
     """イベント種別"""
 
+    # Hive イベント
+    HIVE_CREATED = "hive.created"
+    HIVE_CLOSED = "hive.closed"
+
+    # Colony イベント
+    COLONY_CREATED = "colony.created"
+    COLONY_STARTED = "colony.started"
+    COLONY_COMPLETED = "colony.completed"
+    COLONY_FAILED = "colony.failed"
+
     # Run イベント
     RUN_STARTED = "run.started"
     RUN_COMPLETED = "run.completed"
@@ -143,6 +153,53 @@ class BaseEvent(BaseModel):
 # --- 具体的なイベントクラス ---
 
 
+# Hive イベント
+class HiveCreatedEvent(BaseEvent):
+    """Hive作成イベント
+
+    Hiveは複数のColonyを管理する最上位のコンテナ。
+    run_idは持たず、payload内のhive_idで識別される。
+    """
+
+    type: Literal[EventType.HIVE_CREATED] = EventType.HIVE_CREATED
+
+
+class HiveClosedEvent(BaseEvent):
+    """Hive終了イベント"""
+
+    type: Literal[EventType.HIVE_CLOSED] = EventType.HIVE_CLOSED
+
+
+# Colony イベント
+class ColonyCreatedEvent(BaseEvent):
+    """Colony作成イベント
+
+    ColonyはHive内のサブプロジェクト単位。
+    複数のRunを束ねて1つの目標に向かう。
+    """
+
+    type: Literal[EventType.COLONY_CREATED] = EventType.COLONY_CREATED
+
+
+class ColonyStartedEvent(BaseEvent):
+    """Colony開始イベント"""
+
+    type: Literal[EventType.COLONY_STARTED] = EventType.COLONY_STARTED
+
+
+class ColonyCompletedEvent(BaseEvent):
+    """Colony完了イベント"""
+
+    type: Literal[EventType.COLONY_COMPLETED] = EventType.COLONY_COMPLETED
+
+
+class ColonyFailedEvent(BaseEvent):
+    """Colony失敗イベント"""
+
+    type: Literal[EventType.COLONY_FAILED] = EventType.COLONY_FAILED
+
+
+# Run イベント
 class RunStartedEvent(BaseEvent):
     """Run開始イベント"""
 
@@ -263,6 +320,15 @@ class EmergencyStopEvent(BaseEvent):
 
 # イベントタイプからクラスへのマッピング
 EVENT_TYPE_MAP: dict[EventType, type[BaseEvent]] = {
+    # Hive
+    EventType.HIVE_CREATED: HiveCreatedEvent,
+    EventType.HIVE_CLOSED: HiveClosedEvent,
+    # Colony
+    EventType.COLONY_CREATED: ColonyCreatedEvent,
+    EventType.COLONY_STARTED: ColonyStartedEvent,
+    EventType.COLONY_COMPLETED: ColonyCompletedEvent,
+    EventType.COLONY_FAILED: ColonyFailedEvent,
+    # Run
     EventType.RUN_STARTED: RunStartedEvent,
     EventType.RUN_COMPLETED: RunCompletedEvent,
     EventType.RUN_FAILED: RunFailedEvent,

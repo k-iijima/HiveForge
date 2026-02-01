@@ -404,3 +404,183 @@ class TestEventType:
         # Assert: Task関連イベントのプレフィックス確認
         assert EventType.TASK_CREATED.value == "task.created"
         assert EventType.TASK_COMPLETED.value == "task.completed"
+
+    def test_hive_events_have_hive_prefix(self):
+        """Hiveイベントはhive.プレフィックスを持つ"""
+        # Assert: Hive関連イベントのプレフィックス確認
+        assert EventType.HIVE_CREATED.value == "hive.created"
+        assert EventType.HIVE_CLOSED.value == "hive.closed"
+
+    def test_colony_events_have_colony_prefix(self):
+        """Colonyイベントはcolony.プレフィックスを持つ"""
+        # Assert: Colony関連イベントのプレフィックス確認
+        assert EventType.COLONY_CREATED.value == "colony.created"
+        assert EventType.COLONY_STARTED.value == "colony.started"
+        assert EventType.COLONY_COMPLETED.value == "colony.completed"
+        assert EventType.COLONY_FAILED.value == "colony.failed"
+
+
+class TestHiveEvents:
+    """Hiveイベントのテスト
+
+    Hiveは複数のColonyを管理する最上位のコンテナ。
+    Hive層のイベントはrun_idを持たず、hive_idで識別される。
+    """
+
+    def test_hive_created_event_can_be_instantiated(self):
+        """HiveCreatedEventが正しくインスタンス化できる"""
+        # Arrange: なし
+
+        # Act: Hive作成イベントを生成
+        from hiveforge.core.events import HiveCreatedEvent
+
+        event = HiveCreatedEvent(
+            actor="beekeeper",
+            payload={"hive_id": "hive-001", "name": "Test Hive"},
+        )
+
+        # Assert: 正しい型と値
+        assert event.type == EventType.HIVE_CREATED
+        assert event.actor == "beekeeper"
+        assert event.payload["hive_id"] == "hive-001"
+        assert event.run_id is None  # Hiveイベントはrun_idを持たない
+
+    def test_hive_closed_event_can_be_instantiated(self):
+        """HiveClosedEventが正しくインスタンス化できる"""
+        # Arrange: なし
+
+        # Act: Hive終了イベントを生成
+        from hiveforge.core.events import HiveClosedEvent
+
+        event = HiveClosedEvent(
+            actor="beekeeper",
+            payload={"hive_id": "hive-001", "reason": "completed"},
+        )
+
+        # Assert: 正しい型と値
+        assert event.type == EventType.HIVE_CLOSED
+        assert event.payload["reason"] == "completed"
+
+    def test_hive_events_are_parseable(self):
+        """Hiveイベントがparse_eventでパース可能"""
+        # Arrange: Hive作成イベントのデータ
+        data = {
+            "type": "hive.created",
+            "actor": "beekeeper",
+            "payload": {"hive_id": "hive-001", "name": "Test Hive"},
+        }
+
+        # Act: パース
+        from hiveforge.core.events import HiveCreatedEvent
+
+        event = parse_event(data)
+
+        # Assert: 正しいクラスにパースされる
+        assert isinstance(event, HiveCreatedEvent)
+        assert event.type == EventType.HIVE_CREATED
+
+
+class TestColonyEvents:
+    """Colonyイベントのテスト
+
+    ColonyはHive内のサブプロジェクト単位。
+    複数のRunを束ねて1つの目標に向かう。
+    """
+
+    def test_colony_created_event_can_be_instantiated(self):
+        """ColonyCreatedEventが正しくインスタンス化できる"""
+        # Arrange: なし
+
+        # Act: Colony作成イベントを生成
+        from hiveforge.core.events import ColonyCreatedEvent
+
+        event = ColonyCreatedEvent(
+            actor="queen_bee",
+            payload={
+                "colony_id": "colony-001",
+                "hive_id": "hive-001",
+                "goal": "Implement feature X",
+            },
+        )
+
+        # Assert: 正しい型と値
+        assert event.type == EventType.COLONY_CREATED
+        assert event.actor == "queen_bee"
+        assert event.payload["colony_id"] == "colony-001"
+        assert event.payload["hive_id"] == "hive-001"
+
+    def test_colony_started_event_can_be_instantiated(self):
+        """ColonyStartedEventが正しくインスタンス化できる"""
+        # Arrange: なし
+
+        # Act: Colony開始イベントを生成
+        from hiveforge.core.events import ColonyStartedEvent
+
+        event = ColonyStartedEvent(
+            actor="queen_bee",
+            payload={"colony_id": "colony-001"},
+        )
+
+        # Assert: 正しい型
+        assert event.type == EventType.COLONY_STARTED
+
+    def test_colony_completed_event_can_be_instantiated(self):
+        """ColonyCompletedEventが正しくインスタンス化できる"""
+        # Arrange: なし
+
+        # Act: Colony完了イベントを生成
+        from hiveforge.core.events import ColonyCompletedEvent
+
+        event = ColonyCompletedEvent(
+            actor="queen_bee",
+            payload={"colony_id": "colony-001", "summary": "All runs completed"},
+        )
+
+        # Assert: 正しい型
+        assert event.type == EventType.COLONY_COMPLETED
+
+    def test_colony_failed_event_can_be_instantiated(self):
+        """ColonyFailedEventが正しくインスタンス化できる"""
+        # Arrange: なし
+
+        # Act: Colony失敗イベントを生成
+        from hiveforge.core.events import ColonyFailedEvent
+
+        event = ColonyFailedEvent(
+            actor="queen_bee",
+            payload={"colony_id": "colony-001", "error": "Critical failure"},
+        )
+
+        # Assert: 正しい型
+        assert event.type == EventType.COLONY_FAILED
+
+    def test_colony_events_are_parseable(self):
+        """Colonyイベントがparse_eventでパース可能"""
+        # Arrange: 各Colonyイベントのデータ
+        colony_events_data = [
+            {"type": "colony.created", "payload": {"colony_id": "c1"}},
+            {"type": "colony.started", "payload": {"colony_id": "c1"}},
+            {"type": "colony.completed", "payload": {"colony_id": "c1"}},
+            {"type": "colony.failed", "payload": {"colony_id": "c1", "error": "err"}},
+        ]
+
+        # Act & Assert: 全てパース可能
+        from hiveforge.core.events import (
+            ColonyCreatedEvent,
+            ColonyStartedEvent,
+            ColonyCompletedEvent,
+            ColonyFailedEvent,
+        )
+
+        expected_classes = [
+            ColonyCreatedEvent,
+            ColonyStartedEvent,
+            ColonyCompletedEvent,
+            ColonyFailedEvent,
+        ]
+
+        for data, expected_class in zip(colony_events_data, expected_classes):
+            event = parse_event(data)
+            assert isinstance(event, expected_class), (
+                f"{data['type']} should parse to {expected_class.__name__}"
+            )
