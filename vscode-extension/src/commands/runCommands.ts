@@ -9,6 +9,7 @@ import { TasksProvider } from '../providers/tasksProvider';
 import { RequirementsProvider } from '../providers/requirementsProvider';
 import { EventsProvider } from '../providers/eventsProvider';
 import { DecisionsProvider } from '../providers/decisionsProvider';
+import { DashboardPanel } from '../views/dashboardPanel';
 
 import { RunItem } from '../providers/runsProvider';
 import { HiveEvent } from '../client';
@@ -31,7 +32,7 @@ export function registerRunCommands(
     refresh: () => void
 ): void {
     context.subscriptions.push(
-        vscode.commands.registerCommand('hiveforge.showDashboard', showDashboard),
+        vscode.commands.registerCommand('hiveforge.showDashboard', () => showDashboard(context, client)),
         vscode.commands.registerCommand('hiveforge.startRun', () => startRun(client, refresh)),
         vscode.commands.registerCommand('hiveforge.viewEvents', (runId: string) => viewEvents(runId, client, providers.events)),
         vscode.commands.registerCommand('hiveforge.refresh', refresh),
@@ -42,8 +43,8 @@ export function registerRunCommands(
     );
 }
 
-async function showDashboard(): Promise<void> {
-    vscode.window.showInformationMessage('HiveForge ダッシュボード (開発中)');
+function showDashboard(context: vscode.ExtensionContext, client: HiveForgeClient): void {
+    DashboardPanel.createOrShow(context.extensionUri, client);
 }
 
 async function startRun(client: HiveForgeClient, refresh: () => void): Promise<void> {
