@@ -1102,3 +1102,270 @@ class TestConflictResolver:
 
         pending = resolver.get_pending_resolutions()
         assert len(pending) == 1  # ESCALATEDも含む
+
+
+# Conference テスト
+from hiveforge.beekeeper.conference import (
+    ConferenceSession,
+    ConferenceStatus,
+    ConferenceAgenda,
+    ConferenceManager,
+    Opinion,
+    Vote,
+    VoteType,
+)
+
+
+class TestConferenceSession:
+    """ConferenceSessionの基本テスト"""
+
+    def test_create_session(self):
+        """セッション作成"""
+        session = ConferenceSession(
+            hive_id="hive-1",
+            topic="APIデザイン",
+            participants=["colony-1", "colony-2"],
+        )
+
+        assert session.session_id is not None
+        assert session.status == ConferenceStatus.PENDING
+
+    def test_is_active(self):
+        """アクティブ状態チェック"""
+        session = ConferenceSession()
+        assert not session.is_active()
+
+        session.status = ConferenceStatus.IN_PROGRESS
+        assert session.is_active()
+
+
+class TestConferenceManager:
+    """ConferenceManagerのテスト"""
+
+    def test_create_and_start_session(self):
+        """セッション作成と開始"""
+        manager = ConferenceManager()
+
+        session = manager.create_session(
+            hive_id="hive-1",
+            topic="設計レビュー",
+            participants=["colony-1", "colony-2", "colony-3"],
+        )
+
+        result = manager.start_session(session.session_id)
+
+        assert result is True
+        assert session.status == ConferenceStatus.IN_PROGRESS
+
+    def test_submit_opinion(self):
+        """意見提出"""
+        manager = ConferenceManager()
+        session = manager.create_session(
+            hive_id="hive-1",
+            topic="テスト",
+            participants=["colony-1", "colony-2"],
+        )
+        manager.start_session(session.session_id)
+
+        opinion = manager.submit_opinion(
+            session.session_id,
+            colony_id="colony-1",
+            content="RESTよりGraphQLを推奨",
+            rationale="柔軟なクエリが可能",
+        )
+
+        assert opinion is not None
+        assert len(session.opinions) == 1
+
+    def test_submit_opinion_not_participant(self):
+        """参加者以外は意見提出不可"""
+        manager = ConferenceManager()
+        session = manager.create_session(
+            hive_id="hive-1",
+            topic="テスト",
+            participants=["colony-1"],
+        )
+        manager.start_session(session.session_id)
+
+        opinion = manager.submit_opinion(
+            session.session_id,
+            colony_id="colony-99",  # 参加者ではない
+            content="意見",
+        )
+
+        assert opinion is None
+
+    def test_voting(self):
+        """投票"""
+        manager = ConferenceManager()
+        session = manager.create_session(
+            hive_id="hive-1",
+            topic="テスト",
+            participants=["colony-1", "colony-2"],
+        )
+        manager.start_session(session.session_id)
+        manager.start_voting(session.session_id)
+
+        vote = manager.cast_vote(
+            session.session_id,
+            colony_id="colony-1",
+            vote_type=VoteType.APPROVE,
+        )
+
+        assert vote is not None
+        assert len(session.votes) == 1
+
+    def test_vote_replaces_previous(self):
+        """再投票で上書き"""
+        manager = ConferenceManager()
+        session = manager.create_session(
+            hive_id="hive-1",
+            topic="テスト",
+            participants=["colony-1"],
+        )
+        manager.start_session(session.session_id)
+        manager.start_voting(session.session_id)
+
+        manager.cast_vote(session.session_id, "colony-1", VoteType.APPROVE)
+        manager.cast_vote(session.session_id, "colony-1", VoteType.REJECT)
+
+        assert len(session.votes) == 1
+        assert session.votes[0].vote_type == VoteType.REJECT
+
+    def test_conclude_session(self):
+        """会議結論"""
+        manager = ConferenceManager()
+        session = manager.create_session(
+            hive_id="hive-1",
+            topic="テスト",
+            participants=["colony-1", "colony-2"],
+        )
+        manager.start_session(session.session_id)
+        manager.start_voting(session.session_id)
+        manager.cast_vote(session.session_id, "colony-1", VoteType.APPROVE)
+        manager.cast_vote(session.session_id, "colony-2", VoteType.APPROVE)
+
+        result = manager.conclude_session(session.session_id)
+
+        assert result is True
+        assert session.status == ConferenceStatus.CONCLUDED
+        assert "Approved" in session.conclusion
+
+    def test_conclude_rejected(self):
+        """否決"""
+        manager = ConferenceManager()
+        session = manager.create_session(
+            hive_id="hive-1",
+            topic="テスト",
+            participants=["colony-1", "colony-2", "colony-3"],
+        )
+        manager.start_session(session.session_id)
+        manager.start_voting(session.session_id)
+        manager.cast_vote(session.session_id, "colony-1", VoteType.REJECT)
+        manager.cast_vote(session.session_id, "colony-2", VoteType.REJECT)
+        manager.cast_vote(session.session_id, "colony-3", VoteType.APPROVE)
+
+        manager.conclude_session(session.session_id)
+
+        assert "Rejected" in session.conclusion
+
+    def test_cancel_session(self):
+        """会議キャンセル"""
+        manager = ConferenceManager()
+        session = manager.create_session(
+            hive_id="hive-1",
+            topic="テスト",
+            participants=["colony-1"],
+        )
+        manager.start_session(session.session_id)
+
+        result = manager.cancel_session(session.session_id, "時間切れ")
+
+        assert result is True
+        assert session.status == ConferenceStatus.CANCELLED
+
+    def test_get_vote_summary(self):
+        """投票サマリ"""
+        manager = ConferenceManager()
+        session = manager.create_session(
+            hive_id="hive-1",
+            topic="テスト",
+            participants=["colony-1", "colony-2", "colony-3"],
+        )
+        manager.start_session(session.session_id)
+        manager.start_voting(session.session_id)
+        manager.cast_vote(session.session_id, "colony-1", VoteType.APPROVE)
+        manager.cast_vote(session.session_id, "colony-2", VoteType.REJECT)
+
+        summary = manager.get_vote_summary(session.session_id)
+
+        assert summary["approve"] == 1
+        assert summary["reject"] == 1
+        assert summary["pending"] == 1
+
+    def test_get_active_sessions(self):
+        """進行中セッション一覧"""
+        manager = ConferenceManager()
+        s1 = manager.create_session(hive_id="hive-1", topic="t1", participants=["c1"])
+        s2 = manager.create_session(hive_id="hive-1", topic="t2", participants=["c2"])
+
+        manager.start_session(s1.session_id)
+
+        active = manager.get_active_sessions()
+        assert len(active) == 1
+
+    def test_listeners(self):
+        """リスナー"""
+        started = []
+        concluded = []
+        manager = ConferenceManager()
+        manager.add_listener(
+            on_started=lambda s: started.append(s),
+            on_concluded=lambda s: concluded.append(s),
+        )
+
+        session = manager.create_session(hive_id="hive-1", topic="t", participants=["c1"])
+        manager.start_session(session.session_id)
+        manager.start_voting(session.session_id)
+        manager.cast_vote(session.session_id, "c1", VoteType.APPROVE)
+        manager.conclude_session(session.session_id)
+
+        assert len(started) == 1
+        assert len(concluded) == 1
+
+    def test_get_stats(self):
+        """統計情報"""
+        manager = ConferenceManager()
+        s1 = manager.create_session(hive_id="hive-1", topic="t1", participants=["c1"])
+        s2 = manager.create_session(hive_id="hive-1", topic="t2", participants=["c2"])
+
+        manager.start_session(s1.session_id)
+        manager.start_voting(s1.session_id)
+        manager.cast_vote(s1.session_id, "c1", VoteType.APPROVE)
+        manager.conclude_session(s1.session_id)
+
+        stats = manager.get_stats()
+        assert stats["total"] == 2
+        assert stats["concluded"] == 1
+
+    def test_consensus_required(self):
+        """全員一致必要"""
+        manager = ConferenceManager()
+        agenda = ConferenceAgenda(
+            title="重要決定",
+            requires_consensus=True,
+        )
+        session = manager.create_session(
+            hive_id="hive-1",
+            topic="テスト",
+            participants=["colony-1", "colony-2"],
+            agenda=agenda,
+        )
+        manager.start_session(session.session_id)
+        manager.start_voting(session.session_id)
+        manager.cast_vote(session.session_id, "colony-1", VoteType.APPROVE)
+        manager.cast_vote(session.session_id, "colony-2", VoteType.REJECT)
+
+        manager.conclude_session(session.session_id)
+
+        assert "No consensus" in session.conclusion
