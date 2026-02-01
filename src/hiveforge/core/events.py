@@ -66,6 +66,10 @@ class EventType(str, Enum):
     CONFLICT_DETECTED = "conflict.detected"  # 衝突検出
     CONFLICT_RESOLVED = "conflict.resolved"  # 衝突解決
 
+    # Operation Failure/Timeout（標準エラー分類、v5.1追加）
+    OPERATION_TIMEOUT = "operation.timeout"  # タイムアウト
+    OPERATION_FAILED = "operation.failed"  # 失敗
+
     # LLM イベント
     LLM_REQUEST = "llm.request"
     LLM_RESPONSE = "llm.response"
@@ -426,6 +430,55 @@ class ConflictResolvedEvent(BaseEvent):
     type: Literal[EventType.CONFLICT_RESOLVED] = EventType.CONFLICT_RESOLVED
 
 
+# FailureReason 列挙型（v5.1追加）
+class FailureReason(str, Enum):
+    """失敗理由の標準分類
+
+    全ての失敗イベントで共通の理由コードを使用する。
+    """
+
+    TIMEOUT = "timeout"  # タイムアウト
+    TOOL_ERROR = "tool_error"  # ツール実行エラー
+    CONTEXT_MISSING = "context_missing"  # 必要なコンテキスト不足
+    PERMISSION_DENIED = "permission_denied"  # 権限不足
+    CONFLICT = "conflict"  # 衝突
+    CANCELLED = "cancelled"  # キャンセル
+    UNKNOWN = "unknown"  # 不明
+
+
+# Operation Failure/Timeout イベント（v5.1追加）
+class OperationTimeoutEvent(BaseEvent):
+    """タイムアウトイベント
+
+    Operation Failure: 操作がタイムアウトした時に発行する。
+
+    payload:
+        operation_id: 操作ID
+        operation_type: 操作種別
+        timeout_seconds: 設定されたタイムアウト時間（秒）
+        waited_seconds: 実際に待機した時間（秒）
+    """
+
+    type: Literal[EventType.OPERATION_TIMEOUT] = EventType.OPERATION_TIMEOUT
+
+
+class OperationFailedEvent(BaseEvent):
+    """操作失敗イベント
+
+    Operation Failure: 操作が失敗した時に発行する。
+    failure_reasonでFailureReasonの値を使用する。
+
+    payload:
+        operation_id: 操作ID
+        operation_type: 操作種別
+        failure_reason: 失敗理由（FailureReason値）
+        error_message: エラーメッセージ
+        （追加フィールドは理由に応じて任意）
+    """
+
+    type: Literal[EventType.OPERATION_FAILED] = EventType.OPERATION_FAILED
+
+
 class HeartbeatEvent(BaseEvent):
     """ハートビートイベント"""
 
@@ -486,6 +539,9 @@ EVENT_TYPE_MAP: dict[EventType, type[BaseEvent]] = {
     # Conflict Detection (v5.1)
     EventType.CONFLICT_DETECTED: ConflictDetectedEvent,
     EventType.CONFLICT_RESOLVED: ConflictResolvedEvent,
+    # Operation Failure/Timeout (v5.1)
+    EventType.OPERATION_TIMEOUT: OperationTimeoutEvent,
+    EventType.OPERATION_FAILED: OperationFailedEvent,
     EventType.HEARTBEAT: HeartbeatEvent,
     EventType.ERROR: ErrorEvent,
     EventType.SILENCE_DETECTED: SilenceDetectedEvent,
