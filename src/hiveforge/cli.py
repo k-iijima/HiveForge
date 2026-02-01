@@ -23,7 +23,7 @@ def main():
     server_parser.add_argument("--reload", action="store_true", help="ホットリロードを有効化")
 
     # mcp コマンド
-    mcp_parser = subparsers.add_parser("mcp", help="MCPサーバーを起動")
+    subparsers.add_parser("mcp", help="MCPサーバーを起動")
 
     # init コマンド
     init_parser = subparsers.add_parser("init", help="プロジェクトを初期化")
@@ -32,6 +32,54 @@ def main():
     # status コマンド
     status_parser = subparsers.add_parser("status", help="Runの状態を表示")
     status_parser.add_argument("--run-id", help="Run ID（省略時は最新のRun）")
+
+    # record-decision コマンド
+    decision_parser = subparsers.add_parser(
+        "record-decision",
+        help="Decisionをイベントとして記録",
+    )
+    decision_parser.add_argument(
+        "--run-id",
+        default="meta-decisions",
+        help="Decisionを格納するRun ID（既定: meta-decisions）",
+    )
+    decision_parser.add_argument(
+        "--key",
+        required=True,
+        help="Decisionのキー（例: D5）",
+    )
+    decision_parser.add_argument(
+        "--title",
+        required=True,
+        help="Decisionのタイトル",
+    )
+    decision_parser.add_argument(
+        "--selected",
+        required=True,
+        help="選択した案（例: A/B/C）",
+    )
+    decision_parser.add_argument(
+        "--rationale",
+        default="",
+        help="理由",
+    )
+    decision_parser.add_argument(
+        "--impact",
+        default="",
+        help="影響範囲や結果",
+    )
+    decision_parser.add_argument(
+        "--option",
+        action="append",
+        default=[],
+        help="選択肢（複数指定可）",
+    )
+    decision_parser.add_argument(
+        "--supersedes",
+        action="append",
+        default=[],
+        help="置き換えるDecisionキー（複数指定可）",
+    )
 
     args = parser.parse_args()
 
@@ -43,6 +91,8 @@ def main():
         run_init(args)
     elif args.command == "status":
         run_status(args)
+    elif args.command == "record-decision":
+        run_record_decision(args)
     else:
         parser.print_help()
         sys.exit(1)
@@ -69,7 +119,6 @@ def run_mcp():
 
 def run_init(args):
     """プロジェクトを初期化"""
-    from pathlib import Path
 
     from .core import get_settings
 
@@ -110,7 +159,7 @@ def run_status(args):
     print(f"目標: {proj.goal}")
     print(f"状態: {proj.state.value}")
     print(f"イベント数: {proj.event_count}")
-    print(f"\nタスク:")
+    print("\nタスク:")
     print(f"  保留中: {len(proj.pending_tasks)}")
     print(f"  進行中: {len(proj.in_progress_tasks)}")
     print(f"  完了: {len(proj.completed_tasks)}")
@@ -120,6 +169,49 @@ def run_status(args):
         print(f"\n⚠ 承認待ちの要件: {len(proj.pending_requirements)}件")
         for req in proj.pending_requirements:
             print(f"  - {req.description}")
+
+
+def run_record_decision(args):
+    """Decisionをイベントとして記録"""
+    from .core import AkashicRecord, get_settings
+    from .core.events import DecisionRecordedEvent, RunStartedEvent
+
+    settings = get_settings()
+    vault_path = settings.get_vault_path()
+    vault_path.mkdir(parents=True, exist_ok=True)
+
+    ar = AkashicRecord(vault_path)
+
+    run_id: str = args.run_id
+    if run_id not in ar.list_runs():
+        ar.append(
+            RunStartedEvent(
+                run_id=run_id,
+                actor="system",
+                payload={"goal": "Meta decisions"},
+            ),
+            run_id,
+        )
+
+    event = DecisionRecordedEvent(
+        run_id=run_id,
+        actor="cli",
+        payload={
+            "key": args.key,
+            "title": args.title,
+            "rationale": args.rationale,
+            "options": args.option,
+            "selected": args.selected,
+            "impact": args.impact,
+            "supersedes": args.supersedes,
+        },
+    )
+    ar.append(event, run_id)
+
+    print("✓ Decisionを記録しました")
+    print(f"  run_id: {run_id}")
+    print(f"  decision_key: {args.key}")
+    print(f"  event_id: {event.id}")
 
 
 if __name__ == "__main__":  # pragma: no cover

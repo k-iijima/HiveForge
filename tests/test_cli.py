@@ -1,11 +1,12 @@
 """CLIモジュールのテスト"""
 
-import pytest
 import sys
-from unittest.mock import patch, MagicMock
 from argparse import Namespace
+from unittest.mock import MagicMock, patch
 
-from hiveforge.cli import main, run_init, run_status, run_server, run_mcp
+import pytest
+
+from hiveforge.cli import main, run_init, run_mcp, run_record_decision, run_server, run_status
 
 
 class TestMainFunction:
@@ -38,16 +39,15 @@ class TestMainFunction:
             sys,
             "argv",
             ["hiveforge", "server", "--host", "127.0.0.1", "--port", "9000", "--reload"],
-        ):
-            with patch("hiveforge.cli.run_server") as mock_run_server:
-                # Act
-                main()
+        ), patch("hiveforge.cli.run_server") as mock_run_server:
+            # Act
+            main()
 
-                # Assert
-                args = mock_run_server.call_args[0][0]
-                assert args.host == "127.0.0.1"
-                assert args.port == 9000
-                assert args.reload is True
+            # Assert
+            args = mock_run_server.call_args[0][0]
+            assert args.host == "127.0.0.1"
+            assert args.port == 9000
+            assert args.reload is True
 
     def test_mcp_command(self):
         """mcpコマンドが正しく処理される"""
@@ -81,6 +81,29 @@ class TestMainFunction:
 
                 # Assert
                 mock_run_status.assert_called_once()
+
+    def test_record_decision_command(self):
+        """record-decisionコマンドが正しく処理される"""
+        # Arrange
+        with patch.object(
+            sys,
+            "argv",
+            [
+                "hiveforge",
+                "record-decision",
+                "--key",
+                "D5",
+                "--title",
+                "自動parents付与の責務境界",
+                "--selected",
+                "A",
+            ],
+        ), patch("hiveforge.cli.run_record_decision") as mock_run_decision:
+            # Act
+            main()
+
+            # Assert
+            mock_run_decision.assert_called_once()
 
 
 class TestRunServer:
@@ -169,12 +192,12 @@ class TestRunStatus:
         """Runがある場合の表示"""
         # Arrange
         from hiveforge.core.ar.projections import (
+            RequirementProjection,
+            RequirementState,
             RunProjection,
             RunState,
             TaskProjection,
             TaskState,
-            RequirementProjection,
-            RequirementState,
         )
 
         args = Namespace(run_id=None)
@@ -284,6 +307,81 @@ class TestRunStatus:
                     captured = capsys.readouterr()
                     assert "specific-run" in captured.out
                     assert "Specific Goal" in captured.out
+
+
+class TestRunRecordDecision:
+    """run_record_decision関数のテスト"""
+
+    def test_run_record_decision_creates_run_if_missing(self, tmp_path, capsys, monkeypatch):
+        """対象Runが存在しない場合、RunStartedを先に追加してからDecisionを追加する"""
+        # Arrange
+        args = Namespace(
+            run_id="meta-decisions",
+            key="D5",
+            title="自動parents付与の責務境界",
+            selected="A",
+            rationale="API/MCPハンドラー層で補完する",
+            impact="デフォルト因果が自動で付く",
+            option=["A", "B", "C"],
+            supersedes=[],
+        )
+        monkeypatch.chdir(tmp_path)
+
+        with patch("hiveforge.core.get_settings") as mock_get_settings:
+            mock_settings = MagicMock()
+            mock_settings.get_vault_path.return_value = tmp_path / "Vault"
+            mock_get_settings.return_value = mock_settings
+
+            with patch("hiveforge.core.AkashicRecord") as mock_ar_class:
+                mock_ar = MagicMock()
+                mock_ar.list_runs.return_value = []
+                mock_ar_class.return_value = mock_ar
+
+                # Act
+                run_record_decision(args)
+
+                # Assert
+                assert mock_ar.append.call_count == 2
+                decision_event = mock_ar.append.call_args_list[1][0][0]
+                assert decision_event.payload["key"] == "D5"
+                assert decision_event.payload["selected"] == "A"
+
+        captured = capsys.readouterr()
+        assert "Decisionを記録しました" in captured.out
+
+    def test_run_record_decision_does_not_create_run_if_exists(self, tmp_path, capsys, monkeypatch):
+        """対象Runが存在する場合、Decisionのみ追加する"""
+        # Arrange
+        args = Namespace(
+            run_id="meta-decisions",
+            key="D5",
+            title="自動parents付与の責務境界",
+            selected="A",
+            rationale="",
+            impact="",
+            option=[],
+            supersedes=[],
+        )
+        monkeypatch.chdir(tmp_path)
+
+        with patch("hiveforge.core.get_settings") as mock_get_settings:
+            mock_settings = MagicMock()
+            mock_settings.get_vault_path.return_value = tmp_path / "Vault"
+            mock_get_settings.return_value = mock_settings
+
+            with patch("hiveforge.core.AkashicRecord") as mock_ar_class:
+                mock_ar = MagicMock()
+                mock_ar.list_runs.return_value = ["meta-decisions"]
+                mock_ar_class.return_value = mock_ar
+
+                # Act
+                run_record_decision(args)
+
+                # Assert
+                assert mock_ar.append.call_count == 1
+
+        captured = capsys.readouterr()
+        assert "Decisionを記録しました" in captured.out
 
 
 class TestMainEntryPoint:
