@@ -110,8 +110,8 @@ export class HiveForgeClient {
         return response.data;
     }
 
-    async getRun(runId: string): Promise<RunStatus> {
-        const response = await this.client.get<RunStatus>(`/runs/${runId}`);
+    async getRun(runId: string): Promise<Run> {
+        const response = await this.client.get<Run>(`/runs/${runId}`);
         return response.data;
     }
 

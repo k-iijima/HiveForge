@@ -5,13 +5,15 @@
  */
 
 import * as vscode from 'vscode';
-import { HiveForgeClient, RunStatus } from '../client';
+import { HiveForgeClient, Run } from '../client';
 
 export class DashboardPanel {
     public static currentPanel: DashboardPanel | undefined;
     private readonly _panel: vscode.WebviewPanel;
     private readonly _extensionUri: vscode.Uri;
     private _disposables: vscode.Disposable[] = [];
+    private _refreshInterval: NodeJS.Timeout | undefined;
+    private static readonly REFRESH_INTERVAL_MS = 3000; // 3秒ごとに更新
 
     private constructor(
         panel: vscode.WebviewPanel,
@@ -22,8 +24,22 @@ export class DashboardPanel {
         this._extensionUri = extensionUri;
 
         this._update();
+        this._startAutoRefresh();
 
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
+
+        // パネルが非表示になったら更新を停止、表示されたら再開
+        this._panel.onDidChangeViewState(
+            e => {
+                if (e.webviewPanel.visible) {
+                    this._startAutoRefresh();
+                } else {
+                    this._stopAutoRefresh();
+                }
+            },
+            null,
+            this._disposables
+        );
     }
 
     public static createOrShow(extensionUri: vscode.Uri, client: HiveForgeClient): void {
@@ -52,12 +68,29 @@ export class DashboardPanel {
 
     public dispose(): void {
         DashboardPanel.currentPanel = undefined;
+        this._stopAutoRefresh();
         this._panel.dispose();
         while (this._disposables.length) {
             const x = this._disposables.pop();
             if (x) {
                 x.dispose();
             }
+        }
+    }
+
+    private _startAutoRefresh(): void {
+        if (this._refreshInterval) {
+            return; // 既に開始済み
+        }
+        this._refreshInterval = setInterval(() => {
+            this._update();
+        }, DashboardPanel.REFRESH_INTERVAL_MS);
+    }
+
+    private _stopAutoRefresh(): void {
+        if (this._refreshInterval) {
+            clearInterval(this._refreshInterval);
+            this._refreshInterval = undefined;
         }
     }
 
@@ -132,20 +165,19 @@ export class DashboardPanel {
 </html>`;
     }
 
-    private _getHtmlForRun(run: RunStatus): string {
+    private _getHtmlForRun(run: Run): string {
         const stateIcon = this._getStateIcon(run.state);
         const stateColor = this._getStateColor(run.state);
 
-        // null安全対策: tasksがundefinedの場合も考慮
-        const tasks = run.tasks || { pending: [], in_progress: [], completed: [], blocked: [] };
-        const pendingTasks = tasks.pending?.length || 0;
-        const inProgressTasks = tasks.in_progress?.length || 0;
-        const completedTasks = tasks.completed?.length || 0;
-        const blockedTasks = tasks.blocked?.length || 0;
-        const totalTasks = pendingTasks + inProgressTasks + completedTasks + blockedTasks;
+        // APIがフラットな数値を返す形式に対応
+        const totalTasks = run.tasks_total || 0;
+        const completedTasks = run.tasks_completed || 0;
+        const inProgressTasks = run.tasks_in_progress || 0;
+        const failedTasks = run.tasks_failed || 0;
+        const pendingTasks = Math.max(0, totalTasks - completedTasks - inProgressTasks - failedTasks);
         const progressPercent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
-        const pendingRequirements = run.pending_requirements?.length || 0;
+        const pendingRequirements = run.pending_requirements_count || 0;
 
         return `<!DOCTYPE html>
 <html lang="ja">
@@ -288,8 +320,8 @@ export class DashboardPanel {
             <div class="stat-label">待機中</div>
         </div>
         <div class="stat-card">
-            <div class="stat-value" style="color: #FF9800">${blockedTasks}</div>
-            <div class="stat-label">ブロック</div>
+            <div class="stat-value" style="color: #f44336">${failedTasks}</div>
+            <div class="stat-label">失敗</div>
         </div>
         <div class="stat-card">
             <div class="stat-value">${run.event_count}</div>
@@ -297,28 +329,11 @@ export class DashboardPanel {
         </div>
     </div>
 
-    ${inProgressTasks > 0 ? `
-    <div class="section-title">進行中のタスク</div>
-    <ul class="task-list">
-        ${tasks.in_progress?.map(t => `
-        <li class="task-item">
-            <span class="task-state">🔄 in_progress</span>
-            ${this._escapeHtml(t.title)}
-        </li>
-        `).join('') || ''}
-    </ul>
-    ` : ''}
-
     ${pendingRequirements > 0 ? `
     <div class="section-title">未解決の確認要請</div>
-    <ul class="task-list">
-        ${run.pending_requirements?.map(r => `
-        <li class="task-item">
-            <span class="task-state">❓ pending</span>
-            ${this._escapeHtml(r.description)}
-        </li>
-        `).join('') || ''}
-    </ul>
+    <p style="color: var(--vscode-descriptionForeground);">
+        確認要請の詳細はサイドバーのRequirementsパネルをご確認ください
+    </p>
     ` : ''}
 </body>
 </html>`;
