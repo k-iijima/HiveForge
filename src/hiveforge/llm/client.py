@@ -70,9 +70,8 @@ class LLMClient:
         self._rate_limiter = rate_limiter
         self._http_client: httpx.AsyncClient | None = None
 
-    @property
-    def rate_limiter(self) -> RateLimiter:
-        """レートリミッターを取得"""
+    async def _get_rate_limiter(self) -> RateLimiter:
+        """レートリミッターを取得（非同期）"""
         if self._rate_limiter is None:
             registry = get_rate_limiter_registry()
             limiter_key = f"{self.config.provider}:{self.config.model}"
@@ -86,7 +85,7 @@ class LLMClient:
                 burst_limit=self.config.rate_limit.burst_limit,
                 retry_after_429=self.config.rate_limit.retry_after_429,
             )
-            self._rate_limiter = registry.get_limiter(limiter_key, rate_config)
+            self._rate_limiter = await registry.get_limiter(limiter_key, rate_config)
         return self._rate_limiter
 
     async def _get_client(self) -> httpx.AsyncClient:
@@ -124,10 +123,13 @@ class LLMClient:
         Returns:
             LLM応答
         """
-        # レート制限を待機
-        await self.rate_limiter.wait()
+        # レートリミッターを取得
+        rate_limiter = await self._get_rate_limiter()
 
-        async with self.rate_limiter.acquire():
+        # レート制限を待機
+        await rate_limiter.wait()
+
+        async with await rate_limiter.acquire():
             if self.config.provider == "openai":
                 return await self._chat_openai(messages, tools, tool_choice)
             elif self.config.provider == "anthropic":
@@ -189,7 +191,8 @@ class LLMClient:
 
         if response.status_code == 429:
             retry_after = float(response.headers.get("Retry-After", 60))
-            await self.rate_limiter.handle_429(retry_after)
+            rate_limiter = await self._get_rate_limiter()
+            await rate_limiter.handle_429(retry_after)
             # リトライ
             return await self._chat_openai(messages, tools, tool_choice)
 
@@ -306,7 +309,8 @@ class LLMClient:
 
         if response.status_code == 429:
             retry_after = float(response.headers.get("Retry-After", 60))
-            await self.rate_limiter.handle_429(retry_after)
+            rate_limiter = await self._get_rate_limiter()
+            await rate_limiter.handle_429(retry_after)
             return await self._chat_anthropic(messages, tools, tool_choice)
 
         response.raise_for_status()

@@ -186,28 +186,28 @@ def run_status(args):
 def run_task(args):
     """タスクをLLMで実行（ワンパス）"""
     import asyncio
-    
+
     async def _run():
         from .llm.client import LLMClient
         from .llm.runner import AgentRunner
         from .llm.tools import get_basic_tools
-        
+
         print(f"🐝 {args.agent} がタスクを実行します...")
         print(f"📝 タスク: {args.task}")
         print("-" * 50)
-        
+
         # クライアント初期化
         client = LLMClient()
         runner = AgentRunner(client, agent_type=args.agent)
-        
+
         # 基本ツールを登録
         for tool in get_basic_tools():
             runner.register_tool(tool)
-        
+
         try:
             # 実行
             result = await runner.run(args.task)
-            
+
             print("-" * 50)
             if result.success:
                 print(f"✅ 完了（ツール呼び出し: {result.tool_calls_made}回）")
@@ -216,7 +216,7 @@ def run_task(args):
                 print(f"❌ エラー: {result.error}")
         finally:
             await client.close()
-    
+
     asyncio.run(_run())
 
 
