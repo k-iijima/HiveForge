@@ -1366,3 +1366,195 @@ class TestHelpers:
         policy = create_no_retry_policy()
         assert policy.strategy == RetryStrategy.NONE
         assert policy.max_retries == 0
+
+
+# ActionClass・TrustLevel テスト
+from hiveforge.worker_bee.trust import (
+    ActionClass,
+    TrustLevel,
+    ConfirmationResult,
+    ConfirmationRequest,
+    ConfirmationResponse,
+    TrustManager,
+    requires_confirmation,
+    get_max_action_class,
+    create_default_tool_classes,
+)
+
+
+class TestActionClass:
+    """ActionClassのテスト"""
+
+    def test_ordering(self):
+        """危険度順序"""
+        assert ActionClass.SAFE < ActionClass.CAREFUL
+        assert ActionClass.CAREFUL < ActionClass.DANGEROUS
+        assert ActionClass.DANGEROUS < ActionClass.CRITICAL
+
+    def test_comparison(self):
+        """比較演算"""
+        assert ActionClass.SAFE <= ActionClass.SAFE
+        assert ActionClass.SAFE <= ActionClass.CAREFUL
+        assert ActionClass.DANGEROUS >= ActionClass.CAREFUL
+        assert not ActionClass.SAFE > ActionClass.CAREFUL
+
+
+class TestTrustLevel:
+    """TrustLevelのテスト"""
+
+    def test_ordering(self):
+        """信頼度順序"""
+        assert TrustLevel.UNTRUSTED < TrustLevel.LIMITED
+        assert TrustLevel.LIMITED < TrustLevel.STANDARD
+        assert TrustLevel.STANDARD < TrustLevel.ELEVATED
+        assert TrustLevel.ELEVATED < TrustLevel.FULL
+
+
+class TestRequiresConfirmation:
+    """requires_confirmationのテスト"""
+
+    def test_untrusted_safe(self):
+        """UNTRUSTED + SAFE = 承認不要"""
+        assert not requires_confirmation(TrustLevel.UNTRUSTED, ActionClass.SAFE)
+
+    def test_untrusted_careful(self):
+        """UNTRUSTED + CAREFUL = 承認必要"""
+        assert requires_confirmation(TrustLevel.UNTRUSTED, ActionClass.CAREFUL)
+
+    def test_limited_careful(self):
+        """LIMITED + CAREFUL = 承認不要"""
+        assert not requires_confirmation(TrustLevel.LIMITED, ActionClass.CAREFUL)
+
+    def test_standard_dangerous(self):
+        """STANDARD + DANGEROUS = 承認必要"""
+        assert requires_confirmation(TrustLevel.STANDARD, ActionClass.DANGEROUS)
+
+    def test_elevated_dangerous(self):
+        """ELEVATED + DANGEROUS = 承認不要"""
+        assert not requires_confirmation(TrustLevel.ELEVATED, ActionClass.DANGEROUS)
+
+    def test_elevated_critical(self):
+        """ELEVATED + CRITICAL = 承認必要"""
+        assert requires_confirmation(TrustLevel.ELEVATED, ActionClass.CRITICAL)
+
+    def test_full_critical(self):
+        """FULL + CRITICAL = 承認不要"""
+        assert not requires_confirmation(TrustLevel.FULL, ActionClass.CRITICAL)
+
+
+class TestGetMaxActionClass:
+    """get_max_action_classのテスト"""
+
+    def test_untrusted_auto(self):
+        """UNTRUSTED 自動承認はSAFEまで"""
+        assert get_max_action_class(TrustLevel.UNTRUSTED, auto_approve_only=True) == ActionClass.SAFE
+
+    def test_limited_auto(self):
+        """LIMITED 自動承認はCAREFULまで"""
+        assert get_max_action_class(TrustLevel.LIMITED, auto_approve_only=True) == ActionClass.CAREFUL
+
+    def test_elevated_auto(self):
+        """ELEVATED 自動承認はDANGEROUSまで"""
+        assert get_max_action_class(TrustLevel.ELEVATED, auto_approve_only=True) == ActionClass.DANGEROUS
+
+    def test_full_auto(self):
+        """FULL 自動承認は全て"""
+        assert get_max_action_class(TrustLevel.FULL, auto_approve_only=True) == ActionClass.CRITICAL
+
+
+class TestTrustManager:
+    """TrustManagerのテスト"""
+
+    def test_set_get_agent_trust(self):
+        """エージェント信頼レベル設定・取得"""
+        manager = TrustManager()
+        manager.set_agent_trust("agent-1", TrustLevel.STANDARD)
+        assert manager.get_agent_trust("agent-1") == TrustLevel.STANDARD
+
+    def test_default_trust(self):
+        """デフォルトはUNTRUSTED"""
+        manager = TrustManager()
+        assert manager.get_agent_trust("unknown") == TrustLevel.UNTRUSTED
+
+    def test_set_get_tool_class(self):
+        """ツール危険度設定・取得"""
+        manager = TrustManager()
+        manager.set_tool_class("my_tool", ActionClass.DANGEROUS)
+        assert manager.get_tool_class("my_tool") == ActionClass.DANGEROUS
+
+    def test_default_tool_class(self):
+        """デフォルトはDANGEROUS"""
+        manager = TrustManager()
+        assert manager.get_tool_class("unknown") == ActionClass.DANGEROUS
+
+    def test_check_permission_allowed(self):
+        """許可チェック - 許可"""
+        manager = TrustManager()
+        manager.set_agent_trust("agent-1", TrustLevel.STANDARD)
+        manager.set_tool_class("read_file", ActionClass.SAFE)
+
+        allowed, needs_confirm = manager.check_permission("agent-1", "read_file")
+        assert allowed
+        assert not needs_confirm
+
+    def test_check_permission_needs_confirm(self):
+        """許可チェック - 承認必要"""
+        manager = TrustManager()
+        manager.set_agent_trust("agent-1", TrustLevel.STANDARD)
+        manager.set_tool_class("delete_file", ActionClass.DANGEROUS)
+
+        allowed, needs_confirm = manager.check_permission("agent-1", "delete_file")
+        assert allowed
+        assert needs_confirm
+
+    def test_check_permission_denied(self):
+        """許可チェック - 拒否"""
+        manager = TrustManager()
+        manager.set_agent_trust("agent-1", TrustLevel.UNTRUSTED)
+        manager.set_tool_class("delete_file", ActionClass.DANGEROUS)
+
+        # UNTRUSTED は DANGEROUS を実行できない（承認があっても）
+        # ただし現在の実装では STANDARD 以上なら全て可能
+        # UNTRUSTED は SAFE のみ許可
+        allowed, needs_confirm = manager.check_permission("agent-1", "delete_file")
+        assert not allowed
+
+    def test_request_confirmation_no_handler(self):
+        """承認リクエスト - ハンドラなし"""
+        manager = TrustManager()
+        response = manager.request_confirmation("agent-1", "tool", "description")
+        assert response.result == ConfirmationResult.DENIED
+        assert "No confirmation handler" in response.reason
+
+    def test_request_confirmation_with_handler(self):
+        """承認リクエスト - ハンドラあり"""
+        manager = TrustManager()
+        
+        def approve_all(req: ConfirmationRequest) -> ConfirmationResponse:
+            return ConfirmationResponse(result=ConfirmationResult.APPROVED)
+        
+        manager.set_confirmation_handler(approve_all)
+        response = manager.request_confirmation("agent-1", "tool", "description")
+        assert response.result == ConfirmationResult.APPROVED
+
+
+class TestDefaultToolClasses:
+    """デフォルトツール分類テスト"""
+
+    def test_safe_tools(self):
+        """SAFEツール"""
+        classes = create_default_tool_classes()
+        assert classes["read_file"] == ActionClass.SAFE
+        assert classes["list_dir"] == ActionClass.SAFE
+
+    def test_dangerous_tools(self):
+        """DANGEROUSツール"""
+        classes = create_default_tool_classes()
+        assert classes["delete_file"] == ActionClass.DANGEROUS
+        assert classes["execute_command"] == ActionClass.DANGEROUS
+
+    def test_critical_tools(self):
+        """CRITICALツール"""
+        classes = create_default_tool_classes()
+        assert classes["rm_rf"] == ActionClass.CRITICAL
+        assert classes["sudo"] == ActionClass.CRITICAL
