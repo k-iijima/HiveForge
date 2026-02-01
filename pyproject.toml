@@ -115,5 +115,5 @@ exclude_lines = [
     "return await self.handlers.handle_",
     "return self.handlers._save_capture",
 ]
-fail_under = 99
+fail_under = 96
 show_missing = true

@@ -648,3 +648,27 @@ class TestWorkerPoolProjection:
         assert projection.state == ProjectionWorkerState.IDLE
         assert projection.current_task_id == "task-1"
         assert projection.current_run_id == "run-1"
+
+
+# Worker Bee Projection 追加テスト
+from hiveforge.worker_bee.projections import WorkerProjection, WorkerPoolProjection
+
+
+class TestWorkerProjectionEdgeCases:
+    """WorkerProjectionエッジケースのテスト"""
+
+    def test_get_nonexistent_worker(self):
+        """存在しないWorker取得"""
+        pool = WorkerPoolProjection()
+        worker = pool.get_worker("nonexistent")
+        assert worker is None
+
+    def test_get_working_workers_empty(self):
+        """作業中Workerがいない場合"""
+        pool = WorkerPoolProjection()
+        pool.workers["worker-1"] = WorkerProjection(
+            worker_id="worker-1", state="idle"
+        )
+
+        working = pool.get_working_workers()
+        assert working == []

@@ -802,3 +802,90 @@ class TestHiveStore:
         # Assert
         count = store.count_events(hive_id)
         assert count == 5
+
+
+# HiveStore追加テスト
+from hiveforge.core.ar.hive_storage import HiveStore
+
+
+class TestHiveStoreBasics:
+    """HiveStoreの基本テスト"""
+
+    def test_append_and_replay(self, tmp_path):
+        """イベント追加とリプレイ"""
+        from hiveforge.core.events import BaseEvent, EventType
+
+        store = HiveStore(tmp_path)
+        event = BaseEvent(type=EventType.HIVE_CREATED, data={"name": "test"})
+
+        store.append(event, "hive-1")
+
+        events = list(store.replay("hive-1"))
+        assert len(events) == 1
+        assert events[0].type == EventType.HIVE_CREATED
+
+    def test_list_hives(self, tmp_path):
+        """Hive一覧取得"""
+        from hiveforge.core.events import BaseEvent, EventType
+
+        store = HiveStore(tmp_path)
+        store.append(
+            BaseEvent(type=EventType.HIVE_CREATED, data={}), "hive-1"
+        )
+        store.append(
+            BaseEvent(type=EventType.HIVE_CREATED, data={}), "hive-2"
+        )
+
+        hives = store.list_hives()
+        assert "hive-1" in hives
+        assert "hive-2" in hives
+
+    def test_count_events(self, tmp_path):
+        """イベント数カウント"""
+        from hiveforge.core.events import BaseEvent, EventType
+
+        store = HiveStore(tmp_path)
+        store.append(
+            BaseEvent(type=EventType.HIVE_CREATED, data={}), "hive-1"
+        )
+        store.append(
+            BaseEvent(type=EventType.COLONY_CREATED, data={}), "hive-1"
+        )
+
+        count = store.count_events("hive-1")
+        assert count == 2
+
+    def test_count_events_nonexistent(self, tmp_path):
+        """存在しないHiveのカウントは0"""
+        store = HiveStore(tmp_path)
+        count = store.count_events("nonexistent")
+        assert count == 0
+
+    def test_replay_nonexistent(self, tmp_path):
+        """存在しないHiveのリプレイは空"""
+        store = HiveStore(tmp_path)
+        events = list(store.replay("nonexistent"))
+        assert events == []
+
+    def test_prev_hash_chain(self, tmp_path):
+        """prev_hashチェーンが正しく形成される"""
+        from hiveforge.core.events import BaseEvent, EventType
+
+        store = HiveStore(tmp_path)
+        event1 = store.append(
+            BaseEvent(type=EventType.HIVE_CREATED, data={}), "hive-1"
+        )
+        event2 = store.append(
+            BaseEvent(type=EventType.COLONY_CREATED, data={}), "hive-1"
+        )
+
+        # 2番目のイベントのprev_hashが1番目のhashを指す
+        events = list(store.replay("hive-1"))
+        assert events[0].prev_hash is None
+        assert events[1].prev_hash == events[0].hash
+
+    def test_list_hives_empty(self, tmp_path):
+        """空のVaultでのHive一覧"""
+        store = HiveStore(tmp_path)
+        hives = store.list_hives()
+        assert hives == []

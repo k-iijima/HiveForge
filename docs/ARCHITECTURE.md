@@ -740,18 +740,17 @@ Phase 6 完了後、Phase 7 に進むための必須条件:
 
 ### 12.4 現在のステータス（v5.1）
 
-Phase 1.5（フィードバック対応）の完了状況:
+Phase 2（Worker Bee）の完了状況:
 
 | 要件 | ステータス | 実装 |
 |------|----------|------|
-| Decision Protocol イベント | ✅ 完了 | `events.py` |
-| Conference イベント | ✅ 完了 | `events.py` |
-| ProjectContract スキーマ | ✅ 完了 | `models/project_contract.py` |
-| Action Class 定義 | ✅ 完了 | `models/action_class.py` |
-| Conflict Detection イベント | ✅ 完了 | `events.py` |
-| Failure/Timeout イベント | ✅ 完了 | `events.py` |
+| Worker Bee基盤 | ✅ 完了 | `worker_bee/server.py`, `projections.py` |
+| Queen Bee連携 | ✅ 完了 | `queen_bee/__init__.py`, `progress.py`, `retry.py` |
+| Colony優先度スケジューラ | ✅ 完了 | `queen_bee/scheduler.py` |
+| Colony間通信 | ✅ 完了 | `queen_bee/communication.py` |
+| デッドロック検出 | ✅ 完了 | `queen_bee/communication.py` |
 
-これにより、Phase 6/7 へのゲート条件を満たすための基盤が整いました。
+テスト: 931件、カバレッジ: 96%
 
 ---
 
@@ -759,6 +758,9 @@ Phase 1.5（フィードバック対応）の完了状況:
 
 ### 12.1 主要な計画
 
+- [x] Worker Bee: MCPサブプロセスベースのWorker
+- [x] Queen Bee連携: タスク割り当て、進捗集約、リトライ
+- [x] Colony優先度: 静的設定ベースのリソース配分
 - [ ] LLM Orchestrator: 自律的なタスク分解・実行
 - [ ] Artifact管理: 成果物の保存と参照
 - [ ] 因果リンクの自動設定（[Issue #001](issues/001-lineage-auto-parents.md)）

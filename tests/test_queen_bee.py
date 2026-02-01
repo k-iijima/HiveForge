@@ -1040,3 +1040,185 @@ class TestDeadlockDetection:
         result = conflict.is_deadlock(["colony-1", "colony-2"])
 
         assert result is True
+
+
+# 追加テスト: カバレッジ改善
+class TestMessengerEdgeCases:
+    """Messengerエッジケースのテスト"""
+
+    def test_receive_from_unregistered(self):
+        """未登録Colonyからの受信はNone"""
+        messenger = ColonyMessenger()
+        result = messenger.receive("nonexistent")
+        assert result is None
+
+    def test_peek_from_unregistered(self):
+        """未登録Colonyのpeekはnone"""
+        messenger = ColonyMessenger()
+        result = messenger.peek("nonexistent")
+        assert result is None
+
+    def test_pending_count_unregistered(self):
+        """未登録Colonyのpending_countは0"""
+        messenger = ColonyMessenger()
+        result = messenger.pending_count("nonexistent")
+        assert result == 0
+
+    def test_unregister_colony(self):
+        """Colony登録解除"""
+        messenger = ColonyMessenger()
+        messenger.register_colony("colony-1")
+        messenger.unregister_colony("colony-1")
+        assert messenger.pending_count("colony-1") == 0
+
+    def test_send_to_unregistered(self):
+        """未登録先へのsendは配信しない"""
+        messenger = ColonyMessenger()
+        messenger.register_colony("sender")
+        message_id = messenger.send(
+            from_colony="sender",
+            to_colony="nonexistent",
+            message_type=MessageType.NOTIFICATION,
+            payload={},
+        )
+        assert message_id is not None  # IDは発行される
+
+    def test_peek(self):
+        """peekでメッセージを確認（取り出さない）"""
+        messenger = ColonyMessenger()
+        messenger.register_colony("sender")
+        messenger.register_colony("receiver")
+        messenger.send(
+            from_colony="sender",
+            to_colony="receiver",
+            message_type=MessageType.NOTIFICATION,
+            payload={"data": "test"},
+        )
+
+        msg = messenger.peek("receiver")
+        assert msg is not None
+        assert messenger.pending_count("receiver") == 1  # 取り出していない
+
+
+class TestResourceConflictEdgeCases:
+    """ResourceConflictエッジケースのテスト"""
+
+    def test_release_not_held(self):
+        """保持していないリソースの解放"""
+        conflict = ResourceConflict()
+        result = conflict.release("file-1", "colony-1")
+        assert result is None
+
+    def test_release_by_wrong_holder(self):
+        """別Colonyが保持しているリソースの解放は無効"""
+        conflict = ResourceConflict()
+        conflict.try_acquire("file-1", "colony-1")
+        result = conflict.release("file-1", "colony-2")
+        assert result is None
+        assert conflict.get_holder("file-1") == "colony-1"
+
+    def test_wait_for_duplicate(self):
+        """重複waitは無視"""
+        conflict = ResourceConflict()
+        conflict.try_acquire("file-1", "colony-1")
+        conflict.wait_for("file-1", "colony-2")
+        conflict.wait_for("file-1", "colony-2")  # 重複
+
+        waiting = conflict.get_waiting("file-1")
+        assert waiting.count("colony-2") == 1
+
+    def test_get_waiting_empty(self):
+        """待機がないリソース"""
+        conflict = ResourceConflict()
+        waiting = conflict.get_waiting("nonexistent")
+        assert waiting == []
+
+    def test_acquire_same_holder(self):
+        """同じColonyが再取得（既に保持）"""
+        conflict = ResourceConflict()
+        conflict.try_acquire("file-1", "colony-1")
+        result = conflict.try_acquire("file-1", "colony-1")
+        assert result is True  # 再取得OK
+
+    def test_release_clears_wait_queue(self):
+        """待機キューが空になった後"""
+        conflict = ResourceConflict()
+        conflict.try_acquire("file-1", "colony-1")
+        conflict.wait_for("file-1", "colony-2")
+        conflict.release("file-1", "colony-1")  # colony-2に移譲
+        conflict.release("file-1", "colony-2")  # 完全解放
+
+        assert conflict.get_holder("file-1") is None
+
+
+class TestSchedulerEdgeCases:
+    """Schedulerエッジケースのテスト"""
+
+    def test_enable_nonexistent(self):
+        """存在しないColonyのenable"""
+        scheduler = ColonyScheduler()
+        result = scheduler.enable_colony("nonexistent")
+        assert result is False
+
+    def test_disable_nonexistent(self):
+        """存在しないColonyのdisable"""
+        scheduler = ColonyScheduler()
+        result = scheduler.disable_colony("nonexistent")
+        assert result is False
+
+    def test_unregister_nonexistent(self):
+        """存在しないColonyのunregister"""
+        scheduler = ColonyScheduler()
+        # エラーにならない
+        scheduler.unregister_colony("nonexistent")
+
+    def test_allocate_disabled_colony(self):
+        """無効化されたColonyには配分しない"""
+        scheduler = ColonyScheduler(total_workers=10)
+        scheduler.register_colony("colony-1")
+        scheduler.disable_colony("colony-1")
+
+        allocations = scheduler.allocate_workers()
+        assert len(allocations) == 0
+
+    def test_execution_order_disabled(self):
+        """無効Colonyは実行順序に含まれない"""
+        scheduler = ColonyScheduler()
+        scheduler.register_colony("colony-1")
+        scheduler.register_colony("colony-2")
+        scheduler.disable_colony("colony-2")
+
+        order = scheduler.get_execution_order()
+        assert "colony-2" not in order
+
+
+# ProgressCollector追加テスト
+class TestProgressCollectorEdgeCases:
+    """ProgressCollectorエッジケースのテスト"""
+
+    def test_get_failed_tasks_empty(self):
+        """失敗タスクがない場合"""
+        from hiveforge.queen_bee.progress import ProgressCollector, TaskProgress
+
+        collector = ProgressCollector()
+        collector._task_progress["task-1"] = TaskProgress(
+            task_id="task-1", worker_id="worker-1", status="completed", progress=100
+        )
+
+        failed = collector.get_failed_tasks()
+        assert failed == []
+
+    def test_overall_progress_with_completed(self):
+        """完了タスクを含む進捗計算"""
+        from hiveforge.queen_bee.progress import ProgressCollector, TaskProgress
+
+        collector = ProgressCollector()
+        collector._task_progress["task-1"] = TaskProgress(
+            task_id="task-1", worker_id="worker-1", status="completed", progress=100
+        )
+        collector._task_progress["task-2"] = TaskProgress(
+            task_id="task-2", worker_id="worker-2", status="in_progress", progress=50
+        )
+
+        overall = collector.get_overall_progress()
+        assert overall == 75  # (100 + 50) / 2
