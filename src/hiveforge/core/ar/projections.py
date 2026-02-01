@@ -54,6 +54,22 @@ class HiveState(str, Enum):
     CLOSED = "closed"
 
 
+class ColonyState(str, Enum):
+    """Colony状態
+
+    ColonyはHive内のサブプロジェクト単位。
+    - PENDING: 開始待ち
+    - IN_PROGRESS: 実行中
+    - COMPLETED: 完了
+    - FAILED: 失敗
+    """
+
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
 @dataclass
 class TaskProjection:
     """タスクの現在状態"""

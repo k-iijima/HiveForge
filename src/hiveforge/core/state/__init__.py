@@ -1,6 +1,7 @@
 """状態機械モジュール"""
 
 from .machines import (
+    ColonyStateMachine,
     GovernanceError,
     HiveStateMachine,
     OscillationDetector,
@@ -15,6 +16,7 @@ __all__ = [
     "TaskStateMachine",
     "RequirementStateMachine",
     "HiveStateMachine",
+    "ColonyStateMachine",
     "OscillationDetector",
     "TransitionError",
     "GovernanceError",

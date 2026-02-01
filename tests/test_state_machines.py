@@ -371,3 +371,131 @@ class TestHiveStateMachine:
         # Assert: colony.completed と hive.closed が有効
         assert EventType.COLONY_COMPLETED in valid_events
         assert EventType.HIVE_CLOSED in valid_events
+
+
+class TestColonyStateMachine:
+    """ColonyStateMachineのテスト
+
+    ColonyはHive内のサブプロジェクト単位。
+    状態: PENDING -> IN_PROGRESS -> COMPLETED/FAILED
+    """
+
+    def test_initial_state_is_pending(self):
+        """初期状態はPENDING
+
+        Colony作成直後は開始待ちのPENDING状態。
+        """
+        # Arrange: なし
+
+        # Act: Colony状態機械を作成
+        from hiveforge.core.state import ColonyStateMachine
+        from hiveforge.core.ar.projections import ColonyState
+
+        sm = ColonyStateMachine()
+
+        # Assert: 初期状態はPENDING
+        assert sm.current_state == ColonyState.PENDING
+
+    def test_transition_pending_to_in_progress(self):
+        """PENDING -> IN_PROGRESS遷移
+
+        Colony開始時にIN_PROGRESS状態に遷移。
+        """
+        # Arrange: PENDING状態のColony
+        from hiveforge.core.state import ColonyStateMachine
+        from hiveforge.core.ar.projections import ColonyState
+        from hiveforge.core.events import ColonyStartedEvent
+
+        sm = ColonyStateMachine()
+
+        # Act: Colony開始イベントを適用
+        event = ColonyStartedEvent(payload={"colony_id": "colony-001"})
+        new_state = sm.transition(event)
+
+        # Assert: IN_PROGRESS状態に遷移
+        assert new_state == ColonyState.IN_PROGRESS
+
+    def test_transition_in_progress_to_completed(self):
+        """IN_PROGRESS -> COMPLETED遷移
+
+        全Run完了時にCOMPLETED状態に遷移。
+        """
+        # Arrange: IN_PROGRESS状態のColony
+        from hiveforge.core.state import ColonyStateMachine
+        from hiveforge.core.ar.projections import ColonyState
+        from hiveforge.core.events import ColonyCompletedEvent
+
+        sm = ColonyStateMachine()
+        sm.current_state = ColonyState.IN_PROGRESS
+
+        # Act: Colony完了イベントを適用
+        event = ColonyCompletedEvent(payload={"colony_id": "colony-001"})
+        new_state = sm.transition(event)
+
+        # Assert: COMPLETED状態に遷移
+        assert new_state == ColonyState.COMPLETED
+
+    def test_transition_in_progress_to_failed(self):
+        """IN_PROGRESS -> FAILED遷移
+
+        致命的エラー発生時にFAILED状態に遷移。
+        """
+        # Arrange: IN_PROGRESS状態のColony
+        from hiveforge.core.state import ColonyStateMachine
+        from hiveforge.core.ar.projections import ColonyState
+        from hiveforge.core.events import ColonyFailedEvent
+
+        sm = ColonyStateMachine()
+        sm.current_state = ColonyState.IN_PROGRESS
+
+        # Act: Colony失敗イベントを適用
+        event = ColonyFailedEvent(payload={"colony_id": "colony-001", "error": "Critical error"})
+        new_state = sm.transition(event)
+
+        # Assert: FAILED状態に遷移
+        assert new_state == ColonyState.FAILED
+
+    def test_completed_state_is_terminal(self):
+        """COMPLETED状態からは遷移不可（終端状態）"""
+        # Arrange: COMPLETED状態のColony
+        from hiveforge.core.state import ColonyStateMachine
+        from hiveforge.core.ar.projections import ColonyState
+        from hiveforge.core.events import ColonyStartedEvent
+
+        sm = ColonyStateMachine()
+        sm.current_state = ColonyState.COMPLETED
+
+        # Act & Assert: いかなる遷移も失敗
+        event = ColonyStartedEvent(payload={"colony_id": "colony-001"})
+        with pytest.raises(TransitionError):
+            sm.transition(event)
+
+    def test_failed_state_is_terminal(self):
+        """FAILED状態からは遷移不可（終端状態）"""
+        # Arrange: FAILED状態のColony
+        from hiveforge.core.state import ColonyStateMachine
+        from hiveforge.core.ar.projections import ColonyState
+        from hiveforge.core.events import ColonyStartedEvent
+
+        sm = ColonyStateMachine()
+        sm.current_state = ColonyState.FAILED
+
+        # Act & Assert: いかなる遷移も失敗
+        event = ColonyStartedEvent(payload={"colony_id": "colony-001"})
+        with pytest.raises(TransitionError):
+            sm.transition(event)
+
+    def test_get_valid_events_from_pending(self):
+        """PENDING状態から遷移可能なイベント一覧"""
+        # Arrange: PENDING状態のColony
+        from hiveforge.core.state import ColonyStateMachine
+        from hiveforge.core.events import EventType
+
+        sm = ColonyStateMachine()
+
+        # Act: 有効なイベント一覧を取得
+        valid_events = sm.get_valid_events()
+
+        # Assert: colony.started のみが有効
+        assert EventType.COLONY_STARTED in valid_events
+        assert len(valid_events) == 1

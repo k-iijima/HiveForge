@@ -10,7 +10,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 
-from ..ar.projections import HiveState, RequirementState, RunState, TaskState
+from ..ar.projections import ColonyState, HiveState, RequirementState, RunState, TaskState
 from ..config import get_settings
 from ..events import (
     BaseEvent,
@@ -239,3 +239,26 @@ class HiveStateMachine(StateMachine):
             Transition(HiveState.IDLE, HiveState.CLOSED, EventType.HIVE_CLOSED),
         ]
         super().__init__(HiveState.ACTIVE, transitions)
+
+
+class ColonyStateMachine(StateMachine):
+    """Colony状態機械
+
+    ColonyはHive内のサブプロジェクト単位。
+
+    状態遷移:
+    - PENDING -> IN_PROGRESS (開始時)
+    - IN_PROGRESS -> COMPLETED (全Run完了時)
+    - IN_PROGRESS -> FAILED (致命的エラー時)
+    """
+
+    def __init__(self):
+        transitions = [
+            # PENDING -> IN_PROGRESS: Colony開始時
+            Transition(ColonyState.PENDING, ColonyState.IN_PROGRESS, EventType.COLONY_STARTED),
+            # IN_PROGRESS -> COMPLETED: 全Run完了時
+            Transition(ColonyState.IN_PROGRESS, ColonyState.COMPLETED, EventType.COLONY_COMPLETED),
+            # IN_PROGRESS -> FAILED: 致命的エラー時
+            Transition(ColonyState.IN_PROGRESS, ColonyState.FAILED, EventType.COLONY_FAILED),
+        ]
+        super().__init__(ColonyState.PENDING, transitions)
