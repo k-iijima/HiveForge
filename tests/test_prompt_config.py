@@ -238,16 +238,34 @@ class TestPromptLoader:
         vault.mkdir()
         return vault
 
-    def test_no_config_file_returns_none(self, temp_vault: Path):
-        """設定ファイルが存在しない場合はNoneを返す"""
-        # Arrange
-        loader = PromptLoader(temp_vault)
+    def test_no_config_file_returns_none(self, tmp_path: Path):
+        """Vaultにもパッケージにも設定ファイルがない場合はNoneを返す
 
-        # Act
-        config = loader.load_queen_bee_config()
+        存在しないファイル名を指定してテスト。
+        """
+        # Arrange
+        vault = tmp_path / "Vault"
+        vault.mkdir()
+        loader = PromptLoader(vault)
+
+        # Act: 存在しないWorker名を指定
+        config = loader.load_worker_bee_config(name="nonexistent")
 
         # Assert
         assert config is None
+
+    def test_fallback_to_package_defaults(self, temp_vault: Path):
+        """Vaultに設定がない場合はパッケージ内のデフォルトを使う"""
+        # Arrange
+        loader = PromptLoader(temp_vault)
+
+        # Act: Vaultには何もないがパッケージ内にデフォルトがある
+        config = loader.load_queen_bee_config()
+
+        # Assert: パッケージ内のデフォルトが読み込まれる
+        assert config is not None
+        assert config.name == "default"
+        assert "Queen Bee" in config.prompt.system
 
     def test_load_queen_bee_config_from_colony(self, temp_vault: Path):
         """Colony固有のQueen Bee設定を読み込める"""

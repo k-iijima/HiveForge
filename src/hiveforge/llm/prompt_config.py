@@ -94,12 +94,14 @@ class PromptLoader:
     読み込み優先順位:
     1. Vault/hives/{hive_id}/colonies/{colony_id}/ のファイル
     2. Vault/hives/{hive_id}/ のファイル（Hive全体のデフォルト）
-    3. Vault/prompts/ のデフォルトファイル
+    3. パッケージ内のデフォルトファイル (src/hiveforge/llm/default_prompts/)
     4. コード内のハードコードされたデフォルト
     """
 
     def __init__(self, vault_path: str | Path = "./Vault"):
         self.vault_path = Path(vault_path)
+        # パッケージ内のデフォルトプロンプトディレクトリ
+        self._default_prompts_dir = Path(__file__).parent / "default_prompts"
 
     def _find_config_file(
         self,
@@ -119,8 +121,8 @@ class PromptLoader:
         # 2. Hive全体のデフォルト
         candidates.append(self.vault_path / "hives" / hive_id / filename)
 
-        # 3. グローバルデフォルト
-        candidates.append(self.vault_path / "prompts" / filename)
+        # 3. パッケージ内のデフォルト
+        candidates.append(self._default_prompts_dir / filename)
 
         for path in candidates:
             if path.exists():
