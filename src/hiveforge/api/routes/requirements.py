@@ -7,11 +7,35 @@ from fastapi import APIRouter, HTTPException, status
 
 from ...core import build_run_projection, generate_event_id
 from ...core.events import (
+    EventType,
     RequirementApprovedEvent,
     RequirementCreatedEvent,
     RequirementRejectedEvent,
 )
 from ..helpers import apply_event_to_projection, get_active_runs, get_ar
+
+
+def _get_run_started_event_id(run_id: str) -> str | None:
+    """Run開始イベントのIDを取得"""
+    ar = get_ar()
+    for event in ar.replay(run_id):
+        if event.type == EventType.RUN_STARTED:
+            return event.id
+    return None
+
+
+def _get_requirement_created_event_id(run_id: str, requirement_id: str) -> str | None:
+    """Requirement作成イベントのIDを取得"""
+    ar = get_ar()
+    for event in ar.replay(run_id):
+        if (
+            event.type == EventType.REQUIREMENT_CREATED
+            and event.payload.get("requirement_id") == requirement_id
+        ):
+            return event.id
+    return None
+
+
 from ..models import (
     CreateRequirementRequest,
     RequirementResponse,
@@ -74,6 +98,12 @@ async def create_requirement(run_id: str, request: CreateRequirementRequest):
     ar = get_ar()
     requirement_id = generate_event_id()
 
+    # auto-parents: 明示指定がなければ run.started を親にする
+    parents = None
+    run_started_id = _get_run_started_event_id(run_id)
+    if run_started_id:
+        parents = [run_started_id]
+
     event = RequirementCreatedEvent(
         run_id=run_id,
         actor="api",
@@ -82,6 +112,7 @@ async def create_requirement(run_id: str, request: CreateRequirementRequest):
             "description": request.description,
             "options": request.options,
         },
+        parents=parents,
     )
     ar.append(event, run_id)
 
@@ -106,6 +137,12 @@ async def resolve_requirement(run_id: str, requirement_id: str, request: Resolve
 
     ar = get_ar()
 
+    # auto-parents: requirement.created を親にする
+    parents = None
+    req_created_id = _get_requirement_created_event_id(run_id, requirement_id)
+    if req_created_id:
+        parents = [req_created_id]
+
     if request.approved:
         event = RequirementApprovedEvent(
             run_id=run_id,
@@ -115,6 +152,7 @@ async def resolve_requirement(run_id: str, requirement_id: str, request: Resolve
                 "selected_option": request.selected_option,
                 "comment": request.comment,
             },
+            parents=parents,
         )
     else:
         event = RequirementRejectedEvent(
@@ -125,6 +163,7 @@ async def resolve_requirement(run_id: str, requirement_id: str, request: Resolve
                 "selected_option": request.selected_option,
                 "comment": request.comment,
             },
+            parents=parents,
         )
 
     ar.append(event, run_id)
