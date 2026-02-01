@@ -1,6 +1,5 @@
 """Akashic Record ストレージのテスト"""
 
-
 from datetime import UTC
 
 import pytest
@@ -653,3 +652,153 @@ class TestAkashicRecordMultibyteOperations:
         for input_bytes, expected_substring in test_cases:
             result = ar._decode_utf8_safe(input_bytes)
             assert expected_substring in result, f"Failed for {input_bytes!r}"
+
+
+class TestHiveStore:
+    """HiveStore のテスト
+
+    Hive/Colony イベントは run_id を持たないため、
+    Vault/hives/{hive_id}/events.jsonl に保存する。
+    """
+
+    def test_append_and_replay_hive_events(self, temp_vault):
+        """Hiveイベントの追記とリプレイ
+
+        Hiveイベントは hive_id をキーとして保存される。
+        """
+        # Arrange: HiveStore を作成
+        from hiveforge.core.ar.hive_storage import HiveStore
+        from hiveforge.core.events import HiveCreatedEvent, ColonyCreatedEvent
+
+        store = HiveStore(temp_vault)
+        hive_id = "test-hive-001"
+
+        # Act: イベントを追記
+        event1 = HiveCreatedEvent(
+            actor="beekeeper",
+            payload={"hive_id": hive_id, "name": "Test Hive"},
+        )
+        event2 = ColonyCreatedEvent(
+            actor="queen_bee",
+            payload={"colony_id": "colony-001", "hive_id": hive_id, "goal": "Test"},
+        )
+
+        store.append(event1, hive_id)
+        store.append(event2, hive_id)
+
+        # Assert: リプレイで取得できる
+        events = list(store.replay(hive_id))
+        assert len(events) == 2
+        assert events[0].type.value == "hive.created"
+        assert events[1].type.value == "colony.created"
+
+    def test_event_chain_integrity(self, temp_vault):
+        """イベントチェーンの整合性
+
+        prev_hash が正しく設定される。
+        """
+        # Arrange
+        from hiveforge.core.ar.hive_storage import HiveStore
+        from hiveforge.core.events import HiveCreatedEvent, HiveClosedEvent
+
+        store = HiveStore(temp_vault)
+        hive_id = "test-hive-chain"
+
+        # Act: 複数イベントを追記
+        event1 = HiveCreatedEvent(payload={"hive_id": hive_id})
+        stored1 = store.append(event1, hive_id)
+
+        event2 = HiveClosedEvent(payload={"hive_id": hive_id})
+        stored2 = store.append(event2, hive_id)
+
+        # Assert: prev_hash が連鎖している
+        assert stored1.prev_hash is None  # 最初のイベント
+        assert stored2.prev_hash == stored1.hash  # 2番目は最初を参照
+
+    def test_list_hives(self, temp_vault):
+        """Hive一覧の取得
+
+        複数のHiveを作成して一覧で取得できる。
+        """
+        # Arrange
+        from hiveforge.core.ar.hive_storage import HiveStore
+        from hiveforge.core.events import HiveCreatedEvent
+
+        store = HiveStore(temp_vault)
+
+        # Act: 複数Hiveを作成
+        for i in range(3):
+            hive_id = f"hive-{i:03d}"
+            event = HiveCreatedEvent(payload={"hive_id": hive_id, "name": f"Hive {i}"})
+            store.append(event, hive_id)
+
+        # Assert: 一覧で取得できる
+        hives = store.list_hives()
+        assert len(hives) == 3
+        assert "hive-000" in hives
+        assert "hive-001" in hives
+        assert "hive-002" in hives
+
+    def test_list_hives_does_not_include_runs(self, temp_vault):
+        """list_hivesはRun（通常のVaultディレクトリ）を含まない
+
+        Vault/hives/ 配下のみを対象とする。
+        """
+        # Arrange: HiveStoreとAkashicRecordを両方使用
+        from hiveforge.core.ar.hive_storage import HiveStore
+        from hiveforge.core.ar.storage import AkashicRecord
+        from hiveforge.core.events import HiveCreatedEvent, RunStartedEvent
+
+        hive_store = HiveStore(temp_vault)
+        ar = AkashicRecord(temp_vault)
+
+        # Act: HiveとRunを両方作成
+        hive_event = HiveCreatedEvent(payload={"hive_id": "hive-001"})
+        hive_store.append(hive_event, "hive-001")
+
+        run_event = RunStartedEvent(run_id="run-001", payload={"goal": "Test"})
+        ar.append(run_event, "run-001")
+
+        # Assert: list_hivesはHiveのみ、list_runsはRunのみ
+        hives = hive_store.list_hives()
+        runs = ar.list_runs()
+
+        assert "hive-001" in hives
+        assert "run-001" not in hives
+        assert "run-001" in runs
+        assert "hive-001" not in runs
+
+    def test_storage_path_is_under_hives_directory(self, temp_vault):
+        """Hiveイベントは Vault/hives/{hive_id}/ に保存される"""
+        # Arrange
+        from hiveforge.core.ar.hive_storage import HiveStore
+        from hiveforge.core.events import HiveCreatedEvent
+
+        store = HiveStore(temp_vault)
+        hive_id = "test-hive-path"
+
+        # Act: イベントを追記
+        event = HiveCreatedEvent(payload={"hive_id": hive_id})
+        store.append(event, hive_id)
+
+        # Assert: ファイルパスを確認
+        expected_path = temp_vault / "hives" / hive_id / "events.jsonl"
+        assert expected_path.exists()
+
+    def test_count_events(self, temp_vault):
+        """イベント数のカウント"""
+        # Arrange
+        from hiveforge.core.ar.hive_storage import HiveStore
+        from hiveforge.core.events import ColonyCreatedEvent
+
+        store = HiveStore(temp_vault)
+        hive_id = "test-hive-count"
+
+        # Act: イベントを追記
+        for i in range(5):
+            event = ColonyCreatedEvent(payload={"colony_id": f"colony-{i}", "hive_id": hive_id})
+            store.append(event, hive_id)
+
+        # Assert
+        count = store.count_events(hive_id)
+        assert count == 5
