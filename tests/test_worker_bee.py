@@ -1447,15 +1447,22 @@ class TestGetMaxActionClass:
 
     def test_untrusted_auto(self):
         """UNTRUSTED 自動承認はSAFEまで"""
-        assert get_max_action_class(TrustLevel.UNTRUSTED, auto_approve_only=True) == ActionClass.SAFE
+        assert (
+            get_max_action_class(TrustLevel.UNTRUSTED, auto_approve_only=True) == ActionClass.SAFE
+        )
 
     def test_limited_auto(self):
         """LIMITED 自動承認はCAREFULまで"""
-        assert get_max_action_class(TrustLevel.LIMITED, auto_approve_only=True) == ActionClass.CAREFUL
+        assert (
+            get_max_action_class(TrustLevel.LIMITED, auto_approve_only=True) == ActionClass.CAREFUL
+        )
 
     def test_elevated_auto(self):
         """ELEVATED 自動承認はDANGEROUSまで"""
-        assert get_max_action_class(TrustLevel.ELEVATED, auto_approve_only=True) == ActionClass.DANGEROUS
+        assert (
+            get_max_action_class(TrustLevel.ELEVATED, auto_approve_only=True)
+            == ActionClass.DANGEROUS
+        )
 
     def test_full_auto(self):
         """FULL 自動承認は全て"""
@@ -1529,10 +1536,10 @@ class TestTrustManager:
     def test_request_confirmation_with_handler(self):
         """承認リクエスト - ハンドラあり"""
         manager = TrustManager()
-        
+
         def approve_all(req: ConfirmationRequest) -> ConfirmationResponse:
             return ConfirmationResponse(result=ConfirmationResult.APPROVED)
-        
+
         manager.set_confirmation_handler(approve_all)
         response = manager.request_confirmation("agent-1", "tool", "description")
         assert response.result == ConfirmationResult.APPROVED
@@ -1558,3 +1565,42 @@ class TestDefaultToolClasses:
         classes = create_default_tool_classes()
         assert classes["rm_rf"] == ActionClass.CRITICAL
         assert classes["sudo"] == ActionClass.CRITICAL
+
+
+class TestExecuteTaskWithLLM:
+    """execute_task_with_llmハンドラのテスト"""
+
+    def test_execute_task_with_llm_in_tool_definitions(self, worker_bee):
+        """execute_task_with_llmがツール定義に含まれている"""
+        tools = worker_bee.get_tool_definitions()
+        tool_names = [t["name"] for t in tools]
+
+        assert "execute_task_with_llm" in tool_names
+
+    def test_execute_task_with_llm_schema(self, worker_bee):
+        """execute_task_with_llmのスキーマが正しい"""
+        tools = worker_bee.get_tool_definitions()
+        llm_tool = next(t for t in tools if t["name"] == "execute_task_with_llm")
+
+        schema = llm_tool["inputSchema"]
+        assert "task_id" in schema["properties"]
+        assert "run_id" in schema["properties"]
+        assert "goal" in schema["properties"]
+        assert "context" in schema["properties"]
+        assert schema["required"] == ["task_id", "run_id", "goal"]
+
+    @pytest.mark.asyncio
+    async def test_dispatch_includes_execute_task_with_llm(self, worker_bee):
+        """dispatch_toolにexecute_task_with_llmが含まれる"""
+        # まずget_statusで正常動作確認
+        result = await worker_bee.dispatch_tool("get_status", {})
+        assert result["worker_id"] == "worker-1"
+
+    @pytest.mark.asyncio
+    async def test_close_releases_resources(self, worker_bee):
+        """closeでリソースが解放される"""
+        # 何も初期化されていない状態でcloseしてもエラーにならない
+        await worker_bee.close()
+
+        assert worker_bee._llm_client is None
+        assert worker_bee._agent_runner is None

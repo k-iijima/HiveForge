@@ -1,15 +1,18 @@
 """Worker Bee MCPサーバー
 
 Worker Beeの状態を管理し、Queen Beeとの通信を処理する。
+LLMを使用してタスクを自律的に実行する。
 """
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
 from ..core import AkashicRecord, generate_event_id
+from ..core.config import LLMConfig
 from ..core.events import (
     EventType,
     WorkerAssignedEvent,
@@ -18,6 +21,8 @@ from ..core.events import (
     WorkerProgressEvent,
     WorkerStartedEvent,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class WorkerState(str, Enum):
@@ -45,15 +50,19 @@ class WorkerBeeMCPServer:
 
     Queen Beeからタスクを受け取り、作業を実行する。
     MCPプロトコルでQueen Beeと通信する。
+    LLMを使用してタスクを自律的に実行できる。
     """
 
     worker_id: str
     ar: AkashicRecord
     context: WorkerContext = field(init=False)
+    llm_config: LLMConfig | None = None  # エージェント別LLM設定
 
     def __post_init__(self) -> None:
         """初期化"""
         self.context = WorkerContext(worker_id=self.worker_id)
+        self._llm_client = None
+        self._agent_runner = None
 
     @property
     def state(self) -> WorkerState:
@@ -132,6 +141,26 @@ class WorkerBeeMCPServer:
                 "name": "get_status",
                 "description": "Worker Beeの現在の状態を取得",
                 "inputSchema": {"type": "object", "properties": {}},
+            },
+            {
+                "name": "execute_task_with_llm",
+                "description": "タスクを受け取りLLMで自律的に実行する（ワンショット）",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "task_id": {"type": "string", "description": "タスクID"},
+                        "run_id": {"type": "string", "description": "Run ID"},
+                        "goal": {"type": "string", "description": "タスクの目標（自然言語）"},
+                        "context": {
+                            "type": "object",
+                            "description": "タスクのコンテキスト情報",
+                            "properties": {
+                                "working_directory": {"type": "string"},
+                            },
+                        },
+                    },
+                    "required": ["task_id", "run_id", "goal"],
+                },
             },
         ]
 
@@ -282,6 +311,131 @@ class WorkerBeeMCPServer:
             "progress": self.context.progress,
         }
 
+    async def _get_llm_client(self):
+        """LLMクライアントを取得（遅延初期化）"""
+        if self._llm_client is None:
+            from ..llm.client import LLMClient
+
+            self._llm_client = LLMClient(config=self.llm_config)
+        return self._llm_client
+
+    async def _get_agent_runner(self):
+        """AgentRunnerを取得（遅延初期化）"""
+        if self._agent_runner is None:
+            from ..llm.runner import AgentRunner
+            from ..llm.tools import get_basic_tools
+
+            client = await self._get_llm_client()
+            self._agent_runner = AgentRunner(client, agent_type="worker_bee")
+
+            # 基本ツールを登録
+            for tool in get_basic_tools():
+                self._agent_runner.register_tool(tool)
+
+        return self._agent_runner
+
+    async def run_with_llm(
+        self, goal: str, context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """LLMを使用してタスクを自律実行
+
+        Args:
+            goal: タスクの目標（自然言語）
+            context: 追加コンテキスト情報
+
+        Returns:
+            実行結果
+        """
+        from ..llm.runner import AgentContext
+
+        runner = await self._get_agent_runner()
+
+        # コンテキストを構築
+        agent_context = AgentContext(
+            run_id=self.context.current_run_id or "standalone",
+            task_id=self.context.current_task_id,
+            working_directory=context.get("working_directory", ".") if context else ".",
+            metadata=context or {},
+        )
+
+        # 進捗報告: 開始
+        await self.handle_report_progress({"progress": 10, "message": "LLMで思考中..."})
+
+        try:
+            # LLMで実行
+            result = await runner.run(goal, agent_context)
+
+            # 進捗報告: 完了
+            await self.handle_report_progress({"progress": 100, "message": "実行完了"})
+
+            if result.success:
+                return {
+                    "status": "success",
+                    "output": result.output,
+                    "tool_calls_made": result.tool_calls_made,
+                }
+            else:
+                return {
+                    "status": "error",
+                    "error": result.error,
+                    "tool_calls_made": result.tool_calls_made,
+                }
+
+        except Exception as e:
+            logger.exception(f"LLM実行エラー: {e}")
+            return {
+                "status": "error",
+                "error": str(e),
+            }
+
+    async def execute_task_with_llm(self, arguments: dict[str, Any]) -> dict[str, Any]:
+        """タスクを受け取りLLMで自律実行（ワンショット）
+
+        receive_task + run_with_llm + complete_task/fail_task を一括実行
+        """
+        # タスクを受け取る
+        receive_result = await self.handle_receive_task(arguments)
+        if "error" in receive_result:
+            return receive_result
+
+        goal = arguments.get("goal", "")
+        context = arguments.get("context", {})
+
+        # LLMで実行
+        llm_result = await self.run_with_llm(goal, context)
+
+        # 結果に応じて完了/失敗を報告
+        if llm_result.get("status") == "success":
+            complete_result = await self.handle_complete_task(
+                {
+                    "result": llm_result.get("output", ""),
+                    "deliverables": [],
+                }
+            )
+            return {
+                **complete_result,
+                "llm_output": llm_result.get("output"),
+                "tool_calls_made": llm_result.get("tool_calls_made", 0),
+            }
+        else:
+            fail_result = await self.handle_fail_task(
+                {
+                    "reason": llm_result.get("error", "Unknown error"),
+                    "recoverable": True,
+                }
+            )
+            return {
+                **fail_result,
+                "llm_error": llm_result.get("error"),
+            }
+
+    async def close(self) -> None:
+        """リソースを解放"""
+        if self._llm_client:
+            await self._llm_client.close()
+            self._llm_client = None
+        self._agent_runner = None
+
     async def dispatch_tool(self, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         """ツール呼び出しをディスパッチ"""
         handlers = {
@@ -290,6 +444,7 @@ class WorkerBeeMCPServer:
             "complete_task": self.handle_complete_task,
             "fail_task": self.handle_fail_task,
             "get_status": self.handle_get_status,
+            "execute_task_with_llm": self.execute_task_with_llm,  # 新規追加
         }
 
         handler = handlers.get(tool_name)
