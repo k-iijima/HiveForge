@@ -1,10 +1,23 @@
 """エージェントプロンプト
 
 各エージェント（Beekeeper, QueenBee, WorkerBee）のシステムプロンプト。
+YAML設定ファイルから読み込むか、ハードコードされたデフォルトを使用。
 """
 
+from __future__ import annotations
+
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from hiveforge.llm.prompt_config import (
+        BeekeeperConfig,
+        QueenBeeConfig,
+        WorkerBeeConfig,
+    )
+
 # -----------------------------------------------------------------------------
-# Worker Bee プロンプト
+# Worker Bee プロンプト（ハードコードされたデフォルト）
 # -----------------------------------------------------------------------------
 
 WORKER_BEE_SYSTEM = """あなたはHiveForgeのWorker Beeです。専門的なタスクを実行するエージェントです。
@@ -29,7 +42,7 @@ WORKER_BEE_SYSTEM = """あなたはHiveForgeのWorker Beeです。専門的な�
 """
 
 # -----------------------------------------------------------------------------
-# Queen Bee プロンプト
+# Queen Bee プロンプト（ハードコードされたデフォルト）
 # -----------------------------------------------------------------------------
 
 QUEEN_BEE_SYSTEM = """あなたはHiveForgeのQueen Beeです。Colonyを統括し、タスクを分解・割り当てるエージェントです。
@@ -54,7 +67,7 @@ QUEEN_BEE_SYSTEM = """あなたはHiveForgeのQueen Beeです。Colonyを統括�
 """
 
 # -----------------------------------------------------------------------------
-# Beekeeper プロンプト
+# Beekeeper プロンプト（ハードコードされたデフォルト）
 # -----------------------------------------------------------------------------
 
 BEEKEEPER_SYSTEM = """あなたはHiveForgeのBeekeeperです。ユーザーとの対話窓口であり、Colonyを通じて作業を実行します。
@@ -81,8 +94,13 @@ BEEKEEPER_SYSTEM = """あなたはHiveForgeのBeekeeperです。ユーザーと�
 """
 
 
+# -----------------------------------------------------------------------------
+# プロンプト取得関数
+# -----------------------------------------------------------------------------
+
+
 def get_system_prompt(agent_type: str) -> str:
-    """エージェントタイプに応じたシステムプロンプトを取得
+    """エージェントタイプに応じたシステムプロンプトを取得（ハードコードデフォルト）
 
     Args:
         agent_type: "worker_bee", "queen_bee", "beekeeper"
@@ -96,3 +114,78 @@ def get_system_prompt(agent_type: str) -> str:
         "beekeeper": BEEKEEPER_SYSTEM,
     }
     return prompts.get(agent_type, WORKER_BEE_SYSTEM)
+
+
+def get_prompt_from_config(
+    agent_type: str,
+    vault_path: str | Path = "./Vault",
+    hive_id: str = "0",
+    colony_id: str = "0",
+    worker_name: str = "default",
+) -> str:
+    """YAML設定ファイルからプロンプトを取得
+
+    設定ファイルが存在しない場合はハードコードされたデフォルトを返す。
+
+    Args:
+        agent_type: "worker_bee", "queen_bee", "beekeeper"
+        vault_path: Vaultディレクトリパス
+        hive_id: Hive ID
+        colony_id: Colony ID
+        worker_name: Worker Beeの名前（worker_beeの場合のみ使用）
+
+    Returns:
+        システムプロンプト
+    """
+    from hiveforge.llm.prompt_config import PromptLoader
+
+    loader = PromptLoader(vault_path)
+
+    if agent_type == "beekeeper":
+        config = loader.load_beekeeper_config(hive_id)
+        if config:
+            return config.prompt.system
+    elif agent_type == "queen_bee":
+        config = loader.load_queen_bee_config(hive_id, colony_id)
+        if config:
+            return config.prompt.system
+    elif agent_type == "worker_bee":
+        config = loader.load_worker_bee_config(worker_name, hive_id, colony_id)
+        if config:
+            return config.prompt.system
+
+    # 設定ファイルがない場合はデフォルト
+    return get_system_prompt(agent_type)
+
+
+def get_beekeeper_config(
+    vault_path: str | Path = "./Vault",
+    hive_id: str = "0",
+) -> "BeekeeperConfig | None":
+    """Beekeeper設定を取得"""
+    from hiveforge.llm.prompt_config import PromptLoader
+
+    return PromptLoader(vault_path).load_beekeeper_config(hive_id)
+
+
+def get_queen_bee_config(
+    vault_path: str | Path = "./Vault",
+    hive_id: str = "0",
+    colony_id: str = "0",
+) -> "QueenBeeConfig | None":
+    """Queen Bee設定を取得"""
+    from hiveforge.llm.prompt_config import PromptLoader
+
+    return PromptLoader(vault_path).load_queen_bee_config(hive_id, colony_id)
+
+
+def get_worker_bee_config(
+    name: str = "default",
+    vault_path: str | Path = "./Vault",
+    hive_id: str = "0",
+    colony_id: str = "0",
+) -> "WorkerBeeConfig | None":
+    """Worker Bee設定を取得"""
+    from hiveforge.llm.prompt_config import PromptLoader
+
+    return PromptLoader(vault_path).load_worker_bee_config(name, hive_id, colony_id)
