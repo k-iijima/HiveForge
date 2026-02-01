@@ -78,6 +78,60 @@ class HiveConfig(BaseModel):
     vault_path: str = Field(default="./Vault")
 
 
+class BeekeeperConfig(BaseModel):
+    """Beekeeper設定"""
+
+    enabled: bool = Field(default=True)
+    max_colonies: int = Field(default=10, ge=1, le=100)
+    session_timeout_minutes: int = Field(default=60, ge=5)
+
+
+class QueenBeeConfig(BaseModel):
+    """Queen Bee設定"""
+
+    enabled: bool = Field(default=True)
+    max_workers_per_colony: int = Field(default=5, ge=1, le=20)
+    task_assignment_strategy: Literal["round_robin", "priority", "load_balanced"] = Field(
+        default="round_robin"
+    )
+
+
+class WorkerBeeConfig(BaseModel):
+    """Worker Bee設定"""
+
+    enabled: bool = Field(default=True)
+    tool_timeout_seconds: int = Field(default=60, ge=10)
+    max_retries: int = Field(default=3, ge=0, le=10)
+    trust_level_default: Literal["untrusted", "limited", "standard", "elevated", "full"] = Field(
+        default="standard"
+    )
+
+
+class AgentsConfig(BaseModel):
+    """エージェント設定"""
+
+    beekeeper: BeekeeperConfig = Field(default_factory=BeekeeperConfig)
+    queen_bee: QueenBeeConfig = Field(default_factory=QueenBeeConfig)
+    worker_bee: WorkerBeeConfig = Field(default_factory=WorkerBeeConfig)
+
+
+class ConflictConfig(BaseModel):
+    """衝突検出・解決設定"""
+
+    detection_enabled: bool = Field(default=True)
+    auto_resolve_low_severity: bool = Field(default=True)
+    escalation_timeout_minutes: int = Field(default=30, ge=5)
+
+
+class ConferenceConfig(BaseModel):
+    """Conference設定"""
+
+    enabled: bool = Field(default=True)
+    max_participants: int = Field(default=10, ge=2, le=50)
+    voting_timeout_minutes: int = Field(default=15, ge=1)
+    quorum_percentage: int = Field(default=50, ge=1, le=100)
+
+
 class HiveForgeSettings(BaseSettings):
     """HiveForge全体設定
 
@@ -98,6 +152,9 @@ class HiveForgeSettings(BaseSettings):
     auth: AuthConfig = Field(default_factory=AuthConfig)
     server: ServerConfig = Field(default_factory=ServerConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
+    agents: AgentsConfig = Field(default_factory=AgentsConfig)
+    conflict: ConflictConfig = Field(default_factory=ConflictConfig)
+    conference: ConferenceConfig = Field(default_factory=ConferenceConfig)
 
     @classmethod
     def from_yaml(cls, config_path: Path | str | None = None) -> "HiveForgeSettings":

@@ -174,3 +174,97 @@ hive:
         # 再度 get_settings を呼ぶと同じインスタンスが返される
         same_settings = get_settings()
         assert same_settings.hive.name == "reloaded-hive"
+
+
+class TestAgentsConfig:
+    """エージェント設定のテスト"""
+
+    def test_default_agents_config(self):
+        """デフォルトのエージェント設定"""
+        settings = HiveForgeSettings()
+
+        assert settings.agents.beekeeper.enabled is True
+        assert settings.agents.beekeeper.max_colonies == 10
+        assert settings.agents.queen_bee.max_workers_per_colony == 5
+        assert settings.agents.worker_bee.trust_level_default == "standard"
+
+    def test_agents_from_yaml(self, tmp_path):
+        """YAMLからエージェント設定を読み込む"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("""
+agents:
+  beekeeper:
+    enabled: true
+    max_colonies: 20
+  queen_bee:
+    max_workers_per_colony: 10
+    task_assignment_strategy: priority
+  worker_bee:
+    trust_level_default: elevated
+    tool_timeout_seconds: 120
+""")
+
+        settings = HiveForgeSettings.from_yaml(config_file)
+
+        assert settings.agents.beekeeper.max_colonies == 20
+        assert settings.agents.queen_bee.max_workers_per_colony == 10
+        assert settings.agents.queen_bee.task_assignment_strategy == "priority"
+        assert settings.agents.worker_bee.trust_level_default == "elevated"
+        assert settings.agents.worker_bee.tool_timeout_seconds == 120
+
+
+class TestConflictConfig:
+    """衝突設定のテスト"""
+
+    def test_default_conflict_config(self):
+        """デフォルトの衝突設定"""
+        settings = HiveForgeSettings()
+
+        assert settings.conflict.detection_enabled is True
+        assert settings.conflict.auto_resolve_low_severity is True
+        assert settings.conflict.escalation_timeout_minutes == 30
+
+    def test_conflict_from_yaml(self, tmp_path):
+        """YAMLから衝突設定を読み込む"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("""
+conflict:
+  detection_enabled: false
+  auto_resolve_low_severity: false
+  escalation_timeout_minutes: 60
+""")
+
+        settings = HiveForgeSettings.from_yaml(config_file)
+
+        assert settings.conflict.detection_enabled is False
+        assert settings.conflict.auto_resolve_low_severity is False
+        assert settings.conflict.escalation_timeout_minutes == 60
+
+
+class TestConferenceConfig:
+    """Conference設定のテスト"""
+
+    def test_default_conference_config(self):
+        """デフォルトのConference設定"""
+        settings = HiveForgeSettings()
+
+        assert settings.conference.enabled is True
+        assert settings.conference.max_participants == 10
+        assert settings.conference.quorum_percentage == 50
+
+    def test_conference_from_yaml(self, tmp_path):
+        """YAMLからConference設定を読み込む"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("""
+conference:
+  enabled: true
+  max_participants: 20
+  voting_timeout_minutes: 30
+  quorum_percentage: 75
+""")
+
+        settings = HiveForgeSettings.from_yaml(config_file)
+
+        assert settings.conference.max_participants == 20
+        assert settings.conference.voting_timeout_minutes == 30
+        assert settings.conference.quorum_percentage == 75

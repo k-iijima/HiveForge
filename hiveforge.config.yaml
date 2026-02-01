@@ -32,3 +32,34 @@ server:
 logging:
   level: "INFO"
   events_max_file_size_mb: 100
+
+# エージェント設定
+agents:
+  beekeeper:
+    enabled: true
+    max_colonies: 10
+    session_timeout_minutes: 60
+
+  queen_bee:
+    enabled: true
+    max_workers_per_colony: 5
+    task_assignment_strategy: "round_robin"  # round_robin, priority, load_balanced
+
+  worker_bee:
+    enabled: true
+    tool_timeout_seconds: 60
+    max_retries: 3
+    trust_level_default: "standard"  # untrusted, limited, standard, elevated, full
+
+# 衝突検出・解決
+conflict:
+  detection_enabled: true
+  auto_resolve_low_severity: true
+  escalation_timeout_minutes: 30
+
+# Conference設定
+conference:
+  enabled: true
+  max_participants: 10
+  voting_timeout_minutes: 15
+  quorum_percentage: 50
