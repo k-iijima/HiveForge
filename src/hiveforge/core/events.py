@@ -106,6 +106,29 @@ class ConflictSeverity(str, Enum):
     BLOCKER = "blocker"  # 阻害: 解決するまで作業停止
 
 
+class DecisionScope(str, Enum):
+    """決定の適用範囲（v5.2追加）
+
+    決定がどのスコープに効くかを示す。
+    """
+
+    HIVE = "hive"  # Hive全体に適用
+    COLONY = "colony"  # 特定のColonyに適用
+    RUN = "run"  # 特定のRunに適用
+    TASK = "task"  # 特定のTaskに適用
+
+
+class RiskLevel(str, Enum):
+    """リスクレベル（v5.2追加）
+
+    決定の影響リスクを示す。
+    """
+
+    LOW = "low"  # 低リスク
+    MEDIUM = "medium"  # 中リスク
+    HIGH = "high"  # 高リスク
+
+
 def generate_event_id() -> str:
     """イベントIDを生成 (ULID形式)"""
     return str(ULID())
