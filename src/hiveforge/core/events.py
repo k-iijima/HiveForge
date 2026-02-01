@@ -53,6 +53,11 @@ class EventType(str, Enum):
     # Decision イベント（仕様変更・合意事項の記録など）
     DECISION_RECORDED = "decision.recorded"
 
+    # Decision Protocol（意思決定ライフサイクル、v5.1追加）
+    PROPOSAL_CREATED = "decision.proposal.created"  # 提案作成
+    DECISION_APPLIED = "decision.applied"  # 決定適用
+    DECISION_SUPERSEDED = "decision.superseded"  # 決定上書き
+
     # LLM イベント
     LLM_REQUEST = "llm.request"
     LLM_RESPONSE = "llm.response"
@@ -294,6 +299,54 @@ class DecisionRecordedEvent(BaseEvent):
     type: Literal[EventType.DECISION_RECORDED] = EventType.DECISION_RECORDED
 
 
+# Decision Protocol イベント（v5.1追加）
+class ProposalCreatedEvent(BaseEvent):
+    """提案作成イベント
+
+    Decision Protocol: 意思決定ライフサイクルの最初のステップ。
+    ColonyやBeekeeperが新しい提案を作成した時に発行する。
+
+    payload:
+        proposal_id: 提案ID
+        proposer: 提案者（Colony ID or "user"）
+        title: 提案タイトル
+        description: 詳細説明
+        options: 選択肢（あれば）
+    """
+
+    type: Literal[EventType.PROPOSAL_CREATED] = EventType.PROPOSAL_CREATED
+
+
+class DecisionAppliedEvent(BaseEvent):
+    """決定適用イベント
+
+    Decision Protocol: 決定が実際に適用（実装）された時に発行する。
+
+    payload:
+        decision_id: 決定ID
+        proposal_id: 対応する提案ID
+        applied_by: 適用者
+        applied_to: 適用対象（ファイルパス等）
+    """
+
+    type: Literal[EventType.DECISION_APPLIED] = EventType.DECISION_APPLIED
+
+
+class DecisionSupersededEvent(BaseEvent):
+    """決定上書きイベント
+
+    Decision Protocol: 以前の決定が新しい決定で置き換えられた時に発行する。
+    過去の決定を無効化するのではなく、新しい決定が優先されることを示す。
+
+    payload:
+        old_decision_id: 以前の決定ID
+        new_decision_id: 新しい決定ID
+        reason: 上書き理由
+    """
+
+    type: Literal[EventType.DECISION_SUPERSEDED] = EventType.DECISION_SUPERSEDED
+
+
 class HeartbeatEvent(BaseEvent):
     """ハートビートイベント"""
 
@@ -344,6 +397,10 @@ EVENT_TYPE_MAP: dict[EventType, type[BaseEvent]] = {
     EventType.REQUIREMENT_APPROVED: RequirementApprovedEvent,
     EventType.REQUIREMENT_REJECTED: RequirementRejectedEvent,
     EventType.DECISION_RECORDED: DecisionRecordedEvent,
+    # Decision Protocol (v5.1)
+    EventType.PROPOSAL_CREATED: ProposalCreatedEvent,
+    EventType.DECISION_APPLIED: DecisionAppliedEvent,
+    EventType.DECISION_SUPERSEDED: DecisionSupersededEvent,
     EventType.HEARTBEAT: HeartbeatEvent,
     EventType.ERROR: ErrorEvent,
     EventType.SILENCE_DETECTED: SilenceDetectedEvent,

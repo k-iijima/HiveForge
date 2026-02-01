@@ -73,7 +73,8 @@ class HiveAggregate:
     def active_colonies(self) -> list[ColonyProjection]:
         """アクティブなColony一覧（PENDING または IN_PROGRESS）"""
         return [
-            c for c in self._projection.colonies.values()
+            c
+            for c in self._projection.colonies.values()
             if c.state in (ColonyState.PENDING, ColonyState.IN_PROGRESS)
         ]
 
