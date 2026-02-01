@@ -66,21 +66,25 @@ class TestColonyMCPHandlers:
     @pytest.mark.asyncio
     async def test_create_colony(self, mcp_server, hive_id):
         """Colonyを作成できる"""
-        result = await mcp_server._handle_create_colony({
-            "hive_id": hive_id,
-            "name": "TestColony",
-            "goal": "テスト目標",
-        })
+        result = await mcp_server._handle_create_colony(
+            {
+                "hive_id": hive_id,
+                "name": "TestColony",
+                "goal": "テスト目標",
+            }
+        )
         assert "colony_id" in result
         assert result["name"] == "TestColony"
 
     @pytest.mark.asyncio
     async def test_create_colony_hive_not_found(self, mcp_server):
         """存在しないHiveにはColonyを作成できない"""
-        result = await mcp_server._handle_create_colony({
-            "hive_id": "nonexistent",
-            "name": "TestColony",
-        })
+        result = await mcp_server._handle_create_colony(
+            {
+                "hive_id": "nonexistent",
+                "name": "TestColony",
+            }
+        )
         assert "error" in result
 
     @pytest.mark.asyncio
@@ -96,10 +100,12 @@ class TestColonyMCPHandlers:
     @pytest.mark.asyncio
     async def test_start_colony(self, mcp_server, hive_id):
         """Colonyを開始できる"""
-        create_result = await mcp_server._handle_create_colony({
-            "hive_id": hive_id,
-            "name": "StartTest",
-        })
+        create_result = await mcp_server._handle_create_colony(
+            {
+                "hive_id": hive_id,
+                "name": "StartTest",
+            }
+        )
         colony_id = create_result["colony_id"]
 
         result = await mcp_server._handle_start_colony({"colony_id": colony_id})
@@ -108,10 +114,12 @@ class TestColonyMCPHandlers:
     @pytest.mark.asyncio
     async def test_complete_colony(self, mcp_server, hive_id):
         """Colonyを完了できる"""
-        create_result = await mcp_server._handle_create_colony({
-            "hive_id": hive_id,
-            "name": "CompleteTest",
-        })
+        create_result = await mcp_server._handle_create_colony(
+            {
+                "hive_id": hive_id,
+                "name": "CompleteTest",
+            }
+        )
         colony_id = create_result["colony_id"]
         await mcp_server._handle_start_colony({"colony_id": colony_id})
 

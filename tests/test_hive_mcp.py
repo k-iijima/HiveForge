@@ -86,10 +86,12 @@ class TestHiveMCPHandlers:
     async def test_create_hive(self, mcp_server):
         """Hiveを作成できる"""
         # Act
-        result = await mcp_server._handle_create_hive({
-            "name": "TestHive",
-            "description": "テスト用Hive",
-        })
+        result = await mcp_server._handle_create_hive(
+            {
+                "name": "TestHive",
+                "description": "テスト用Hive",
+            }
+        )
 
         # Assert
         assert "hive_id" in result
