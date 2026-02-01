@@ -672,3 +672,203 @@ class TestWorkerProjectionEdgeCases:
 
         working = pool.get_working_workers()
         assert working == []
+
+
+# Worker Process Manager テスト
+from hiveforge.worker_bee.process import (
+    WorkerProcess,
+    WorkerProcessState,
+    WorkerPoolConfig,
+    WorkerProcessManager,
+)
+import pytest
+
+
+class TestWorkerProcess:
+    """WorkerProcessの基本テスト"""
+
+    def test_create_worker_process(self):
+        """Workerプロセスを作成"""
+        worker = WorkerProcess(worker_id="worker-1", colony_id="colony-1")
+
+        assert worker.process_id is not None
+        assert worker.state == WorkerProcessState.STOPPED
+        assert worker.restart_count == 0
+
+    def test_is_running(self):
+        """稼働状態チェック"""
+        worker = WorkerProcess(worker_id="worker-1", colony_id="colony-1")
+        assert not worker.is_running()
+
+        worker.state = WorkerProcessState.RUNNING
+        assert worker.is_running()
+
+        worker.state = WorkerProcessState.STARTING
+        assert worker.is_running()
+
+    def test_can_restart(self):
+        """再起動可能チェック"""
+        worker = WorkerProcess(worker_id="worker-1", colony_id="colony-1", max_restarts=3)
+        assert worker.can_restart()
+
+        worker.restart_count = 3
+        assert not worker.can_restart()
+
+
+class TestWorkerPoolConfig:
+    """WorkerPoolConfigのテスト"""
+
+    def test_default_config(self):
+        """デフォルト設定"""
+        config = WorkerPoolConfig()
+        assert config.min_workers == 1
+        assert config.max_workers == 10
+        assert config.auto_restart is True
+
+    def test_custom_config(self):
+        """カスタム設定"""
+        config = WorkerPoolConfig(min_workers=5, max_workers=20, auto_restart=False)
+        assert config.min_workers == 5
+        assert config.max_workers == 20
+        assert config.auto_restart is False
+
+
+class TestWorkerProcessManager:
+    """WorkerProcessManagerのテスト"""
+
+    @pytest.mark.asyncio
+    async def test_start_worker(self):
+        """Workerプロセスを起動"""
+        manager = WorkerProcessManager()
+        worker = await manager.start_worker(worker_id="worker-1", colony_id="colony-1")
+
+        assert worker.state == WorkerProcessState.RUNNING
+        assert worker.worker_id == "worker-1"
+
+    @pytest.mark.asyncio
+    async def test_stop_worker(self):
+        """Workerプロセスを停止"""
+        manager = WorkerProcessManager()
+        worker = await manager.start_worker(worker_id="worker-1", colony_id="colony-1")
+
+        result = await manager.stop_worker(worker.process_id)
+
+        assert result is True
+        assert manager.get_worker(worker.process_id).state == WorkerProcessState.STOPPED
+
+    @pytest.mark.asyncio
+    async def test_stop_nonexistent_worker(self):
+        """存在しないWorkerの停止"""
+        manager = WorkerProcessManager()
+        result = await manager.stop_worker("nonexistent")
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_get_workers_by_colony(self):
+        """Colony別Worker一覧"""
+        manager = WorkerProcessManager()
+        await manager.start_worker(worker_id="worker-1", colony_id="colony-1")
+        await manager.start_worker(worker_id="worker-2", colony_id="colony-1")
+        await manager.start_worker(worker_id="worker-3", colony_id="colony-2")
+
+        workers = manager.get_workers_by_colony("colony-1")
+        assert len(workers) == 2
+
+    @pytest.mark.asyncio
+    async def test_get_running_workers(self):
+        """稼働中Worker一覧"""
+        manager = WorkerProcessManager()
+        w1 = await manager.start_worker(worker_id="worker-1", colony_id="colony-1")
+        w2 = await manager.start_worker(worker_id="worker-2", colony_id="colony-1")
+        await manager.stop_worker(w2.process_id)
+
+        running = manager.get_running_workers()
+        assert len(running) == 1
+        assert running[0].worker_id == "worker-1"
+
+    @pytest.mark.asyncio
+    async def test_get_stats(self):
+        """統計情報"""
+        manager = WorkerProcessManager()
+        w1 = await manager.start_worker(worker_id="worker-1", colony_id="colony-1")
+        w2 = await manager.start_worker(worker_id="worker-2", colony_id="colony-1")
+        await manager.stop_worker(w2.process_id)
+
+        stats = manager.get_stats()
+        assert stats["total"] == 2
+        assert stats["running"] == 1
+        assert stats["stopped"] == 1
+
+    @pytest.mark.asyncio
+    async def test_callbacks(self):
+        """コールバック"""
+        started_workers = []
+        stopped_workers = []
+
+        manager = WorkerProcessManager()
+        manager.set_callbacks(
+            on_started=lambda w: started_workers.append(w),
+            on_stopped=lambda w: stopped_workers.append(w),
+        )
+
+        worker = await manager.start_worker(worker_id="worker-1", colony_id="colony-1")
+        await manager.stop_worker(worker.process_id)
+
+        assert len(started_workers) == 1
+        assert len(stopped_workers) == 1
+
+    @pytest.mark.asyncio
+    async def test_shutdown_all(self):
+        """全Worker停止"""
+        manager = WorkerProcessManager()
+        await manager.start_worker(worker_id="worker-1", colony_id="colony-1")
+        await manager.start_worker(worker_id="worker-2", colony_id="colony-1")
+
+        await manager.shutdown_all()
+
+        assert len(manager.get_running_workers()) == 0
+
+    @pytest.mark.asyncio
+    async def test_restart_worker(self):
+        """Workerプロセスを再起動"""
+        manager = WorkerProcessManager()
+        worker = await manager.start_worker(worker_id="worker-1", colony_id="colony-1")
+
+        new_worker = await manager.restart_worker(worker.process_id)
+
+        assert new_worker is not None
+        assert new_worker.process_id != worker.process_id
+        assert new_worker.state == WorkerProcessState.RUNNING
+
+    @pytest.mark.asyncio
+    async def test_restart_nonexistent(self):
+        """存在しないWorkerの再起動"""
+        manager = WorkerProcessManager()
+        result = await manager.restart_worker("nonexistent")
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_restart_exceeded(self):
+        """再起動回数上限超過"""
+        manager = WorkerProcessManager()
+        worker = await manager.start_worker(worker_id="worker-1", colony_id="colony-1")
+        manager._workers[worker.process_id].restart_count = 3  # Max reached
+
+        result = await manager.restart_worker(worker.process_id)
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_health_check_running(self):
+        """ヘルスチェック: 稼働中"""
+        manager = WorkerProcessManager()
+        worker = await manager.start_worker(worker_id="worker-1", colony_id="colony-1")
+
+        healthy = await manager.check_health(worker.process_id)
+        assert healthy is True
+
+    @pytest.mark.asyncio
+    async def test_health_check_nonexistent(self):
+        """ヘルスチェック: 存在しない"""
+        manager = WorkerProcessManager()
+        healthy = await manager.check_health("nonexistent")
+        assert healthy is False
