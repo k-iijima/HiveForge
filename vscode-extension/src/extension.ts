@@ -9,8 +9,9 @@ import { RunsProvider } from './providers/runsProvider';
 import { TasksProvider } from './providers/tasksProvider';
 import { RequirementsProvider } from './providers/requirementsProvider';
 import { EventsProvider } from './providers/eventsProvider';
+import { DecisionsProvider } from './providers/decisionsProvider';
 import { HiveForgeClient } from './client';
-import { registerRunCommands, registerRequirementCommands, registerFilterCommands, registerTaskCommands, Providers } from './commands';
+import { registerRunCommands, registerRequirementCommands, registerFilterCommands, registerTaskCommands, registerDecisionCommands, Providers } from './commands';
 
 let client: HiveForgeClient;
 let providers: Providers;
@@ -24,6 +25,7 @@ export function activate(context: vscode.ExtensionContext) {
     // 初期化
     const config = vscode.workspace.getConfiguration('hiveforge');
     const serverUrl = config.get<string>('serverUrl', 'http://localhost:8000');
+    const decisionsRunId = config.get<string>('decisionsRunId', 'meta-decisions');
 
     client = new HiveForgeClient(serverUrl);
     providers = {
@@ -31,6 +33,7 @@ export function activate(context: vscode.ExtensionContext) {
         tasks: new TasksProvider(client),
         requirements: new RequirementsProvider(client),
         events: new EventsProvider(client),
+        decisions: new DecisionsProvider(client, decisionsRunId),
     };
 
     // TreeViewを登録
@@ -41,6 +44,7 @@ export function activate(context: vscode.ExtensionContext) {
     registerRequirementCommands(context, client, refresh);
     registerFilterCommands(context, providers);
     registerTaskCommands(context, client, refresh);
+    registerDecisionCommands(context);
 
     // 自動更新を設定
     setupAutoRefresh(config);
@@ -74,7 +78,8 @@ function registerTreeViews(context: vscode.ExtensionContext): void {
         runsTreeView,
         requirementsTreeView,
         vscode.window.registerTreeDataProvider('hiveforge.tasks', providers.tasks),
-        vscode.window.registerTreeDataProvider('hiveforge.events', providers.events)
+        vscode.window.registerTreeDataProvider('hiveforge.events', providers.events),
+        vscode.window.registerTreeDataProvider('hiveforge.decisions', providers.decisions)
     );
 }
 
@@ -92,6 +97,9 @@ function updateConfiguration(): void {
     const serverUrl = config.get<string>('serverUrl', 'http://localhost:8000');
     client.setServerUrl(serverUrl);
 
+    const decisionsRunId = config.get<string>('decisionsRunId', 'meta-decisions');
+    providers.decisions.setRunId(decisionsRunId);
+
     // 自動更新を更新
     if (refreshInterval) {
         clearInterval(refreshInterval);
@@ -105,6 +113,7 @@ async function refresh(): Promise<void> {
     providers.tasks.refresh();
     providers.requirements.refresh();
     providers.events.refresh();
+    providers.decisions.refresh();
 
     // バッジを更新
     try {

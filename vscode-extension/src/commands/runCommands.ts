@@ -8,6 +8,7 @@ import { RunsProvider } from '../providers/runsProvider';
 import { TasksProvider } from '../providers/tasksProvider';
 import { RequirementsProvider } from '../providers/requirementsProvider';
 import { EventsProvider } from '../providers/eventsProvider';
+import { DecisionsProvider } from '../providers/decisionsProvider';
 
 import { RunItem } from '../providers/runsProvider';
 import { HiveEvent } from '../client';
@@ -17,6 +18,7 @@ export interface Providers {
     tasks: TasksProvider;
     requirements: RequirementsProvider;
     events: EventsProvider;
+    decisions: DecisionsProvider;
 }
 
 /**
