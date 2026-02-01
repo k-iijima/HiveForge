@@ -6,15 +6,16 @@ Run管理に関するエンドポイント。
 from fastapi import APIRouter, HTTPException, status
 
 from ...core import RunProjection, build_run_projection, generate_event_id
+from ...core.ar.projections import RunState, TaskState
 from ...core.events import (
     EmergencyStopEvent,
+    EventType,
     HeartbeatEvent,
     RequirementRejectedEvent,
     RunCompletedEvent,
     RunStartedEvent,
     TaskFailedEvent,
 )
-from ...core.ar.projections import RunState, TaskState
 from ..helpers import apply_event_to_projection, get_active_runs, get_ar
 from ..models import (
     CompleteRunRequest,
@@ -24,8 +25,18 @@ from ..models import (
     StartRunResponse,
 )
 
-
 router = APIRouter(prefix="/runs", tags=["Runs"])
+
+
+def _get_task_completed_event_ids(run_id: str, task_ids: set[str]) -> list[str]:
+    if not task_ids:
+        return []
+    ar = get_ar()
+    parents: list[str] = []
+    for event in ar.replay(run_id):
+        if event.type == EventType.TASK_COMPLETED and event.task_id in task_ids:
+            parents.append(event.id)
+    return parents
 
 
 @router.post("", response_model=StartRunResponse, status_code=status.HTTP_201_CREATED)
@@ -163,6 +174,7 @@ async def complete_run(run_id: str, request: CompleteRunRequest | None = None):
         raise HTTPException(status_code=400, detail=detail)
 
     cancelled_task_ids = []
+    cancelled_task_event_ids: list[str] = []
     if incomplete_tasks and force:
         # 強制完了: 未完了タスクを自動的にキャンセル
         for task in incomplete_tasks:
@@ -178,9 +190,11 @@ async def complete_run(run_id: str, request: CompleteRunRequest | None = None):
             ar.append(fail_event, run_id)
             apply_event_to_projection(run_id, fail_event)
             cancelled_task_ids.append(task.id)
+            cancelled_task_event_ids.append(fail_event.id)
 
     # 強制完了時は未解決の確認要請も却下する
     cancelled_requirement_ids = []
+    cancelled_requirement_event_ids: list[str] = []
     if force:
         for req in pending_requirements:
             reject_event = RequirementRejectedEvent(
@@ -194,8 +208,16 @@ async def complete_run(run_id: str, request: CompleteRunRequest | None = None):
             ar.append(reject_event, run_id)
             apply_event_to_projection(run_id, reject_event)
             cancelled_requirement_ids.append(req.id)
+            cancelled_requirement_event_ids.append(reject_event.id)
 
-    event = RunCompletedEvent(run_id=run_id, actor="api")
+    parents = request.parents if request else []
+    if not parents:
+        completed_task_ids = {t.id for t in proj.tasks.values() if t.state == TaskState.COMPLETED}
+        parents = _get_task_completed_event_ids(run_id, completed_task_ids)
+        if force:
+            parents = parents + cancelled_task_event_ids + cancelled_requirement_event_ids
+
+    event = RunCompletedEvent(run_id=run_id, actor="api", parents=parents)
     ar.append(event, run_id)
 
     active_runs.pop(run_id)

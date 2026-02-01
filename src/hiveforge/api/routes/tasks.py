@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, status
 
 from ...core import build_run_projection, generate_event_id
 from ...core.events import (
+    EventType,
     TaskAssignedEvent,
     TaskCompletedEvent,
     TaskCreatedEvent,
@@ -23,8 +24,23 @@ from ..models import (
     TaskResponse,
 )
 
-
 router = APIRouter(prefix="/runs/{run_id}/tasks", tags=["Tasks"])
+
+
+def _get_run_started_event_id(run_id: str) -> str | None:
+    ar = get_ar()
+    for event in ar.replay(run_id):
+        if event.type == EventType.RUN_STARTED:
+            return event.id
+    return None
+
+
+def _get_task_created_event_id(run_id: str, task_id: str) -> str | None:
+    ar = get_ar()
+    for event in ar.replay(run_id):
+        if event.type == EventType.TASK_CREATED and event.task_id == task_id:
+            return event.id
+    return None
 
 
 @router.post("", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)
@@ -37,6 +53,12 @@ async def create_task(run_id: str, request: CreateTaskRequest):
     ar = get_ar()
     task_id = generate_event_id()
 
+    parents = request.parents
+    if not parents:
+        run_started_id = _get_run_started_event_id(run_id)
+        if run_started_id:
+            parents = [run_started_id]
+
     event = TaskCreatedEvent(
         run_id=run_id,
         task_id=task_id,
@@ -46,7 +68,7 @@ async def create_task(run_id: str, request: CreateTaskRequest):
             "description": request.description,
             "metadata": request.metadata,
         },
-        parents=request.parents,
+        parents=parents,
     )
     ar.append(event, run_id)
 
@@ -103,12 +125,19 @@ async def complete_task(run_id: str, task_id: str, request: CompleteTaskRequest)
         raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
 
     ar = get_ar()
+
+    parents = request.parents
+    if not parents:
+        created_id = _get_task_created_event_id(run_id, task_id)
+        if created_id:
+            parents = [created_id]
+
     event = TaskCompletedEvent(
         run_id=run_id,
         task_id=task_id,
         actor="api",
         payload={"result": request.result},
-        parents=request.parents,
+        parents=parents,
     )
     ar.append(event, run_id)
 
@@ -130,12 +159,19 @@ async def fail_task(run_id: str, task_id: str, request: FailTaskRequest):
         raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
 
     ar = get_ar()
+
+    parents = request.parents
+    if not parents:
+        created_id = _get_task_created_event_id(run_id, task_id)
+        if created_id:
+            parents = [created_id]
+
     event = TaskFailedEvent(
         run_id=run_id,
         task_id=task_id,
         actor="api",
         payload={"error": request.error, "retryable": request.retryable},
-        parents=request.parents,
+        parents=parents,
     )
     ar.append(event, run_id)
 
@@ -157,12 +193,19 @@ async def assign_task(run_id: str, task_id: str, request: AssignTaskRequest):
         raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
 
     ar = get_ar()
+
+    parents = request.parents
+    if not parents:
+        created_id = _get_task_created_event_id(run_id, task_id)
+        if created_id:
+            parents = [created_id]
+
     event = TaskAssignedEvent(
         run_id=run_id,
         task_id=task_id,
         actor="api",
         payload={"assignee": request.assignee},
-        parents=request.parents,
+        parents=parents,
     )
     ar.append(event, run_id)
 
@@ -184,12 +227,19 @@ async def report_progress(run_id: str, task_id: str, request: ReportProgressRequ
         raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
 
     ar = get_ar()
+
+    parents = request.parents
+    if not parents:
+        created_id = _get_task_created_event_id(run_id, task_id)
+        if created_id:
+            parents = [created_id]
+
     event = TaskProgressedEvent(
         run_id=run_id,
         task_id=task_id,
         actor="api",
         payload={"progress": request.progress, "message": request.message},
-        parents=request.parents,
+        parents=parents,
     )
     ar.append(event, run_id)
 

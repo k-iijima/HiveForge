@@ -1,17 +1,17 @@
 """API Server モジュールのテスト"""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
-from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 
-from hiveforge.api.server import app
 from hiveforge.api.helpers import (
-    get_ar,
-    get_active_runs,
-    set_ar,
     clear_active_runs,
+    get_active_runs,
+    get_ar,
+    set_ar,
 )
+from hiveforge.api.server import app
 
 
 @pytest.fixture
@@ -28,10 +28,9 @@ def client(tmp_path):
 
     with (
         patch("hiveforge.api.server.get_settings", return_value=mock_s),
-        patch("hiveforge.api.helpers.get_settings", return_value=mock_s),
+        patch("hiveforge.api.helpers.get_settings", return_value=mock_s),TestClient(app) as client
     ):
-        with TestClient(app) as client:
-            yield client
+        yield client
 
     # クリーンアップ
     set_ar(None)
@@ -338,6 +337,34 @@ class TestTasksEndpoints:
         assert data["title"] == "テストタスク"
         assert data["state"] == "pending"
 
+    def test_create_task_auto_parents_defaults_to_run_started(self, client):
+        """parents未指定なら task.created は run.started を親に自動補完する
+
+        Issue #001 のルール: task.created -> run.started
+        """
+        # Arrange
+        from hiveforge.core.events import EventType
+
+        run_resp = client.post("/runs", json={"goal": "auto parents"})
+        run_id = run_resp.json()["run_id"]
+
+        # Act
+        task_resp = client.post(
+            f"/runs/{run_id}/tasks",
+            json={"title": "タスク"},
+        )
+        task_id = task_resp.json()["task_id"]
+
+        # Assert
+        ar = get_ar()
+        run_started_id = next(e.id for e in ar.replay(run_id) if e.type == EventType.RUN_STARTED)
+        created_event = next(
+            e
+            for e in ar.replay(run_id)
+            if e.type == EventType.TASK_CREATED and e.task_id == task_id
+        )
+        assert created_event.parents == [run_started_id]
+
     def test_create_task_run_not_found(self, client):
         """存在しないRunへのTask作成で404を返す"""
         # Act
@@ -410,6 +437,41 @@ class TestTasksEndpoints:
         assert data["status"] == "completed"
         assert data["task_id"] == task_id
 
+    def test_assign_task_auto_parents_defaults_to_task_created(self, client):
+        """parents未指定なら task.assigned は task.created を親に自動補完する
+
+        Issue #001 のルール: task.assigned -> task.created
+        """
+        # Arrange
+        from hiveforge.core.events import EventType
+
+        run_resp = client.post("/runs", json={"goal": "auto parents"})
+        run_id = run_resp.json()["run_id"]
+        task_resp = client.post(f"/runs/{run_id}/tasks", json={"title": "タスク"})
+        task_id = task_resp.json()["task_id"]
+
+        ar = get_ar()
+        created_event_id = next(
+            e.id
+            for e in ar.replay(run_id)
+            if e.type == EventType.TASK_CREATED and e.task_id == task_id
+        )
+
+        # Act
+        response = client.post(
+            f"/runs/{run_id}/tasks/{task_id}/assign",
+            json={"assignee": "me"},
+        )
+
+        # Assert
+        assert response.status_code == 200
+        assigned_event = next(
+            e
+            for e in ar.replay(run_id)
+            if e.type == EventType.TASK_ASSIGNED and e.task_id == task_id
+        )
+        assert assigned_event.parents == [created_event_id]
+
     def test_complete_task_run_not_found(self, client):
         """存在しないRunのTask完了で404を返す"""
         # Act
@@ -481,6 +543,67 @@ class TestTasksEndpoints:
 
         # Assert
         assert response.status_code == 404
+
+
+class TestRunCompletionAutoParents:
+    """Run完了時のparents自動補完テスト"""
+
+    def test_run_completed_parents_include_task_completed(self, client):
+        """run.completed は全 task.completed をparentsに含める
+
+        Issue #001 のルール: run.completed -> all task.completed
+        """
+        # Arrange
+        from hiveforge.core.events import EventType
+
+        run_resp = client.post("/runs", json={"goal": "complete run"})
+        run_id = run_resp.json()["run_id"]
+        task_resp = client.post(f"/runs/{run_id}/tasks", json={"title": "タスク"})
+        task_id = task_resp.json()["task_id"]
+        client.post(f"/runs/{run_id}/tasks/{task_id}/complete", json={"result": {}})
+
+        ar = get_ar()
+        completed_event_id = next(
+            e.id
+            for e in ar.replay(run_id)
+            if e.type == EventType.TASK_COMPLETED and e.task_id == task_id
+        )
+
+        # Act
+        resp = client.post(f"/runs/{run_id}/complete")
+
+        # Assert
+        assert resp.status_code == 200
+        run_completed_event = next(
+            e for e in ar.replay(run_id) if e.type == EventType.RUN_COMPLETED
+        )
+        assert completed_event_id in run_completed_event.parents
+
+    def test_run_completed_explicit_parents_are_preserved(self, client):
+        """run.completed でparentsを明示した場合は自動補完せず、そのまま使う"""
+        # Arrange
+        from hiveforge.core.events import EventType
+
+        run_resp = client.post("/runs", json={"goal": "complete run"})
+        run_id = run_resp.json()["run_id"]
+        task_resp = client.post(f"/runs/{run_id}/tasks", json={"title": "タスク"})
+        task_id = task_resp.json()["task_id"]
+        client.post(f"/runs/{run_id}/tasks/{task_id}/complete", json={"result": {}})
+
+        ar = get_ar()
+
+        # Act
+        resp = client.post(
+            f"/runs/{run_id}/complete",
+            json={"parents": ["p1"]},
+        )
+
+        # Assert
+        assert resp.status_code == 200
+        run_completed_event = next(
+            e for e in ar.replay(run_id) if e.type == EventType.RUN_COMPLETED
+        )
+        assert run_completed_event.parents == ["p1"]
 
 
 class TestEventsEndpoint:
@@ -790,7 +913,6 @@ class TestGetArFunction:
     def test_get_ar_creates_instance(self, tmp_path):
         """ARインスタンスを作成する"""
         # Arrange
-        import hiveforge.api.helpers as helpers_module
 
         set_ar(None)
 
@@ -811,7 +933,6 @@ class TestGetArFunction:
     def test_get_ar_returns_existing(self, tmp_path):
         """既存のARインスタンスを返す"""
         # Arrange
-        import hiveforge.api.helpers as helpers_module
 
         mock_ar = MagicMock()
         set_ar(mock_ar)
@@ -858,7 +979,7 @@ class TestLifespanRunRecovery:
             patch("hiveforge.api.helpers.get_settings", return_value=mock_s),
         ):
             # Act
-            with TestClient(app) as client:
+            with TestClient(app):
                 # Assert: 復元されたRunがアクティブに追加されている
                 assert "recovery-run-001" in get_active_runs()
                 proj = get_active_runs()["recovery-run-001"]
@@ -880,7 +1001,6 @@ class TestGetRunFromInactiveRun:
         client.post(f"/runs/{run_id}/complete")
 
         # runを_active_runsから削除されていることを確認
-        import hiveforge.api.helpers as helpers_module
 
         assert run_id not in get_active_runs()
 
@@ -1040,7 +1160,7 @@ class TestLifespanNoRuns:
     def test_lifespan_with_completed_run_only(self, tmp_path):
         """COMPLETEDのRunのみの場合、アクティブに追加されない"""
         from hiveforge.core.ar.storage import AkashicRecord
-        from hiveforge.core.events import RunStartedEvent, RunCompletedEvent
+        from hiveforge.core.events import RunCompletedEvent, RunStartedEvent
 
         vault_path = tmp_path / "CompletedVault"
         ar = AkashicRecord(vault_path)
@@ -1073,7 +1193,7 @@ class TestLifespanNoRuns:
             patch("hiveforge.api.helpers.get_settings", return_value=mock_s),
         ):
             # Act
-            with TestClient(app) as client:
+            with TestClient(app):
                 # Assert: 完了済みRunはアクティブに追加されない
                 assert run_id not in get_active_runs()
 

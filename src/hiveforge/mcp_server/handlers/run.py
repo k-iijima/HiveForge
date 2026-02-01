@@ -5,24 +5,35 @@ Run開始、完了、状態取得、ハートビート、緊急停止を担当�
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from ...core import build_run_projection, generate_event_id
+from ...core.ar.projections import TaskState
 from ...core.events import (
-    HeartbeatEvent,
     EmergencyStopEvent,
+    EventType,
+    HeartbeatEvent,
     RequirementRejectedEvent,
     RunCompletedEvent,
     RunStartedEvent,
     TaskFailedEvent,
 )
-from ...core.ar.projections import TaskState
 from .base import BaseHandler
 
 
 class RunHandlers(BaseHandler):
     """Run関連ハンドラー"""
+
+    def _get_task_completed_event_ids(self, run_id: str, task_ids: set[str]) -> list[str]:
+        if not task_ids:
+            return []
+        ar = self._get_ar()
+        parents: list[str] = []
+        for event in ar.replay(run_id):
+            if event.type == EventType.TASK_COMPLETED and event.task_id in task_ids:
+                parents.append(event.id)
+        return parents
 
     async def handle_start_run(self, args: dict[str, Any]) -> dict[str, Any]:
         """Run開始"""
@@ -124,6 +135,7 @@ class RunHandlers(BaseHandler):
             return result
 
         cancelled_task_ids = []
+        cancelled_task_event_ids: list[str] = []
         if incomplete_tasks and force:
             # 強制完了: 未完了タスクを自動的にキャンセル
             for task in incomplete_tasks:
@@ -138,9 +150,11 @@ class RunHandlers(BaseHandler):
                 )
                 ar.append(fail_event, run_id)
                 cancelled_task_ids.append(task.id)
+                cancelled_task_event_ids.append(fail_event.id)
 
         # 強制完了時は未解決の確認要請も却下する
         cancelled_requirement_ids = []
+        cancelled_requirement_event_ids: list[str] = []
         if force:
             for req in pending_requirements:
                 reject_event = RequirementRejectedEvent(
@@ -153,10 +167,19 @@ class RunHandlers(BaseHandler):
                 )
                 ar.append(reject_event, run_id)
                 cancelled_requirement_ids.append(req.id)
+                cancelled_requirement_event_ids.append(reject_event.id)
+
+        parents = args.get("parents", [])
+        if not parents:
+            completed_task_ids = {t.id for t in proj.completed_tasks}
+            parents = self._get_task_completed_event_ids(run_id, completed_task_ids)
+            if force:
+                parents = parents + cancelled_task_event_ids + cancelled_requirement_event_ids
 
         event = RunCompletedEvent(
             run_id=run_id,
             actor="copilot",
+            parents=parents,
             payload={"summary": args.get("summary", "")},
         )
         ar.append(event, run_id)
@@ -190,7 +213,7 @@ class RunHandlers(BaseHandler):
 
         return {
             "status": "ok",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
     async def handle_emergency_stop(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -258,7 +281,7 @@ class RunHandlers(BaseHandler):
             "run_id": run_id,
             "reason": reason,
             "scope": scope,
-            "stopped_at": datetime.now(timezone.utc).isoformat(),
+            "stopped_at": datetime.now(UTC).isoformat(),
         }
         if cancelled_task_ids:
             result["cancelled_task_ids"] = cancelled_task_ids

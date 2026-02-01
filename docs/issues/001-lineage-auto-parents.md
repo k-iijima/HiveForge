@@ -90,7 +90,7 @@ run.started (01ABC...)
 - `src/hiveforge/mcp_server/server.py`
 - `src/hiveforge/api/server.py`
 - `src/hiveforge/core/events.py`
-- `コンセプト_v3.md`: 因果リンク仕様
+- `docs/コンセプト_v3.md`: 因果リンク仕様
 
 ## ラベル
 

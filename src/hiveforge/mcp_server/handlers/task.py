@@ -9,6 +9,7 @@ from typing import Any
 
 from ...core import generate_event_id
 from ...core.events import (
+    EventType,
     TaskAssignedEvent,
     TaskCompletedEvent,
     TaskCreatedEvent,
@@ -21,6 +22,20 @@ from .base import BaseHandler
 class TaskHandlers(BaseHandler):
     """Task関連ハンドラー"""
 
+    def _get_run_started_event_id(self, run_id: str) -> str | None:
+        ar = self._get_ar()
+        for event in ar.replay(run_id):
+            if event.type == EventType.RUN_STARTED:
+                return event.id
+        return None
+
+    def _get_task_created_event_id(self, run_id: str, task_id: str) -> str | None:
+        ar = self._get_ar()
+        for event in ar.replay(run_id):
+            if event.type == EventType.TASK_CREATED and event.task_id == task_id:
+                return event.id
+        return None
+
     async def handle_create_task(self, args: dict[str, Any]) -> dict[str, Any]:
         """Task作成"""
         if not self._current_run_id:
@@ -29,11 +44,17 @@ class TaskHandlers(BaseHandler):
         ar = self._get_ar()
         task_id = generate_event_id()
 
+        parents = args.get("parents", [])
+        if not parents:
+            run_started_id = self._get_run_started_event_id(self._current_run_id)
+            if run_started_id:
+                parents = [run_started_id]
+
         event = TaskCreatedEvent(
             run_id=self._current_run_id,
             task_id=task_id,
             actor="copilot",
-            parents=args.get("parents", []),
+            parents=parents,
             payload={
                 "title": args.get("title", ""),
                 "description": args.get("description", ""),
@@ -57,10 +78,17 @@ class TaskHandlers(BaseHandler):
         if not task_id:
             return {"error": "task_id is required"}
 
+        parents = args.get("parents", [])
+        if not parents:
+            created_id = self._get_task_created_event_id(self._current_run_id, task_id)
+            if created_id:
+                parents = [created_id]
+
         event = TaskAssignedEvent(
             run_id=self._current_run_id,
             task_id=task_id,
             actor="copilot",
+            parents=parents,
             payload={"assignee": "copilot"},
         )
         ar.append(event, self._current_run_id)
@@ -82,11 +110,17 @@ class TaskHandlers(BaseHandler):
         if not task_id:
             return {"error": "task_id is required"}
 
+        parents = args.get("parents", [])
+        if not parents:
+            created_id = self._get_task_created_event_id(self._current_run_id, task_id)
+            if created_id:
+                parents = [created_id]
+
         event = TaskProgressedEvent(
             run_id=self._current_run_id,
             task_id=task_id,
             actor="copilot",
-            parents=args.get("parents", []),
+            parents=parents,
             payload={
                 "progress": progress,
                 "message": args.get("message", ""),
@@ -111,11 +145,17 @@ class TaskHandlers(BaseHandler):
         if not task_id:
             return {"error": "task_id is required"}
 
+        parents = args.get("parents", [])
+        if not parents:
+            created_id = self._get_task_created_event_id(self._current_run_id, task_id)
+            if created_id:
+                parents = [created_id]
+
         event = TaskCompletedEvent(
             run_id=self._current_run_id,
             task_id=task_id,
             actor="copilot",
-            parents=args.get("parents", []),
+            parents=parents,
             payload={"result": args.get("result", "")},
         )
         ar.append(event, self._current_run_id)
@@ -136,11 +176,17 @@ class TaskHandlers(BaseHandler):
         if not task_id:
             return {"error": "task_id is required"}
 
+        parents = args.get("parents", [])
+        if not parents:
+            created_id = self._get_task_created_event_id(self._current_run_id, task_id)
+            if created_id:
+                parents = [created_id]
+
         event = TaskFailedEvent(
             run_id=self._current_run_id,
             task_id=task_id,
             actor="copilot",
-            parents=args.get("parents", []),
+            parents=parents,
             payload={
                 "error": args.get("error", ""),
                 "retryable": args.get("retryable", True),

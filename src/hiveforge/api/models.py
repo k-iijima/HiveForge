@@ -8,7 +8,6 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-
 # --- Run モデル ---
 
 
@@ -51,6 +50,7 @@ class CompleteRunRequest(BaseModel):
         default=False,
         description="未完了タスクがあっても強制的に完了するか。Trueの場合、未完了タスクは自動的にキャンセルされる",
     )
+    parents: list[str] = Field(default_factory=list, description="親イベントID（因果リンク用）")
 
 
 class EmergencyStopRequest(BaseModel):
