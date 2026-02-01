@@ -1,5 +1,11 @@
 """Akashic Record (AR) - イベント永続化層"""
 
+from .hive_projections import (
+    ColonyProjection,
+    HiveAggregate,
+    HiveProjection,
+    build_hive_aggregate,
+)
 from .hive_storage import HiveStore
 from .projections import (
     ColonyState,
@@ -18,6 +24,10 @@ from .storage import AkashicRecord
 __all__ = [
     "AkashicRecord",
     "HiveStore",
+    "HiveAggregate",
+    "HiveProjection",
+    "ColonyProjection",
+    "build_hive_aggregate",
     "RunProjection",
     "TaskProjection",
     "RequirementProjection",

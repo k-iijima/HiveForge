@@ -574,3 +574,229 @@ class TestProjectionProperties:
 
         # Assert: 未決定の要件が2件
         assert len(pending) == 2
+
+
+class TestHiveAggregate:
+    """HiveAggregate のテスト
+
+    Hive集約はイベント列からHiveとColonyの状態を投影する。
+    """
+
+    def test_apply_hive_created_event(self):
+        """HiveCreatedEventの適用
+
+        Hive作成イベントで集約が初期化される。
+        """
+        # Arrange
+        from hiveforge.core.ar.hive_projections import HiveAggregate
+        from hiveforge.core.events import HiveCreatedEvent
+
+        aggregate = HiveAggregate("hive-001")
+
+        # Act: Hive作成イベントを適用
+        event = HiveCreatedEvent(
+            actor="beekeeper",
+            payload={"hive_id": "hive-001", "name": "Test Hive"},
+        )
+        aggregate.apply(event)
+
+        # Assert: 状態がACTIVEで、名前が設定される
+        from hiveforge.core.ar.projections import HiveState
+
+        assert aggregate.state == HiveState.ACTIVE
+        assert aggregate.name == "Test Hive"
+
+    def test_apply_colony_created_event(self):
+        """ColonyCreatedEventの適用
+
+        Colony作成イベントでColonyが登録される。
+        """
+        # Arrange
+        from hiveforge.core.ar.hive_projections import HiveAggregate
+        from hiveforge.core.events import HiveCreatedEvent, ColonyCreatedEvent
+
+        aggregate = HiveAggregate("hive-001")
+        aggregate.apply(HiveCreatedEvent(payload={"hive_id": "hive-001", "name": "Test"}))
+
+        # Act: Colony作成イベントを適用
+        event = ColonyCreatedEvent(
+            actor="queen_bee",
+            payload={"colony_id": "colony-001", "hive_id": "hive-001", "goal": "Build feature X"},
+        )
+        aggregate.apply(event)
+
+        # Assert: Colonyが登録される
+        assert "colony-001" in aggregate.colonies
+        colony = aggregate.colonies["colony-001"]
+        assert colony.goal == "Build feature X"
+        from hiveforge.core.ar.projections import ColonyState
+
+        assert colony.state == ColonyState.PENDING
+
+    def test_apply_colony_started_event(self):
+        """ColonyStartedEventの適用
+
+        Colony開始イベントでColonyの状態がIN_PROGRESSになる。
+        """
+        # Arrange
+        from hiveforge.core.ar.hive_projections import HiveAggregate
+        from hiveforge.core.events import HiveCreatedEvent, ColonyCreatedEvent, ColonyStartedEvent
+        from hiveforge.core.ar.projections import ColonyState
+
+        aggregate = HiveAggregate("hive-001")
+        aggregate.apply(HiveCreatedEvent(payload={"hive_id": "hive-001", "name": "Test"}))
+        aggregate.apply(
+            ColonyCreatedEvent(payload={"colony_id": "colony-001", "hive_id": "hive-001"})
+        )
+
+        # Act: Colony開始イベントを適用
+        event = ColonyStartedEvent(payload={"colony_id": "colony-001"})
+        aggregate.apply(event)
+
+        # Assert: ColonyがIN_PROGRESSになる
+        assert aggregate.colonies["colony-001"].state == ColonyState.IN_PROGRESS
+
+    def test_apply_colony_completed_event(self):
+        """ColonyCompletedEventの適用
+
+        Colony完了イベントでColonyの状態がCOMPLETEDになる。
+        """
+        # Arrange
+        from hiveforge.core.ar.hive_projections import HiveAggregate
+        from hiveforge.core.events import (
+            HiveCreatedEvent,
+            ColonyCreatedEvent,
+            ColonyStartedEvent,
+            ColonyCompletedEvent,
+        )
+        from hiveforge.core.ar.projections import ColonyState
+
+        aggregate = HiveAggregate("hive-001")
+        aggregate.apply(HiveCreatedEvent(payload={"hive_id": "hive-001", "name": "Test"}))
+        aggregate.apply(
+            ColonyCreatedEvent(payload={"colony_id": "colony-001", "hive_id": "hive-001"})
+        )
+        aggregate.apply(ColonyStartedEvent(payload={"colony_id": "colony-001"}))
+
+        # Act: Colony完了イベントを適用
+        event = ColonyCompletedEvent(payload={"colony_id": "colony-001"})
+        aggregate.apply(event)
+
+        # Assert: ColonyがCOMPLETEDになる
+        assert aggregate.colonies["colony-001"].state == ColonyState.COMPLETED
+
+    def test_apply_colony_failed_event(self):
+        """ColonyFailedEventの適用
+
+        Colony失敗イベントでColonyの状態がFAILEDになる。
+        """
+        # Arrange
+        from hiveforge.core.ar.hive_projections import HiveAggregate
+        from hiveforge.core.events import (
+            HiveCreatedEvent,
+            ColonyCreatedEvent,
+            ColonyStartedEvent,
+            ColonyFailedEvent,
+        )
+        from hiveforge.core.ar.projections import ColonyState
+
+        aggregate = HiveAggregate("hive-001")
+        aggregate.apply(HiveCreatedEvent(payload={"hive_id": "hive-001", "name": "Test"}))
+        aggregate.apply(
+            ColonyCreatedEvent(payload={"colony_id": "colony-001", "hive_id": "hive-001"})
+        )
+        aggregate.apply(ColonyStartedEvent(payload={"colony_id": "colony-001"}))
+
+        # Act: Colony失敗イベントを適用
+        event = ColonyFailedEvent(payload={"colony_id": "colony-001", "error": "Critical error"})
+        aggregate.apply(event)
+
+        # Assert: ColonyがFAILEDになる
+        assert aggregate.colonies["colony-001"].state == ColonyState.FAILED
+        assert aggregate.colonies["colony-001"].error == "Critical error"
+
+    def test_apply_hive_closed_event(self):
+        """HiveClosedEventの適用
+
+        Hive終了イベントでHiveの状態がCLOSEDになる。
+        """
+        # Arrange
+        from hiveforge.core.ar.hive_projections import HiveAggregate
+        from hiveforge.core.events import HiveCreatedEvent, HiveClosedEvent
+        from hiveforge.core.ar.projections import HiveState
+
+        aggregate = HiveAggregate("hive-001")
+        aggregate.apply(HiveCreatedEvent(payload={"hive_id": "hive-001", "name": "Test"}))
+
+        # Act: Hive終了イベントを適用
+        event = HiveClosedEvent(payload={"hive_id": "hive-001", "reason": "completed"})
+        aggregate.apply(event)
+
+        # Assert: HiveがCLOSEDになる
+        assert aggregate.state == HiveState.CLOSED
+
+    def test_build_from_events(self):
+        """イベント列からHive集約を構築
+
+        複数のイベントを順に適用してHive状態を再構築する。
+        """
+        # Arrange
+        from hiveforge.core.ar.hive_projections import HiveAggregate, build_hive_aggregate
+        from hiveforge.core.events import (
+            HiveCreatedEvent,
+            ColonyCreatedEvent,
+            ColonyStartedEvent,
+            ColonyCompletedEvent,
+        )
+        from hiveforge.core.ar.projections import HiveState, ColonyState
+
+        events = [
+            HiveCreatedEvent(payload={"hive_id": "hive-001", "name": "Test Hive"}),
+            ColonyCreatedEvent(
+                payload={"colony_id": "colony-001", "hive_id": "hive-001", "goal": "Goal 1"}
+            ),
+            ColonyCreatedEvent(
+                payload={"colony_id": "colony-002", "hive_id": "hive-001", "goal": "Goal 2"}
+            ),
+            ColonyStartedEvent(payload={"colony_id": "colony-001"}),
+            ColonyCompletedEvent(payload={"colony_id": "colony-001"}),
+        ]
+
+        # Act: イベント列から集約を構築
+        aggregate = build_hive_aggregate("hive-001", events)
+
+        # Assert: 状態が正しく反映される
+        assert aggregate.state == HiveState.ACTIVE
+        assert len(aggregate.colonies) == 2
+        assert aggregate.colonies["colony-001"].state == ColonyState.COMPLETED
+        assert aggregate.colonies["colony-002"].state == ColonyState.PENDING
+
+    def test_active_colonies_property(self):
+        """アクティブなColony一覧を取得"""
+        # Arrange
+        from hiveforge.core.ar.hive_projections import HiveAggregate
+        from hiveforge.core.events import (
+            HiveCreatedEvent,
+            ColonyCreatedEvent,
+            ColonyStartedEvent,
+            ColonyCompletedEvent,
+        )
+
+        aggregate = HiveAggregate("hive-001")
+        aggregate.apply(HiveCreatedEvent(payload={"hive_id": "hive-001", "name": "Test"}))
+        aggregate.apply(
+            ColonyCreatedEvent(payload={"colony_id": "colony-001", "hive_id": "hive-001"})
+        )
+        aggregate.apply(
+            ColonyCreatedEvent(payload={"colony_id": "colony-002", "hive_id": "hive-001"})
+        )
+        aggregate.apply(ColonyStartedEvent(payload={"colony_id": "colony-001"}))
+        aggregate.apply(ColonyCompletedEvent(payload={"colony_id": "colony-001"}))
+
+        # Act: アクティブなColonyを取得
+        active = aggregate.active_colonies
+
+        # Assert: PENDING の colony-002 のみ（IN_PROGRESS もアクティブだが今回はPENDINGのみ）
+        # 実際には PENDING と IN_PROGRESS の両方がアクティブ
+        assert len(active) == 1
+        assert active[0].colony_id == "colony-002"
