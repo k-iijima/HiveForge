@@ -285,3 +285,85 @@ class TestLineageResolverEdgeCases:
 
         # Assert
         assert parents == []
+
+
+class TestLineageResolverNullRunId:
+    """run_idがNoneの場合のテスト"""
+
+    def test_task_created_with_none_run_id_returns_empty(self):
+        """run_idがNoneのtask.createdは空リストを返す"""
+        # Arrange
+        resolver = LineageResolver()
+        run_started = RunStartedEvent(
+            id="run-started-001",
+            run_id="run-001",
+            actor="user",
+            payload={"goal": "テスト"},
+        )
+        existing_events = [run_started]
+
+        # run_idをNoneに設定（通常はないが防御コード確認）
+        task_created = TaskCreatedEvent(
+            run_id=None,  # type: ignore
+            task_id="task-001",
+            actor="copilot",
+            payload={"title": "テストタスク"},
+        )
+
+        # Act
+        parents = resolver.resolve_parents(task_created, existing_events)
+
+        # Assert
+        assert parents == []
+
+    def test_task_completed_with_none_task_id_returns_empty(self):
+        """task_idがNoneのtask.completedは空リストを返す"""
+        # Arrange
+        resolver = LineageResolver()
+        task_created = TaskCreatedEvent(
+            id="task-created-001",
+            run_id="run-001",
+            task_id="task-001",
+            actor="copilot",
+            payload={"title": "テストタスク"},
+        )
+        existing_events = [task_created]
+
+        # task_idをNoneに設定
+        task_completed = TaskCompletedEvent(
+            run_id="run-001",
+            task_id=None,  # type: ignore
+            actor="worker-001",
+            payload={"result": "完了"},
+        )
+
+        # Act
+        parents = resolver.resolve_parents(task_completed, existing_events)
+
+        # Assert
+        assert parents == []
+
+    def test_run_completed_with_none_run_id_returns_empty(self):
+        """run_idがNoneのrun.completedは空リストを返す"""
+        # Arrange
+        resolver = LineageResolver()
+        task_completed = TaskCompletedEvent(
+            id="task-completed-001",
+            run_id="run-001",
+            task_id="task-001",
+            actor="worker-001",
+            payload={"result": "完了"},
+        )
+        existing_events = [task_completed]
+
+        run_completed = RunCompletedEvent(
+            run_id=None,  # type: ignore
+            actor="system",
+            payload={"summary": "完了"},
+        )
+
+        # Act
+        parents = resolver.resolve_parents(run_completed, existing_events)
+
+        # Assert
+        assert parents == []
