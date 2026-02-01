@@ -64,13 +64,13 @@ class TestConferenceStartedEvent:
         assert event.payload["topic"] == "ECサイト基本設計の方針決定"
 
     def test_conference_started_event_is_immutable(self):
-        """ConferenceStartedEventはイミュータブル"""
+        """会議開始イベントはイミュータブル"""
         # Arrange
         event = ConferenceStartedEvent(
             payload={"conference_id": "conf-001", "topic": "test"},
         )
 
-        # Act & Assert
+        # Act & Assert: frozen modelの変更試行はValidationErrorを投げる
         with pytest.raises(Exception):
             event.payload = {"conference_id": "changed"}
 

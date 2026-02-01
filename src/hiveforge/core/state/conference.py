@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 
-from ..events import ConferenceEndedEvent, ConferenceStartedEvent, EventType
+from ..events import EventType
 
 
 class ConferenceState(Enum):

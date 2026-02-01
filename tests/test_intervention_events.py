@@ -4,7 +4,6 @@ Direct Intervention イベントテスト
 ユーザー直接介入、Queen直訴、Beekeeperフィードバックのイベントテスト。
 """
 
-import pytest
 
 from hiveforge.core.events import (
     BeekeeperFeedbackEvent,

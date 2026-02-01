@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from ...core import generate_event_id
 from ...core.events import (
     BeekeeperFeedbackEvent,
     EscalationType,
@@ -19,7 +18,7 @@ from ...core.events import (
 from .base import BaseHandler
 
 if TYPE_CHECKING:
-    from ..server import HiveForgeMCPServer
+    pass
 
 
 # インメモリストア（Phase 1用簡易実装）

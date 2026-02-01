@@ -9,7 +9,6 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from ...core import generate_event_id
 from ...core.events import (
     BeekeeperFeedbackEvent,
     EscalationType,
@@ -125,12 +124,12 @@ async def create_queen_escalation(request: QueenEscalationRequest) -> Interventi
     # エスカレーションタイプを検証
     try:
         esc_type = EscalationType(request.escalation_type)
-    except ValueError:
+    except ValueError as err:
         raise HTTPException(
             status_code=400,
             detail=f"Invalid escalation_type: {request.escalation_type}. "
             f"Valid types: {[t.value for t in EscalationType]}",
-        )
+        ) from err
 
     event = QueenEscalationEvent(
         actor=f"queen-{request.colony_id}",

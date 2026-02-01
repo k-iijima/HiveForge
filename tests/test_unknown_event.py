@@ -3,7 +3,6 @@
 外部フィードバック対応: 未知のイベントタイプを例外ではなくUnknownEventとして読み込む。
 """
 
-import pytest
 
 from hiveforge.core.events import BaseEvent, UnknownEvent, parse_event
 

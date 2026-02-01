@@ -13,6 +13,11 @@ from ...core.events import (
     RequirementRejectedEvent,
 )
 from ..helpers import apply_event_to_projection, get_active_runs, get_ar
+from ..models import (
+    CreateRequirementRequest,
+    RequirementResponse,
+    ResolveRequirementRequest,
+)
 
 
 def _get_run_started_event_id(run_id: str) -> str | None:
@@ -35,12 +40,6 @@ def _get_requirement_created_event_id(run_id: str, requirement_id: str) -> str |
             return event.id
     return None
 
-
-from ..models import (
-    CreateRequirementRequest,
-    RequirementResponse,
-    ResolveRequirementRequest,
-)
 
 router = APIRouter(prefix="/runs/{run_id}/requirements", tags=["Requirements"])
 

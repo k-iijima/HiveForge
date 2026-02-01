@@ -566,10 +566,10 @@ class TestColonyEvents:
 
         # Act & Assert: 全てパース可能
         from hiveforge.core.events import (
-            ColonyCreatedEvent,
-            ColonyStartedEvent,
             ColonyCompletedEvent,
+            ColonyCreatedEvent,
             ColonyFailedEvent,
+            ColonyStartedEvent,
         )
 
         expected_classes = [
@@ -579,7 +579,7 @@ class TestColonyEvents:
             ColonyFailedEvent,
         ]
 
-        for data, expected_class in zip(colony_events_data, expected_classes):
+        for data, expected_class in zip(colony_events_data, expected_classes, strict=True):
             event = parse_event(data)
             assert isinstance(event, expected_class), (
                 f"{data['type']} should parse to {expected_class.__name__}"

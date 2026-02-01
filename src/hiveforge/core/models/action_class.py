@@ -116,9 +116,7 @@ def requires_confirmation(
 
     # IRREVERSIBLE は Level 3 でもデフォルトは確認必須
     if action_class == ActionClass.IRREVERSIBLE:
-        if trust_level == TrustLevel.FULL_DELEGATION and allow_irreversible_skip:
-            return False
-        return True
+        return not (trust_level == TrustLevel.FULL_DELEGATION and allow_irreversible_skip)
 
     # フォールバック: 確認必須
     return True

@@ -7,7 +7,6 @@ import pytest
 
 from hiveforge.core.events import (
     EVENT_TYPE_MAP,
-    BaseEvent,
     DecisionAppliedEvent,
     DecisionSupersededEvent,
     EventType,
@@ -90,7 +89,7 @@ class TestProposalCreatedEvent:
         )
 
         # Act & Assert
-        with pytest.raises(Exception):  # ValidationError or frozen error
+        with pytest.raises(Exception):  # frozen model
             event.payload = {"proposal_id": "changed"}
 
 

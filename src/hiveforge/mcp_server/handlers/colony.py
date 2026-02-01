@@ -8,7 +8,6 @@ from typing import Any
 from .base import BaseHandler
 from .hive import _hives
 
-
 # In-memory Colony ストレージ（Phase 1用簡易実装）
 _colonies: dict[str, dict[str, Any]] = {}
 

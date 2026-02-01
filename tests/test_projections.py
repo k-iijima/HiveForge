@@ -613,7 +613,7 @@ class TestHiveAggregate:
         """
         # Arrange
         from hiveforge.core.ar.hive_projections import HiveAggregate
-        from hiveforge.core.events import HiveCreatedEvent, ColonyCreatedEvent
+        from hiveforge.core.events import ColonyCreatedEvent, HiveCreatedEvent
 
         aggregate = HiveAggregate("hive-001")
         aggregate.apply(HiveCreatedEvent(payload={"hive_id": "hive-001", "name": "Test"}))
@@ -640,8 +640,8 @@ class TestHiveAggregate:
         """
         # Arrange
         from hiveforge.core.ar.hive_projections import HiveAggregate
-        from hiveforge.core.events import HiveCreatedEvent, ColonyCreatedEvent, ColonyStartedEvent
         from hiveforge.core.ar.projections import ColonyState
+        from hiveforge.core.events import ColonyCreatedEvent, ColonyStartedEvent, HiveCreatedEvent
 
         aggregate = HiveAggregate("hive-001")
         aggregate.apply(HiveCreatedEvent(payload={"hive_id": "hive-001", "name": "Test"}))
@@ -663,13 +663,13 @@ class TestHiveAggregate:
         """
         # Arrange
         from hiveforge.core.ar.hive_projections import HiveAggregate
+        from hiveforge.core.ar.projections import ColonyState
         from hiveforge.core.events import (
-            HiveCreatedEvent,
+            ColonyCompletedEvent,
             ColonyCreatedEvent,
             ColonyStartedEvent,
-            ColonyCompletedEvent,
+            HiveCreatedEvent,
         )
-        from hiveforge.core.ar.projections import ColonyState
 
         aggregate = HiveAggregate("hive-001")
         aggregate.apply(HiveCreatedEvent(payload={"hive_id": "hive-001", "name": "Test"}))
@@ -692,13 +692,13 @@ class TestHiveAggregate:
         """
         # Arrange
         from hiveforge.core.ar.hive_projections import HiveAggregate
-        from hiveforge.core.events import (
-            HiveCreatedEvent,
-            ColonyCreatedEvent,
-            ColonyStartedEvent,
-            ColonyFailedEvent,
-        )
         from hiveforge.core.ar.projections import ColonyState
+        from hiveforge.core.events import (
+            ColonyCreatedEvent,
+            ColonyFailedEvent,
+            ColonyStartedEvent,
+            HiveCreatedEvent,
+        )
 
         aggregate = HiveAggregate("hive-001")
         aggregate.apply(HiveCreatedEvent(payload={"hive_id": "hive-001", "name": "Test"}))
@@ -722,8 +722,8 @@ class TestHiveAggregate:
         """
         # Arrange
         from hiveforge.core.ar.hive_projections import HiveAggregate
-        from hiveforge.core.events import HiveCreatedEvent, HiveClosedEvent
         from hiveforge.core.ar.projections import HiveState
+        from hiveforge.core.events import HiveClosedEvent, HiveCreatedEvent
 
         aggregate = HiveAggregate("hive-001")
         aggregate.apply(HiveCreatedEvent(payload={"hive_id": "hive-001", "name": "Test"}))
@@ -741,14 +741,14 @@ class TestHiveAggregate:
         複数のイベントを順に適用してHive状態を再構築する。
         """
         # Arrange
-        from hiveforge.core.ar.hive_projections import HiveAggregate, build_hive_aggregate
+        from hiveforge.core.ar.hive_projections import build_hive_aggregate
+        from hiveforge.core.ar.projections import ColonyState, HiveState
         from hiveforge.core.events import (
-            HiveCreatedEvent,
+            ColonyCompletedEvent,
             ColonyCreatedEvent,
             ColonyStartedEvent,
-            ColonyCompletedEvent,
+            HiveCreatedEvent,
         )
-        from hiveforge.core.ar.projections import HiveState, ColonyState
 
         events = [
             HiveCreatedEvent(payload={"hive_id": "hive-001", "name": "Test Hive"}),
@@ -776,10 +776,10 @@ class TestHiveAggregate:
         # Arrange
         from hiveforge.core.ar.hive_projections import HiveAggregate
         from hiveforge.core.events import (
-            HiveCreatedEvent,
+            ColonyCompletedEvent,
             ColonyCreatedEvent,
             ColonyStartedEvent,
-            ColonyCompletedEvent,
+            HiveCreatedEvent,
         )
 
         aggregate = HiveAggregate("hive-001")

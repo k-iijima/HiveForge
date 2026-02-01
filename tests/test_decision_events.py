@@ -3,7 +3,6 @@
 外部フィードバック対応: 誰が記録したか、どこに効くか、何を上書きしたかを追跡。
 """
 
-import pytest
 
 from hiveforge.core.events import (
     DecisionAppliedEvent,
@@ -11,7 +10,6 @@ from hiveforge.core.events import (
     DecisionScope,
     DecisionSupersededEvent,
     EventType,
-    ProposalCreatedEvent,
     RiskLevel,
     parse_event,
 )

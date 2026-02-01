@@ -4,8 +4,7 @@ Conference REST API エンドポイント
 Conference（会議）の作成・終了・取得を提供する。
 """
 
-from datetime import datetime, timezone
-from typing import Any
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
@@ -176,7 +175,7 @@ async def end_conference(conference_id: str, request: EndConferenceRequest | Non
         raise HTTPException(status_code=400, detail="Conference already ended")
 
     # 継続時間を計算
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     duration_seconds = 0
     if conference.started_at:
         duration_seconds = int((now - conference.started_at).total_seconds())

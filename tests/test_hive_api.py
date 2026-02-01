@@ -3,8 +3,6 @@
 GitHub Issue #7: P1-06: Hive REST API エンドポイント
 """
 
-import pytest
-from fastapi.testclient import TestClient
 
 
 class TestHiveRoutes:

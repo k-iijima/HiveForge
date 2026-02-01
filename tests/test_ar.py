@@ -668,7 +668,7 @@ class TestHiveStore:
         """
         # Arrange: HiveStore を作成
         from hiveforge.core.ar.hive_storage import HiveStore
-        from hiveforge.core.events import HiveCreatedEvent, ColonyCreatedEvent
+        from hiveforge.core.events import ColonyCreatedEvent, HiveCreatedEvent
 
         store = HiveStore(temp_vault)
         hive_id = "test-hive-001"
@@ -699,7 +699,7 @@ class TestHiveStore:
         """
         # Arrange
         from hiveforge.core.ar.hive_storage import HiveStore
-        from hiveforge.core.events import HiveCreatedEvent, HiveClosedEvent
+        from hiveforge.core.events import HiveClosedEvent, HiveCreatedEvent
 
         store = HiveStore(temp_vault)
         hive_id = "test-hive-chain"

@@ -9,7 +9,6 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from hiveforge.core.events import (
-    EventType,
     HiveClosedEvent,
     HiveCreatedEvent,
     generate_event_id,

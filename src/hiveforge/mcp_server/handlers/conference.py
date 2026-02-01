@@ -6,7 +6,7 @@ Conference（会議）操作のMCPツールハンドラー。
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from ...core import generate_event_id
@@ -116,7 +116,7 @@ class ConferenceHandlers(BaseHandler):
         if conference.state == ConferenceState.ENDED:
             return {"error": "Conference already ended"}
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         duration_seconds = 0
         if conference.started_at:
             duration_seconds = int((now - conference.started_at).total_seconds())

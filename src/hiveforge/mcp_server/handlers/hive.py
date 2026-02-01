@@ -7,7 +7,6 @@ from typing import Any
 
 from .base import BaseHandler
 
-
 # In-memory Hive ストレージ（Phase 1用簡易実装）
 _hives: dict[str, dict[str, Any]] = {}
 

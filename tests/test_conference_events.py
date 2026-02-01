@@ -3,7 +3,6 @@
 外部フィードバック対応: conference_idを中心としたイベント束ね。
 """
 
-import pytest
 
 from hiveforge.core.events import (
     ConferenceEndedEvent,

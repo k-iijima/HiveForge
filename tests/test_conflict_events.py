@@ -3,14 +3,12 @@
 外部フィードバック対応: 衝突の優先順位付けのためのcategory/severityを追加。
 """
 
-import pytest
 
 from hiveforge.core.events import (
     ConflictCategory,
     ConflictDetectedEvent,
     ConflictResolvedEvent,
     ConflictSeverity,
-    EventType,
     parse_event,
 )
 
@@ -140,14 +138,7 @@ class TestConflictSeverityOrdering:
 
     def test_severity_ordering_low_to_blocker(self):
         """深刻度はLOW < MEDIUM < HIGH < BLOCKERの順"""
-        # Arrange
-        severities = [
-            ConflictSeverity.BLOCKER,
-            ConflictSeverity.LOW,
-            ConflictSeverity.HIGH,
-            ConflictSeverity.MEDIUM,
-        ]
-
+        # Arrange & Act: 定義順でソート（Enumのメンバー定義順）
         # Act: 定義順でソート（Enumのメンバー定義順）
         expected_order = [
             ConflictSeverity.LOW,

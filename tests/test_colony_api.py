@@ -4,7 +4,6 @@ GitHub Issue #8: P1-07: Colony REST API エンドポイント
 """
 
 import pytest
-from fastapi.testclient import TestClient
 
 
 class TestColonyRoutes:
