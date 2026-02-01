@@ -18,7 +18,8 @@
     "commands": [
       {
         "command": "hiveforge.showDashboard",
-        "title": "HiveForge: ダッシュボードを表示"
+        "title": "HiveForge: ダッシュボードを表示",
+        "icon": "$(dashboard)"
       },
       {
         "command": "hiveforge.startRun",
@@ -182,6 +183,11 @@
           "command": "hiveforge.rejectRequirement",
           "when": "view == hiveforge.requirements && viewItem == pendingRequirement",
           "group": "inline@2"
+        },
+        {
+          "command": "hiveforge.showDashboard",
+          "when": "view == hiveforge.runs",
+          "group": "inline@0"
         },
         {
           "command": "hiveforge.completeRun",

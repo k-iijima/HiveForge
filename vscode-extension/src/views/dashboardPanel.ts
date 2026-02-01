@@ -136,10 +136,12 @@ export class DashboardPanel {
         const stateIcon = this._getStateIcon(run.state);
         const stateColor = this._getStateColor(run.state);
 
-        const pendingTasks = run.tasks.pending?.length || 0;
-        const inProgressTasks = run.tasks.in_progress?.length || 0;
-        const completedTasks = run.tasks.completed?.length || 0;
-        const blockedTasks = run.tasks.blocked?.length || 0;
+        // null安全対策: tasksがundefinedの場合も考慮
+        const tasks = run.tasks || { pending: [], in_progress: [], completed: [], blocked: [] };
+        const pendingTasks = tasks.pending?.length || 0;
+        const inProgressTasks = tasks.in_progress?.length || 0;
+        const completedTasks = tasks.completed?.length || 0;
+        const blockedTasks = tasks.blocked?.length || 0;
         const totalTasks = pendingTasks + inProgressTasks + completedTasks + blockedTasks;
         const progressPercent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
@@ -298,7 +300,7 @@ export class DashboardPanel {
     ${inProgressTasks > 0 ? `
     <div class="section-title">進行中のタスク</div>
     <ul class="task-list">
-        ${run.tasks.in_progress?.map(t => `
+        ${tasks.in_progress?.map(t => `
         <li class="task-item">
             <span class="task-state">🔄 in_progress</span>
             ${this._escapeHtml(t.title)}

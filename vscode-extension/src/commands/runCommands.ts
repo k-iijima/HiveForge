@@ -32,7 +32,7 @@ export function registerRunCommands(
     refresh: () => void
 ): void {
     context.subscriptions.push(
-        vscode.commands.registerCommand('hiveforge.showDashboard', () => showDashboard(context, client)),
+        vscode.commands.registerCommand('hiveforge.showDashboard', (item?: RunItem) => showDashboard(context, client, providers, item)),
         vscode.commands.registerCommand('hiveforge.startRun', () => startRun(client, refresh)),
         vscode.commands.registerCommand('hiveforge.viewEvents', (runId: string) => viewEvents(runId, client, providers.events)),
         vscode.commands.registerCommand('hiveforge.refresh', refresh),
@@ -43,7 +43,14 @@ export function registerRunCommands(
     );
 }
 
-function showDashboard(context: vscode.ExtensionContext, client: HiveForgeClient): void {
+function showDashboard(context: vscode.ExtensionContext, client: HiveForgeClient, providers: Providers, item?: RunItem): void {
+    // RunItemから起動された場合、そのRunを選択
+    if (item) {
+        client.setCurrentRunId(item.run.run_id);
+        providers.tasks.refresh();
+        providers.requirements.refresh();
+        providers.events.refresh();
+    }
     DashboardPanel.createOrShow(context.extensionUri, client);
 }
 
