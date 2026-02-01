@@ -1,9 +1,8 @@
 """MCP Server モジュールのテスト"""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
-from datetime import datetime, timezone
-import asyncio
 
 from hiveforge.mcp_server.server import HiveForgeMCPServer
 
@@ -31,6 +30,7 @@ def mcp_server(tmp_path):
         server._handle_fail_task = server._task_handlers.handle_fail_task
         server._handle_create_requirement = server._requirement_handlers.handle_create_requirement
         server._handle_get_lineage = server._lineage_handlers.handle_get_lineage
+        server._handle_record_decision = server._decision_handlers.handle_record_decision
 
         yield server
 
@@ -177,6 +177,54 @@ class TestHandleCreateTask:
         assert "task_id" in result
         assert result["title"] == "テストタスク"
 
+    @pytest.mark.asyncio
+    async def test_create_task_auto_parents_defaults_to_run_started(self, mcp_server):
+        """parents未指定なら task.created は run.started を親に自動補完する
+
+        Issue #001 のルール: task.created -> run.started
+        """
+        # Arrange
+        from hiveforge.core.events import EventType
+
+        await mcp_server._handle_start_run({"goal": "auto parents"})
+        run_id = mcp_server._current_run_id
+        ar = mcp_server._get_ar()
+        run_started_id = next(e.id for e in ar.replay(run_id) if e.type == EventType.RUN_STARTED)
+
+        # Act
+        result = await mcp_server._handle_create_task({"title": "タスク"})
+        task_id = result["task_id"]
+
+        # Assert
+        created_event = next(
+            e
+            for e in ar.replay(run_id)
+            if e.type == EventType.TASK_CREATED and e.task_id == task_id
+        )
+        assert created_event.parents == [run_started_id]
+
+    @pytest.mark.asyncio
+    async def test_create_task_explicit_parents_are_preserved(self, mcp_server):
+        """parentsを明示した場合は自動補完せず、そのまま使う"""
+        # Arrange
+        from hiveforge.core.events import EventType
+
+        await mcp_server._handle_start_run({"goal": "explicit parents"})
+        run_id = mcp_server._current_run_id
+        ar = mcp_server._get_ar()
+
+        # Act
+        result = await mcp_server._handle_create_task({"title": "タスク", "parents": ["p1"]})
+        task_id = result["task_id"]
+
+        # Assert
+        created_event = next(
+            e
+            for e in ar.replay(run_id)
+            if e.type == EventType.TASK_CREATED and e.task_id == task_id
+        )
+        assert created_event.parents == ["p1"]
+
 
 class TestHandleAssignTask:
     """assign_taskハンドラのテスト"""
@@ -216,6 +264,38 @@ class TestHandleAssignTask:
         # Assert
         assert result["status"] == "assigned"
         assert result["task_id"] == task_id
+
+    @pytest.mark.asyncio
+    async def test_assign_task_auto_parents_defaults_to_task_created(self, mcp_server):
+        """parents未指定なら task.assigned は task.created を親に自動補完する
+
+        Issue #001 のルール: task.assigned -> task.created
+        """
+        # Arrange
+        from hiveforge.core.events import EventType
+
+        await mcp_server._handle_start_run({"goal": "auto parents"})
+        run_id = mcp_server._current_run_id
+        ar = mcp_server._get_ar()
+
+        create_result = await mcp_server._handle_create_task({"title": "タスク"})
+        task_id = create_result["task_id"]
+        created_event_id = next(
+            e.id
+            for e in ar.replay(run_id)
+            if e.type == EventType.TASK_CREATED and e.task_id == task_id
+        )
+
+        # Act
+        await mcp_server._handle_assign_task({"task_id": task_id})
+
+        # Assert
+        assigned_event = next(
+            e
+            for e in ar.replay(run_id)
+            if e.type == EventType.TASK_ASSIGNED and e.task_id == task_id
+        )
+        assert assigned_event.parents == [created_event_id]
 
 
 class TestHandleReportProgress:
@@ -1189,7 +1269,34 @@ class TestMCPToolDefinitions:
             "heartbeat",
             "emergency_stop",
             "create_requirement",
+            "record_decision",
             "get_lineage",
         ]
         for required in required_tools:
             assert required in tool_names, f"{required} should be in tool definitions"
+
+
+class TestDecisionTool:
+    """Decisionツールのテスト"""
+
+    @pytest.mark.asyncio
+    async def test_dispatch_record_decision(self, mcp_server):
+        """record_decision ツールをディスパッチする"""
+        # Arrange: Run開始
+        await mcp_server._handle_start_run({"goal": "仕様Decision化"})
+
+        # Act
+        result = await mcp_server._dispatch_tool(
+            "record_decision",
+            {
+                "key": "D3",
+                "title": "Requirementを2階層に分割",
+                "selected": "C",
+                "rationale": "v3のユーザー要求と現状の確認要請を両立するため",
+            },
+        )
+
+        # Assert
+        assert result["status"] == "recorded"
+        assert result["key"] == "D3"
+        assert "decision_id" in result

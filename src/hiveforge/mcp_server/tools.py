@@ -178,6 +178,49 @@ def get_tool_definitions() -> list[Tool]:
             },
         ),
         Tool(
+            name="record_decision",
+            description=(
+                "Decision（判断/合意/仕様変更）をイベントとして記録します。"
+                "v3→v4差分のDecision化などに使用します。"
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string",
+                        "description": "Decisionキー（例: D3, D5）",
+                    },
+                    "title": {
+                        "type": "string",
+                        "description": "Decisionのタイトル",
+                    },
+                    "rationale": {
+                        "type": "string",
+                        "description": "理由（なぜこの判断になったか）",
+                    },
+                    "options": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "検討した選択肢（任意）",
+                    },
+                    "selected": {
+                        "type": "string",
+                        "description": "採用した選択肢（例: A/B/C、または自由記述）",
+                    },
+                    "impact": {
+                        "type": "string",
+                        "description": "影響範囲（任意）",
+                    },
+                    "supersedes": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "置き換えるDecisionキー/ID（任意）",
+                    },
+                },
+                "required": ["key", "title", "selected"],
+            },
+        ),
+        Tool(
             name="complete_run",
             description="Runを完了します。全てのTaskが完了したら呼び出してください。",
             inputSchema={

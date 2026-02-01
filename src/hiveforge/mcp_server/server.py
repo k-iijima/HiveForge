@@ -10,7 +10,7 @@ import asyncio
 import json
 from typing import Any
 
-from mcp.server import Server, InitializationOptions
+from mcp.server import InitializationOptions, Server
 from mcp.server.stdio import stdio_server
 from mcp.types import (
     CallToolResult,
@@ -21,7 +21,13 @@ from mcp.types import (
 )
 
 from ..core import AkashicRecord, get_settings
-from .handlers import RunHandlers, TaskHandlers, RequirementHandlers, LineageHandlers
+from .handlers import (
+    DecisionHandlers,
+    LineageHandlers,
+    RequirementHandlers,
+    RunHandlers,
+    TaskHandlers,
+)
 from .tools import get_tool_definitions
 
 
@@ -51,6 +57,7 @@ class HiveForgeMCPServer:
         self._task_handlers = TaskHandlers(self)
         self._requirement_handlers = RequirementHandlers(self)
         self._lineage_handlers = LineageHandlers(self)
+        self._decision_handlers = DecisionHandlers(self)
 
         self._setup_handlers()
 
@@ -111,6 +118,9 @@ class HiveForgeMCPServer:
         # Requirement関連
         elif name == "create_requirement":
             return await self._requirement_handlers.handle_create_requirement(arguments)
+        # Decision関連
+        elif name == "record_decision":
+            return await self._decision_handlers.handle_record_decision(arguments)
         # Lineage関連
         elif name == "get_lineage":
             return await self._lineage_handlers.handle_get_lineage(arguments)
