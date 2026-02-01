@@ -62,6 +62,10 @@ class EventType(str, Enum):
     CONFERENCE_STARTED = "conference.started"  # 会議開始
     CONFERENCE_ENDED = "conference.ended"  # 会議終了
 
+    # Conflict Detection（衝突検出・解決、v5.1追加）
+    CONFLICT_DETECTED = "conflict.detected"  # 衝突検出
+    CONFLICT_RESOLVED = "conflict.resolved"  # 衝突解決
+
     # LLM イベント
     LLM_REQUEST = "llm.request"
     LLM_RESPONSE = "llm.response"
@@ -386,6 +390,42 @@ class ConferenceEndedEvent(BaseEvent):
     type: Literal[EventType.CONFERENCE_ENDED] = EventType.CONFERENCE_ENDED
 
 
+# Conflict Detection イベント（v5.1追加）
+class ConflictDetectedEvent(BaseEvent):
+    """衝突検出イベント
+
+    Conflict Detection: 複数ColonyからのOpinionResponseが矛盾する場合に発行。
+    Beekeeperが衝突を検出し、解決が必要であることを通知する。
+
+    payload:
+        conflict_id: 衝突ID
+        topic: 対象の議題
+        colonies: 関係するColony IDリスト
+        opinions: 各Colonyの意見リスト
+            - colony_id: Colony ID
+            - position: 立場・意見
+            - rationale: 理由
+    """
+
+    type: Literal[EventType.CONFLICT_DETECTED] = EventType.CONFLICT_DETECTED
+
+
+class ConflictResolvedEvent(BaseEvent):
+    """衝突解決イベント
+
+    Conflict Detection: 衝突が解決された時に発行。
+    ユーザー判断またはマージルールによる自動解決。
+
+    payload:
+        conflict_id: 衝突ID
+        resolved_by: 解決者（"user" or "beekeeper"）
+        resolution: 解決内容
+        merge_rule: 適用したマージルール（あれば）
+    """
+
+    type: Literal[EventType.CONFLICT_RESOLVED] = EventType.CONFLICT_RESOLVED
+
+
 class HeartbeatEvent(BaseEvent):
     """ハートビートイベント"""
 
@@ -443,6 +483,9 @@ EVENT_TYPE_MAP: dict[EventType, type[BaseEvent]] = {
     # Conference (v5.1)
     EventType.CONFERENCE_STARTED: ConferenceStartedEvent,
     EventType.CONFERENCE_ENDED: ConferenceEndedEvent,
+    # Conflict Detection (v5.1)
+    EventType.CONFLICT_DETECTED: ConflictDetectedEvent,
+    EventType.CONFLICT_RESOLVED: ConflictResolvedEvent,
     EventType.HEARTBEAT: HeartbeatEvent,
     EventType.ERROR: ErrorEvent,
     EventType.SILENCE_DETECTED: SilenceDetectedEvent,
