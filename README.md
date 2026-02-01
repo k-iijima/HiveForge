@@ -152,9 +152,13 @@ Vault/              # イベントログ (gitignore)
 
 ### テスト状況
 
-- **Python**: 401テスト 全てパス
-- **VS Code拡張**: 17テスト（Mocha）
-- **カバレッジ 99%+** 
+- **Python**: 745テスト 全てパス
+- **VS Code拡張**: TypeScriptコンパイル・Lint通過
+- **カバレッジ 99%+**
+
+### CI/CD
+
+[![CI](https://github.com/k-iijima/HiveForge/actions/workflows/ci.yml/badge.svg)](https://github.com/k-iijima/HiveForge/actions/workflows/ci.yml)
 
 ## ライセンス
 
