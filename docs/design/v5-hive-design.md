@@ -3,7 +3,7 @@
 > Phase 0: 設計検証の成果物
 
 作成日: 2026-02-01
-ステータス: **Draft**
+ステータス: **Reviewed** (レビュー完了・Phase 1着手可能)
 
 ---
 
@@ -221,9 +221,25 @@ class EscalationType(Enum):
 
 ---
 
-## 2. Colony状態機械
+## 2. Hive/Colony状態機械
 
-### 2.1 状態定義
+### 2.0 Hive状態機械
+
+Hiveにも状態が必要（設計漏れを補完）:
+
+```python
+class HiveState(Enum):
+    ACTIVE = "active"       # 1つ以上のColonyがアクティブ
+    IDLE = "idle"           # 全Colonyが idle/completed
+    CLOSED = "closed"       # クローズ済み（読み取り専用）
+```
+
+遷移ルール:
+- `IDLE` → `ACTIVE`: いずれかのColonyが `ACTIVE` になった時
+- `ACTIVE` → `IDLE`: 全Colonyが `IDLE` or `COMPLETED` になった時
+- `IDLE` → `CLOSED`: `hive.closed` イベント発行時（元に戻せない）
+
+### 2.1 Colony状態定義
 
 ```python
 class ColonyState(Enum):
@@ -247,7 +263,7 @@ class ColonyState(Enum):
         │                  ▼                  │
         │           ┌─────────────┐           │
         │           │             │           │
-  全Run完了         │   ACTIVE    │───────────┤ emergency.stop
+  全Run完了         │   ACTIVE    │───────────┤ colony.failed
   (自動遷移)        │             │           │
         │           └──────┬──────┘           │
         │                  │                  │
@@ -268,13 +284,19 @@ class ColonyState(Enum):
 
 ### 2.3 遷移ルール
 
+補足: `auto_complete`
+
+- `auto_complete` は **Colony設定（例: `colony_config.auto_complete`）** のフラグ。
+- `true` の場合、Colony配下の全Runが完了したタイミングで `COMPLETED` へ自動遷移する。
+- `false` の場合、全Run完了後は `IDLE` に戻る（Colonyは再利用可能）。
+
 | 現在状態 | イベント | 次状態 | 条件 |
 |---------|---------|--------|------|
 | IDLE | run.started | ACTIVE | Colony内でRunが開始 |
 | ACTIVE | run.completed | ACTIVE | 他に実行中Runあり |
 | ACTIVE | run.completed | IDLE | 全Run完了、auto_complete=false |
 | ACTIVE | run.completed | COMPLETED | 全Run完了、auto_complete=true |
-| ACTIVE | emergency.stop | FAILED | 緊急停止 |
+| ACTIVE | colony.failed | FAILED | 緊急停止または致命的エラー（配下Runへ `run.aborted` が伝播） |
 | ACTIVE | suspend | SUSPENDED | 一時停止要求 |
 | SUSPENDED | resume | ACTIVE | 再開要求 |
 
@@ -316,72 +338,96 @@ class EventType(Enum):
 
 ### 3.2 イベントスキーマ
 
+重要: v4実装（`BaseEvent`）との整合
+
+- 現行の `BaseEvent` は `run_id` / `task_id` / `actor` / `payload` を持つ。
+- Phase 1では **後方互換性と実装コスト最小化** のため、Hive/Colony/Agent関連の追加情報は原則 `payload` に格納する。
+    - 例: `payload.hive_id`, `payload.colony_id`, `payload.request_id` など
+    - `run_id` / `task_id` は「既存のRun/Taskに紐づく場合のみ」設定し、それ以外は `None` とする
+- 将来（Phase 2以降）に、`hive_id` / `colony_id` を `BaseEvent` のトップレベルフィールドへ昇格する案は検討対象（ただし破壊的変更になりやすいので慎重に）。
+
+課題: `run_id=None` のイベントの格納先
+
+- v4の `AkashicRecord.append()` は `run_id` 必須（ディレクトリ決定に使用）。
+- `HiveCreatedEvent` 等の `run_id=None` イベントは、以下いずれかで対応:
+    - (A) 専用ストア: `Vault/hives/{hive_id}/events.jsonl` に別途格納（推奨）
+    - (B) システムRun: 特別な `run_id` (例: `"__system__"`) に格納し、Hive/Colony横断イベントを集約
+- Phase 1では (A) を採用し、Hive/Colonyは専用ディレクトリで管理する。
+
+注意: `parse_event` の前方互換性
+
+- v4実装の `parse_event` は `EventType(data["type"])` を先に評価するため、**未知のtype文字列を読むと例外になる**。
+- 運用で「古いバイナリが新しいイベントログを読む」可能性があるなら、以下いずれかが必要:
+    - (A) バージョンを揃える運用（Phase 1はまずこれで十分）
+    - (B) `parse_event` を拡張し、未知typeは `BaseEvent` として読み込める設計に変更（将来の改善項目）
+
 ```python
 class HiveCreatedEvent(BaseEvent):
     """Hive作成イベント"""
     type: Literal[EventType.HIVE_CREATED] = EventType.HIVE_CREATED
-    hive_id: str
-    # payload: { name, goal, beekeeper_config }
+    # run_id: None
+    # payload: { hive_id, name, goal, beekeeper_config }
 
 class ColonyCreatedEvent(BaseEvent):
     """Colony作成イベント"""
     type: Literal[EventType.COLONY_CREATED] = EventType.COLONY_CREATED
-    hive_id: str
-    colony_id: str
-    # payload: { name, domain, queen_config }
+    # run_id: None
+    # payload: { hive_id, colony_id, name, domain, queen_config }
 
 class ColonyActivatedEvent(BaseEvent):
     """Colonyアクティブ化イベント"""
     type: Literal[EventType.COLONY_ACTIVATED] = EventType.COLONY_ACTIVATED
-    colony_id: str
-    # payload: { trigger_run_id }
+    # run_id: trigger_run_id
+    # payload: { colony_id, trigger_run_id }
 
 class OpinionRequestedEvent(BaseEvent):
     """意見要求イベント（Beekeeper → Queen Bee）"""
     type: Literal[EventType.OPINION_REQUESTED] = EventType.OPINION_REQUESTED
-    colony_id: str  # 宛先Colony
-    # payload: { context, question, priority, deadline }
+    # run_id: None
+    # payload: { colony_id, context, question, priority, deadline }
 
 class OpinionRespondedEvent(BaseEvent):
     """意見回答イベント（Queen Bee → Beekeeper）"""
     type: Literal[EventType.OPINION_RESPONDED] = EventType.OPINION_RESPONDED
-    colony_id: str  # 送信元Colony
-    # payload: { request_id, summary, details, questions, confidence }
+    # run_id: None
+    # payload: { colony_id, request_id, summary, details, questions, confidence }
 
 class WorkerAssignedEvent(BaseEvent):
     """Worker Bee割り当てイベント（Queen Bee → Worker Bee）"""
     type: Literal[EventType.WORKER_ASSIGNED] = EventType.WORKER_ASSIGNED
-    colony_id: str
-    worker_id: str
-    run_id: str
-    # payload: { role, instruction }
+    # run_id: run_id
+    # payload: { colony_id, worker_id, run_id, role, instruction }
 
 class UserDirectInterventionEvent(BaseEvent):
     """ユーザー直接介入イベント（ユーザー → Queen Bee、Beekeeperをバイパス）"""
     type: Literal[EventType.USER_DIRECT_INTERVENTION] = EventType.USER_DIRECT_INTERVENTION
-    colony_id: str
-    # payload: { 
+    # run_id: None
+    # payload: {
+    #   colony_id: string,
     #   instruction: string,           # 直接指示
     #   reason: string,                # 介入理由
     #   bypass_beekeeper: bool,        # Beekeeperをバイパスしたか
+    #   share_with_beekeeper: bool,    # 共有するか（デフォルトtrue推奨）
     # }
 
 class QueenEscalationEvent(BaseEvent):
     """Queen Beeからの直訴イベント（Queen Bee → ユーザー）"""
     type: Literal[EventType.QUEEN_ESCALATION] = EventType.QUEEN_ESCALATION
-    colony_id: str
-    # payload: { 
-    #   escalation_type: EscalationType,  # 直訴の種類
-    #   summary: string,                   # 問題の要約
-    #   details: string,                   # 詳細説明
-    #   suggested_actions: list[string],   # 提案するアクション
-    #   beekeeper_context: string,         # Beekeeperとのやり取りコンテキスト
+    # run_id: None
+    # payload: {
+    #   colony_id: string,
+    #   escalation_type: EscalationType,    # 直訴の種類
+    #   summary: string,                    # 問題の要約
+    #   details: string,                    # 詳細説明
+    #   suggested_actions: list[string],    # 提案するアクション
+    #   beekeeper_context: string,          # Beekeeperとのやり取りコンテキスト
     # }
 
 class BeekeeperFeedbackEvent(BaseEvent):
     """Beekeeper改善フィードバック（エスカレーション解決後）"""
     type: Literal[EventType.BEEKEEPER_FEEDBACK] = EventType.BEEKEEPER_FEEDBACK
-    # payload: { 
+    # run_id: None
+    # payload: {
     #   escalation_id: string,         # 対応したエスカレーションID
     #   resolution: string,            # 解決方法
     #   beekeeper_adjustment: dict,    # Beekeeperへの調整内容
@@ -406,20 +452,27 @@ class TaskCreatedEvent(BaseEvent):
 
 ### 4.1 ディレクトリ構造
 
+重要: Phase 1は「インデックス方式」で後方互換を最優先
+
+- v4実装の `AkashicRecord` は `Vault/{run_id}/events.jsonl`（Vault直下）を前提に `list_runs()` 等を実装している。
+- そのため Phase 1 では **events.jsonlの物理配置は変更しない**（既存コードと既存テストを壊さない）。
+- Hive/Colonyの階層管理は、まず **追加メタデータ（インデックス）** で実現する（例: hive.json/colony.json/runs.json、run_id→colony_idマップ）。
+- 物理的な階層化（runsをcolony配下へ移動）は Phase 2以降に検討し、移行ツールと `list_runs()` の再設計が前提。
+
 ```
 Vault/
-├── hives/                       # Hive別ディレクトリ（v5追加）
+├── hives/                         # Hive別ディレクトリ（v5追加・Phase 1はメタデータ中心）
 │   └── {hive_id}/
-│       ├── hive.json            # Hive設定
-│       └── colonies/            # Colony別ディレクトリ
+│       ├── hive.json              # Hive設定
+│       └── colonies/
 │           └── {colony_id}/
-│               ├── colony.json  # Colony設定（Queen Bee含む）
-│               ├── workers/     # Worker Bee設定
+│               ├── colony.json    # Colony設定（Queen Bee含む）
+│               ├── workers/
 │               │   └── {worker_id}.json
-│               └── runs/        # Colony配下のRun
-│                   └── {run_id}/
-│                       └── events.jsonl
-└── {run_id}/                    # v4互換: Colony未所属のRun
+│               └── runs.json      # Colony配下のRun一覧（run_id参照のリスト）
+├── index/                         # 参照用インデックス（任意）
+│   └── run_to_colony.json         # run_id -> {hive_id, colony_id} のマップ
+└── {run_id}/                      # 既存: RunはVault直下にevents.jsonlを保持
     └── events.jsonl
 ```
 
@@ -440,7 +493,13 @@ Vault/
 POST   /hives                         # Hive作成
 GET    /hives                         # Hive一覧
 GET    /hives/{hive_id}               # Hive詳細
-DELETE /hives/{hive_id}               # Hive削除（全Colony完了時のみ）
+POST   /hives/{hive_id}/close         # Hiveクローズ（全Colony完了時のみ）
+
+補足: 「削除」ではなく「クローズ」を基本とする
+
+- HiveForgeはイベントソーシングであり、AR上の履歴は監査目的で保持される。
+- 物理削除（DELETE）は運用・監査上の扱いが難しいため、設計上は `hive.closed` を発行するクローズ操作を基本にする。
+- 物理削除が必要な場合は別途「管理者向けメンテナンス機能（危険操作）」として切り出す。
 
 # Colony操作
 POST   /hives/{hive_id}/colonies      # Colony作成
@@ -488,6 +547,14 @@ POST /runs                # colony_idはoptionalパラメータとして追加
 GET  /runs                # colony_idでフィルタ可能
 GET  /runs/{run_id}       # 変更なし
 ```
+
+補足: Phase 1の最小実装（既存APIモデルを壊さない）
+
+- 現行の `StartRunRequest` は `goal` + `metadata` のみ。
+- Phase 1では `colony_id` は **`metadata["colony_id"]`** として渡し、`RunStartedEvent.payload` にも格納する。
+- `GET /runs` の `colony_id` フィルタは、まずは以下いずれかで実現する:
+    - (A) `Vault/index/run_to_colony.json` 等のインデックス参照（推奨）
+    - (B) 各Runの先頭イベント（`run.started`）をリプレイして `payload.colony_id` を読む（実装容易だが遅い）
 
 ---
 
@@ -787,25 +854,77 @@ Queen Beeとの直接対話（Beekeeperをバイパス）:
 
 ## 10. Phase 1 実装タスク
 
-### 10.1 Python (Core/API/MCP)
+### 10.0 実装順序（依存関係を考慮）
 
-- [ ] `src/hiveforge/core/hive.py` - Hive/Colonyモデル・状態機械
-- [ ] `src/hiveforge/core/events.py` - Hive/Colonyイベント型追加
-- [ ] `src/hiveforge/core/ar/colony_projections.py` - Colony投影
-- [ ] `src/hiveforge/api/routes/colonies.py` - Colony APIルート
-- [ ] `src/hiveforge/mcp_server/handlers/colony.py` - Colony MCPハンドラ
-- [ ] `tests/test_colony.py` - Colonyテスト
+```
+1. イベント型定義 (events.py)
+   ↓
+2. Hive/Colonyモデル・状態機械 (hive.py)
+   ↓
+3. Hive専用ストレージ (ar/hive_storage.py)
+   ↓
+4. Colony投影 (ar/colony_projections.py)
+   ↓
+5. APIルート (routes/hives.py, routes/colonies.py)
+   ↓
+6. MCPツール (handlers/hive.py, handlers/colony.py)
+   ↓
+7. VS Code拡張 (coloniesProvider.ts)
+```
 
-### 10.2 VS Code拡張
+### 10.1 Python Core (基盤)
 
-- [ ] `src/providers/coloniesProvider.ts` - Colony TreeView
-- [ ] `src/commands/colonyCommands.ts` - Colonyコマンド
-- [ ] `package.json` - Colony View追加
+| Issue# | タスク | ファイル | 見積(h) | 依存 |
+|--------|------|--------|---------|------|
+| P1-01 | Hive/Colonyイベント型追加 | `core/events.py` | 2 | - |
+| P1-02 | HiveState/ColonyState定義 | `core/hive.py` | 1 | P1-01 |
+| P1-03 | Hive/Colonyモデル(Pydantic) | `core/hive.py` | 2 | P1-02 |
+| P1-04 | Colony状態機械 | `core/hive.py` | 3 | P1-03 |
+| P1-05 | Hive専用ストレージ | `core/ar/hive_storage.py` | 4 | P1-01 |
+| P1-06 | Colony投影 | `core/ar/colony_projections.py` | 3 | P1-04 |
+| P1-07 | ユニットテスト | `tests/test_hive.py`, `tests/test_colony.py` | 4 | P1-01〜P1-06 |
 
-### 10.3 ドキュメント
+### 10.2 Python API
 
-- [ ] `docs/ARCHITECTURE.md` - Hive/Colony概念追加
-- [ ] `docs/QUICKSTART.md` - Colony操作手順追加
+| Issue# | タスク | ファイル | 見積(h) | 依存 |
+|--------|------|--------|---------|------|
+| P1-08 | Hive APIルート | `api/routes/hives.py` | 3 | P1-05 |
+| P1-09 | Colony APIルート | `api/routes/colonies.py` | 4 | P1-06 |
+| P1-10 | APIモデル追加 | `api/models.py` | 1 | - |
+| P1-11 | APIテスト | `tests/test_hive_api.py`, `tests/test_colony_api.py` | 3 | P1-08,P1-09 |
+
+### 10.3 Python MCP
+
+| Issue# | タスク | ファイル | 見積(h) | 依存 |
+|--------|------|--------|---------|------|
+| P1-12 | Hive MCPツール | `mcp_server/handlers/hive.py` | 2 | P1-08 |
+| P1-13 | Colony MCPツール | `mcp_server/handlers/colony.py` | 3 | P1-09 |
+| P1-14 | MCPテスト | `tests/test_hive_mcp.py`, `tests/test_colony_mcp.py` | 2 | P1-12,P1-13 |
+
+### 10.4 VS Code拡張
+
+| Issue# | タスク | ファイル | 見積(h) | 依存 |
+|--------|------|--------|---------|------|
+| P1-15 | Colony TreeView Provider | `providers/coloniesProvider.ts` | 4 | P1-09 |
+| P1-16 | Colonyコマンド | `commands/colonyCommands.ts` | 2 | P1-15 |
+| P1-17 | package.json更新 | `package.json` | 1 | P1-15 |
+| P1-18 | 拡張テスト | `test/colony.test.ts` | 2 | P1-15,P1-16 |
+
+### 10.5 ドキュメント
+
+| Issue# | タスク | ファイル | 見積(h) | 依存 |
+|--------|------|--------|---------|------|
+| P1-19 | ARCHITECTURE.md更新 | `docs/ARCHITECTURE.md` | 1 | P1-07 |
+| P1-20 | QUICKSTART.md更新 | `docs/QUICKSTART.md` | 1 | P1-11 |
+
+### 10.6 合計見積
+
+- Core: 19h
+- API: 11h  
+- MCP: 7h
+- VS Code: 9h
+- Docs: 2h
+- **合計: 約48h (約6人日)**
 
 ---
 
@@ -818,13 +937,18 @@ Queen Beeとの直接対話（Beekeeperをバイパス）:
 | 2026-02-01 | Phase 1では単一Colonyのみ | 複雑性を段階的に導入 |
 | 2026-02-01 | ユーザーにQueen Bee直接対話権限を付与 | Beekeeperバイパスの必要性 |
 | 2026-02-01 | Queen Beeからの直訴（Escalation）機能追加 | Beekeeper改善フィードバック |
+| 2026-02-01 | Hive永続化形式はJSON | ARと同じ形式で統一、ツール連携容易 |
+| 2026-02-01 | `run_id=None` イベントは専用ストアに格納 | v4のAR実装を変更せず後方互換維持 |
+| 2026-02-01 | Phase 1は `parse_event` 未対応、バージョン運用 | 実装コスト最小化 |
+| 2026-02-01 | Phase 1はVault物理構造変更なし（インデックス方式） | 既存テストを壊さない |
 
 ---
 
 ## 12. 未決定事項
 
 | 項目 | 選択肢 | 決定予定 |
-|------|--------|---------|
-| Hiveの永続化形式 | A: JSON B: YAML C: ARイベント | Phase 1開始前 |
+|------|--------|----------|
 | 複数Colony間の優先度制御 | A: 静的設定 B: 動的調整 | Phase 2開始前 |
 | Worker Beeの実装方法 | A: 個別プロセス B: スレッド C: 外部サービス | Phase 2開始前 |
+| `parse_event` の前方互換拡張 | 未知typeをBaseEventとして読み込む | Phase 2以降 |
+| Vault物理構造の階層化 | RunをColony配下に移動 | Phase 2以降（移行ツール必要） |
