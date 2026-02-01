@@ -58,6 +58,10 @@ class EventType(str, Enum):
     DECISION_APPLIED = "decision.applied"  # 決定適用
     DECISION_SUPERSEDED = "decision.superseded"  # 決定上書き
 
+    # Conference（会議ライフサイクル、v5.1追加）
+    CONFERENCE_STARTED = "conference.started"  # 会議開始
+    CONFERENCE_ENDED = "conference.ended"  # 会議終了
+
     # LLM イベント
     LLM_REQUEST = "llm.request"
     LLM_RESPONSE = "llm.response"
@@ -347,6 +351,41 @@ class DecisionSupersededEvent(BaseEvent):
     type: Literal[EventType.DECISION_SUPERSEDED] = EventType.DECISION_SUPERSEDED
 
 
+# Conference イベント（v5.1追加）
+class ConferenceStartedEvent(BaseEvent):
+    """会議開始イベント
+
+    Conference: Beekeeperと複数ColonyのQueen Beeが同時に対話するセッション。
+    会議の開始時に発行する。
+
+    payload:
+        conference_id: 会議ID
+        hive_id: Hive ID
+        participants: 参加Colony IDリスト
+        topic: 議題
+        initiated_by: 開始者
+    """
+
+    type: Literal[EventType.CONFERENCE_STARTED] = EventType.CONFERENCE_STARTED
+
+
+class ConferenceEndedEvent(BaseEvent):
+    """会議終了イベント
+
+    Conference: 会議の終了時に発行する。
+    決定事項のサマリーを含む。
+
+    payload:
+        conference_id: 会議ID
+        duration_seconds: 会議時間（秒）
+        decisions_made: 決定IDリスト
+        summary: サマリー
+        ended_by: 終了者
+    """
+
+    type: Literal[EventType.CONFERENCE_ENDED] = EventType.CONFERENCE_ENDED
+
+
 class HeartbeatEvent(BaseEvent):
     """ハートビートイベント"""
 
@@ -401,6 +440,9 @@ EVENT_TYPE_MAP: dict[EventType, type[BaseEvent]] = {
     EventType.PROPOSAL_CREATED: ProposalCreatedEvent,
     EventType.DECISION_APPLIED: DecisionAppliedEvent,
     EventType.DECISION_SUPERSEDED: DecisionSupersededEvent,
+    # Conference (v5.1)
+    EventType.CONFERENCE_STARTED: ConferenceStartedEvent,
+    EventType.CONFERENCE_ENDED: ConferenceEndedEvent,
     EventType.HEARTBEAT: HeartbeatEvent,
     EventType.ERROR: ErrorEvent,
     EventType.SILENCE_DETECTED: SilenceDetectedEvent,
