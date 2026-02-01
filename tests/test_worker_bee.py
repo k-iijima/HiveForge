@@ -1,5 +1,7 @@
 """Worker Bee MCPサーバーのテスト"""
 
+import asyncio
+
 import pytest
 
 from hiveforge.core import AkashicRecord
@@ -51,11 +53,13 @@ class TestReceiveTask:
     async def test_receive_task_success(self, worker_bee):
         """タスクを正常に受け取れる"""
         # Act
-        result = await worker_bee.handle_receive_task({
-            "task_id": "task-1",
-            "run_id": "run-1",
-            "goal": "Implement feature X",
-        })
+        result = await worker_bee.handle_receive_task(
+            {
+                "task_id": "task-1",
+                "run_id": "run-1",
+                "goal": "Implement feature X",
+            }
+        )
 
         # Assert
         assert result["status"] == "accepted"
@@ -66,18 +70,22 @@ class TestReceiveTask:
     async def test_receive_task_while_working(self, worker_bee):
         """作業中に別タスクは受け取れない"""
         # Arrange: まず1つ目のタスクを受け取る
-        await worker_bee.handle_receive_task({
-            "task_id": "task-1",
-            "run_id": "run-1",
-            "goal": "First task",
-        })
+        await worker_bee.handle_receive_task(
+            {
+                "task_id": "task-1",
+                "run_id": "run-1",
+                "goal": "First task",
+            }
+        )
 
         # Act: 2つ目のタスクを受け取ろうとする
-        result = await worker_bee.handle_receive_task({
-            "task_id": "task-2",
-            "run_id": "run-1",
-            "goal": "Second task",
-        })
+        result = await worker_bee.handle_receive_task(
+            {
+                "task_id": "task-2",
+                "run_id": "run-1",
+                "goal": "Second task",
+            }
+        )
 
         # Assert
         assert "error" in result
@@ -87,11 +95,13 @@ class TestReceiveTask:
     async def test_receive_task_emits_event(self, worker_bee, ar):
         """タスク受け取り時にイベントが発行される"""
         # Act
-        await worker_bee.handle_receive_task({
-            "task_id": "task-1",
-            "run_id": "run-1",
-            "goal": "Test goal",
-        })
+        await worker_bee.handle_receive_task(
+            {
+                "task_id": "task-1",
+                "run_id": "run-1",
+                "goal": "Test goal",
+            }
+        )
 
         # Assert
         events = list(ar.replay("run-1"))
@@ -107,17 +117,21 @@ class TestReportProgress:
     async def test_report_progress_success(self, worker_bee):
         """進捗を正常に報告できる"""
         # Arrange
-        await worker_bee.handle_receive_task({
-            "task_id": "task-1",
-            "run_id": "run-1",
-            "goal": "Test",
-        })
+        await worker_bee.handle_receive_task(
+            {
+                "task_id": "task-1",
+                "run_id": "run-1",
+                "goal": "Test",
+            }
+        )
 
         # Act
-        result = await worker_bee.handle_report_progress({
-            "progress": 50,
-            "message": "halfway done",
-        })
+        result = await worker_bee.handle_report_progress(
+            {
+                "progress": 50,
+                "message": "halfway done",
+            }
+        )
 
         # Assert
         assert result["status"] == "reported"
@@ -137,17 +151,21 @@ class TestReportProgress:
     async def test_report_progress_emits_event(self, worker_bee, ar):
         """進捗報告時にイベントが発行される"""
         # Arrange
-        await worker_bee.handle_receive_task({
-            "task_id": "task-1",
-            "run_id": "run-1",
-            "goal": "Test",
-        })
+        await worker_bee.handle_receive_task(
+            {
+                "task_id": "task-1",
+                "run_id": "run-1",
+                "goal": "Test",
+            }
+        )
 
         # Act
-        await worker_bee.handle_report_progress({
-            "progress": 75,
-            "message": "Almost done",
-        })
+        await worker_bee.handle_report_progress(
+            {
+                "progress": 75,
+                "message": "Almost done",
+            }
+        )
 
         # Assert
         events = list(ar.replay("run-1"))
@@ -163,17 +181,21 @@ class TestCompleteTask:
     async def test_complete_task_success(self, worker_bee):
         """タスクを正常に完了できる"""
         # Arrange
-        await worker_bee.handle_receive_task({
-            "task_id": "task-1",
-            "run_id": "run-1",
-            "goal": "Test",
-        })
+        await worker_bee.handle_receive_task(
+            {
+                "task_id": "task-1",
+                "run_id": "run-1",
+                "goal": "Test",
+            }
+        )
 
         # Act
-        result = await worker_bee.handle_complete_task({
-            "result": "Feature implemented",
-            "deliverables": ["file1.py", "file2.py"],
-        })
+        result = await worker_bee.handle_complete_task(
+            {
+                "result": "Feature implemented",
+                "deliverables": ["file1.py", "file2.py"],
+            }
+        )
 
         # Assert
         assert result["status"] == "completed"
@@ -193,16 +215,20 @@ class TestCompleteTask:
     async def test_complete_task_emits_event(self, worker_bee, ar):
         """タスク完了時にイベントが発行される"""
         # Arrange
-        await worker_bee.handle_receive_task({
-            "task_id": "task-1",
-            "run_id": "run-1",
-            "goal": "Test",
-        })
+        await worker_bee.handle_receive_task(
+            {
+                "task_id": "task-1",
+                "run_id": "run-1",
+                "goal": "Test",
+            }
+        )
 
         # Act
-        await worker_bee.handle_complete_task({
-            "result": "Success",
-        })
+        await worker_bee.handle_complete_task(
+            {
+                "result": "Success",
+            }
+        )
 
         # Assert
         events = list(ar.replay("run-1"))
@@ -217,17 +243,21 @@ class TestFailTask:
     async def test_fail_task_success(self, worker_bee):
         """タスク失敗を正常に報告できる"""
         # Arrange
-        await worker_bee.handle_receive_task({
-            "task_id": "task-1",
-            "run_id": "run-1",
-            "goal": "Test",
-        })
+        await worker_bee.handle_receive_task(
+            {
+                "task_id": "task-1",
+                "run_id": "run-1",
+                "goal": "Test",
+            }
+        )
 
         # Act
-        result = await worker_bee.handle_fail_task({
-            "reason": "Connection timeout",
-            "recoverable": True,
-        })
+        result = await worker_bee.handle_fail_task(
+            {
+                "reason": "Connection timeout",
+                "recoverable": True,
+            }
+        )
 
         # Assert
         assert result["status"] == "failed"
@@ -239,17 +269,21 @@ class TestFailTask:
     async def test_fail_task_not_recoverable(self, worker_bee):
         """リカバリ不能な失敗はERROR状態になる"""
         # Arrange
-        await worker_bee.handle_receive_task({
-            "task_id": "task-1",
-            "run_id": "run-1",
-            "goal": "Test",
-        })
+        await worker_bee.handle_receive_task(
+            {
+                "task_id": "task-1",
+                "run_id": "run-1",
+                "goal": "Test",
+            }
+        )
 
         # Act
-        await worker_bee.handle_fail_task({
-            "reason": "Fatal error",
-            "recoverable": False,
-        })
+        await worker_bee.handle_fail_task(
+            {
+                "reason": "Fatal error",
+                "recoverable": False,
+            }
+        )
 
         # Assert
         assert worker_bee.state == WorkerState.ERROR
@@ -267,16 +301,20 @@ class TestFailTask:
     async def test_fail_task_emits_event(self, worker_bee, ar):
         """タスク失敗時にイベントが発行される"""
         # Arrange
-        await worker_bee.handle_receive_task({
-            "task_id": "task-1",
-            "run_id": "run-1",
-            "goal": "Test",
-        })
+        await worker_bee.handle_receive_task(
+            {
+                "task_id": "task-1",
+                "run_id": "run-1",
+                "goal": "Test",
+            }
+        )
 
         # Act
-        await worker_bee.handle_fail_task({
-            "reason": "Test failure",
-        })
+        await worker_bee.handle_fail_task(
+            {
+                "reason": "Test failure",
+            }
+        )
 
         # Assert
         events = list(ar.replay("run-1"))
@@ -303,11 +341,13 @@ class TestGetStatus:
     async def test_get_status_working(self, worker_bee):
         """WORKING状態のステータス取得"""
         # Arrange
-        await worker_bee.handle_receive_task({
-            "task_id": "task-1",
-            "run_id": "run-1",
-            "goal": "Test",
-        })
+        await worker_bee.handle_receive_task(
+            {
+                "task_id": "task-1",
+                "run_id": "run-1",
+                "goal": "Test",
+            }
+        )
         await worker_bee.handle_report_progress({"progress": 30})
 
         # Act
@@ -325,11 +365,14 @@ class TestDispatchTool:
     @pytest.mark.asyncio
     async def test_dispatch_receive_task(self, worker_bee):
         """receive_taskがディスパッチされる"""
-        result = await worker_bee.dispatch_tool("receive_task", {
-            "task_id": "task-1",
-            "run_id": "run-1",
-            "goal": "Test",
-        })
+        result = await worker_bee.dispatch_tool(
+            "receive_task",
+            {
+                "task_id": "task-1",
+                "run_id": "run-1",
+                "goal": "Test",
+            },
+        )
         assert result["status"] == "accepted"
 
     @pytest.mark.asyncio
@@ -666,9 +709,7 @@ class TestWorkerProjectionEdgeCases:
     def test_get_working_workers_empty(self):
         """作業中Workerがいない場合"""
         pool = WorkerPoolProjection()
-        pool.workers["worker-1"] = WorkerProjection(
-            worker_id="worker-1", state="idle"
-        )
+        pool.workers["worker-1"] = WorkerProjection(worker_id="worker-1", state="idle")
 
         working = pool.get_working_workers()
         assert working == []
@@ -1110,3 +1151,218 @@ class TestToolExecutor:
         names = [t[0].name for t in builtins]
         assert "echo" in names
         assert "sleep" in names
+
+
+# Retry Executor テスト
+from hiveforge.worker_bee.retry import (
+    RetryPolicy,
+    RetryStrategy,
+    RetryExecutor,
+    RetryResult,
+    TimeoutConfig,
+    TimeoutBehavior,
+    create_default_retry_policy,
+    create_no_retry_policy,
+)
+
+
+class TestRetryPolicy:
+    """RetryPolicyの基本テスト"""
+
+    def test_default_policy(self):
+        """デフォルトポリシー"""
+        policy = RetryPolicy()
+        assert policy.max_retries == 3
+        assert policy.strategy == RetryStrategy.FIXED
+
+    def test_get_delay_fixed(self):
+        """固定遅延"""
+        policy = RetryPolicy(strategy=RetryStrategy.FIXED, initial_delay=2.0, jitter=False)
+        assert policy.get_delay(0) == 2.0
+        assert policy.get_delay(1) == 2.0
+        assert policy.get_delay(5) == 2.0
+
+    def test_get_delay_exponential(self):
+        """指数バックオフ"""
+        policy = RetryPolicy(
+            strategy=RetryStrategy.EXPONENTIAL,
+            initial_delay=1.0,
+            multiplier=2.0,
+            jitter=False,
+        )
+        assert policy.get_delay(0) == 1.0
+        assert policy.get_delay(1) == 2.0
+        assert policy.get_delay(2) == 4.0
+
+    def test_get_delay_max(self):
+        """最大遅延"""
+        policy = RetryPolicy(
+            strategy=RetryStrategy.EXPONENTIAL,
+            initial_delay=10.0,
+            max_delay=20.0,
+            jitter=False,
+        )
+        assert policy.get_delay(5) == 20.0
+
+    def test_should_retry(self):
+        """リトライ判定"""
+        policy = RetryPolicy(max_retries=3)
+        assert policy.should_retry("error", 0)
+        assert policy.should_retry("error", 2)
+        assert not policy.should_retry("error", 3)
+
+    def test_should_retry_with_filter(self):
+        """エラーフィルタ付きリトライ"""
+        policy = RetryPolicy(retryable_errors=["timeout", "connection"])
+        assert policy.should_retry("connection refused", 0)
+        assert policy.should_retry("timeout occurred", 0)
+        assert not policy.should_retry("invalid input", 0)
+
+    def test_no_retry(self):
+        """リトライなし"""
+        policy = RetryPolicy(strategy=RetryStrategy.NONE)
+        assert not policy.should_retry("error", 0)
+
+
+class TestRetryExecutor:
+    """RetryExecutorのテスト"""
+
+    @pytest.mark.asyncio
+    async def test_execute_success(self):
+        """成功時"""
+        executor = RetryExecutor(create_no_retry_policy())
+
+        async def success_op():
+            return "ok"
+
+        result = await executor.execute(success_op)
+
+        assert result.success
+        assert result.result == "ok"
+        assert result.attempt_count == 1
+
+    @pytest.mark.asyncio
+    async def test_execute_with_retry(self):
+        """リトライ成功"""
+        policy = RetryPolicy(
+            strategy=RetryStrategy.FIXED,
+            max_retries=3,
+            initial_delay=0.01,
+            jitter=False,
+        )
+        executor = RetryExecutor(policy)
+
+        call_count = 0
+
+        async def flaky_op():
+            nonlocal call_count
+            call_count += 1
+            if call_count < 3:
+                raise ValueError("Temporary error")
+            return "success"
+
+        result = await executor.execute(flaky_op)
+
+        assert result.success
+        assert result.result == "success"
+        assert result.attempt_count == 3
+
+    @pytest.mark.asyncio
+    async def test_execute_max_retries_exceeded(self):
+        """リトライ上限"""
+        policy = RetryPolicy(
+            strategy=RetryStrategy.FIXED,
+            max_retries=2,
+            initial_delay=0.01,
+            jitter=False,
+        )
+        executor = RetryExecutor(policy)
+
+        async def always_fail():
+            raise ValueError("Always fails")
+
+        result = await executor.execute(always_fail)
+
+        assert not result.success
+        assert "Always fails" in result.error
+        assert result.attempt_count == 3  # 初回 + 2回リトライ
+
+    @pytest.mark.asyncio
+    async def test_execute_timeout(self):
+        """タイムアウト"""
+        executor = RetryExecutor(create_no_retry_policy())
+
+        async def slow_op():
+            await asyncio.sleep(10)
+            return "done"
+
+        timeout = TimeoutConfig(timeout_seconds=0.1)
+        result = await executor.execute(slow_op, timeout)
+
+        assert not result.success
+        assert "Timeout" in result.error
+
+    @pytest.mark.asyncio
+    async def test_execute_with_fallback(self):
+        """フォールバック"""
+        executor = RetryExecutor(create_no_retry_policy())
+
+        async def fail_op():
+            raise ValueError("Failed")
+
+        async def fallback_op():
+            return "fallback"
+
+        result = await executor.execute_with_fallback(fail_op, fallback_op)
+
+        assert result.success
+        assert result.result == "fallback"
+
+    @pytest.mark.asyncio
+    async def test_listeners(self):
+        """リスナー"""
+        retries = []
+        timeouts = []
+
+        policy = RetryPolicy(strategy=RetryStrategy.FIXED, max_retries=2, initial_delay=0.01)
+        executor = RetryExecutor(policy)
+        executor.add_listener(
+            on_retry=lambda a: retries.append(a),
+            on_timeout=lambda e: timeouts.append(e),
+        )
+
+        async def fail_op():
+            raise ValueError("error")
+
+        await executor.execute(fail_op)
+
+        assert len(retries) == 2  # 2回リトライ
+
+    @pytest.mark.asyncio
+    async def test_sync_function(self):
+        """同期関数"""
+        executor = RetryExecutor(create_no_retry_policy())
+
+        def sync_op():
+            return "sync result"
+
+        result = await executor.execute(sync_op)
+
+        assert result.success
+        assert result.result == "sync result"
+
+
+class TestHelpers:
+    """ヘルパー関数テスト"""
+
+    def test_create_default_retry_policy(self):
+        """デフォルトポリシー作成"""
+        policy = create_default_retry_policy()
+        assert policy.strategy == RetryStrategy.EXPONENTIAL
+        assert policy.max_retries == 3
+
+    def test_create_no_retry_policy(self):
+        """リトライなしポリシー作成"""
+        policy = create_no_retry_policy()
+        assert policy.strategy == RetryStrategy.NONE
+        assert policy.max_retries == 0
