@@ -6,10 +6,22 @@
 
 from .session import BeekeeperSession, SessionState
 from .projection import BeekeeperProjection, build_beekeeper_projection
+from .escalation import (
+    Escalation,
+    EscalationType,
+    EscalationSeverity,
+    EscalationStatus,
+    EscalationManager,
+)
 
 __all__ = [
     "BeekeeperSession",
     "SessionState",
     "BeekeeperProjection",
     "build_beekeeper_projection",
+    "Escalation",
+    "EscalationType",
+    "EscalationSeverity",
+    "EscalationStatus",
+    "EscalationManager",
 ]

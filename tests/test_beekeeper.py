@@ -324,3 +324,229 @@ class TestBeekeeperHandler:
 
         active = handler.get_active_sessions()
         assert len(active) == 1
+
+
+# Escalation テスト
+from hiveforge.beekeeper.escalation import (
+    Escalation,
+    EscalationType,
+    EscalationSeverity,
+    EscalationStatus,
+    EscalationManager,
+)
+
+
+class TestEscalation:
+    """Escalationの基本テスト"""
+
+    def test_create_escalation(self):
+        """直訴を作成"""
+        escalation = Escalation(
+            colony_id="colony-1",
+            queen_bee_id="queen-1",
+            escalation_type=EscalationType.BLOCKED,
+            title="進行不能",
+            description="外部APIが応答しない",
+        )
+
+        assert escalation.escalation_id is not None
+        assert escalation.status == EscalationStatus.PENDING
+
+    def test_escalation_with_suggested_actions(self):
+        """推奨アクション付きの直訴"""
+        escalation = Escalation(
+            colony_id="colony-1",
+            queen_bee_id="queen-1",
+            escalation_type=EscalationType.CRITICAL_DECISION,
+            title="重要な判断",
+            description="2つの選択肢があります",
+            suggested_actions=["オプションA", "オプションB"],
+        )
+
+        assert len(escalation.suggested_actions) == 2
+
+
+class TestEscalationManager:
+    """EscalationManagerのテスト"""
+
+    def test_create_and_get(self):
+        """直訴作成と取得"""
+        manager = EscalationManager()
+
+        escalation = manager.create_escalation(
+            colony_id="colony-1",
+            queen_bee_id="queen-1",
+            escalation_type=EscalationType.BEEKEEPER_TIMEOUT,
+            title="Beekeeperタイムアウト",
+            description="60秒応答がありません",
+        )
+
+        retrieved = manager.get_escalation(escalation.escalation_id)
+        assert retrieved is not None
+        assert retrieved.title == "Beekeeperタイムアウト"
+
+    def test_acknowledge(self):
+        """直訴を確認済みに"""
+        manager = EscalationManager()
+        escalation = manager.create_escalation(
+            colony_id="colony-1",
+            queen_bee_id="queen-1",
+            escalation_type=EscalationType.BLOCKED,
+            title="テスト",
+            description="テスト",
+        )
+
+        result = manager.acknowledge(escalation.escalation_id)
+
+        assert result is True
+        assert manager.get_escalation(escalation.escalation_id).status == EscalationStatus.ACKNOWLEDGED
+
+    def test_resolve(self):
+        """直訴を解決済みに"""
+        manager = EscalationManager()
+        escalation = manager.create_escalation(
+            colony_id="colony-1",
+            queen_bee_id="queen-1",
+            escalation_type=EscalationType.BLOCKED,
+            title="テスト",
+            description="テスト",
+        )
+
+        result = manager.resolve(escalation.escalation_id, "問題解決")
+
+        assert result is True
+        assert manager.get_escalation(escalation.escalation_id) is None  # 履歴に移動
+
+    def test_dismiss(self):
+        """直訴を却下"""
+        manager = EscalationManager()
+        escalation = manager.create_escalation(
+            colony_id="colony-1",
+            queen_bee_id="queen-1",
+            escalation_type=EscalationType.RESOURCE_CONCERN,
+            title="コスト懸念",
+            description="API呼び出しが多い",
+        )
+
+        result = manager.dismiss(escalation.escalation_id, "許容範囲")
+
+        assert result is True
+        assert manager.get_escalation(escalation.escalation_id) is None
+
+    def test_get_pending_escalations(self):
+        """未対応の直訴一覧"""
+        manager = EscalationManager()
+        manager.create_escalation(
+            colony_id="colony-1",
+            queen_bee_id="queen-1",
+            escalation_type=EscalationType.BLOCKED,
+            title="テスト1",
+            description="テスト",
+        )
+        e2 = manager.create_escalation(
+            colony_id="colony-1",
+            queen_bee_id="queen-1",
+            escalation_type=EscalationType.BLOCKED,
+            title="テスト2",
+            description="テスト",
+        )
+        manager.acknowledge(e2.escalation_id)
+
+        pending = manager.get_pending_escalations()
+        assert len(pending) == 1
+
+    def test_get_escalations_by_severity(self):
+        """重要度別の直訴一覧"""
+        manager = EscalationManager()
+        manager.create_escalation(
+            colony_id="colony-1",
+            queen_bee_id="queen-1",
+            escalation_type=EscalationType.BLOCKED,
+            title="警告",
+            description="テスト",
+            severity=EscalationSeverity.WARNING,
+        )
+        manager.create_escalation(
+            colony_id="colony-1",
+            queen_bee_id="queen-1",
+            escalation_type=EscalationType.SECURITY_CONCERN,
+            title="緊急",
+            description="テスト",
+            severity=EscalationSeverity.CRITICAL,
+        )
+
+        critical = manager.get_escalations_by_severity(EscalationSeverity.CRITICAL)
+        assert len(critical) == 1
+        assert critical[0].title == "緊急"
+
+    def test_get_history(self):
+        """直訴履歴"""
+        manager = EscalationManager()
+        e = manager.create_escalation(
+            colony_id="colony-1",
+            queen_bee_id="queen-1",
+            escalation_type=EscalationType.BLOCKED,
+            title="テスト",
+            description="テスト",
+        )
+        manager.resolve(e.escalation_id, "解決")
+
+        history = manager.get_history()
+        assert len(history) == 1
+
+    def test_notification_callback(self):
+        """通知コールバック"""
+        notifications = []
+        manager = EscalationManager()
+        manager.set_notification_callback(lambda e: notifications.append(e))
+
+        manager.create_escalation(
+            colony_id="colony-1",
+            queen_bee_id="queen-1",
+            escalation_type=EscalationType.BLOCKED,
+            title="テスト",
+            description="テスト",
+        )
+
+        assert len(notifications) == 1
+
+    def test_get_critical_count(self):
+        """CRITICAL直訴数"""
+        manager = EscalationManager()
+        manager.create_escalation(
+            colony_id="colony-1",
+            queen_bee_id="queen-1",
+            escalation_type=EscalationType.SECURITY_CONCERN,
+            title="緊急1",
+            description="テスト",
+            severity=EscalationSeverity.CRITICAL,
+        )
+        manager.create_escalation(
+            colony_id="colony-1",
+            queen_bee_id="queen-1",
+            escalation_type=EscalationType.BLOCKED,
+            title="警告",
+            description="テスト",
+            severity=EscalationSeverity.WARNING,
+        )
+
+        count = manager.get_critical_count()
+        assert count == 1
+
+    def test_acknowledge_nonexistent(self):
+        """存在しない直訴の確認"""
+        manager = EscalationManager()
+        result = manager.acknowledge("nonexistent")
+        assert result is False
+
+    def test_resolve_nonexistent(self):
+        """存在しない直訴の解決"""
+        manager = EscalationManager()
+        result = manager.resolve("nonexistent", "test")
+        assert result is False
+
+    def test_dismiss_nonexistent(self):
+        """存在しない直訴の却下"""
+        manager = EscalationManager()
+        result = manager.dismiss("nonexistent")
+        assert result is False
