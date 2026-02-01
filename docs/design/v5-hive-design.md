@@ -4,7 +4,9 @@
 
 作成日: 2026-02-01
 ステータス: **Reviewed** (レビュー完了・Phase 1着手可能)
-フィードバック対応: 2026-02-01 (Decision Protocol, Project Contract, Action Class, Conflict Detection 追加)
+フィードバック対応: 
+  - 2026-02-01: Decision Protocol, Project Contract, Action Class, Conflict Detection 追加
+  - 2026-02-01: Conference エンティティ化, Decision scope/owner, Conflict category/severity, Policy Gate, UnknownEvent前方互換
 
 ---
 
@@ -169,6 +171,21 @@ class EscalationType(Enum):
 │  - assignee: string? (担当Worker Bee)                               │
 │  - progress: int (0-100)                                            │
 └─────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    │ 参加（M:N）
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                         Conference (会議)                            │
+│                    複数Colonyが参加するセッション                      │
+│  - conference_id: string (ULID)                                     │
+│  - hive_id: string (所属Hive)                                       │
+│  - topic: string (議題)                                             │
+│  - participants: list[colony_id] (参加Colony)                       │
+│  - state: ConferenceState (active/ended)                            │
+│  - initiated_by: string ("user" | "beekeeper")                      │
+│  - started_at: datetime                                             │
+│  - ended_at: datetime?                                              │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ### 1.2 関係性まとめ
@@ -181,6 +198,8 @@ class EscalationType(Enum):
 | Colony | Run | 1:N | Colony内で複数Runが並行可能 |
 | Run | Task | 1:N | v4と同じ |
 | Task | Task | 1:N | v5で追加: サブタスク階層 |
+| Hive | Conference | 1:N | Hive内で複数会議が並行可能 |
+| Conference | Colony | M:N | 複数Colonyが1つの会議に参加 |
 
 ### 1.3 Beekeeperの位置づけ
 
@@ -465,6 +484,175 @@ class TaskCreatedEvent(BaseEvent):
     # payload: { title, parent_task_id? }  # v5でparent_task_idを追加
 ```
 
+### 3.4 Conference/Decision/Conflict Payload仕様（v5.2追加）
+
+> フィードバック対応: conference_idを中心としたイベント束ね、Decision所有者/適用範囲、Conflict分類
+
+#### 3.4.1 Conference エンティティとイベント
+
+全てのConference関連イベントには `conference_id` を必須とする：
+
+```python
+# ConferenceStartedEvent payload
+{
+    "conference_id": "01HXYZ...",       # ULID（必須）
+    "hive_id": "01HWXY...",             # 所属Hive
+    "topic": "ECサイト基本設計",         # 議題
+    "participants": ["ui-colony", "api-colony", "data-colony"],
+    "initiated_by": "user",              # "user" | "beekeeper"
+}
+
+# ConferenceEndedEvent payload
+{
+    "conference_id": "01HXYZ...",
+    "duration_seconds": 1800,
+    "decisions_made": ["decision-001", "decision-002"],
+    "summary": "モバイルファースト、Stripe決済で合意",
+    "ended_by": "user",
+}
+```
+
+#### 3.4.2 Decision 所有者・適用範囲（v5.2追加）
+
+> フィードバック対応: 誰が記録したか、どこに効くか、何を上書きしたかを追跡
+
+```python
+# DecisionRecordedEvent / DecisionAppliedEvent payload
+{
+    "decision_id": "decision-001",       # ULID
+    "hive_id": "01HWXY...",              # 必須
+    "conference_id": "01HXYZ...",        # 任意（会議外でも決定可能）
+    
+    # 適用範囲（どこに効くか）
+    "scope": "colony",                   # "hive" | "colony" | "run" | "task"
+    "scope_id": "api-colony",            # scope対象のID
+    
+    # 所有者（誰が記録したか）
+    "recorded_by": "user",               # "user" | "beekeeper" | "queen:{colony_id}"
+    
+    # 上書き履歴（何を上書きしたか）
+    "supersedes_decision_id": null,      # 上書き元の決定ID（初回はnull）
+    
+    # 影響分析
+    "impact": {
+        "affected_colonies": ["api-colony", "data-colony"],
+        "estimated_effort_hours": 8,
+        "risk_level": "low",             # "low" | "medium" | "high"
+    },
+    
+    # ロールバック計画
+    "rollback_plan": "Git revert commit abc123",  # 任意
+    
+    # 決定内容
+    "proposal_id": "proposal-001",       # 対応する提案ID
+    "choice": "Stripe決済を採用",
+    "rationale": "既存の技術スタックとの親和性が高い",
+}
+
+# DecisionSupersededEvent payload
+{
+    "old_decision_id": "decision-001",
+    "new_decision_id": "decision-002",
+    "reason": "セキュリティ要件の追加により方針変更",
+    "recorded_by": "user",
+}
+```
+
+#### 3.4.3 Conflict カテゴリ・深刻度（v5.2追加）
+
+> フィードバック対応: 優先順位付けのためのカテゴリと深刻度
+
+```python
+# ConflictCategory
+class ConflictCategory(str, Enum):
+    ASSUMPTION = "assumption"       # 前提条件の不一致
+    PRIORITY = "priority"           # 優先順位の衝突
+    DEPENDENCY = "dependency"       # 依存関係の矛盾
+    CONSTRAINT = "constraint"       # 制約条件の対立
+
+# ConflictSeverity
+class ConflictSeverity(str, Enum):
+    LOW = "low"           # 軽微: 後で調整可能
+    MEDIUM = "medium"     # 中程度: 1-2日以内に解決必要
+    HIGH = "high"         # 重大: 即座に解決必要
+    BLOCKER = "blocker"   # 阻害: 解決するまで作業停止
+
+# ConflictDetectedEvent payload
+{
+    "conflict_id": "conflict-001",       # ULID
+    "conference_id": "01HXYZ...",        # 任意（会議中の衝突の場合）
+    
+    # 分類（v5.2追加）
+    "category": "priority",              # ConflictCategory
+    "severity": "high",                  # ConflictSeverity
+    
+    # 関係者
+    "parties": ["ui-colony", "api-colony"],  # 衝突しているColony
+    "topic": "認証方式の選定",
+    
+    # 証跡
+    "evidence_event_ids": [              # 衝突の根拠となるイベントID
+        "event-001",
+        "event-002",
+    ],
+    
+    # 意見
+    "opinions": [
+        {
+            "colony_id": "ui-colony",
+            "position": "OAuth2.0",
+            "rationale": "UX的にソーシャルログインが必要",
+        },
+        {
+            "colony_id": "api-colony",
+            "position": "JWT + パスワード",
+            "rationale": "実装がシンプル",
+        },
+    ],
+    
+    # 解決案（Beekeeper/Queenが提案）
+    "suggested_resolutions": [
+        "両方サポート（OAuth2.0 + パスワード）",
+        "初期はパスワードのみ、Phase 2でOAuth追加",
+    ],
+}
+
+# ConflictResolvedEvent payload
+{
+    "conflict_id": "conflict-001",
+    "conference_id": "01HXYZ...",        # 任意
+    "resolved_by": "user",               # "user" | "beekeeper"
+    "resolution": "初期はパスワードのみ、Phase 2でOAuth追加",
+    "merge_rule": "priority_weight",     # 適用したマージルール
+    "decision_id": "decision-003",       # 解決により作成された決定ID
+}
+```
+
+#### 3.4.4 Opinion イベントへのconference_id追加
+
+```python
+# OpinionRequestedEvent payload（v5.2更新）
+{
+    "conference_id": "01HXYZ...",        # 必須（v5.2追加）
+    "colony_id": "api-colony",
+    "context": { ... },                  # ProjectContract
+    "question": "決済サービスはStripeでよいか？",
+    "priority": "high",
+    "deadline": "2026-02-01T18:00:00Z",
+}
+
+# OpinionRespondedEvent payload（v5.2更新）
+{
+    "conference_id": "01HXYZ...",        # 必須（v5.2追加）
+    "request_id": "opinion-req-001",
+    "colony_id": "api-colony",
+    "summary": "Stripeで問題なし",
+    "details": "...",
+    "confidence": 0.9,
+    "conflicts_with": [],                # 他Colonyと衝突する場合
+}
+```
+
 ---
 
 ## 4. Akashic Record (AR) への影響
@@ -483,6 +671,9 @@ Vault/
 ├── hives/                         # Hive別ディレクトリ（v5追加・Phase 1はメタデータ中心）
 │   └── {hive_id}/
 │       ├── hive.json              # Hive設定
+│       ├── conferences/           # Conference別ディレクトリ（v5.2追加）
+│       │   └── {conference_id}/
+│       │       └── conference.json  # Conference設定・状態
 │       └── colonies/
 │           └── {colony_id}/
 │               ├── colony.json    # Colony設定（Queen Bee含む）
@@ -870,6 +1061,155 @@ Queen Beeとの直接対話（Beekeeperをバイパス）:
 - `tests/test_direct_intervention.py` - 直接介入機能
 - `tests/test_decision_protocol.py` - Decision Protocol（v5.1追加）
 - `tests/test_conflict_detection.py` - Conflict Detection（v5.1追加）
+- `tests/test_policy_gate.py` - Policy Gate（v5.2追加）
+- `tests/test_unknown_event.py` - UnknownEvent前方互換（v5.2追加）
+
+---
+
+## 9.5 Policy Gate（中央集権的アクション判定）（v5.2追加）
+
+> フィードバック対応: Action Classの判定ロジックを中央集権化し、散在を防ぐ
+
+### 9.5.1 Policy Gateの役割
+
+全てのアクション（API/MCP/Queen→Worker割当）は **Policy Gate** を経由する。
+これにより、判定ロジックが散在して事故するリスクを軽減する。
+
+```python
+class PolicyDecision(str, Enum):
+    ALLOW = "allow"                    # 実行許可
+    REQUIRE_APPROVAL = "require_approval"  # 承認必要
+    DENY = "deny"                      # 拒否
+
+def policy_gate(
+    actor: str,                        # 実行者（"user" | "beekeeper" | "queen:{colony_id}" | "worker:{worker_id}"）
+    action_class: ActionClass,         # READ_ONLY | REVERSIBLE | IRREVERSIBLE
+    trust_level: TrustLevel,           # 0-3
+    scope: str,                        # "hive" | "colony" | "run" | "task"
+    scope_id: str | None = None,       # スコープ対象のID
+    context: dict | None = None,       # 追加コンテキスト（ツール名、パラメータ等）
+) -> PolicyDecision:
+    """
+    中央集権的なアクション判定。
+    
+    戻り値:
+        - ALLOW: 即座に実行可能
+        - REQUIRE_APPROVAL: Requirementを作成して承認待ち
+        - DENY: 実行拒否（エラー返却）
+    """
+    # Level 3 + IRREVERSIBLE でも REQUIRE_APPROVAL を推奨（設定可能）
+    # 具体的なマトリクスは models/action_class.py の requires_confirmation() と整合
+```
+
+### 9.5.2 呼び出しポイント
+
+Policy Gateは以下の3箇所から呼び出される：
+
+| 呼び出し元 | タイミング | 例 |
+|-----------|----------|-----|
+| **API** | エンドポイント実行前 | `POST /runs/{run_id}/tasks` |
+| **MCP** | ツール実行前 | `create_file`, `run_sql` |
+| **Queen→Worker** | タスク割当時 | `TaskAssignment.action_class` チェック |
+
+```python
+# API での使用例
+@router.post("/runs/{run_id}/tasks")
+async def create_task(run_id: str, request: CreateTaskRequest, state: AppState):
+    decision = policy_gate(
+        actor=state.current_actor,
+        action_class=classify_action("create_task", request.dict()),
+        trust_level=state.get_trust_level(),
+        scope="run",
+        scope_id=run_id,
+    )
+    
+    if decision == PolicyDecision.DENY:
+        raise HTTPException(403, "Action denied by policy")
+    elif decision == PolicyDecision.REQUIRE_APPROVAL:
+        # Requirement作成して承認待ち
+        return await create_approval_request(...)
+    else:
+        # 実行
+        return await execute_create_task(...)
+```
+
+### 9.5.3 設定によるカスタマイズ
+
+Policy Gateの振る舞いは設定ファイルでカスタマイズ可能：
+
+```yaml
+# hiveforge.config.yaml
+policy:
+  # Trust Level 3 でも IRREVERSIBLE は確認必須にするか
+  level3_irreversible_requires_approval: true
+  
+  # 特定ツールのオーバーライド
+  tool_overrides:
+    run_sql:
+      action_class: irreversible    # 強制的に irreversible に分類
+      always_require_approval: true # Trust Levelに関係なく確認必須
+    read_file:
+      action_class: read_only       # 明示的に read_only
+```
+
+---
+
+## 9.6 UnknownEvent 前方互換（v5.2追加）
+
+> フィードバック対応: 未知のイベントタイプを例外ではなくUnknownEventとして読み込む
+
+### 9.6.1 問題
+
+現行の `parse_event` は未知の `type` 文字列を読むと `ValueError` が発生する。
+ログは永続であり、新しいイベントタイプを追加した後に古いバイナリでログを読むと落ちる。
+
+### 9.6.2 解決策
+
+`UnknownEvent` クラスを導入し、未知のイベントタイプをエラーにせず読み込む：
+
+```python
+class UnknownEvent(BaseEvent):
+    """未知のイベントタイプを保持するフォールバッククラス
+    
+    - 新しいイベントタイプを古いバイナリで読んでも落ちない
+    - original_type に元のtype文字列を保持
+    - typeはEventType.UNKNOWNではなく、文字列として保持（Enumに追加不要）
+    """
+    type: str = Field(..., description="元のイベントタイプ（未知）")
+    original_data: dict = Field(default_factory=dict, description="パース前の生データ")
+
+def parse_event(data: dict[str, Any] | str) -> BaseEvent:
+    """イベントデータをパースして適切なイベントクラスに変換
+    
+    未知のイベントタイプはUnknownEventとして返す（例外にしない）。
+    """
+    if isinstance(data, str):
+        data = json.loads(data)
+    
+    type_str = data.get("type", "")
+    
+    try:
+        event_type = EventType(type_str)
+        event_class = EVENT_TYPE_MAP.get(event_type, BaseEvent)
+        return event_class.model_validate(data)
+    except ValueError:
+        # 未知のイベントタイプ → UnknownEvent
+        return UnknownEvent(
+            type=type_str,
+            original_data=data,
+            actor=data.get("actor", "unknown"),
+            payload=data.get("payload", {}),
+        )
+```
+
+### 9.6.3 UnknownEventの扱い
+
+| 処理 | 振る舞い |
+|------|---------|
+| ログ表示 | `[UNKNOWN: {original_type}]` として表示 |
+| 投影計算 | スキップ（状態に影響しない） |
+| Lineage | 通常通り `parents` を追跡可能 |
+| 再シリアライズ | `original_data` を使用して元の形式で出力 |
 
 ---
 
@@ -918,6 +1258,17 @@ Queen Beeとの直接対話（Beekeeperをバイパス）:
 | P1.5-05 | Conflict Detectionイベント型 | `core/events.py` | 1 | P1-01 |
 | P1.5-06 | 標準 Failure/Timeoutイベント型 | `core/events.py` | 1 | P1-01 |
 | P1.5-07 | v5.1ユニットテスト | `tests/test_decision_protocol.py` 等 | 3 | P1.5-01〜06 |
+
+### 10.1.6 Python Core (v5.2拡張) - 追加フィードバック対応
+
+| Issue# | タスク | ファイル | 見積(h) | 依存 |
+|--------|------|--------|---------|------|
+| P1.6-A | Conference エンティティ（conference_id必須化） | `core/models/conference.py` | 2 | P1.5-02 |
+| P1.6-B | Decision scope/owner/supersedes拡張 | `core/models/decision.py` | 2 | P1.5-01 |
+| P1.6-C | Conflict category/severity拡張 | `core/models/conflict.py` | 2 | P1.5-05 |
+| P1.6-D | Policy Gate実装 | `core/policy_gate.py` | 3 | P1.5-04 |
+| P1.6-E | UnknownEvent前方互換 | `core/events.py` | 1 | - |
+| P1.6-F | v5.2ユニットテスト | `tests/test_policy_gate.py` 等 | 3 | P1.6-A〜E |
 
 ### 10.2 Python API
 
@@ -982,6 +1333,11 @@ Queen Beeとの直接対話（Beekeeperをバイパス）:
 | 2026-02-01 | Conflict Detection採用（Colony間衝突検出） | 外部フィードバック対応: 調停ルール明確化 |
 | 2026-02-01 | Conference ライフサイクルイベント追加 | 外部フィードバック対応: 会議状態追跡 |
 | 2026-02-01 | Phase 6-7にゲート条件を設定 | 外部フィードバック対応: スコープ爆発防止 |
+| 2026-02-01 | Conference エンティティ導入（conference_id必須） | 外部フィードバック対応: イベント束ねとログ追跡 |
+| 2026-02-01 | Decision に scope/recorded_by/supersedes 追加 | 外部フィードバック対応: 所有者・適用範囲・ロールバック追跡 |
+| 2026-02-01 | Conflict に category/severity 追加 | 外部フィードバック対応: 優先順位付け |
+| 2026-02-01 | Policy Gate（中央集権的判定）導入 | 外部フィードバック対応: 判定ロジック散在防止 |
+| 2026-02-01 | UnknownEvent 前方互換導入 | 外部フィードバック対応: ログ永続性への対応 |
 
 ---
 
@@ -991,7 +1347,7 @@ Queen Beeとの直接対話（Beekeeperをバイパス）:
 |------|--------|----------|
 | 複数Colony間の優先度制御 | A: 静的設定 B: 動的調整 | Phase 2開始前 |
 | Worker Beeの実装方法 | A: 個別プロセス B: スレッド C: 外部サービス | Phase 2開始前 |
-| `parse_event` の前方互換拡張 | 未知typeをBaseEventとして読み込む | Phase 2以降 |
+| ~~`parse_event` の前方互換拡張~~ | ~~未知typeをBaseEventとして読み込む~~ | ~~Phase 2以降~~ → **Phase 1.6で対応（UnknownEvent導入）** |
 | Vault物理構造の階層化 | RunをColony配下に移動 | Phase 2以降（移行ツール必要） |
 
 ---
