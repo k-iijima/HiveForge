@@ -81,6 +81,31 @@ class EventType(str, Enum):
     EMERGENCY_STOP = "system.emergency_stop"
 
 
+class ConflictCategory(str, Enum):
+    """衝突カテゴリ（v5.2追加）
+
+    衝突の種類を分類し、適切な解決戦略を選択するために使用。
+    """
+
+    ASSUMPTION = "assumption"  # 前提条件の不一致
+    PRIORITY = "priority"  # 優先順位の衝突
+    DEPENDENCY = "dependency"  # 依存関係の矛盾
+    CONSTRAINT = "constraint"  # 制約条件の対立
+
+
+class ConflictSeverity(str, Enum):
+    """衝突の深刻度（v5.2追加）
+
+    衝突の緊急度を示し、優先順位付けに使用。
+    定義順がそのまま深刻度の順序（LOW < MEDIUM < HIGH < BLOCKER）。
+    """
+
+    LOW = "low"  # 軽微: 後で調整可能
+    MEDIUM = "medium"  # 中程度: 1-2日以内に解決必要
+    HIGH = "high"  # 重大: 即座に解決必要
+    BLOCKER = "blocker"  # 阻害: 解決するまで作業停止
+
+
 def generate_event_id() -> str:
     """イベントIDを生成 (ULID形式)"""
     return str(ULID())
