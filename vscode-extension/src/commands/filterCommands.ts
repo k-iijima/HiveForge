@@ -6,11 +6,13 @@ import * as vscode from 'vscode';
 import { RunsProvider } from '../providers/runsProvider';
 import { TasksProvider } from '../providers/tasksProvider';
 import { RequirementsProvider } from '../providers/requirementsProvider';
+import { EventsProvider } from '../providers/eventsProvider';
 
 export interface FilterProviders {
     runs: RunsProvider;
     tasks: TasksProvider;
     requirements: RequirementsProvider;
+    events: EventsProvider;
 }
 
 export function registerFilterCommands(
@@ -21,6 +23,7 @@ export function registerFilterCommands(
     vscode.commands.executeCommand('setContext', 'hiveforge.runsShowCompleted', false);
     vscode.commands.executeCommand('setContext', 'hiveforge.tasksShowCompleted', false);
     vscode.commands.executeCommand('setContext', 'hiveforge.requirementsShowResolved', false);
+    vscode.commands.executeCommand('setContext', 'hiveforge.eventsTreeMode', true);
 
     // Runsフィルタ切り替え
     context.subscriptions.push(
@@ -55,6 +58,17 @@ export function registerFilterCommands(
         })
     );
 
+    // イベントログ表示モード切り替え（ツリー/フラット）
+    context.subscriptions.push(
+        vscode.commands.registerCommand('hiveforge.toggleEventsTreeMode', () => {
+            const treeMode = providers.events.toggleTreeMode();
+            vscode.commands.executeCommand('setContext', 'hiveforge.eventsTreeMode', treeMode);
+            vscode.window.showInformationMessage(
+                treeMode ? 'イベントログ: ツリー表示' : 'イベントログ: フラット表示'
+            );
+        })
+    );
+
     // FilterOn コマンド（アイコン切り替え用、同じ動作をする）
     context.subscriptions.push(
         vscode.commands.registerCommand('hiveforge.toggleRunsFilterOn', () => {
@@ -65,6 +79,9 @@ export function registerFilterCommands(
         }),
         vscode.commands.registerCommand('hiveforge.toggleRequirementsFilterOn', () => {
             vscode.commands.executeCommand('hiveforge.toggleRequirementsFilter');
+        }),
+        vscode.commands.registerCommand('hiveforge.toggleEventsTreeModeOn', () => {
+            vscode.commands.executeCommand('hiveforge.toggleEventsTreeMode');
         })
     );
 }

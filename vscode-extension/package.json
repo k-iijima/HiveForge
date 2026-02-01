@@ -107,6 +107,16 @@
         "command": "hiveforge.failTask",
         "title": "タスクを失敗",
         "icon": "$(error)"
+      },
+      {
+        "command": "hiveforge.toggleEventsTreeMode",
+        "title": "ツリー/フラット表示切替",
+        "icon": "$(list-flat)"
+      },
+      {
+        "command": "hiveforge.toggleEventsTreeModeOn",
+        "title": "フラット/ツリー表示切替",
+        "icon": "$(list-tree)"
       }
     ],
     "menus": {
@@ -149,6 +159,16 @@
         {
           "command": "hiveforge.toggleRequirementsFilterOn",
           "when": "view == hiveforge.requirements && hiveforge.requirementsShowResolved",
+          "group": "navigation"
+        },
+        {
+          "command": "hiveforge.toggleEventsTreeMode",
+          "when": "view == hiveforge.events && hiveforge.eventsTreeMode",
+          "group": "navigation"
+        },
+        {
+          "command": "hiveforge.toggleEventsTreeModeOn",
+          "when": "view == hiveforge.events && !hiveforge.eventsTreeMode",
           "group": "navigation"
         }
       ],
