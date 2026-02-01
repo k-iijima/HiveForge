@@ -236,3 +236,138 @@ class TestStateMachineCanTransition:
 
         # Act & Assert: TASK_CREATEDはRunの遷移には無効
         assert sm.can_transition(EventType.TASK_CREATED) is False
+
+
+class TestHiveStateMachine:
+    """HiveStateMachineのテスト
+
+    Hiveは複数のColonyを管理する最上位コンテナ。
+    状態: ACTIVE -> IDLE -> CLOSED
+    """
+
+    def test_initial_state_is_active(self):
+        """初期状態はACTIVE
+
+        Hive作成直後は作業可能なACTIVE状態。
+        """
+        # Arrange: なし
+
+        # Act: Hive状態機械を作成
+        from hiveforge.core.state import HiveStateMachine
+        from hiveforge.core.ar.projections import HiveState
+
+        sm = HiveStateMachine()
+
+        # Assert: 初期状態はACTIVE
+        assert sm.current_state == HiveState.ACTIVE
+
+    def test_transition_active_to_idle(self):
+        """ACTIVE -> IDLE遷移
+
+        全てのColonyが完了したときにIDLE状態に遷移。
+        """
+        # Arrange: ACTIVE状態のHive
+        from hiveforge.core.state import HiveStateMachine
+        from hiveforge.core.ar.projections import HiveState
+        from hiveforge.core.events import ColonyCompletedEvent
+
+        sm = HiveStateMachine()
+
+        # Act: 最後のColony完了イベントを適用
+        event = ColonyCompletedEvent(payload={"colony_id": "colony-001"})
+        new_state = sm.transition(event)
+
+        # Assert: IDLE状態に遷移
+        assert new_state == HiveState.IDLE
+
+    def test_transition_idle_to_active(self):
+        """IDLE -> ACTIVE遷移
+
+        新しいColonyが作成されたときにACTIVE状態に戻る。
+        """
+        # Arrange: IDLE状態のHive
+        from hiveforge.core.state import HiveStateMachine
+        from hiveforge.core.ar.projections import HiveState
+        from hiveforge.core.events import ColonyCreatedEvent
+
+        sm = HiveStateMachine()
+        sm.current_state = HiveState.IDLE
+
+        # Act: 新しいColony作成イベントを適用
+        event = ColonyCreatedEvent(payload={"colony_id": "colony-002", "hive_id": "hive-001"})
+        new_state = sm.transition(event)
+
+        # Assert: ACTIVE状態に戻る
+        assert new_state == HiveState.ACTIVE
+
+    def test_transition_active_to_closed(self):
+        """ACTIVE -> CLOSED遷移
+
+        HiveがクローズされたときにCLOSED状態に遷移。
+        """
+        # Arrange: ACTIVE状態のHive
+        from hiveforge.core.state import HiveStateMachine
+        from hiveforge.core.ar.projections import HiveState
+        from hiveforge.core.events import HiveClosedEvent
+
+        sm = HiveStateMachine()
+
+        # Act: Hive終了イベントを適用
+        event = HiveClosedEvent(payload={"hive_id": "hive-001"})
+        new_state = sm.transition(event)
+
+        # Assert: CLOSED状態に遷移
+        assert new_state == HiveState.CLOSED
+
+    def test_transition_idle_to_closed(self):
+        """IDLE -> CLOSED遷移
+
+        待機中のHiveもクローズ可能。
+        """
+        # Arrange: IDLE状態のHive
+        from hiveforge.core.state import HiveStateMachine
+        from hiveforge.core.ar.projections import HiveState
+        from hiveforge.core.events import HiveClosedEvent
+
+        sm = HiveStateMachine()
+        sm.current_state = HiveState.IDLE
+
+        # Act: Hive終了イベントを適用
+        event = HiveClosedEvent(payload={"hive_id": "hive-001"})
+        new_state = sm.transition(event)
+
+        # Assert: CLOSED状態に遷移
+        assert new_state == HiveState.CLOSED
+
+    def test_closed_state_is_terminal(self):
+        """CLOSED状態からは遷移不可（終端状態）
+
+        クローズされたHiveは再利用できない。
+        """
+        # Arrange: CLOSED状態のHive
+        from hiveforge.core.state import HiveStateMachine
+        from hiveforge.core.ar.projections import HiveState
+        from hiveforge.core.events import ColonyCreatedEvent
+
+        sm = HiveStateMachine()
+        sm.current_state = HiveState.CLOSED
+
+        # Act & Assert: いかなる遷移も失敗
+        event = ColonyCreatedEvent(payload={"colony_id": "colony-001"})
+        with pytest.raises(TransitionError):
+            sm.transition(event)
+
+    def test_get_valid_events_from_active(self):
+        """ACTIVE状態から遷移可能なイベント一覧"""
+        # Arrange: ACTIVE状態のHive
+        from hiveforge.core.state import HiveStateMachine
+        from hiveforge.core.events import EventType
+
+        sm = HiveStateMachine()
+
+        # Act: 有効なイベント一覧を取得
+        valid_events = sm.get_valid_events()
+
+        # Assert: colony.completed と hive.closed が有効
+        assert EventType.COLONY_COMPLETED in valid_events
+        assert EventType.HIVE_CLOSED in valid_events

@@ -10,7 +10,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 
-from ..ar.projections import RequirementState, RunState, TaskState
+from ..ar.projections import HiveState, RequirementState, RunState, TaskState
 from ..config import get_settings
 from ..events import (
     BaseEvent,
@@ -54,9 +54,7 @@ class StateMachine:
     def get_valid_events(self) -> list[EventType]:
         """現在の状態から遷移可能なイベント一覧を取得"""
         return [
-            event_type
-            for (state, event_type) in self._transitions
-            if state == self.current_state
+            event_type for (state, event_type) in self._transitions if state == self.current_state
         ]
 
     def transition(self, event: BaseEvent) -> Enum:
@@ -215,3 +213,29 @@ class OscillationDetector:
                 )
 
         return True
+
+
+class HiveStateMachine(StateMachine):
+    """Hive状態機械
+
+    Hiveは複数のColonyを管理する最上位コンテナ。
+
+    状態遷移:
+    - ACTIVE -> IDLE (全Colony完了時)
+    - ACTIVE -> CLOSED (Hive終了時)
+    - IDLE -> ACTIVE (新規Colony作成時)
+    - IDLE -> CLOSED (Hive終了時)
+    """
+
+    def __init__(self):
+        transitions = [
+            # ACTIVE -> IDLE: 全Colony完了時
+            Transition(HiveState.ACTIVE, HiveState.IDLE, EventType.COLONY_COMPLETED),
+            # ACTIVE -> CLOSED: Hive終了時
+            Transition(HiveState.ACTIVE, HiveState.CLOSED, EventType.HIVE_CLOSED),
+            # IDLE -> ACTIVE: 新規Colony作成時
+            Transition(HiveState.IDLE, HiveState.ACTIVE, EventType.COLONY_CREATED),
+            # IDLE -> CLOSED: Hive終了時
+            Transition(HiveState.IDLE, HiveState.CLOSED, EventType.HIVE_CLOSED),
+        ]
+        super().__init__(HiveState.ACTIVE, transitions)

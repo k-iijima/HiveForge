@@ -2,6 +2,7 @@
 
 from .machines import (
     GovernanceError,
+    HiveStateMachine,
     OscillationDetector,
     RequirementStateMachine,
     RunStateMachine,
@@ -13,6 +14,7 @@ __all__ = [
     "RunStateMachine",
     "TaskStateMachine",
     "RequirementStateMachine",
+    "HiveStateMachine",
     "OscillationDetector",
     "TransitionError",
     "GovernanceError",

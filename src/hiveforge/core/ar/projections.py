@@ -40,6 +40,20 @@ class RequirementState(str, Enum):
     REJECTED = "rejected"
 
 
+class HiveState(str, Enum):
+    """Hive状態
+
+    Hiveは複数のColonyを管理する最上位コンテナ。
+    - ACTIVE: 作業中（Colonyが実行中）
+    - IDLE: 待機中（全Colony完了、新規受付可）
+    - CLOSED: 終了（新規受付不可）
+    """
+
+    ACTIVE = "active"
+    IDLE = "idle"
+    CLOSED = "closed"
+
+
 @dataclass
 class TaskProjection:
     """タスクの現在状態"""
