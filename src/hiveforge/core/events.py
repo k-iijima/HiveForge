@@ -132,7 +132,7 @@ class BaseEvent(BaseModel):
     }
 
     id: str = Field(default_factory=generate_event_id, description="イベントID (ULID)")
-    type: EventType = Field(..., description="イベント種別")
+    type: EventType | str = Field(..., description="イベント種別")
     timestamp: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         description="イベント発生時刻 (UTC)",
@@ -165,6 +165,24 @@ class BaseEvent(BaseModel):
     def to_jsonl(self) -> str:
         """JSONL形式（改行なし）でシリアライズ"""
         return self.model_dump_json()
+
+
+# --- 未知イベント（前方互換性） ---
+
+
+class UnknownEvent(BaseEvent):
+    """未知のイベントタイプを表すクラス（前方互換性）
+
+    将来のバージョンで追加されたイベントタイプを、古いバージョンでも
+    例外を発生させずに読み込めるようにする。
+    original_dataに元のデータを保持し、再シリアライズ可能。
+    """
+
+    type: str = Field(..., description="未知のイベントタイプ")
+    original_data: dict[str, Any] = Field(
+        default_factory=dict,
+        description="元のイベントデータ（全フィールドを保持）",
+    )
 
 
 # --- 具体的なイベントクラス ---
@@ -552,15 +570,36 @@ EVENT_TYPE_MAP: dict[EventType, type[BaseEvent]] = {
 def parse_event(data: dict[str, Any] | str) -> BaseEvent:
     """イベントデータをパースして適切なイベントクラスに変換
 
+    未知のイベントタイプはUnknownEventとして返す（前方互換性）。
+    これにより、将来のバージョンで追加されたイベントタイプを
+    古いバージョンでも読み込める。
+
     Args:
         data: イベントデータ（dictまたはJSON文字列）
 
     Returns:
-        対応するイベントクラスのインスタンス
+        対応するイベントクラスのインスタンス（未知の場合はUnknownEvent）
     """
     if isinstance(data, str):
         data = json.loads(data)
 
-    event_type = EventType(data["type"])
-    event_class = EVENT_TYPE_MAP.get(event_type, BaseEvent)
-    return event_class.model_validate(data)
+    # 元データを保持（UnknownEvent用）
+    original_data = dict(data)
+
+    try:
+        event_type = EventType(data["type"])
+        event_class = EVENT_TYPE_MAP.get(event_type, BaseEvent)
+        return event_class.model_validate(data)
+    except ValueError:
+        # 未知のイベントタイプ: UnknownEventとして返す
+        return UnknownEvent(
+            type=data.get("type", "unknown"),
+            id=data.get("id", generate_event_id()),
+            actor=data.get("actor", "unknown"),
+            payload=data.get("payload", {}),
+            run_id=data.get("run_id"),
+            task_id=data.get("task_id"),
+            prev_hash=data.get("prev_hash"),
+            parents=data.get("parents", []),
+            original_data=original_data,
+        )
