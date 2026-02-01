@@ -302,3 +302,62 @@ class TestClose:
 
         assert beekeeper._llm_client is None
         assert beekeeper._agent_runner is None
+
+    @pytest.mark.asyncio
+    async def test_close_releases_queens(self, beekeeper):
+        """closeでQueen Beeも解放される"""
+        # Arrange: Queen Beeを作成
+        from hiveforge.queen_bee.server import QueenBeeMCPServer
+
+        queen = QueenBeeMCPServer(colony_id="colony-1", ar=beekeeper.ar)
+        beekeeper._queens["colony-1"] = queen
+
+        # Act
+        await beekeeper.close()
+
+        # Assert
+        assert len(beekeeper._queens) == 0
+
+
+class TestDelegateToQueen:
+    """Queen Beeへの委譲テスト"""
+
+    @pytest.mark.asyncio
+    async def test_delegate_creates_queen(self, beekeeper):
+        """委譲時にQueen Beeが作成される"""
+        # Act
+        result = await beekeeper._delegate_to_queen(
+            colony_id="colony-1",
+            task="Test task",
+            context={},
+        )
+
+        # Assert
+        assert "colony-1" in beekeeper._queens
+        assert "タスク完了" in result or "タスク失敗" in result
+
+    @pytest.mark.asyncio
+    async def test_delegate_reuses_queen(self, beekeeper):
+        """同じColonyへの委譲は既存Queenを再利用"""
+        # Arrange
+        await beekeeper._delegate_to_queen("colony-1", "First task")
+        first_queen = beekeeper._queens["colony-1"]
+
+        # Act
+        await beekeeper._delegate_to_queen("colony-1", "Second task")
+        second_queen = beekeeper._queens["colony-1"]
+
+        # Assert
+        assert first_queen is second_queen
+
+    @pytest.mark.asyncio
+    async def test_delegate_adds_colony_to_session(self, beekeeper):
+        """委譲時にセッションにColonyが追加される"""
+        # Arrange
+        beekeeper.current_session = beekeeper.session_manager.create_session()
+
+        # Act
+        await beekeeper._delegate_to_queen("colony-1", "Task")
+
+        # Assert
+        assert "colony-1" in beekeeper.current_session.active_colonies

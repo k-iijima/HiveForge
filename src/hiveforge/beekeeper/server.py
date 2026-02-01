@@ -13,6 +13,7 @@ from typing import Any
 
 from ..core import AkashicRecord, generate_event_id
 from ..core.config import LLMConfig
+from ..queen_bee.server import QueenBeeMCPServer
 from .session import BeekeeperSession, BeekeeperSessionManager, SessionState
 
 logger = logging.getLogger(__name__)
@@ -36,7 +37,7 @@ class BeekeeperMCPServer:
         """初期化"""
         self._llm_client = None
         self._agent_runner = None
-        self._queen_clients: dict[str, Any] = {}  # colony_id -> QueenBee client
+        self._queens: dict[str, QueenBeeMCPServer] = {}  # colony_id -> Queen Bee
 
     def get_tool_definitions(self) -> list[dict[str, Any]]:
         """MCPツール定義を取得
@@ -427,9 +428,49 @@ class BeekeeperMCPServer:
         self, colony_id: str, task: str, context: dict[str, Any] | None = None
     ) -> str:
         """Queen Beeにタスクを委譲"""
-        # TODO: Queen Bee MCP Serverを呼び出す
         logger.info(f"タスクをQueen Bee ({colony_id}) に委譲: {task}")
-        return f"タスクをColony {colony_id} に委譲しました: {task}"
+
+        # Queen Beeを取得または作成
+        if colony_id not in self._queens:
+            queen = QueenBeeMCPServer(
+                colony_id=colony_id,
+                ar=self.ar,
+                llm_config=self.llm_config,
+            )
+            self._queens[colony_id] = queen
+            logger.info(f"新規Queen Bee作成: {colony_id}")
+        else:
+            queen = self._queens[colony_id]
+
+        # セッションにColonyを追加
+        if self.current_session:
+            self.current_session.add_colony(colony_id)
+
+        # Run IDを生成
+        run_id = generate_event_id()
+
+        # Queen Beeでタスクを実行
+        result = await queen.dispatch_tool(
+            "execute_goal",
+            {
+                "run_id": run_id,
+                "goal": task,
+                "context": context or {},
+            },
+        )
+
+        # 結果を整形
+        if result.get("status") == "completed":
+            tasks_completed = result.get("tasks_completed", 0)
+            tasks_total = result.get("tasks_total", 0)
+            return f"タスク完了 ({tasks_completed}/{tasks_total}): {task}"
+        elif result.get("status") == "partial":
+            tasks_completed = result.get("tasks_completed", 0)
+            tasks_total = result.get("tasks_total", 0)
+            return f"一部タスク完了 ({tasks_completed}/{tasks_total}): {task}"
+        else:
+            error = result.get("error", "Unknown error")
+            return f"タスク失敗: {error}"
 
     async def _ask_user(self, question: str, options: list[str] | None = None) -> str:
         """ユーザーに確認を求める"""
@@ -492,6 +533,11 @@ class BeekeeperMCPServer:
 
     async def close(self) -> None:
         """リソースを解放"""
+        # 全Queen Beeを閉じる
+        for queen in self._queens.values():
+            await queen.close()
+        self._queens.clear()
+
         if self._llm_client:
             await self._llm_client.close()
             self._llm_client = None
