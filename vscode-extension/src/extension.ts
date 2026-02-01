@@ -12,9 +12,13 @@ import { EventsProvider } from './providers/eventsProvider';
 import { DecisionsProvider } from './providers/decisionsProvider';
 import { HiveForgeClient } from './client';
 import { registerRunCommands, registerRequirementCommands, registerFilterCommands, registerTaskCommands, registerDecisionCommands, Providers } from './commands';
+import { HiveTreeDataProvider } from './views/hiveTreeView';
+import { registerHiveCommands, setHiveTreeProvider } from './commands/hiveCommands';
+import { registerColonyCommands, setHiveTreeProviderForColony } from './commands/colonyCommands';
 
 let client: HiveForgeClient;
 let providers: Providers;
+let hiveTreeProvider: HiveTreeDataProvider;
 let refreshInterval: NodeJS.Timeout | undefined;
 let runsTreeView: vscode.TreeView<unknown>;
 let requirementsTreeView: vscode.TreeView<unknown>;
@@ -39,12 +43,22 @@ export function activate(context: vscode.ExtensionContext) {
     // TreeViewを登録
     registerTreeViews(context);
 
+    // Hive TreeViewを登録
+    hiveTreeProvider = new HiveTreeDataProvider();
+    setHiveTreeProvider(hiveTreeProvider);
+    setHiveTreeProviderForColony(hiveTreeProvider);
+    context.subscriptions.push(
+        vscode.window.registerTreeDataProvider('hiveforge.hives', hiveTreeProvider)
+    );
+
     // コマンドを登録
     registerRunCommands(context, client, providers, refresh);
     registerRequirementCommands(context, client, refresh);
     registerFilterCommands(context, providers);
     registerTaskCommands(context, client, refresh);
     registerDecisionCommands(context);
+    registerHiveCommands(context);
+    registerColonyCommands(context);
 
     // 自動更新を設定
     setupAutoRefresh(config);

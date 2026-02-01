@@ -118,10 +118,50 @@
         "command": "hiveforge.toggleEventsTreeModeOn",
         "title": "フラット/ツリー表示切替",
         "icon": "$(list-tree)"
+      },
+      {
+        "command": "hiveforge.createHive",
+        "title": "HiveForge: Hiveを作成",
+        "icon": "$(add)"
+      },
+      {
+        "command": "hiveforge.closeHive",
+        "title": "HiveForge: Hiveを終了",
+        "icon": "$(close)"
+      },
+      {
+        "command": "hiveforge.refreshHives",
+        "title": "HiveForge: Hive一覧を更新",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "hiveforge.createColony",
+        "title": "HiveForge: Colonyを作成",
+        "icon": "$(add)"
+      },
+      {
+        "command": "hiveforge.startColony",
+        "title": "HiveForge: Colonyを開始",
+        "icon": "$(play)"
+      },
+      {
+        "command": "hiveforge.completeColony",
+        "title": "HiveForge: Colonyを完了",
+        "icon": "$(check)"
       }
     ],
     "menus": {
       "view/title": [
+        {
+          "command": "hiveforge.createHive",
+          "when": "view == hiveforge.hives",
+          "group": "navigation@1"
+        },
+        {
+          "command": "hiveforge.refreshHives",
+          "when": "view == hiveforge.hives",
+          "group": "navigation@2"
+        },
         {
           "command": "hiveforge.startRun",
           "when": "view == hiveforge.runs",
@@ -174,6 +214,26 @@
         }
       ],
       "view/item/context": [
+        {
+          "command": "hiveforge.closeHive",
+          "when": "view == hiveforge.hives && viewItem == activeHive",
+          "group": "inline@1"
+        },
+        {
+          "command": "hiveforge.createColony",
+          "when": "view == hiveforge.hives && viewItem == activeHive",
+          "group": "inline@2"
+        },
+        {
+          "command": "hiveforge.startColony",
+          "when": "view == hiveforge.hives && viewItem == pendingColony",
+          "group": "inline@1"
+        },
+        {
+          "command": "hiveforge.completeColony",
+          "when": "view == hiveforge.hives && viewItem =~ /^(runningColony|inProgressColony)$/",
+          "group": "inline@1"
+        },
         {
           "command": "hiveforge.approveRequirement",
           "when": "view == hiveforge.requirements && viewItem == pendingRequirement",
@@ -232,6 +292,10 @@
     },
     "views": {
       "hiveforge": [
+        {
+          "id": "hiveforge.hives",
+          "name": "Hives"
+        },
         {
           "id": "hiveforge.runs",
           "name": "Runs"
