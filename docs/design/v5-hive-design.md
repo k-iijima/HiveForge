@@ -31,6 +31,59 @@
 | Worker Bee（働き蜂） | 実務担当。コード生成、調査、レビューなど |
 | Beekeeper（養蜂家） | ユーザーの代理。必要に応じてHive/Colonyを作成・廃止 |
 
+### ユーザーの権限モデル
+
+ユーザー（開発者）は **Beekeeper経由での通常操作** に加えて、**直接介入権限** を持つ。
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        ユーザー（開発者）                         │
+│                                                                 │
+│  権限:                                                          │
+│  - 🔵 通常操作: Beekeeper経由で指示・確認                        │
+│  - 🔴 直接介入: Queen Beeと直接対話（Beekeeperをバイパス）        │
+│  - 🔴 監査権限: 全エージェントの活動ログを閲覧                    │
+│  - 🔴 設定変更: Beekeeper/Queen Bee/Worker Beeの設定を変更       │
+│  - 🔴 緊急停止: 任意のColony/Runを即座に停止                      │
+└─────────────────────────────────────────────────────────────────┘
+         │                                    │
+         │ 通常操作                            │ 直接介入
+         ▼                                    ▼
+┌─────────────────┐                  ┌─────────────────┐
+│   Beekeeper     │◄─── 直訴 ───────│   Queen Bee     │
+│   (養蜂家)       │                  │   (女王蜂)       │
+└─────────────────┘                  └─────────────────┘
+```
+
+### 直接介入のユースケース
+
+| ケース | 説明 | 操作 |
+|--------|------|------|
+| Beekeeperの誤解 | Beekeeperがユーザーの意図を正しく伝えていない | Queen Beeに直接指示 |
+| 詳細確認 | Queen Beeの判断理由を直接聞きたい | Queen Beeとの対話 |
+| 緊急対応 | Beekeeperの応答が遅い/フリーズした | 直接介入で作業継続 |
+| 設定調整 | Queen Beeのシステムプロンプトを調整 | 設定変更 |
+
+### Queen Beeからの直訴（Escalation）
+
+Queen BeeがBeekeeperの動作に問題を感じた場合、ユーザーに直接報告できる。
+
+```python
+class EscalationType(Enum):
+    BEEKEEPER_CONFUSION = "beekeeper_confusion"   # Beekeeperが混乱している
+    BEEKEEPER_TIMEOUT = "beekeeper_timeout"       # Beekeeperが応答しない
+    CONTEXT_LOSS = "context_loss"                 # コンテキストが失われた
+    INSTRUCTION_CONFLICT = "instruction_conflict" # 指示が矛盾している
+    RESOURCE_CONCERN = "resource_concern"         # リソース（コスト/時間）の懸念
+```
+
+**直訴の流れ**:
+1. Queen Beeが問題を検知
+2. `EscalationEvent`を発行（ARに記録）
+3. VS Code拡張に通知（⚠️アイコン + ポップアップ）
+4. ユーザーが確認・対応を選択
+5. 対応結果をBeekeeperの改善に反映
+
 ---
 
 ## 1. エンティティ関係図（ER図）
@@ -254,6 +307,11 @@ class EventType(Enum):
     # Worker Bee関連（v5追加）
     WORKER_ASSIGNED = "worker.assigned"
     WORKER_RELEASED = "worker.released"
+    
+    # 直接介入・エスカレーション（v5追加）
+    USER_DIRECT_INTERVENTION = "user.direct_intervention"  # ユーザーの直接介入
+    QUEEN_ESCALATION = "queen.escalation"                  # Queen Beeからの直訴
+    BEEKEEPER_FEEDBACK = "beekeeper.feedback"              # Beekeeper改善フィードバック
 ```
 
 ### 3.2 イベントスキーマ
@@ -297,6 +355,37 @@ class WorkerAssignedEvent(BaseEvent):
     worker_id: str
     run_id: str
     # payload: { role, instruction }
+
+class UserDirectInterventionEvent(BaseEvent):
+    """ユーザー直接介入イベント（ユーザー → Queen Bee、Beekeeperをバイパス）"""
+    type: Literal[EventType.USER_DIRECT_INTERVENTION] = EventType.USER_DIRECT_INTERVENTION
+    colony_id: str
+    # payload: { 
+    #   instruction: string,           # 直接指示
+    #   reason: string,                # 介入理由
+    #   bypass_beekeeper: bool,        # Beekeeperをバイパスしたか
+    # }
+
+class QueenEscalationEvent(BaseEvent):
+    """Queen Beeからの直訴イベント（Queen Bee → ユーザー）"""
+    type: Literal[EventType.QUEEN_ESCALATION] = EventType.QUEEN_ESCALATION
+    colony_id: str
+    # payload: { 
+    #   escalation_type: EscalationType,  # 直訴の種類
+    #   summary: string,                   # 問題の要約
+    #   details: string,                   # 詳細説明
+    #   suggested_actions: list[string],   # 提案するアクション
+    #   beekeeper_context: string,         # Beekeeperとのやり取りコンテキスト
+    # }
+
+class BeekeeperFeedbackEvent(BaseEvent):
+    """Beekeeper改善フィードバック（エスカレーション解決後）"""
+    type: Literal[EventType.BEEKEEPER_FEEDBACK] = EventType.BEEKEEPER_FEEDBACK
+    # payload: { 
+    #   escalation_id: string,         # 対応したエスカレーションID
+    #   resolution: string,            # 解決方法
+    #   beekeeper_adjustment: dict,    # Beekeeperへの調整内容
+    # }
 ```
 
 ### 3.3 既存イベントの拡張
@@ -372,6 +461,23 @@ POST   /colonies/{colony_id}/opinions/{id}/respond  # 意見回答
 # Worker Bee操作
 GET    /colonies/{colony_id}/workers  # Worker Bee一覧
 POST   /colonies/{colony_id}/workers  # Worker Bee追加
+
+# ユーザー直接介入（Beekeeperバイパス）
+POST   /colonies/{colony_id}/direct-intervention  # Queen Beeに直接指示
+GET    /colonies/{colony_id}/queen/status         # Queen Beeの状態直接確認
+POST   /colonies/{colony_id}/queen/chat           # Queen Beeと直接対話
+
+# エスカレーション
+GET    /escalations                              # 全エスカレーション一覧
+GET    /escalations/pending                      # 未対応エスカレーション
+GET    /colonies/{colony_id}/escalations         # Colony別エスカレーション
+POST   /escalations/{id}/resolve                 # エスカレーション解決
+POST   /escalations/{id}/feedback                # Beekeeper改善フィードバック
+
+# 監査・ログ
+GET    /audit/agents                             # 全エージェント活動ログ
+GET    /audit/agents/{agent_id}                  # 特定エージェントのログ
+GET    /audit/interventions                      # 介入履歴
 ```
 
 ### 5.2 既存エンドポイントへの影響
@@ -406,6 +512,20 @@ get_pending_opinions(colony_id: str) -> list[OpinionRequest]
 # Worker Bee操作
 assign_worker(colony_id: str, run_id: str, role: str) -> WorkerId
 release_worker(worker_id: str) -> None
+
+# ユーザー直接介入（Beekeeperバイパス）
+direct_instruct_queen(colony_id: str, instruction: str, reason: str) -> None
+chat_with_queen(colony_id: str, message: str) -> QueenResponse
+get_queen_status(colony_id: str) -> QueenStatus
+
+# エスカレーション対応
+list_escalations(pending_only: bool = True) -> list[Escalation]
+resolve_escalation(escalation_id: str, resolution: str) -> None
+provide_beekeeper_feedback(escalation_id: str, feedback: dict) -> None
+
+# 監査
+get_agent_logs(agent_id: str | None = None, limit: int = 100) -> list[AgentLog]
+get_intervention_history() -> list[Intervention]
 ```
 
 ### 6.2 既存ツールへの影響
@@ -427,8 +547,10 @@ create_task(title: str, parent_task_id: str | None = None) -> TaskInfo
 ```
 HiveForge Panel (サイドバー)
 ├── 🏠 Hive Overview          # Hive全体概要（プロジェクト）
+├── ⚠️ Escalations (2)        # 未対応エスカレーション（直訴）
 ├── 🐝 Colonies               # Colony一覧
 │   ├── 📦 UI/UX Colony (active)
+│   │   ├── 👑 Queen Bee [直接対話]  # クリックで直接対話
 │   │   ├── ▶️ Run: ログイン画面設計
 │   │   └── ▶️ Run: ダッシュボード設計
 │   ├── 📦 API Colony (idle)
@@ -436,10 +558,60 @@ HiveForge Panel (サイドバー)
 ├── 📋 Tasks                  # 現在のColony/Runのタスク
 ├── ❓ Requirements           # 確認要請
 ├── 📜 Events                 # イベントログ
-└── 🎯 Decisions              # 決定履歴
+├── 🎯 Decisions              # 決定履歴
+└── 🔍 Audit Log              # 監査ログ（介入履歴含む）
 ```
 
-### 7.2 Conference View（Phase 2で実装）
+### 7.2 エスカレーション通知
+
+Queen Beeからの直訴があった場合の表示:
+
+```
+┌────────────────────────────────────────────────────────────┐
+│ ⚠️ Queen Beeからの直訴                                     │
+├────────────────────────────────────────────────────────────┤
+│ 📦 UI/UX Colony                                            │
+│                                                            │
+│ 問題: Beekeeperが「モバイルファースト」と言いつつ、         │
+│       デスクトップ用のワイヤーフレームを要求しています。     │
+│                                                            │
+│ タイプ: INSTRUCTION_CONFLICT                               │
+│                                                            │
+│ 提案:                                                      │
+│   1. モバイルファーストで統一                              │
+│   2. デスクトップも並行して作成                            │
+│   3. Beekeeperに再確認                                     │
+│                                                            │
+│ [対応する] [後で] [Queen Beeと直接対話]                    │
+└────────────────────────────────────────────────────────────┘
+```
+
+### 7.3 直接対話モード
+
+Queen Beeとの直接対話（Beekeeperをバイパス）:
+
+```
+┌────────────────────────────────────────────────────────────┐
+│ 👑 直接対話: UI/UX Queen Bee                 [通常モードへ] │
+├────────────────────────────────────────────────────────────┤
+│ ⚠️ Beekeeperをバイパスして直接対話中                        │
+│                                                            │
+│ [ユーザー] 今のデザイン案を見せて                          │
+│                                                            │
+│ [Queen] 現在3案あります:                                   │
+│   1. モバイルファースト案 [プレビュー]                     │
+│   2. デスクトップ優先案 [プレビュー]                       │
+│   3. レスポンシブ統合案 [プレビュー]                       │
+│                                                            │
+│ [ユーザー] 1でいこう。Beekeeperにも伝えておいて            │
+│                                                            │
+│ [Queen] 了解しました。Beekeeperに方針を伝達します。        │
+├────────────────────────────────────────────────────────────┤
+│ [入力欄] _________________________________ [送信]          │
+└────────────────────────────────────────────────────────────┘
+```
+
+### 7.4 Conference View（Phase 2で実装）
 
 ```
 ┌────────────────────────────────────────────────────────────┐
@@ -455,6 +627,8 @@ HiveForge Panel (サイドバー)
 │ [Data Queen] 商品スキーマ案を作成しました。[詳細を見る]    │
 ├────────────────────────────────────────────────────────────┤
 │ [入力欄] _________________________________ [送信] [🎤]     │
+│                                                            │
+│ [直接介入: Queen選択 ▼]  # 特定のQueenと直接対話           │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -528,6 +702,66 @@ HiveForge Panel (サイドバー)
    │         │───────────►│───────────►│──────────►│
 ```
 
+### 8.3 直接介入フロー（Beekeeperバイパス）
+
+```
+ユーザー    Beekeeper   UI Queen    Worker A
+   │         │            │           │
+   │ (Beekeeperの応答が遅い/誤解がある)
+   │                      │           │
+   │ direct_instruct_queen│           │
+   │─────────────────────►│           │
+   │                      │ DirectIntervention
+   │                      │──────────────────────► AR
+   │                      │           │
+   │                      │ [指示を受領]
+   │                      │           │
+   │                      │ TaskAssign│
+   │                      │──────────►│
+   │                      │           │
+   │                      │◄──────────│ TaskResult
+   │◄─────────────────────│           │
+   │ [結果を直接報告]      │           │
+   │                      │           │
+   │                      │ [Beekeeperに状況共有]
+   │                      │──────────►│ (任意)
+   │         │◄───────────│           │
+   │         │ [コンテキスト更新]      │
+```
+
+### 8.4 エスカレーションフロー（Queen Beeからの直訴）
+
+```
+ユーザー    Beekeeper   UI Queen    VS Code
+   │         │            │           │
+   │         │ OpinionReq │           │
+   │         │───────────►│           │
+   │         │            │           │
+   │         │            │ [矛盾を検知]
+   │         │            │           │
+   │         │            │ QueenEscalation
+   │         │            │──────────────────► AR
+   │         │            │           │
+   │         │            │ [通知]    │
+   │         │            │──────────►│
+   │         │            │           │
+   │◄────────────────────────────────┤│
+   │ ⚠️ "UI/UX Queenからの直訴"      ││
+   │                      │           │
+   │ [対応選択]            │           │
+   │  1. Queen直接対話     │           │
+   │  2. Beekeeper調整     │           │
+   │  3. 両方に指示        │           │
+   │                      │           │
+   │ resolve_escalation   │           │
+   │─────────────────────►│           │
+   │                      │           │
+   │ provide_beekeeper_feedback       │
+   │────────►│            │           │
+   │         │ [設定更新]  │           │
+   │         │            │           │
+```
+
 ---
 
 ## 9. 既存テストへの影響
@@ -546,6 +780,8 @@ HiveForge Panel (サイドバー)
 - `tests/test_colony_events.py` - Colonyイベント型
 - `tests/test_colony_api.py` - Colony API
 - `tests/test_colony_mcp.py` - Colony MCPツール
+- `tests/test_escalation.py` - エスカレーション機能
+- `tests/test_direct_intervention.py` - 直接介入機能
 
 ---
 
@@ -580,6 +816,8 @@ HiveForge Panel (サイドバー)
 | 2026-02-01 | Run.colony_idはoptional | v4後方互換性のため |
 | 2026-02-01 | Colony配下のディレクトリ構造を追加 | Colony単位でのAR管理のため |
 | 2026-02-01 | Phase 1では単一Colonyのみ | 複雑性を段階的に導入 |
+| 2026-02-01 | ユーザーにQueen Bee直接対話権限を付与 | Beekeeperバイパスの必要性 |
+| 2026-02-01 | Queen Beeからの直訴（Escalation）機能追加 | Beekeeper改善フィードバック |
 
 ---
 
