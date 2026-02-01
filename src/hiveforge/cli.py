@@ -43,6 +43,10 @@ def main():
         help="使用するエージェント",
     )
 
+    # chat コマンド（Beekeeper経由の対話）
+    chat_parser = subparsers.add_parser("chat", help="Beekeeperと対話")
+    chat_parser.add_argument("message", help="Beekeeperに送るメッセージ")
+
     # record-decision コマンド
     decision_parser = subparsers.add_parser(
         "record-decision",
@@ -103,6 +107,8 @@ def main():
         run_status(args)
     elif args.command == "run":
         run_task(args)
+    elif args.command == "chat":
+        run_chat(args)
     elif args.command == "record-decision":
         run_record_decision(args)
     else:
@@ -218,6 +224,51 @@ def run_task(args):
             await client.close()
 
     asyncio.run(_run())
+
+
+def run_chat(args):
+    """Beekeeperと対話"""
+    import asyncio
+    import os
+
+    async def _chat():
+        from .beekeeper import BeekeeperMCPServer
+        from .core import AkashicRecord, get_settings
+
+        settings = get_settings()
+        vault_path = settings.get_vault_path()
+        vault_path.mkdir(parents=True, exist_ok=True)
+        ar = AkashicRecord(vault_path)
+
+        print("🧑‍🌾 Beekeeperと対話します...")
+        print(f"📝 メッセージ: {args.message}")
+        print("-" * 50)
+
+        # Beekeeper初期化
+        beekeeper = BeekeeperMCPServer(ar=ar)
+
+        try:
+            # メッセージ送信
+            result = await beekeeper.dispatch_tool(
+                "send_message",
+                {
+                    "message": args.message,
+                    "context": {
+                        "working_directory": os.getcwd(),
+                    },
+                },
+            )
+
+            print("-" * 50)
+            if result.get("status") == "success":
+                print(f"✅ 完了（アクション: {result.get('actions_taken', 0)}回）")
+                print(f"\n{result.get('response', '')}")
+            else:
+                print(f"❌ エラー: {result.get('error', 'Unknown error')}")
+        finally:
+            await beekeeper.close()
+
+    asyncio.run(_chat())
 
 
 def run_record_decision(args):
