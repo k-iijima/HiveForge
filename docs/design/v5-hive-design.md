@@ -4,6 +4,7 @@
 
 作成日: 2026-02-01
 ステータス: **Reviewed** (レビュー完了・Phase 1着手可能)
+フィードバック対応: 2026-02-01 (Decision Protocol, Project Contract, Action Class, Conflict Detection 追加)
 
 ---
 
@@ -334,6 +335,24 @@ class EventType(Enum):
     USER_DIRECT_INTERVENTION = "user.direct_intervention"  # ユーザーの直接介入
     QUEEN_ESCALATION = "queen.escalation"                  # Queen Beeからの直訴
     BEEKEEPER_FEEDBACK = "beekeeper.feedback"              # Beekeeper改善フィードバック
+    
+    # Decision Protocol（意思決定ライフサイクル、v5.1追加）
+    PROPOSAL_CREATED = "decision.proposal.created"         # 提案作成
+    DECISION_RECORDED = "decision.recorded"                # 決定記録
+    DECISION_APPLIED = "decision.applied"                  # 決定適用
+    DECISION_SUPERSEDED = "decision.superseded"            # 決定上書き
+    
+    # Conference（会議ライフサイクル、v5.1追加）
+    CONFERENCE_STARTED = "conference.started"              # 会議開始
+    CONFERENCE_ENDED = "conference.ended"                  # 会議終了
+    
+    # Conflict Detection（衝突検出、v5.1追加）
+    CONFLICT_DETECTED = "conflict.detected"                # Colony間意見衝突検出
+    CONFLICT_RESOLVED = "conflict.resolved"                # 衝突解決
+    
+    # Standard Failure/Timeout（標準失敗、v5.1追加）
+    OPERATION_TIMEOUT = "operation.timeout"                # タイムアウト
+    OPERATION_FAILED = "operation.failed"                  # 操作失敗
 ```
 
 ### 3.2 イベントスキーマ
@@ -849,6 +868,8 @@ Queen Beeとの直接対話（Beekeeperをバイパス）:
 - `tests/test_colony_mcp.py` - Colony MCPツール
 - `tests/test_escalation.py` - エスカレーション機能
 - `tests/test_direct_intervention.py` - 直接介入機能
+- `tests/test_decision_protocol.py` - Decision Protocol（v5.1追加）
+- `tests/test_conflict_detection.py` - Conflict Detection（v5.1追加）
 
 ---
 
@@ -865,11 +886,13 @@ Queen Beeとの直接対話（Beekeeperをバイパス）:
    ↓
 4. Colony投影 (ar/colony_projections.py)
    ↓
-5. APIルート (routes/hives.py, routes/colonies.py)
+5. Decision Protocol・Action Class (core/decision.py)  ← v5.1追加
    ↓
-6. MCPツール (handlers/hive.py, handlers/colony.py)
+6. APIルート (routes/hives.py, routes/colonies.py)
    ↓
-7. VS Code拡張 (coloniesProvider.ts)
+7. MCPツール (handlers/hive.py, handlers/colony.py)
+   ↓
+8. VS Code拡張 (coloniesProvider.ts)
 ```
 
 ### 10.1 Python Core (基盤)
@@ -883,6 +906,18 @@ Queen Beeとの直接対話（Beekeeperをバイパス）:
 | P1-05 | Hive専用ストレージ | `core/ar/hive_storage.py` | 4 | P1-01 |
 | P1-06 | Colony投影 | `core/ar/colony_projections.py` | 3 | P1-04 |
 | P1-07 | ユニットテスト | `tests/test_hive.py`, `tests/test_colony.py` | 4 | P1-01〜P1-06 |
+
+### 10.1.5 Python Core (v5.1拡張) - フィードバック対応
+
+| Issue# | タスク | ファイル | 見積(h) | 依存 |
+|--------|------|--------|---------|------|
+| P1.5-01 | Decision Protocolイベント型追加 | `core/events.py` | 2 | P1-01 |
+| P1.5-02 | Conferenceライフサイクルイベント追加 | `core/events.py` | 1 | P1-01 |
+| P1.5-03 | ProjectContract スキーマ定義 | `core/models/project_contract.py` | 2 | - |
+| P1.5-04 | Action Class定義（Trust Level連携） | `core/models/action_class.py` | 2 | - |
+| P1.5-05 | Conflict Detectionイベント型 | `core/events.py` | 1 | P1-01 |
+| P1.5-06 | 標準 Failure/Timeoutイベント型 | `core/events.py` | 1 | P1-01 |
+| P1.5-07 | v5.1ユニットテスト | `tests/test_decision_protocol.py` 等 | 3 | P1.5-01〜06 |
 
 ### 10.2 Python API
 
@@ -941,6 +976,12 @@ Queen Beeとの直接対話（Beekeeperをバイパス）:
 | 2026-02-01 | `run_id=None` イベントは専用ストアに格納 | v4のAR実装を変更せず後方互換維持 |
 | 2026-02-01 | Phase 1は `parse_event` 未対応、バージョン運用 | 実装コスト最小化 |
 | 2026-02-01 | Phase 1はVault物理構造変更なし（インデックス方式） | 既存テストを壊さない |
+| 2026-02-01 | Decision Protocol採用（提案→決定→適用→上書き） | 外部フィードバック対応: 意思決定追跡の必要性 |
+| 2026-02-01 | Project Contract採用（構造化コンテキスト） | 外部フィードバック対応: context:stringでは曖昧 |
+| 2026-02-01 | Action Class採用（Read-only/Reversible/Irreversible） | 外部フィードバック対応: Trust Level連携強化 |
+| 2026-02-01 | Conflict Detection採用（Colony間衝突検出） | 外部フィードバック対応: 調停ルール明確化 |
+| 2026-02-01 | Conference ライフサイクルイベント追加 | 外部フィードバック対応: 会議状態追跡 |
+| 2026-02-01 | Phase 6-7にゲート条件を設定 | 外部フィードバック対応: スコープ爆発防止 |
 
 ---
 
@@ -952,3 +993,46 @@ Queen Beeとの直接対話（Beekeeperをバイパス）:
 | Worker Beeの実装方法 | A: 個別プロセス B: スレッド C: 外部サービス | Phase 2開始前 |
 | `parse_event` の前方互換拡張 | 未知typeをBaseEventとして読み込む | Phase 2以降 |
 | Vault物理構造の階層化 | RunをColony配下に移動 | Phase 2以降（移行ツール必要） |
+
+---
+
+## 13. Phase 6-7 ゲート条件
+
+> ⚠️ フィードバック対応: スコープ爆発リスク軽減のため、Phase 6-7開始にはゲート条件を設定
+
+### 13.1 Phase 6（会議Bot）開始条件
+
+Phase 6を開始する前に、以下が**安定稼働**していること:
+
+| 条件 | 検証方法 | 責任者 |
+|------|---------|--------|
+| Decision Protocol が正常動作 | 決定ログの作成・参照・上書きが動作 | Core Team |
+| Conflict Detection が正常動作 | 衝突検出→調停フローがE2Eで動作 | Core Team |
+| 基本メトリクス収集が動作 | イベント数、レイテンシ、エラー率が取得可能 | Core Team |
+| Phase 5（委任システム）完了 | 全テストパス、ドキュメント更新済み | PM |
+
+### 13.2 Phase 7（Requirements Discovery）開始条件
+
+Phase 7を開始する前に、以下が**安定稼働**していること:
+
+| 条件 | 検証方法 | 責任者 |
+|------|---------|--------|
+| Phase 6（会議Bot）が少なくとも1プラットフォームで動作 | Teams/Zoom/Meet のいずれかで実会議テスト | Core Team |
+| Project Contract スキーマが実運用でテスト済み | 実プロジェクトで2週間以上使用 | PM |
+| Discovery Tree データモデルの設計レビュー完了 | 設計ドキュメント承認済み | Architect |
+
+### 13.3 ゲート判定プロセス
+
+```
+1. 前Phaseの全タスク完了
+   ↓
+2. ゲート条件チェックリスト作成
+   ↓
+3. 各条件の検証（テスト/レビュー）
+   ↓
+4. ゲート判定会議（30分）
+   ↓
+5. GO/NO-GO 判定
+   ↓
+6. NO-GOの場合: 是正アクションを定義し、再判定日を設定
+```
