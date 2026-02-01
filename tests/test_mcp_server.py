@@ -489,25 +489,17 @@ class TestHandleCreateRequirement:
         # Arrange
         from hiveforge.core.events import EventType
 
-        start_result = await mcp_server._handle_start_run(
-            {"goal": "auto parents requirement"}
-        )
+        start_result = await mcp_server._handle_start_run({"goal": "auto parents requirement"})
         run_id = start_result["run_id"]
 
         ar = mcp_server._get_ar()
-        run_started_id = next(
-            e.id for e in ar.replay(run_id) if e.type == EventType.RUN_STARTED
-        )
+        run_started_id = next(e.id for e in ar.replay(run_id) if e.type == EventType.RUN_STARTED)
 
         # Act
-        await mcp_server._handle_create_requirement(
-            {"description": "確認してください"}
-        )
+        await mcp_server._handle_create_requirement({"description": "確認してください"})
 
         # Assert
-        req_event = next(
-            e for e in ar.replay(run_id) if e.type == EventType.REQUIREMENT_CREATED
-        )
+        req_event = next(e for e in ar.replay(run_id) if e.type == EventType.REQUIREMENT_CREATED)
         assert req_event.parents == [run_started_id]
 
 
