@@ -101,6 +101,49 @@ Copilot Chatで `@hiveforge` を使用（要: VS Code再読み込み）:
 | `complete_task` | Task完了 |
 | `emergency_stop` | 緊急停止 |
 | `get_lineage` | 因果リンク取得 |
+| `record_decision` | Decision記録 |
+
+### Copilot Chat MCP設定
+
+VS CodeでMCPサーバーをCopilot Chatに登録するには、`.vscode/mcp.json` を作成します：
+
+```json
+{
+  "servers": {
+    "hiveforge": {
+      "command": "python",
+      "args": ["-m", "hiveforge.mcp_server"],
+      "env": {
+        "HIVEFORGE_VAULT_PATH": "${workspaceFolder}/Vault"
+      }
+    }
+  }
+}
+```
+
+#### 手順
+
+1. **ファイル作成**: `.vscode/mcp.json` を上記内容で作成
+2. **VS Code再読み込み**: コマンドパレット → `Developer: Reload Window`
+3. **確認**: Copilot Chatで `@hiveforge` と入力 → ツール一覧が表示される
+
+#### devcontainer内での設定
+
+devcontainer使用時は、`HIVEFORGE_VAULT_PATH` を `/workspace/HiveForge/Vault` に設定：
+
+```json
+{
+  "servers": {
+    "hiveforge": {
+      "command": "python",
+      "args": ["-m", "hiveforge.mcp_server"],
+      "env": {
+        "HIVEFORGE_VAULT_PATH": "/workspace/HiveForge/Vault"
+      }
+    }
+  }
+}
+```
 
 > **Note:** `@hiveforge`が出ない場合は `Developer: Reload Window` を実行
 
