@@ -4,6 +4,7 @@ from pathlib import Path
 
 from hiveforge.core.config import (
     HiveForgeSettings,
+    RateLimitConfig,
     get_settings,
     reload_settings,
 )
@@ -268,3 +269,55 @@ conference:
         assert settings.conference.max_participants == 20
         assert settings.conference.voting_timeout_minutes == 30
         assert settings.conference.quorum_percentage == 75
+
+
+class TestRateLimitConfig:
+    """レートリミット設定のテスト"""
+
+    def test_default_rate_limit_config(self):
+        """デフォルトのレートリミット設定"""
+        settings = HiveForgeSettings()
+
+        assert settings.llm.rate_limit.requests_per_minute == 60
+        assert settings.llm.rate_limit.requests_per_day == 0
+        assert settings.llm.rate_limit.tokens_per_minute == 90000
+        assert settings.llm.rate_limit.max_concurrent == 10
+        assert settings.llm.rate_limit.burst_limit == 10
+        assert settings.llm.rate_limit.retry_after_429 == 60
+
+    def test_rate_limit_from_yaml(self, tmp_path):
+        """YAMLからレートリミット設定を読み込む"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("""
+llm:
+  provider: openai
+  model: gpt-4
+  rate_limit:
+    requests_per_minute: 100
+    requests_per_day: 10000
+    tokens_per_minute: 50000
+    max_concurrent: 5
+    burst_limit: 20
+    retry_after_429: 30
+""")
+
+        settings = HiveForgeSettings.from_yaml(config_file)
+
+        assert settings.llm.rate_limit.requests_per_minute == 100
+        assert settings.llm.rate_limit.requests_per_day == 10000
+        assert settings.llm.rate_limit.tokens_per_minute == 50000
+        assert settings.llm.rate_limit.max_concurrent == 5
+        assert settings.llm.rate_limit.burst_limit == 20
+        assert settings.llm.rate_limit.retry_after_429 == 30
+
+    def test_rate_limit_config_standalone(self):
+        """RateLimitConfig単体テスト"""
+        config = RateLimitConfig(
+            requests_per_minute=200,
+            max_concurrent=20,
+        )
+
+        assert config.requests_per_minute == 200
+        assert config.max_concurrent == 20
+        # デフォルト値
+        assert config.requests_per_day == 0

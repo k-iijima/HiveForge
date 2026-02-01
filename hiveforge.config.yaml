@@ -37,6 +37,15 @@ llm:
   api_key_env: "OPENAI_API_KEY"   # APIキーを格納する環境変数名
   max_tokens: 4096                # 最大トークン数
   temperature: 0.2                # 生成温度（0.0-2.0、低いほど決定的）
+  
+  # レートリミット設定
+  rate_limit:
+    requests_per_minute: 60       # 1分あたりの最大リクエスト数
+    requests_per_day: 0           # 1日あたりの最大リクエスト数（0=無制限）
+    tokens_per_minute: 90000      # 1分あたりの最大LLMトークン数
+    max_concurrent: 10            # 最大同時リクエスト数
+    burst_limit: 10               # バースト許容数（瞬間的に許容するリクエスト数）
+    retry_after_429: 60           # 429エラー時のデフォルト待機秒数
 
 # -----------------------------------------------------------------------------
 # 認証設定

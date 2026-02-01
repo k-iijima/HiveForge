@@ -26,6 +26,17 @@ class GovernanceConfig(BaseModel):
     archive_after_days: int = Field(default=7, ge=1, description="アーカイブまでの日数")
 
 
+class RateLimitConfig(BaseModel):
+    """レートリミット設定"""
+
+    requests_per_minute: int = Field(default=60, ge=1, description="1分あたりの最大リクエスト数")
+    requests_per_day: int = Field(default=0, ge=0, description="1日あたりの最大リクエスト数（0=無制限）")
+    tokens_per_minute: int = Field(default=90000, ge=1000, description="1分あたりの最大LLMトークン数")
+    max_concurrent: int = Field(default=10, ge=1, le=100, description="最大同時リクエスト数")
+    burst_limit: int = Field(default=10, ge=1, le=100, description="バースト許容数")
+    retry_after_429: int = Field(default=60, ge=1, description="429エラー時の待機秒数")
+
+
 class LLMConfig(BaseModel):
     """LLM設定"""
 
@@ -34,6 +45,7 @@ class LLMConfig(BaseModel):
     api_key_env: str = Field(default="OPENAI_API_KEY", description="APIキーの環境変数名")
     max_tokens: int = Field(default=4096, ge=100)
     temperature: float = Field(default=0.2, ge=0.0, le=2.0)
+    rate_limit: RateLimitConfig = Field(default_factory=RateLimitConfig)
 
 
 class AuthConfig(BaseModel):
