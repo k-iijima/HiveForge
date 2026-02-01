@@ -8,9 +8,9 @@
 
 | 指標 | 値 |
 |------|-----|
-| **ユニットテスト** | 1092 passed |
+| **ユニットテスト** | 1113 passed |
 | **カバレッジ** | 96% |
-| **完了Phase** | Phase 1〜5 |
+| **完了Phase** | Phase 1〜6 |
 | **GitHub Issues** | 47 closed |
 
 ---
@@ -106,6 +106,25 @@ Worker Beeのツール実行とセキュリティ。
 - `worker_bee/tools.py` - ToolDefinition, ToolExecutor, ToolResult
 - `worker_bee/retry.py` - RetryPolicy, RetryExecutor, TimeoutConfig
 - `worker_bee/trust.py` - ActionClass, TrustLevel, TrustManager
+
+---
+
+### ✅ Phase 6: 統合テスト (完了)
+
+コンポーネント間の連携をテスト。
+
+| サブフェーズ | 内容 | 成果 |
+|-------------|------|------|
+| P6.1 | 統合テスト | tests/test_integration.py (15テスト) |
+| P6.2 | 設定拡張 | AgentsConfig, ConflictConfig, ConferenceConfig |
+
+**主要成果物**:
+- `tests/test_integration.py` - 15件の統合テスト
+  - Beekeeper ↔ Queen Bee ↔ Worker Bee連携
+  - エンドツーエンドシナリオ
+  - 複数Colony協調テスト
+- `core/config.py` - エージェント/衝突/Conference設定モデル
+- `hiveforge.config.yaml` - 詳細コメント付き設定ファイル
 
 ---
 
