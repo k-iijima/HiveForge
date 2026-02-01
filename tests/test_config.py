@@ -3,7 +3,9 @@
 from pathlib import Path
 
 from hiveforge.core.config import (
+    AgentLLMConfig,
     HiveForgeSettings,
+    LLMConfig,
     RateLimitConfig,
     get_settings,
     reload_settings,
@@ -321,3 +323,169 @@ llm:
         assert config.max_concurrent == 20
         # デフォルト値
         assert config.requests_per_day == 0
+
+
+class TestAgentLLMConfig:
+    """エージェント別LLM設定のテスト"""
+
+    def test_default_agent_llm_config_all_none(self):
+        """デフォルトでは全てNone（グローバル設定を継承）"""
+        # Arrange & Act: デフォルト設定
+        agent_llm = AgentLLMConfig()
+
+        # Assert: 全てNone
+        assert agent_llm.provider is None
+        assert agent_llm.model is None
+        assert agent_llm.api_key_env is None
+        assert agent_llm.max_tokens is None
+        assert agent_llm.temperature is None
+        assert agent_llm.rate_limit is None
+
+    def test_merge_with_global_inherits_unset_values(self):
+        """未設定の値はグローバル設定から継承される"""
+        # Arrange: グローバル設定とエージェント設定
+        global_llm = LLMConfig(
+            provider="openai",
+            model="gpt-4o",
+            api_key_env="OPENAI_API_KEY",
+            max_tokens=4096,
+            temperature=0.2,
+        )
+        agent_llm = AgentLLMConfig()  # 全てNone
+
+        # Act: マージ
+        merged = agent_llm.merge_with_global(global_llm)
+
+        # Assert: 全てグローバル設定から継承
+        assert merged.provider == "openai"
+        assert merged.model == "gpt-4o"
+        assert merged.api_key_env == "OPENAI_API_KEY"
+        assert merged.max_tokens == 4096
+        assert merged.temperature == 0.2
+
+    def test_merge_with_global_overrides_set_values(self):
+        """設定された値はグローバル設定を上書きする"""
+        # Arrange: グローバル設定とエージェント設定（一部上書き）
+        global_llm = LLMConfig(
+            provider="openai",
+            model="gpt-4o",
+            max_tokens=4096,
+            temperature=0.2,
+        )
+        agent_llm = AgentLLMConfig(
+            provider="anthropic",
+            model="claude-3-5-sonnet",
+            api_key_env="ANTHROPIC_API_KEY",
+        )
+
+        # Act: マージ
+        merged = agent_llm.merge_with_global(global_llm)
+
+        # Assert: 上書きされた値とグローバルから継承された値
+        assert merged.provider == "anthropic"  # 上書き
+        assert merged.model == "claude-3-5-sonnet"  # 上書き
+        assert merged.api_key_env == "ANTHROPIC_API_KEY"  # 上書き
+        assert merged.max_tokens == 4096  # 継承
+        assert merged.temperature == 0.2  # 継承
+
+    def test_merge_with_global_partial_override(self):
+        """一部の値のみ上書きする場合"""
+        # Arrange: グローバル設定とエージェント設定（モデルのみ上書き）
+        global_llm = LLMConfig(
+            provider="openai",
+            model="gpt-4o",
+            max_tokens=4096,
+        )
+        agent_llm = AgentLLMConfig(
+            model="gpt-4o-mini",  # 高速モデルに変更
+            temperature=0.0,  # より決定的に
+        )
+
+        # Act: マージ
+        merged = agent_llm.merge_with_global(global_llm)
+
+        # Assert: 部分上書き
+        assert merged.provider == "openai"  # 継承
+        assert merged.model == "gpt-4o-mini"  # 上書き
+        assert merged.temperature == 0.0  # 上書き
+
+    def test_agents_config_with_llm_from_yaml(self, tmp_path):
+        """YAMLからエージェント別LLM設定を読み込む"""
+        # Arrange: YAMLファイルを作成
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("""
+llm:
+  provider: openai
+  model: gpt-4o
+  max_tokens: 4096
+
+agents:
+  beekeeper:
+    llm:
+      model: gpt-4o
+      temperature: 0.3
+  queen_bee:
+    llm:
+      model: gpt-4o-mini
+  worker_bee:
+    llm:
+      provider: anthropic
+      model: claude-3-5-sonnet
+      api_key_env: ANTHROPIC_API_KEY
+""")
+
+        # Act: 読み込み
+        settings = HiveForgeSettings.from_yaml(config_file)
+
+        # Assert: 各エージェントのLLM設定が正しく読み込まれる
+        assert settings.agents.beekeeper.llm is not None
+        assert settings.agents.beekeeper.llm.model == "gpt-4o"
+        assert settings.agents.beekeeper.llm.temperature == 0.3
+
+        assert settings.agents.queen_bee.llm is not None
+        assert settings.agents.queen_bee.llm.model == "gpt-4o-mini"
+        assert settings.agents.queen_bee.llm.provider is None  # 未設定
+
+        assert settings.agents.worker_bee.llm is not None
+        assert settings.agents.worker_bee.llm.provider == "anthropic"
+        assert settings.agents.worker_bee.llm.model == "claude-3-5-sonnet"
+        assert settings.agents.worker_bee.llm.api_key_env == "ANTHROPIC_API_KEY"
+
+    def test_agents_llm_merge_with_global(self, tmp_path):
+        """エージェント別LLM設定をグローバル設定とマージ"""
+        # Arrange: YAMLファイルを作成
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("""
+llm:
+  provider: openai
+  model: gpt-4o
+  max_tokens: 4096
+  temperature: 0.2
+
+agents:
+  worker_bee:
+    llm:
+      model: gpt-4o-mini
+      temperature: 0.0
+""")
+
+        settings = HiveForgeSettings.from_yaml(config_file)
+
+        # Act: マージ
+        worker_llm = settings.agents.worker_bee.llm.merge_with_global(settings.llm)
+
+        # Assert: 上書きと継承が正しく動作
+        assert worker_llm.provider == "openai"  # 継承
+        assert worker_llm.model == "gpt-4o-mini"  # 上書き
+        assert worker_llm.max_tokens == 4096  # 継承
+        assert worker_llm.temperature == 0.0  # 上書き
+
+    def test_agent_without_llm_config(self):
+        """LLM設定がないエージェントはNone"""
+        # Arrange & Act: デフォルト設定
+        settings = HiveForgeSettings()
+
+        # Assert: 全エージェントのllmがNone
+        assert settings.agents.beekeeper.llm is None
+        assert settings.agents.queen_bee.llm is None
+        assert settings.agents.worker_bee.llm is None

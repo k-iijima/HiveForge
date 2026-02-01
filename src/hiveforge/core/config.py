@@ -30,8 +30,12 @@ class RateLimitConfig(BaseModel):
     """レートリミット設定"""
 
     requests_per_minute: int = Field(default=60, ge=1, description="1分あたりの最大リクエスト数")
-    requests_per_day: int = Field(default=0, ge=0, description="1日あたりの最大リクエスト数（0=無制限）")
-    tokens_per_minute: int = Field(default=90000, ge=1000, description="1分あたりの最大LLMトークン数")
+    requests_per_day: int = Field(
+        default=0, ge=0, description="1日あたりの最大リクエスト数（0=無制限）"
+    )
+    tokens_per_minute: int = Field(
+        default=90000, ge=1000, description="1分あたりの最大LLMトークン数"
+    )
     max_concurrent: int = Field(default=10, ge=1, le=100, description="最大同時リクエスト数")
     burst_limit: int = Field(default=10, ge=1, le=100, description="バースト許容数")
     retry_after_429: int = Field(default=60, ge=1, description="429エラー時の待機秒数")
@@ -46,6 +50,55 @@ class LLMConfig(BaseModel):
     max_tokens: int = Field(default=4096, ge=100)
     temperature: float = Field(default=0.2, ge=0.0, le=2.0)
     rate_limit: RateLimitConfig = Field(default_factory=RateLimitConfig)
+
+
+class AgentLLMConfig(BaseModel):
+    """エージェント別LLM設定（オプション）
+
+    各エージェントは個別のLLM設定を持てる。
+    未設定の場合はグローバルのllm設定を使用する。
+    """
+
+    provider: Literal["openai", "azure", "anthropic"] | None = Field(
+        default=None, description="LLMプロバイダー（未設定時はグローバル設定を使用）"
+    )
+    model: str | None = Field(
+        default=None, description="モデル名（未設定時はグローバル設定を使用）"
+    )
+    api_key_env: str | None = Field(
+        default=None, description="APIキー環境変数名（未設定時はグローバル設定を使用）"
+    )
+    max_tokens: int | None = Field(
+        default=None, ge=100, description="最大トークン数（未設定時はグローバル設定を使用）"
+    )
+    temperature: float | None = Field(
+        default=None, ge=0.0, le=2.0, description="生成温度（未設定時はグローバル設定を使用）"
+    )
+    rate_limit: RateLimitConfig | None = Field(
+        default=None, description="レートリミット設定（未設定時はグローバル設定を使用）"
+    )
+
+    def merge_with_global(self, global_llm: LLMConfig) -> LLMConfig:
+        """グローバル設定とマージして完全なLLMConfigを生成
+
+        Args:
+            global_llm: グローバルLLM設定
+
+        Returns:
+            マージされたLLMConfig
+        """
+        return LLMConfig(
+            provider=self.provider if self.provider is not None else global_llm.provider,
+            model=self.model if self.model is not None else global_llm.model,
+            api_key_env=self.api_key_env
+            if self.api_key_env is not None
+            else global_llm.api_key_env,
+            max_tokens=self.max_tokens if self.max_tokens is not None else global_llm.max_tokens,
+            temperature=self.temperature
+            if self.temperature is not None
+            else global_llm.temperature,
+            rate_limit=self.rate_limit if self.rate_limit is not None else global_llm.rate_limit,
+        )
 
 
 class AuthConfig(BaseModel):
@@ -96,6 +149,9 @@ class BeekeeperConfig(BaseModel):
     enabled: bool = Field(default=True)
     max_colonies: int = Field(default=10, ge=1, le=100)
     session_timeout_minutes: int = Field(default=60, ge=5)
+    llm: AgentLLMConfig | None = Field(
+        default=None, description="Beekeeper専用LLM設定（未設定時はグローバル設定を使用）"
+    )
 
 
 class QueenBeeConfig(BaseModel):
@@ -105,6 +161,9 @@ class QueenBeeConfig(BaseModel):
     max_workers_per_colony: int = Field(default=5, ge=1, le=20)
     task_assignment_strategy: Literal["round_robin", "priority", "load_balanced"] = Field(
         default="round_robin"
+    )
+    llm: AgentLLMConfig | None = Field(
+        default=None, description="Queen Bee専用LLM設定（未設定時はグローバル設定を使用）"
     )
 
 
@@ -116,6 +175,9 @@ class WorkerBeeConfig(BaseModel):
     max_retries: int = Field(default=3, ge=0, le=10)
     trust_level_default: Literal["untrusted", "limited", "standard", "elevated", "full"] = Field(
         default="standard"
+    )
+    llm: AgentLLMConfig | None = Field(
+        default=None, description="Worker Bee専用LLM設定（未設定時はグローバル設定を使用）"
     )
 
 
