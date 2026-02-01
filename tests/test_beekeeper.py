@@ -550,3 +550,285 @@ class TestEscalationManager:
         manager = EscalationManager()
         result = manager.dismiss("nonexistent")
         assert result is False
+
+
+# Conflict Detection テスト
+from hiveforge.beekeeper.conflict import (
+    Conflict,
+    ConflictType,
+    ConflictSeverity,
+    ConflictDetector,
+    ResourceClaim,
+)
+
+
+class TestResourceClaim:
+    """ResourceClaimの基本テスト"""
+
+    def test_create_claim(self):
+        """リソース要求を作成"""
+        claim = ResourceClaim(
+            colony_id="colony-1",
+            resource_type="file",
+            resource_id="/path/to/file.py",
+            operation="write",
+        )
+
+        assert claim.colony_id == "colony-1"
+        assert claim.resource_type == "file"
+        assert claim.operation == "write"
+
+
+class TestConflict:
+    """Conflictの基本テスト"""
+
+    def test_create_conflict(self):
+        """衝突を作成"""
+        conflict = Conflict(
+            conflict_type=ConflictType.FILE_CONFLICT,
+            severity=ConflictSeverity.HIGH,
+            resource_id="/path/to/file.py",
+            colony_ids=["colony-1", "colony-2"],
+        )
+
+        assert conflict.conflict_id is not None
+        assert not conflict.resolved
+
+
+class TestConflictDetector:
+    """ConflictDetectorのテスト"""
+
+    def test_no_conflict_read_read(self):
+        """読み取り同士は競合しない"""
+        detector = ConflictDetector()
+
+        claim1 = ResourceClaim(
+            colony_id="colony-1",
+            resource_type="file",
+            resource_id="/file.py",
+            operation="read",
+        )
+        claim2 = ResourceClaim(
+            colony_id="colony-2",
+            resource_type="file",
+            resource_id="/file.py",
+            operation="read",
+        )
+
+        result1 = detector.register_claim(claim1)
+        result2 = detector.register_claim(claim2)
+
+        assert result1 is None
+        assert result2 is None
+
+    def test_conflict_write_write(self):
+        """書き込み同士は競合する"""
+        detector = ConflictDetector()
+
+        claim1 = ResourceClaim(
+            colony_id="colony-1",
+            resource_type="file",
+            resource_id="/file.py",
+            operation="write",
+        )
+        claim2 = ResourceClaim(
+            colony_id="colony-2",
+            resource_type="file",
+            resource_id="/file.py",
+            operation="write",
+        )
+
+        detector.register_claim(claim1)
+        conflict = detector.register_claim(claim2)
+
+        assert conflict is not None
+        assert ConflictType.FILE_CONFLICT == conflict.conflict_type
+        assert len(conflict.colony_ids) == 2
+
+    def test_conflict_write_delete(self):
+        """書き込みと削除は競合する"""
+        detector = ConflictDetector()
+
+        claim1 = ResourceClaim(
+            colony_id="colony-1",
+            resource_type="file",
+            resource_id="/file.py",
+            operation="write",
+        )
+        claim2 = ResourceClaim(
+            colony_id="colony-2",
+            resource_type="file",
+            resource_id="/file.py",
+            operation="delete",
+        )
+
+        detector.register_claim(claim1)
+        conflict = detector.register_claim(claim2)
+
+        assert conflict is not None
+        assert conflict.severity == ConflictSeverity.CRITICAL
+
+    def test_no_conflict_same_colony(self):
+        """同一Colonyは競合しない"""
+        detector = ConflictDetector()
+
+        claim1 = ResourceClaim(
+            colony_id="colony-1",
+            resource_type="file",
+            resource_id="/file.py",
+            operation="write",
+        )
+        claim2 = ResourceClaim(
+            colony_id="colony-1",  # 同じColony
+            resource_type="file",
+            resource_id="/file.py",
+            operation="write",
+        )
+
+        detector.register_claim(claim1)
+        conflict = detector.register_claim(claim2)
+
+        assert conflict is None
+
+    def test_release_claim(self):
+        """リソース要求を解放"""
+        detector = ConflictDetector()
+
+        claim = ResourceClaim(
+            colony_id="colony-1",
+            resource_type="file",
+            resource_id="/file.py",
+            operation="write",
+        )
+        detector.register_claim(claim)
+
+        result = detector.release_claim("colony-1", "/file.py")
+        assert result is True
+
+        result2 = detector.release_claim("colony-1", "/file.py")
+        assert result2 is False
+
+    def test_get_conflicts(self):
+        """衝突一覧"""
+        detector = ConflictDetector()
+
+        claim1 = ResourceClaim(
+            colony_id="colony-1", resource_type="file", resource_id="/file.py", operation="write"
+        )
+        claim2 = ResourceClaim(
+            colony_id="colony-2", resource_type="file", resource_id="/file.py", operation="write"
+        )
+
+        detector.register_claim(claim1)
+        detector.register_claim(claim2)
+
+        conflicts = detector.get_conflicts()
+        assert len(conflicts) == 1
+
+    def test_mark_resolved(self):
+        """衝突を解決済みに"""
+        detector = ConflictDetector()
+
+        claim1 = ResourceClaim(
+            colony_id="colony-1", resource_type="file", resource_id="/file.py", operation="write"
+        )
+        claim2 = ResourceClaim(
+            colony_id="colony-2", resource_type="file", resource_id="/file.py", operation="write"
+        )
+
+        detector.register_claim(claim1)
+        conflict = detector.register_claim(claim2)
+
+        result = detector.mark_resolved(conflict.conflict_id, "Merged changes")
+        assert result is True
+
+        unresolved = detector.get_conflicts(include_resolved=False)
+        assert len(unresolved) == 0
+
+    def test_conflict_listener(self):
+        """衝突リスナー"""
+        detected = []
+        detector = ConflictDetector()
+        detector.add_conflict_listener(lambda c: detected.append(c))
+
+        claim1 = ResourceClaim(
+            colony_id="colony-1", resource_type="file", resource_id="/file.py", operation="write"
+        )
+        claim2 = ResourceClaim(
+            colony_id="colony-2", resource_type="file", resource_id="/file.py", operation="write"
+        )
+
+        detector.register_claim(claim1)
+        detector.register_claim(claim2)
+
+        assert len(detected) == 1
+
+    def test_get_claims_by_colony(self):
+        """Colony別要求一覧"""
+        detector = ConflictDetector()
+
+        claim1 = ResourceClaim(
+            colony_id="colony-1", resource_type="file", resource_id="/file1.py", operation="write"
+        )
+        claim2 = ResourceClaim(
+            colony_id="colony-1", resource_type="file", resource_id="/file2.py", operation="write"
+        )
+        claim3 = ResourceClaim(
+            colony_id="colony-2", resource_type="file", resource_id="/file3.py", operation="write"
+        )
+
+        detector.register_claim(claim1)
+        detector.register_claim(claim2)
+        detector.register_claim(claim3)
+
+        claims = detector.get_claims_by_colony("colony-1")
+        assert len(claims) == 2
+
+    def test_get_stats(self):
+        """統計情報"""
+        detector = ConflictDetector()
+
+        claim1 = ResourceClaim(
+            colony_id="colony-1", resource_type="file", resource_id="/file.py", operation="write"
+        )
+        claim2 = ResourceClaim(
+            colony_id="colony-2", resource_type="file", resource_id="/file.py", operation="write"
+        )
+
+        detector.register_claim(claim1)
+        detector.register_claim(claim2)
+
+        stats = detector.get_stats()
+        assert stats["total_conflicts"] == 1
+        assert stats["unresolved_conflicts"] == 1
+
+    def test_clear_all(self):
+        """全クリア"""
+        detector = ConflictDetector()
+
+        claim = ResourceClaim(
+            colony_id="colony-1", resource_type="file", resource_id="/file.py", operation="write"
+        )
+        detector.register_claim(claim)
+
+        detector.clear_all()
+
+        stats = detector.get_stats()
+        assert stats["total_resources"] == 0
+
+    def test_high_severity_multiple_colonies(self):
+        """3つ以上のColonyで HIGH 判定"""
+        detector = ConflictDetector()
+
+        for i in range(3):
+            claim = ResourceClaim(
+                colony_id=f"colony-{i}",
+                resource_type="file",
+                resource_id="/file.py",
+                operation="write",
+            )
+            conflict = detector.register_claim(claim)
+
+        # 最後のregister_claimで衝突が返る
+        assert conflict is not None
+        assert conflict.severity == ConflictSeverity.HIGH
