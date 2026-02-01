@@ -14,6 +14,7 @@ from ..core.ar.projections import RunState
 from .helpers import clear_active_runs, get_active_runs, set_ar
 from .routes import (
     colonies_router,
+    conferences_router,
     events_router,
     hive_colonies_router,
     hives_router,
@@ -76,6 +77,7 @@ app.include_router(system_router)
 app.include_router(hives_router)
 app.include_router(hive_colonies_router)
 app.include_router(colonies_router)
+app.include_router(conferences_router)
 app.include_router(runs_router)
 app.include_router(tasks_router)
 app.include_router(requirements_router)

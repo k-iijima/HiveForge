@@ -23,6 +23,7 @@ from mcp.types import (
 from ..core import AkashicRecord, get_settings
 from .handlers import (
     ColonyHandlers,
+    ConferenceHandlers,
     DecisionHandlers,
     HiveHandlers,
     LineageHandlers,
@@ -62,6 +63,7 @@ class HiveForgeMCPServer:
         self._requirement_handlers = RequirementHandlers(self)
         self._lineage_handlers = LineageHandlers(self)
         self._decision_handlers = DecisionHandlers(self)
+        self._conference_handlers = ConferenceHandlers(self)
 
         self._setup_handlers()
 
@@ -146,6 +148,15 @@ class HiveForgeMCPServer:
         # Lineage関連
         elif name == "get_lineage":
             return await self._lineage_handlers.handle_get_lineage(arguments)
+        # Conference関連
+        elif name == "start_conference":
+            return await self._conference_handlers.handle_start_conference(arguments)
+        elif name == "end_conference":
+            return await self._conference_handlers.handle_end_conference(arguments)
+        elif name == "list_conferences":
+            return await self._conference_handlers.handle_list_conferences(arguments)
+        elif name == "get_conference":
+            return await self._conference_handlers.handle_get_conference(arguments)
         else:
             return {"error": f"Unknown tool: {name}"}
 
