@@ -186,6 +186,7 @@ class BaseEvent(BaseModel):
         description="イベント発生時刻 (UTC)",
     )
     run_id: str | None = Field(default=None, description="関連するRunのID")
+    colony_id: str | None = Field(default=None, description="関連するColonyのID")
     task_id: str | None = Field(default=None, description="関連するTaskのID")
     actor: str = Field(default="system", description="イベント発生者")
     payload: dict[str, Any] = Field(default_factory=dict, description="イベントペイロード")
