@@ -74,11 +74,38 @@ logging:
 # エージェント設定
 # Beekeeper / Queen Bee / Worker Bee の動作制御
 # 各エージェントは個別のLLM設定を持てる（未設定時はグローバルllm設定を使用）
+#
+# =============================================================================
+# プロンプトYAML設定（別ファイル）
+# =============================================================================
+# 各エージェントのシステムプロンプトはYAMLファイルで管理します。
+# 読み込み優先順位:
+#   1. Vault/hives/{hive_id}/colonies/{colony_id}/ - Colony固有
+#   2. Vault/hives/{hive_id}/                      - Hive全体のデフォルト
+#   3. src/hiveforge/llm/default_prompts/          - パッケージ内デフォルト
+#   4. ハードコードフォールバック
+#
+# ファイル命名規則:
+#   - beekeeper.yml            → Beekeeperプロンプト
+#   - queen_bee.yml            → Queen Beeプロンプト
+#   - {name}_worker_bee.yml    → Worker Beeプロンプト（名前付き）
+#   - default_worker_bee.yml   → Worker Beeデフォルト
+#
+# 例: Vault/hives/my-hive/colonies/backend/queen_bee.yml
+#   name: backend-queen
+#   prompt:
+#     system: "あなたはバックエンド開発専門のQueen Beeです。"
+#   max_workers: 3
+#   task_assignment_strategy: priority
+#
+# 以下のagentsセクションは「ガバナンス設定」（LLM設定、タイムアウト等）を制御し、
+# プロンプト内容はYAMLファイルで個別に管理する構成です。
 # =============================================================================
 agents:
   # ---------------------------------------------------------------------------
   # Beekeeper（養蜂家）
   # ユーザーとの対話窓口、Colony間の調整役
+  # プロンプト: Vault/hives/{hive_id}/beekeeper.yml
   # ---------------------------------------------------------------------------
   beekeeper:
     enabled: true                     # Beekeeperを有効にするか
@@ -92,6 +119,7 @@ agents:
   # ---------------------------------------------------------------------------
   # Queen Bee（女王蜂）
   # Colonyの統括、Worker Beeへのタスク割り当て
+  # プロンプト: Vault/hives/{hive_id}/colonies/{colony_id}/queen_bee.yml
   # ---------------------------------------------------------------------------
   queen_bee:
     enabled: true                     # Queen Beeを有効にするか
@@ -108,6 +136,7 @@ agents:
   # ---------------------------------------------------------------------------
   # Worker Bee（働き蜂）
   # 実務を担当する専門エージェント
+  # プロンプト: Vault/hives/{hive_id}/colonies/{colony_id}/{name}_worker_bee.yml
   # ---------------------------------------------------------------------------
   worker_bee:
     enabled: true                     # Worker Beeを有効にするか
