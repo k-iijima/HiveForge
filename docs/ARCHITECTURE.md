@@ -6,10 +6,10 @@
 >
 > | ドキュメント | 役割 | 記述レベル |
 > |---|---|---|
-> | [コンセプト_v5.md](コンセプト_v5.md) | **なぜ**: 設計思想・ビジョン・ユースケース | 概念・メタファー |
+> | [コンセプト_v6.md](コンセプト_v6.md) | **なぜ**: 設計思想・ビジョン・ユースケース | 概念・メタファー |
 > | [v5-hive-design.md](design/v5-hive-design.md) | **何を**: 詳細設計・スキーマ・プロトコル定義 | 正式な仕様（Single Source of Truth） |
 > | **本書 (ARCHITECTURE.md)** | **今どうなっている**: 実装の現況・ディレクトリ構造 | 実装の事実 |
-> | [DEVELOPMENT_PLAN_v1.md](DEVELOPMENT_PLAN_v1.md) | **次に何をする**: 開発計画・マイルストーン | タスク・優先度 |  
+> | [DEVELOPMENT_PLAN_v2.md](DEVELOPMENT_PLAN_v2.md) | **次に何をする**: 開発計画・マイルストーン | タスク・優先度 |  
 >
 > 状態機械・イベント型・通信プロトコルの正式定義は [v5-hive-design.md](design/v5-hive-design.md) を参照。
 > 本書は実装の現況を反映し、設計との乖離がある場合は明示します。
@@ -121,24 +121,29 @@ HiveForgeは「**信頼できる部品を、信頼できる組み合わせ方を
 | コンポーネント | 役割 | 実装状況 |
 |----------------|------|----------|
 | **Hive Core** | イベント管理・状態機械・投影 | ✅ 実装済・テスト済 |
-| **API Server** | REST API エンドポイント | ⚠️ 部分的（Hive/Colonyがインメモリdict、AR未移行）→ M1 |
+| **API Server** | REST API エンドポイント | ✅ Hive/Colony CRUD が AR永続化と接続済み (M1-1完了) |
 | **MCP Server** | Copilot Chat連携 | ✅ 実装済・テスト済 |
 | **CLI** | コマンドラインインターフェース | ✅ 実装済（型注釈不足 → M1-3） |
-| **Beekeeper** | ユーザー窓口・Colony間調整 | ⚠️ ハンドラ実装済、Server大半スタブ → M1-2 |
-| **Queen Bee** | Colony統括・タスク分解 | ⚠️ 基盤完了、タスク分解スタブ → M3-1 |
+| **Beekeeper** | ユーザー窓口・Colony間調整 | ✅ 全ハンドラ実装済 (M1-2完了) |
+| **Queen Bee** | Colony統括・タスク分解 | ⚠️ 基盤完了、タスク分解スタブ → M4-1 |
 | **Worker Bee** | タスク実行（MCPサブプロセス） | ✅ 実装済（ツール実行, リトライ, Trust） |
-| **Sentinel Hornet** | Hive内監視・異常検出・強制停止 | ❌ 未実装 → M2-0 |
-| **LLM Orchestrator** | 自律的タスク分解・実行 | ❌ 未実装 → M3-2 |
+| **Sentinel Hornet** | Hive内監視・異常検出・強制停止 | ✅ 4検出パターン実装済 (M2-0完了) |
+| **LLM Orchestrator** | 自律的タスク分解・実行 | ❌ 未実装 → M4-2 |
 | **VS Code拡張** (TreeView) | Activity階層表示 | ✅ API接続済 |
 | **VS Code拡張** (Hive Monitor) | リアルタイム活動可視化 | ✅ 実装済 |
-| **VS Code拡張** (コマンド) | Hive/Colony操作 | ⚠️ UIフレームワークのみ、API未接続 → M2-1 |
+| **VS Code拡張** (コマンド) | Hive/Colony操作 | 🔄 API接続コード作成済、確認中 (M2-1) |
+| **Swarming Protocol Engine** | タスク適応的Colony編成 | ❌ 未実装 → M3-2 |
+| **Guard Bee** | 品質検証エージェント | ❌ 未実装 → M3-3 |
+| **Honeycomb** | 実行履歴・学習基盤 | ❌ 未実装 → M3-1 |
+| **Scout Bee** | 過去実績に基づく編成最適化 | ❌ 未実装 → M3-6 |
+| **Waggle Dance** | I/O構造化検証 | ❌ 未実装 → M3-5 |
 | **Agent UI** | ブラウザ自動操作MCPサーバー | ✅ 実装済 |
 | **VLM** | 画像解析・画面認識 | ✅ 実装済 |
 | **VLM Tester** | Playwright + VLMによるE2Eテスト | ✅ 実装済 |
 | **Silence Detector** | 沈黙検出 | ✅ 実装済 |
 
-> 各コンポーネントの詳細な実態とギャップは [DEVELOPMENT_PLAN_v1.md](DEVELOPMENT_PLAN_v1.md) §1.3 を参照。
-> マイルストーン（M1〜M4）の記号は同計画の §3 に対応。
+> 各コンポーネントの詳細な実態とギャップは [DEVELOPMENT_PLAN_v2.md](DEVELOPMENT_PLAN_v2.md) §1.2 を参照。
+> マイルストーン（M1〜M5）の記号は同計画の §3 に対応。
 
 ### 2.2 モジュール依存関係
 
@@ -299,7 +304,7 @@ Hive（組織単位・プロジェクト）
 | `hive_id` | string | 所属Hive ID |
 | `name` | string | Colony名 |
 | `goal` | string? | 目標説明 |
-| `status` | ColonyState | `pending` \| `in_progress` \| `completed` \| `failed` |
+| `status` | ColonyState | `pending` \| `in_progress` \| `completed` \| `failed` \| `suspended` |
 
 **状態遷移**（実装済み: `core/ar/projections.py`, `core/state/machines.py`）:
 ```
@@ -308,18 +313,19 @@ Hive（組織単位・プロジェクト）
 └────┬─────┘
      │ COLONY_STARTED
      ▼
-┌────────────┐
-│IN_PROGRESS │
-└──┬──────┬──┘
-   │      │
-   ▼      ▼
-┌────────┐ ┌────────┐
-│COMPLETED│ │ FAILED │
-└────────┘ └────────┘
+┌────────────┐     ┌───────────┐
+│IN_PROGRESS │────►│ SUSPENDED │
+└──┬──────┬──┘     └─────┬──┬──┘
+   │      │              │  │
+   │      │    (再開)◄────┘  │
+   ▼      ▼                 ▼
+┌────────┐ ┌────────┐ ┌────────┐
+│COMPLETED│ │ FAILED │ │ FAILED │
+└────────┘ └────────┘ └────────┘
 ```
 
-> **設計との差異**: [v5-hive-design.md](design/v5-hive-design.md) §2.1 では `SUSPENDED` 状態（Sentinel Hornet強制停止用）を含む5状態を定義。
-> 現在の実装は4状態。M2-0（Sentinel Hornet実装）時に `SUSPENDED` 状態を追加予定。
+> `SUSPENDED` 状態はSentinel Hornet（M2-0）により追加済み。
+> Sentinel の異常検出 → `colony.suspended` イベント → Colony一時停止 → Beekeeper判断で再開/失敗。
 
 **APIエンドポイント**:
 - `POST /hives/{hive_id}/colonies` - Colony作成
@@ -750,10 +756,12 @@ HiveForge/
 │           └── vscode-mock.ts
 ├── docs/                    # ドキュメント
 │   ├── ARCHITECTURE.md
-│   ├── DEVELOPMENT_PLAN_v1.md
+│   ├── DEVELOPMENT_PLAN_v2.md
 │   ├── QUICKSTART.md
 │   ├── VLM_TESTER.md
-│   ├── コンセプト_v5.md
+│   ├── コンセプト_v6.md
+│   ├── design/              # 詳細設計
+│   │   └── v5-hive-design.md
 │   └── archive/             # 旧ドキュメント
 ├── Vault/                   # イベントログ（gitignore）
 ├── AGENTS.md                # AI開発ガイドライン
@@ -834,16 +842,17 @@ logging:
 ### 11.1 概要
 
 開発の進捗管理はフェーズベースからマイルストーンベースに移行しました。
-詳細は [DEVELOPMENT_PLAN_v1.md](DEVELOPMENT_PLAN_v1.md) を参照してください。
+詳細は [DEVELOPMENT_PLAN_v2.md](DEVELOPMENT_PLAN_v2.md) を参照してください。
 
 ### 11.2 マイルストーン
 
 | マイルストーン | 目標 | ステータス |
 |---------------|------|----------|
-| M1: 基盤固め | AR移行、スタブ解消、型安全 | 🔄 進行中 |
-| M2: 接続 | VS Code↔API、エージェント間E2E | 計画中 |
-| M3: 自律 | LLMタスク分解、Orchestrator | 計画中 |
-| M4: 運用品質 | セキュリティ、CI/CD、ドキュメント | 計画中 |
+| M1: 基盤固め | AR移行、スタブ解消 | ✅ 完了（M1-1, M1-2） |
+| M2: 接続 | Sentinel Hornet、VS Code↔API、エージェント間E2E | 🔄 進行中（M2-0完了、M2-1進行中） |
+| M3: 適応的協調 | Swarming Protocol、Guard Bee、Honeycomb | 計画中（v1.5新規） |
+| M4: 自律 | LLMタスク分解、Orchestrator | 計画中 |
+| M5: 運用品質 | セキュリティ、KPIダッシュボード、CI/CD | 計画中 |
 
 ### 11.3 ゲート条件
 
@@ -858,8 +867,8 @@ logging:
 | G-05 | Action Classが実装済み | `ActionClass`, `TrustLevel` による分類 | ✅ |
 | G-06 | 確認要求マトリクスが定義済み | `requires_confirmation()` 関数 | ✅ |
 | G-07 | Conference モードが動作 | `CONFERENCE_STARTED/ENDED` イベント | ✅ |
-| G-08 | Hive/ColonyがAR永続化 | サーバー再起動後もデータ維持 | M1 |
-| G-09 | Beekeeperの全ハンドラが実装 | TODOスタブがゼロ | M1 |
+| G-08 | Hive/ColonyがAR永続化 | サーバー再起動後もデータ維持 | ✅ (M1-1) |
+| G-09 | Beekeeperの全ハンドラが実装 | TODOスタブがゼロ | ✅ (M1-2) |
 | G-10 | E2Eエージェントチェーンが動作 | Beekeeper→Queen→Worker完走 | M2 |
 | G-11 | LLMタスク分解が動作 | 抽象目標→複数タスク自動分解 | M3 |
 
@@ -872,7 +881,12 @@ logging:
 - [x] Worker Bee: MCPサブプロセスベースのWorker
 - [x] Queen Bee連携: タスク割り当て、進捗集約、リトライ
 - [x] Colony優先度: 静的設定ベースのリソース配分
-- [ ] LLM Orchestrator: 自律的なタスク分解・実行 (M3)
+- [ ] Swarming Protocol Engine: タスク適応的Colony編成 (M3-2)
+- [ ] Guard Bee: 品質検証エージェント (M3-3)
+- [ ] Honeycomb: 実行履歴・学習基盤 (M3-1)
+- [ ] Scout Bee: 過去実績に基づく編成最適化 (M3-6)
+- [ ] Waggle Dance: I/O構造化検証 (M3-5)
+- [ ] LLM Orchestrator: 自律的なタスク分解・実行 (M4-2)
 - [ ] Artifact管理: 成果物の保存と参照
 - [ ] 因果リンクの自動設定（[Issue #001](issues/001-lineage-auto-parents.md)）
 - [ ] イベント署名: 改ざん者の特定
@@ -894,7 +908,7 @@ logging:
 
 ## 参照
 
-- [DEVELOPMENT_PLAN_v1.md](DEVELOPMENT_PLAN_v1.md) - 開発計画（進捗の正）
+- [DEVELOPMENT_PLAN_v2.md](DEVELOPMENT_PLAN_v2.md) - 開発計画（進捗の正）
 - [QUICKSTART.md](QUICKSTART.md) - 動作確認手順
 - [AGENTS.md](../AGENTS.md) - AI開発ガイドライン
-- [コンセプト_v5.md](%E3%82%B3%E3%83%B3%E3%82%BB%E3%83%97%E3%83%88_v5.md) - 設計思想（最新版）
+- [コンセプト_v6.md](コンセプト_v6.md) - 設計思想（最新版）
