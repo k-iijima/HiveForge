@@ -35,12 +35,19 @@ def client(tmp_path):
     """テスト用FastAPIクライアント"""
     from fastapi.testclient import TestClient
 
-    from hiveforge.api.helpers import clear_active_runs, set_ar
+    from hiveforge.api.dependencies import AppState
+    from hiveforge.api.helpers import clear_active_runs, set_ar, set_hive_store
     from hiveforge.api.server import app
+    from hiveforge.core.ar.hive_storage import HiveStore
 
-    # グローバル状態をクリア
+    # グローバル状態をリセット
+    AppState.reset()
     set_ar(None)
     clear_active_runs()
+
+    # テスト用HiveStoreを設定（tmp_pathを使用）
+    test_hive_store = HiveStore(tmp_path / "Vault")
+    set_hive_store(test_hive_store)
 
     # server.py と helpers.py の両方で使用される get_settings をモック
     mock_s = MagicMock()
@@ -55,5 +62,4 @@ def client(tmp_path):
         yield client
 
     # クリーンアップ
-    set_ar(None)
-    clear_active_runs()
+    AppState.reset()

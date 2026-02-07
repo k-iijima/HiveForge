@@ -1,20 +1,21 @@
 """Hive REST API エンドポイント
 
 Hive管理用のREST API。
+イベントソーシング設計: 全操作はイベントとしてHiveStoreに永続化され、
+読み取りはイベント列からの投影（HiveAggregate）により再構築される。
 """
-
-from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from hiveforge.core.ar.hive_projections import HiveAggregate, build_hive_aggregate
 from hiveforge.core.events import (
     HiveClosedEvent,
     HiveCreatedEvent,
     generate_event_id,
 )
 
-from ..helpers import get_ar
+from ..helpers import get_hive_store
 
 router = APIRouter(prefix="/hives", tags=["Hives"])
 
@@ -46,15 +47,43 @@ class HiveCloseResponse(BaseModel):
     status: str = Field(default="closed", description="Hiveのステータス")
 
 
-# --- In-memory Hive ストレージ（Phase 1用簡易実装） ---
-# TODO: Phase 2でAkashic Recordに移行
-
-_hives: dict[str, dict[str, Any]] = {}
+# --- ヘルパー ---
 
 
-def _clear_hives() -> None:
-    """テスト用: Hiveストレージをクリア"""
-    _hives.clear()
+def _rebuild_hive(hive_id: str) -> HiveAggregate | None:
+    """HiveStoreからイベントをリプレイしてHive集約を再構築
+
+    Args:
+        hive_id: Hive ID
+
+    Returns:
+        HiveAggregate（存在しない場合はNone）
+    """
+    store = get_hive_store()
+    events = list(store.replay(hive_id))
+    if not events:
+        return None
+    return build_hive_aggregate(hive_id, events)
+
+
+def _aggregate_to_response(hive_id: str, aggregate: HiveAggregate) -> HiveResponse:
+    """HiveAggregateからHiveResponseを生成
+
+    Args:
+        hive_id: Hive ID
+        aggregate: Hive集約
+
+    Returns:
+        HiveResponse
+    """
+    projection = aggregate.projection
+    return HiveResponse(
+        hive_id=hive_id,
+        name=projection.name,
+        description=projection.metadata.get("description"),
+        status=projection.state.value,
+        colonies=list(projection.colonies.keys()),
+    )
 
 
 # --- エンドポイント ---
@@ -64,11 +93,11 @@ def _clear_hives() -> None:
 async def create_hive(request: CreateHiveRequest) -> HiveResponse:
     """Hiveを作成"""
     hive_id = generate_event_id()
+    store = get_hive_store()
 
-    # イベントを発行
-    ar = get_ar()
+    # イベントを発行してHiveStoreに永続化
     event = HiveCreatedEvent(
-        run_id=hive_id,  # Hive IDをrun_idとして使用
+        run_id=hive_id,
         actor="user",
         payload={
             "hive_id": hive_id,
@@ -76,57 +105,52 @@ async def create_hive(request: CreateHiveRequest) -> HiveResponse:
             "description": request.description,
         },
     )
+    store.append(event, hive_id)
 
-    # メモリに保存
-    hive_data = {
-        "hive_id": hive_id,
-        "name": request.name,
-        "description": request.description,
-        "status": "active",
-        "colonies": [],
-    }
-    _hives[hive_id] = hive_data
-
-    # ARがあればイベントを記録
-    if ar:
-        ar.append(event, hive_id)
-
-    return HiveResponse(**hive_data)
+    # イベントから投影を再構築してレスポンス
+    aggregate = _rebuild_hive(hive_id)
+    assert aggregate is not None  # 直前にイベントを書いたので必ず存在
+    return _aggregate_to_response(hive_id, aggregate)
 
 
 @router.get("", response_model=list[HiveResponse])
 async def list_hives() -> list[HiveResponse]:
     """Hive一覧を取得"""
-    return [HiveResponse(**hive) for hive in _hives.values()]
+    store = get_hive_store()
+    hive_ids = store.list_hives()
+    result = []
+    for hive_id in hive_ids:
+        aggregate = _rebuild_hive(hive_id)
+        if aggregate is not None:
+            result.append(_aggregate_to_response(hive_id, aggregate))
+    return result
 
 
 @router.get("/{hive_id}", response_model=HiveResponse)
 async def get_hive(hive_id: str) -> HiveResponse:
     """Hive詳細を取得"""
-    if hive_id not in _hives:
+    aggregate = _rebuild_hive(hive_id)
+    if aggregate is None:
         raise HTTPException(status_code=404, detail=f"Hive {hive_id} not found")
 
-    return HiveResponse(**_hives[hive_id])
+    return _aggregate_to_response(hive_id, aggregate)
 
 
 @router.post("/{hive_id}/close", response_model=HiveCloseResponse)
 async def close_hive(hive_id: str) -> HiveCloseResponse:
     """Hiveを終了"""
-    if hive_id not in _hives:
+    aggregate = _rebuild_hive(hive_id)
+    if aggregate is None:
         raise HTTPException(status_code=404, detail=f"Hive {hive_id} not found")
 
-    # イベントを発行
-    ar = get_ar()
+    store = get_hive_store()
+
+    # イベントを発行してHiveStoreに永続化
     event = HiveClosedEvent(
         run_id=hive_id,
         actor="user",
         payload={"hive_id": hive_id},
     )
-
-    # ステータスを更新
-    _hives[hive_id]["status"] = "closed"
-
-    if ar:
-        ar.append(event, hive_id)
+    store.append(event, hive_id)
 
     return HiveCloseResponse(hive_id=hive_id, status="closed")

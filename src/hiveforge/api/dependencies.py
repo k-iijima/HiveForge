@@ -11,6 +11,7 @@ from typing import Annotated
 from fastapi import Depends
 
 from ..core import AkashicRecord, RunProjection, get_settings
+from ..core.ar.hive_storage import HiveStore
 from ..core.ar.projections import RunProjector
 from ..core.events import BaseEvent
 
@@ -26,6 +27,7 @@ class AppState:
 
     def __init__(self) -> None:
         self._ar: AkashicRecord | None = None
+        self._hive_store: HiveStore | None = None
         self._active_runs: dict[str, RunProjection] = {}
 
     @classmethod
@@ -52,6 +54,19 @@ class AppState:
     def ar(self, value: AkashicRecord | None) -> None:
         """Akashic Recordインスタンスを設定"""
         self._ar = value
+
+    @property
+    def hive_store(self) -> HiveStore:
+        """HiveStoreインスタンスを取得"""
+        if self._hive_store is None:
+            settings = get_settings()
+            self._hive_store = HiveStore(settings.get_vault_path())
+        return self._hive_store
+
+    @hive_store.setter
+    def hive_store(self, value: HiveStore | None) -> None:
+        """HiveStoreインスタンスを設定"""
+        self._hive_store = value
 
     @property
     def active_runs(self) -> dict[str, RunProjection]:
@@ -98,6 +113,16 @@ def get_ar() -> AkashicRecord:
 def set_ar(ar: AkashicRecord | None) -> None:
     """Akashic Recordインスタンスを設定（後方互換性・テスト用）"""
     get_app_state().ar = ar
+
+
+def get_hive_store() -> HiveStore:
+    """HiveStoreインスタンスを取得（後方互換性）"""
+    return get_app_state().hive_store
+
+
+def set_hive_store(store: HiveStore | None) -> None:
+    """HiveStoreインスタンスを設定（後方互換性・テスト用）"""
+    get_app_state().hive_store = store
 
 
 def get_active_runs() -> dict[str, RunProjection]:

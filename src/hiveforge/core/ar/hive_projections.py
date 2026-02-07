@@ -98,6 +98,7 @@ class HiveAggregate:
         self._projection.state = HiveState.ACTIVE
         self._projection.name = event.payload.get("name", "")
         self._projection.created_at = event.timestamp
+        self._projection.metadata["description"] = event.payload.get("description")
 
     def _apply_hive_closed(self, event: BaseEvent) -> None:
         """Hive終了イベントを適用"""
@@ -110,13 +111,15 @@ class HiveAggregate:
         if not colony_id:
             return
 
-        self._projection.colonies[colony_id] = ColonyProjection(
+        colony = ColonyProjection(
             colony_id=colony_id,
             hive_id=self.hive_id,
             goal=event.payload.get("goal", ""),
             state=ColonyState.PENDING,
             created_at=event.timestamp,
         )
+        colony.metadata["name"] = event.payload.get("name", "")
+        self._projection.colonies[colony_id] = colony
 
     def _apply_colony_started(self, event: BaseEvent) -> None:
         """Colony開始イベントを適用"""

@@ -18,7 +18,9 @@ from .dependencies import (
     get_active_runs,
     get_app_state,
     get_ar,
+    get_hive_store,
     set_ar,
+    set_hive_store,
 )
 
 __all__ = [
@@ -27,6 +29,8 @@ __all__ = [
     "get_app_state",
     "get_ar",
     "set_ar",
+    "get_hive_store",
+    "set_hive_store",
     "get_active_runs",
     "clear_active_runs",
     "apply_event_to_projection",

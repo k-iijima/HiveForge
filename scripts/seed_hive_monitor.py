@@ -336,10 +336,10 @@ async def main():
     # クリーンな状態にリセット
     ActivityBus.reset()
 
-    # Hiveメモリストアをクリア
-    from hiveforge.api.routes.hives import _clear_hives
+    # AppStateをリセット（HiveStore含む）
+    from hiveforge.api.dependencies import AppState
 
-    _clear_hives()
+    AppState.reset()
 
     # APIサーバーをバックグラウンドで起動
     config = uvicorn.Config(
