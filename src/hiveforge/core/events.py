@@ -91,6 +91,12 @@ class EventType(str, Enum):
     SENTINEL_ALERT_RAISED = "sentinel.alert_raised"
     SENTINEL_REPORT = "sentinel.report"
 
+    # Guard Bee イベント（M3-3追加）
+    GUARD_VERIFICATION_REQUESTED = "guard.verification_requested"
+    GUARD_PASSED = "guard.passed"
+    GUARD_CONDITIONAL_PASSED = "guard.conditional_passed"
+    GUARD_FAILED = "guard.failed"
+
     # システムイベント
     HEARTBEAT = "system.heartbeat"
     ERROR = "system.error"
