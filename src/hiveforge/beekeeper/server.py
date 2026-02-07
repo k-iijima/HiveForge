@@ -600,10 +600,41 @@ class BeekeeperMCPServer:
         """Beekeeperが内部で使えるツールを登録"""
         from ..llm.tools import ToolDefinition
 
+        # Hiveを作成するツール
+        create_hive = ToolDefinition(
+            name="create_hive",
+            description="新しいHive（プロジェクト）を作成する。タスクを実行する前にHiveを作成する必要がある。",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Hive名（プロジェクト名）"},
+                    "goal": {"type": "string", "description": "プロジェクトの目標"},
+                },
+                "required": ["name", "goal"],
+            },
+            handler=self._internal_create_hive,
+        )
+
+        # Colonyを作成するツール
+        create_colony = ToolDefinition(
+            name="create_colony",
+            description="Hive内に新しいColony（作業チーム）を作成する。タスクを委譲する前にColonyを作成する必要がある。",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "hive_id": {"type": "string", "description": "所属Hive ID"},
+                    "name": {"type": "string", "description": "Colony名"},
+                    "domain": {"type": "string", "description": "専門領域の説明"},
+                },
+                "required": ["hive_id", "name", "domain"],
+            },
+            handler=self._internal_create_colony,
+        )
+
         # Queen Beeに作業を依頼するツール
         delegate_to_queen = ToolDefinition(
             name="delegate_to_queen",
-            description="Queen Beeにタスクを委譲する",
+            description="Queen Beeにタスクを委譲する。事前にcreate_hiveとcreate_colonyでHive/Colonyを作成しておく必要がある。",
             parameters={
                 "type": "object",
                 "properties": {
@@ -648,9 +679,48 @@ class BeekeeperMCPServer:
             handler=self._get_hive_status,
         )
 
+        # Hive一覧を取得するツール
+        list_hives = ToolDefinition(
+            name="list_hives",
+            description="全Hiveの一覧を取得する",
+            parameters={
+                "type": "object",
+                "properties": {},
+            },
+            handler=self._internal_list_hives,
+        )
+
+        self._agent_runner.register_tool(create_hive)
+        self._agent_runner.register_tool(create_colony)
         self._agent_runner.register_tool(delegate_to_queen)
         self._agent_runner.register_tool(ask_user)
         self._agent_runner.register_tool(get_hive_status)
+        self._agent_runner.register_tool(list_hives)
+
+    async def _internal_create_hive(self, name: str, goal: str) -> str:
+        """内部ツール: Hiveを作成"""
+        result = await self.handle_create_hive({"name": name, "goal": goal})
+        if result.get("status") == "created":
+            return f"Hive作成完了: hive_id={result['hive_id']}, name={result['name']}"
+        return f"Hive作成失敗: {result.get('error', 'Unknown')}"
+
+    async def _internal_create_colony(self, hive_id: str, name: str, domain: str) -> str:
+        """内部ツール: Colonyを作成"""
+        result = await self.handle_create_colony(
+            {"hive_id": hive_id, "name": name, "domain": domain}
+        )
+        if result.get("status") == "created":
+            return f"Colony作成完了: colony_id={result['colony_id']}, name={result['name']}"
+        return f"Colony作成失敗: {result.get('error', 'Unknown')}"
+
+    async def _internal_list_hives(self) -> str:
+        """内部ツール: Hive一覧を取得"""
+        result = await self.handle_list_hives({})
+        hives = result.get("hives", [])
+        if not hives:
+            return "Hiveはまだありません。create_hiveで新しいHiveを作成してください。"
+        lines = [f"- {h['hive_id']}: {h['name']} ({h['status']})" for h in hives]
+        return "Hive一覧:\n" + "\n".join(lines)
 
     async def _delegate_to_queen(
         self, colony_id: str, task: str, context: dict[str, Any] | None = None

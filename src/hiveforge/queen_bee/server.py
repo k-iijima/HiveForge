@@ -13,6 +13,11 @@ from typing import Any
 from ..core import AkashicRecord, generate_event_id
 from ..core.config import LLMConfig
 from ..core.events import (
+    ColonyStartedEvent,
+    RunCompletedEvent,
+    RunFailedEvent,
+    RunStartedEvent,
+    TaskAssignedEvent,
     TaskCreatedEvent,
     TaskCompletedEvent,
     TaskFailedEvent,
@@ -179,6 +184,7 @@ class QueenBeeMCPServer:
         """目標実行ハンドラ
 
         目標をタスクに分解し、Worker Beeで実行する。
+        RunStarted/RunCompleted/RunFailedイベントを発行して追跡可能にする。
         """
         run_id = arguments.get("run_id", generate_event_id())
         goal = arguments.get("goal", "")
@@ -189,6 +195,29 @@ class QueenBeeMCPServer:
         # Workerがいなければ1つ作成
         if not self._workers:
             self.add_worker(f"worker-{self.colony_id}-1")
+
+        # RunStartedイベントを発行
+        run_started = RunStartedEvent(
+            id=generate_event_id(),
+            run_id=run_id,
+            actor=f"queen-{self.colony_id}",
+            payload={
+                "colony_id": self.colony_id,
+                "goal": goal,
+            },
+        )
+        self.ar.append(run_started, run_id)
+
+        # ColonyStartedイベントを発行（初回のみ）
+        colony_started = ColonyStartedEvent(
+            id=generate_event_id(),
+            run_id=run_id,
+            actor=f"queen-{self.colony_id}",
+            payload={
+                "colony_id": self.colony_id,
+            },
+        )
+        self.ar.append(colony_started, run_id)
 
         try:
             # LLMでタスク分解（または単純なタスクとしてそのまま実行）
@@ -212,6 +241,36 @@ class QueenBeeMCPServer:
             success_count = sum(1 for r in results if r.get("status") == "completed")
             total = len(results)
 
+            if success_count == total:
+                # RunCompletedイベント
+                run_completed = RunCompletedEvent(
+                    id=generate_event_id(),
+                    run_id=run_id,
+                    actor=f"queen-{self.colony_id}",
+                    payload={
+                        "colony_id": self.colony_id,
+                        "goal": goal,
+                        "tasks_completed": success_count,
+                        "tasks_total": total,
+                    },
+                )
+                self.ar.append(run_completed, run_id)
+            else:
+                # RunFailedイベント（一部失敗）
+                run_failed = RunFailedEvent(
+                    id=generate_event_id(),
+                    run_id=run_id,
+                    actor=f"queen-{self.colony_id}",
+                    payload={
+                        "colony_id": self.colony_id,
+                        "goal": goal,
+                        "tasks_completed": success_count,
+                        "tasks_total": total,
+                        "reason": "Some tasks failed",
+                    },
+                )
+                self.ar.append(run_failed, run_id)
+
             return {
                 "status": "completed" if success_count == total else "partial",
                 "run_id": run_id,
@@ -223,6 +282,20 @@ class QueenBeeMCPServer:
 
         except Exception as e:
             logger.exception(f"目標実行エラー: {e}")
+
+            # RunFailedイベント
+            run_failed = RunFailedEvent(
+                id=generate_event_id(),
+                run_id=run_id,
+                actor=f"queen-{self.colony_id}",
+                payload={
+                    "colony_id": self.colony_id,
+                    "goal": goal,
+                    "reason": str(e),
+                },
+            )
+            self.ar.append(run_failed, run_id)
+
             return {
                 "status": "error",
                 "run_id": run_id,
@@ -359,6 +432,18 @@ class QueenBeeMCPServer:
         )
         self.ar.append(task_event, run_id)
 
+        # TaskAssignedイベントを発行
+        assign_event = TaskAssignedEvent(
+            id=generate_event_id(),
+            run_id=run_id,
+            actor=f"queen-{self.colony_id}",
+            payload={
+                "task_id": task_id,
+                "worker_id": worker.worker_id,
+            },
+        )
+        self.ar.append(assign_event, run_id)
+
         # Worker BeeでLLM実行
         try:
             result = await worker.server.execute_task_with_llm(
@@ -373,6 +458,19 @@ class QueenBeeMCPServer:
             worker.current_task_id = None
 
             if result.get("status") == "completed":
+                # TaskCompletedイベントを発行
+                completed_event = TaskCompletedEvent(
+                    id=generate_event_id(),
+                    run_id=run_id,
+                    actor=f"queen-{self.colony_id}",
+                    payload={
+                        "task_id": task_id,
+                        "worker_id": worker.worker_id,
+                        "result": result.get("result", ""),
+                    },
+                )
+                self.ar.append(completed_event, run_id)
+
                 return {
                     "status": "completed",
                     "task_id": task_id,
@@ -382,6 +480,19 @@ class QueenBeeMCPServer:
                     "tool_calls_made": result.get("tool_calls_made", 0),
                 }
             else:
+                # TaskFailedイベントを発行
+                failed_event = TaskFailedEvent(
+                    id=generate_event_id(),
+                    run_id=run_id,
+                    actor=f"queen-{self.colony_id}",
+                    payload={
+                        "task_id": task_id,
+                        "worker_id": worker.worker_id,
+                        "reason": result.get("reason", result.get("llm_error", "Unknown")),
+                    },
+                )
+                self.ar.append(failed_event, run_id)
+
                 return {
                     "status": "failed",
                     "task_id": task_id,
