@@ -716,6 +716,52 @@ class WorkerFailedEvent(BaseEvent):
     reason: str = Field(default="", description="失敗理由")
 
 
+# =========================================================================
+# Guard Bee イベント (v1.5 M3-3)
+# =========================================================================
+
+
+class GuardVerificationRequestedEvent(BaseEvent):
+    """Guard Bee検証要求イベント
+
+    ColonyがGuard Beeに品質検証を要求した際に発行。
+    """
+
+    type: Literal[EventType.GUARD_VERIFICATION_REQUESTED] = (
+        EventType.GUARD_VERIFICATION_REQUESTED
+    )
+
+
+class GuardPassedEvent(BaseEvent):
+    """Guard Bee検証合格イベント
+
+    全検証項目をクリアした際に発行。
+    """
+
+    type: Literal[EventType.GUARD_PASSED] = EventType.GUARD_PASSED
+
+
+class GuardConditionalPassedEvent(BaseEvent):
+    """Guard Bee条件付き合格イベント
+
+    L1合格・L2に軽微な指摘がある際に発行。
+    """
+
+    type: Literal[EventType.GUARD_CONDITIONAL_PASSED] = (
+        EventType.GUARD_CONDITIONAL_PASSED
+    )
+
+
+class GuardFailedEvent(BaseEvent):
+    """Guard Bee検証失敗イベント
+
+    L1検証で重大な問題が検出された際に発行（差戻し）。
+    """
+
+    type: Literal[EventType.GUARD_FAILED] = EventType.GUARD_FAILED
+    remand_reason: str = Field(default="", description="差戻し理由")
+
+
 # イベントタイプからクラスへのマッピング
 EVENT_TYPE_MAP: dict[EventType, type[BaseEvent]] = {
     # Hive
@@ -769,6 +815,11 @@ EVENT_TYPE_MAP: dict[EventType, type[BaseEvent]] = {
     EventType.WORKER_PROGRESS: WorkerProgressEvent,
     EventType.WORKER_COMPLETED: WorkerCompletedEvent,
     EventType.WORKER_FAILED: WorkerFailedEvent,
+    # Guard Bee (v1.5 M3-3)
+    EventType.GUARD_VERIFICATION_REQUESTED: GuardVerificationRequestedEvent,
+    EventType.GUARD_PASSED: GuardPassedEvent,
+    EventType.GUARD_CONDITIONAL_PASSED: GuardConditionalPassedEvent,
+    EventType.GUARD_FAILED: GuardFailedEvent,
 }
 
 
