@@ -89,14 +89,10 @@ class Episode(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    episode_id: str = Field(
-        ..., description="エピソードID (ULID)", examples=["01JKXYZ..."]
-    )
+    episode_id: str = Field(..., description="エピソードID (ULID)", examples=["01JKXYZ..."])
     run_id: str = Field(..., description="対応するRun ID")
     colony_id: str = Field(..., description="対応するColony ID")
-    template_used: str = Field(
-        default="balanced", description="使用したColonyテンプレート"
-    )
+    template_used: str = Field(default="balanced", description="使用したColonyテンプレート")
 
     # 入力: タスク特徴量（Swarming Protocolスコア）
     # SwarmingFeaturesがまだ未実装のためdictで保持
@@ -107,17 +103,11 @@ class Episode(BaseModel):
 
     # 結果
     outcome: Outcome = Field(..., description="結果")
-    duration_seconds: float = Field(
-        default=0.0, description="所要時間（秒）", ge=0.0
-    )
-    token_count: int = Field(
-        default=0, description="使用トークン数", ge=0
-    )
+    duration_seconds: float = Field(default=0.0, description="所要時間（秒）", ge=0.0)
+    token_count: int = Field(default=0, description="使用トークン数", ge=0)
 
     # 失敗分類（失敗時のみ）
-    failure_class: FailureClass | None = Field(
-        default=None, description="失敗分類"
-    )
+    failure_class: FailureClass | None = Field(default=None, description="失敗分類")
 
     # KPI計測値
     kpi_scores: KPIScores = Field(

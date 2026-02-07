@@ -9,6 +9,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from .models import TemplateName
@@ -81,3 +83,53 @@ COLONY_TEMPLATES: dict[TemplateName, ColonyTemplate] = {
     TemplateName.QUALITY: QUALITY_TEMPLATE,
     TemplateName.RECOVERY: RECOVERY_TEMPLATE,
 }
+
+
+def apply_config_overrides(
+    config: dict[str, Any],
+) -> dict[TemplateName, ColonyTemplate]:
+    """設定ファイルのテンプレートカスタマイズを適用
+
+    hiveforge.config.yaml の swarming.templates セクションから
+    テンプレートパラメータを上書きした新しい辞書を返す。
+
+    Args:
+        config: swarming.templates セクションの辞書
+            例: {"speed": {"max_workers": 2}, "balanced": {"retry_limit": 5}}
+
+    Returns:
+        カスタマイズ済みのテンプレート辞書
+    """
+    result = dict(COLONY_TEMPLATES)
+
+    # テンプレート名 → TemplateName マッピング
+    name_map = {t.value: t for t in TemplateName}
+
+    for template_key, overrides in config.items():
+        template_name = name_map.get(template_key)
+        if template_name is None or template_name not in result:
+            continue
+
+        base = result[template_name]
+        # 設定キー → Pydanticフィールド名 マッピング
+        field_map = {
+            "min_workers": "min_workers",
+            "max_workers": "max_workers",
+            "guard_bee": "guard_bee_enabled",
+            "reviewer": "reviewer_enabled",
+            "sentinel": "sentinel_integration",
+            "retry_limit": "retry_limit",
+        }
+
+        update_kwargs: dict[str, Any] = {}
+        for config_key, field_name in field_map.items():
+            if config_key in overrides:
+                update_kwargs[field_name] = overrides[config_key]
+
+        if update_kwargs:
+            # frozenモデルなので新インスタンスを生成
+            data = base.model_dump()
+            data.update(update_kwargs)
+            result[template_name] = ColonyTemplate(**data)
+
+    return result

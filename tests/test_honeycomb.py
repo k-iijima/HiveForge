@@ -666,7 +666,7 @@ class TestKPICalculator:
 
         # Assert
         assert scores.correctness is not None
-        assert abs(scores.correctness - 2/3) < 0.01
+        assert abs(scores.correctness - 2 / 3) < 0.01
 
     def test_lead_time_average(self, calc, store):
         """リードタイムは平均所要時間"""
@@ -711,15 +711,21 @@ class TestKPICalculator:
         """同一FailureClassの再発がある場合"""
         # Arrange: TIMEOUT が2回（初発 + 再発1回）
         self._add_episode(
-            store, "ep-1", Outcome.FAILURE,
+            store,
+            "ep-1",
+            Outcome.FAILURE,
             failure_class=FailureClass.TIMEOUT,
         )
         self._add_episode(
-            store, "ep-2", Outcome.FAILURE,
+            store,
+            "ep-2",
+            Outcome.FAILURE,
             failure_class=FailureClass.TIMEOUT,
         )
         self._add_episode(
-            store, "ep-3", Outcome.FAILURE,
+            store,
+            "ep-3",
+            Outcome.FAILURE,
             failure_class=FailureClass.IMPLEMENTATION_ERROR,
         )
 
@@ -728,7 +734,7 @@ class TestKPICalculator:
 
         # Assert: 再発1回 / 全失敗3回 ≈ 0.333
         assert scores.recurrence_rate is not None
-        assert abs(scores.recurrence_rate - 1/3) < 0.01
+        assert abs(scores.recurrence_rate - 1 / 3) < 0.01
 
     def test_calculate_by_colony(self, calc, store):
         """Colony単位でKPIを算出"""
@@ -749,7 +755,9 @@ class TestKPICalculator:
         # Arrange
         self._add_episode(store, "ep-1", Outcome.SUCCESS)
         self._add_episode(
-            store, "ep-2", Outcome.FAILURE,
+            store,
+            "ep-2",
+            Outcome.FAILURE,
             failure_class=FailureClass.TIMEOUT,
         )
 

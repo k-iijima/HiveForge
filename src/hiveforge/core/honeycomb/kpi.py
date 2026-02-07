@@ -40,11 +40,7 @@ class KPICalculator:
         Returns:
             KPIScores with calculated values
         """
-        episodes = (
-            self.store.replay_colony(colony_id)
-            if colony_id
-            else self.store.replay_all()
-        )
+        episodes = self.store.replay_colony(colony_id) if colony_id else self.store.replay_all()
 
         if not episodes:
             return KPIScores()
@@ -57,15 +53,9 @@ class KPICalculator:
             recurrence_rate=self._calc_recurrence_rate(episodes),
         )
 
-    def calculate_summary(
-        self, colony_id: str | None = None
-    ) -> dict[str, Any]:
+    def calculate_summary(self, colony_id: str | None = None) -> dict[str, Any]:
         """KPIサマリーをdict形式で取得"""
-        episodes = (
-            self.store.replay_colony(colony_id)
-            if colony_id
-            else self.store.replay_all()
-        )
+        episodes = self.store.replay_colony(colony_id) if colony_id else self.store.replay_all()
 
         if not episodes:
             return {
@@ -83,16 +73,12 @@ class KPICalculator:
 
         # 結果内訳
         outcome_counts = Counter(e.outcome for e in episodes)
-        failure_counts = Counter(
-            e.failure_class for e in episodes if e.failure_class
-        )
+        failure_counts = Counter(e.failure_class for e in episodes if e.failure_class)
 
         return {
             "total_episodes": len(episodes),
             "outcomes": {k.value: v for k, v in outcome_counts.items()},
-            "failure_classes": {
-                k.value: v for k, v in failure_counts.items()
-            },
+            "failure_classes": {k.value: v for k, v in failure_counts.items()},
             "kpi": scores.model_dump(),
         }
 
@@ -104,9 +90,7 @@ class KPICalculator:
         if not episodes:
             return None
 
-        success_count = sum(
-            1 for e in episodes if e.outcome == Outcome.SUCCESS
-        )
+        success_count = sum(1 for e in episodes if e.outcome == Outcome.SUCCESS)
         return success_count / len(episodes)
 
     def _calc_repeatability(self, episodes: list[Episode]) -> float | None:
@@ -121,9 +105,7 @@ class KPICalculator:
         # テンプレート別成功率を計算
         template_results: defaultdict[str, list[int]] = defaultdict(list)
         for e in episodes:
-            template_results[e.template_used].append(
-                1 if e.outcome == Outcome.SUCCESS else 0
-            )
+            template_results[e.template_used].append(1 if e.outcome == Outcome.SUCCESS else 0)
 
         success_rates = []
         for results in template_results.values():
@@ -137,9 +119,7 @@ class KPICalculator:
 
     def _calc_lead_time(self, episodes: list[Episode]) -> float | None:
         """リードタイム: 平均所要時間（秒）"""
-        durations = [
-            e.duration_seconds for e in episodes if e.duration_seconds > 0
-        ]
+        durations = [e.duration_seconds for e in episodes if e.duration_seconds > 0]
         if not durations:
             return None
         return statistics.mean(durations)
@@ -153,11 +133,7 @@ class KPICalculator:
         if not episodes:
             return None
 
-        incident_count = sum(
-            1
-            for e in episodes
-            if e.outcome in (Outcome.FAILURE, Outcome.PARTIAL)
-        )
+        incident_count = sum(1 for e in episodes if e.outcome in (Outcome.FAILURE, Outcome.PARTIAL))
         return incident_count / len(episodes)
 
     def _calc_recurrence_rate(self, episodes: list[Episode]) -> float | None:

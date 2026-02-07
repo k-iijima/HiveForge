@@ -19,6 +19,7 @@ from hiveforge.core.swarming.templates import (
     QUALITY_TEMPLATE,
     RECOVERY_TEMPLATE,
     SPEED_TEMPLATE,
+    apply_config_overrides,
 )
 
 
@@ -347,3 +348,108 @@ class TestTemplateName:
         assert TemplateName.BALANCED.value == "balanced"
         assert TemplateName.QUALITY.value == "quality"
         assert TemplateName.RECOVERY.value == "recovery"
+
+
+# =========================================================================
+# 設定ファイルカスタマイズのテスト
+# =========================================================================
+
+
+class TestApplyConfigOverrides:
+    """apply_config_overrides のテスト"""
+
+    def test_no_overrides_returns_default(self):
+        """空のconfigではデフォルトテンプレートが返る"""
+        # Act
+        result = apply_config_overrides({})
+
+        # Assert
+        assert result[TemplateName.SPEED].max_workers == 1
+        assert result[TemplateName.BALANCED].max_workers == 3
+
+    def test_override_max_workers(self):
+        """max_workersをカスタマイズできる"""
+        # Arrange
+        config = {"speed": {"max_workers": 2}}
+
+        # Act
+        result = apply_config_overrides(config)
+
+        # Assert
+        assert result[TemplateName.SPEED].max_workers == 2
+        # 他のフィールドはデフォルトのまま
+        assert result[TemplateName.SPEED].min_workers == 1
+
+    def test_override_guard_bee(self):
+        """guard_beeフラグをカスタマイズできる"""
+        # Arrange
+        config = {"speed": {"guard_bee": True}}
+
+        # Act
+        result = apply_config_overrides(config)
+
+        # Assert
+        assert result[TemplateName.SPEED].guard_bee_enabled is True
+
+    def test_override_retry_limit(self):
+        """retry_limitをカスタマイズできる"""
+        # Arrange
+        config = {"balanced": {"retry_limit": 10}}
+
+        # Act
+        result = apply_config_overrides(config)
+
+        # Assert
+        assert result[TemplateName.BALANCED].retry_limit == 10
+
+    def test_override_multiple_templates(self):
+        """複数テンプレートを同時にカスタマイズできる"""
+        # Arrange
+        config = {
+            "speed": {"max_workers": 2},
+            "quality": {"retry_limit": 10},
+        }
+
+        # Act
+        result = apply_config_overrides(config)
+
+        # Assert
+        assert result[TemplateName.SPEED].max_workers == 2
+        assert result[TemplateName.QUALITY].retry_limit == 10
+
+    def test_unknown_template_ignored(self):
+        """不明なテンプレート名は無視される"""
+        # Arrange
+        config = {"unknown": {"max_workers": 99}}
+
+        # Act
+        result = apply_config_overrides(config)
+
+        # Assert: デフォルトのまま
+        assert len(result) == 4
+
+    def test_original_templates_unchanged(self):
+        """apply_config_overridesは元のCOLONY_TEMPLATESを変更しない"""
+        # Arrange
+        config = {"speed": {"max_workers": 99}}
+
+        # Act
+        apply_config_overrides(config)
+
+        # Assert: 元テンプレートは不変
+        assert COLONY_TEMPLATES[TemplateName.SPEED].max_workers == 1
+
+    def test_engine_with_custom_templates(self):
+        """カスタマイズしたテンプレートでSwarmingEngineを初期化できる"""
+        # Arrange
+        config = {"speed": {"max_workers": 3}}
+        custom_templates = apply_config_overrides(config)
+
+        # Act
+        engine = SwarmingEngine(templates=custom_templates)
+        features = SwarmingFeatures(complexity=1, risk=1, urgency=5)
+        template = engine.select_template(features)
+
+        # Assert
+        assert template.name == TemplateName.SPEED
+        assert template.max_workers == 3

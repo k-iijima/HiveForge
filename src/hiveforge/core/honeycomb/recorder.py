@@ -25,9 +25,7 @@ class EpisodeRecorder:
     ARイベントを分析してEpisodeを構築する。
     """
 
-    def __init__(
-        self, honeycomb_store: HoneycombStore, ar: AkashicRecord
-    ) -> None:
+    def __init__(self, honeycomb_store: HoneycombStore, ar: AkashicRecord) -> None:
         self.store = honeycomb_store
         self.ar = ar
 
@@ -90,8 +88,7 @@ class EpisodeRecorder:
 
         self.store.append(episode)
         logger.info(
-            f"Episode記録完了: {episode.episode_id} "
-            f"(run={run_id}, outcome={outcome.value})"
+            f"Episode記録完了: {episode.episode_id} (run={run_id}, outcome={outcome.value})"
         )
         return episode
 
@@ -105,12 +102,8 @@ class EpisodeRecorder:
         elif EventType.RUN_FAILED in event_types:
             # RunFailed イベントがある場合
             # タスクの成功/失敗比率で partial を判定
-            task_completed = sum(
-                1 for e in events if e.type == EventType.TASK_COMPLETED
-            )
-            task_failed = sum(
-                1 for e in events if e.type == EventType.TASK_FAILED
-            )
+            task_completed = sum(1 for e in events if e.type == EventType.TASK_COMPLETED)
+            task_failed = sum(1 for e in events if e.type == EventType.TASK_FAILED)
             if task_completed > 0 and task_failed > 0:
                 return Outcome.PARTIAL
             return Outcome.FAILURE
@@ -178,9 +171,7 @@ class EpisodeRecorder:
                 total += event.payload.get("tokens_used", 0)
         return total
 
-    def _calculate_kpi_scores(
-        self, events: list, duration: float
-    ) -> KPIScores:
+    def _calculate_kpi_scores(self, events: list, duration: float) -> KPIScores:
         """イベントからKPIスコアを算出"""
         # 現時点ではlead_timeのみ算出
         return KPIScores(

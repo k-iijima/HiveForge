@@ -22,6 +22,7 @@ from ..core.events import (
     RequirementApprovedEvent,
     RequirementRejectedEvent,
 )
+from ..core.swarming import SwarmingEngine, SwarmingFeatures
 from ..queen_bee.server import QueenBeeMCPServer
 from .session import BeekeeperSession, BeekeeperSessionManager, SessionState
 
@@ -48,6 +49,7 @@ class BeekeeperMCPServer:
         self._llm_client = None
         self._agent_runner = None
         self._queens: dict[str, QueenBeeMCPServer] = {}  # colony_id -> Queen Bee
+        self._swarming_engine = SwarmingEngine()
         # HiveStoreが未設定の場合、ARと同じVaultパスで作成
         if self.hive_store is None:
             self.hive_store = HiveStore(self.ar.vault_path)
@@ -690,12 +692,43 @@ class BeekeeperMCPServer:
             handler=self._internal_list_hives,
         )
 
+        # タスク特徴量を評価してテンプレートを提案するツール
+        evaluate_task = ToolDefinition(
+            name="evaluate_task",
+            description="タスクの特徴量（複雑性・リスク・緊急度）を評価し、最適なColonyテンプレートを提案する",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "complexity": {
+                        "type": "integer",
+                        "description": "複雑性 (1-5)",
+                        "minimum": 1,
+                        "maximum": 5,
+                    },
+                    "risk": {
+                        "type": "integer",
+                        "description": "リスク (1-5)",
+                        "minimum": 1,
+                        "maximum": 5,
+                    },
+                    "urgency": {
+                        "type": "integer",
+                        "description": "緊急度 (1-5)",
+                        "minimum": 1,
+                        "maximum": 5,
+                    },
+                },
+            },
+            handler=self._internal_evaluate_task,
+        )
+
         self._agent_runner.register_tool(create_hive)
         self._agent_runner.register_tool(create_colony)
         self._agent_runner.register_tool(delegate_to_queen)
         self._agent_runner.register_tool(ask_user)
         self._agent_runner.register_tool(get_hive_status)
         self._agent_runner.register_tool(list_hives)
+        self._agent_runner.register_tool(evaluate_task)
 
     async def _internal_create_hive(self, name: str, goal: str) -> str:
         """内部ツール: Hiveを作成"""
@@ -722,11 +755,51 @@ class BeekeeperMCPServer:
         lines = [f"- {h['hive_id']}: {h['name']} ({h['status']})" for h in hives]
         return "Hive一覧:\n" + "\n".join(lines)
 
+    async def _internal_evaluate_task(
+        self,
+        complexity: int = 3,
+        risk: int = 3,
+        urgency: int = 3,
+    ) -> str:
+        """内部ツール: タスク特徴量を評価してテンプレートを提案
+
+        Swarming Protocolを使用してタスク特徴量から
+        最適なColonyテンプレートを選択・提案する。
+        """
+        features = SwarmingFeatures(
+            complexity=complexity,
+            risk=risk,
+            urgency=urgency,
+        )
+        evaluation = self._swarming_engine.evaluate(features)
+        config = evaluation["config"]
+
+        return (
+            f"テンプレート推奨: {evaluation['template'].upper()}\n"
+            f"理由: {evaluation['reason']}\n"
+            f"構成: Workers {config['min_workers']}-{config['max_workers']}, "
+            f"GuardBee={'有' if config['guard_bee'] else '無'}, "
+            f"Reviewer={'有' if config['reviewer'] else '無'}, "
+            f"リトライ上限={config['retry_limit']}"
+        )
+
     async def _delegate_to_queen(
         self, colony_id: str, task: str, context: dict[str, Any] | None = None
     ) -> str:
         """Queen Beeにタスクを委譲"""
         logger.info(f"タスクをQueen Bee ({colony_id}) に委譲: {task}")
+
+        # Swarming評価: タスク特徴量をcontextから取得（あれば）
+        ctx = context or {}
+        swarming_info: dict[str, Any] | None = None
+        if any(k in ctx for k in ("complexity", "risk", "urgency")):
+            features = SwarmingFeatures(
+                complexity=ctx.get("complexity", 3),
+                risk=ctx.get("risk", 3),
+                urgency=ctx.get("urgency", 3),
+            )
+            swarming_info = self._swarming_engine.evaluate(features)
+            logger.info(f"Swarming評価: {swarming_info['template']} - {swarming_info['reason']}")
 
         # Queen Beeを取得または作成
         if colony_id not in self._queens:
@@ -748,12 +821,16 @@ class BeekeeperMCPServer:
         run_id = generate_event_id()
 
         # Queen Beeでタスクを実行
+        execute_context = ctx.copy()
+        if swarming_info:
+            execute_context["swarming"] = swarming_info
+
         result = await queen.dispatch_tool(
             "execute_goal",
             {
                 "run_id": run_id,
                 "goal": task,
-                "context": context or {},
+                "context": execute_context,
             },
         )
 

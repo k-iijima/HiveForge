@@ -121,7 +121,7 @@ class TestBeekeeperInternalTools:
         """AgentRunner初期化時に内部ツールが登録される
 
         create_hive, create_colony, delegate_to_queen, ask_user,
-        get_hive_status, list_hives の6ツールが登録されることを確認。
+        get_hive_status, list_hives, evaluate_task の7ツールが登録されることを確認。
         """
         # Arrange: AgentRunnerのモックを設定
         mock_runner = MagicMock()
@@ -131,8 +131,8 @@ class TestBeekeeperInternalTools:
             # Act
             beekeeper._register_internal_tools()
 
-        # Assert: 6ツールが登録される
-        assert mock_runner.register_tool.call_count == 6
+        # Assert: 7ツールが登録される
+        assert mock_runner.register_tool.call_count == 7
         registered_names = [call.args[0].name for call in mock_runner.register_tool.call_args_list]
         assert "create_hive" in registered_names
         assert "create_colony" in registered_names
@@ -140,6 +140,7 @@ class TestBeekeeperInternalTools:
         assert "ask_user" in registered_names
         assert "get_hive_status" in registered_names
         assert "list_hives" in registered_names
+        assert "evaluate_task" in registered_names
 
 
 # =========================================================================
@@ -643,3 +644,73 @@ class TestEventCompleteness:
         events = list(ar.replay(run_id))
         queen_events = [e for e in events if e.actor == f"queen-{queen_bee.colony_id}"]
         assert len(queen_events) >= 4  # RunStarted, ColonyStarted, TaskCreated, TaskAssigned
+
+
+# =========================================================================
+# Beekeeper Swarming統合テスト
+# =========================================================================
+
+
+class TestBeekeeperSwarmingIntegration:
+    """BeekeeperのSwarming Protocol統合テスト"""
+
+    @pytest.mark.asyncio
+    async def test_evaluate_task_default(self, beekeeper):
+        """evaluate_taskがデフォルト特徴量でBalancedを推奨"""
+        # Act
+        result = await beekeeper._internal_evaluate_task()
+
+        # Assert
+        assert "BALANCED" in result
+        assert "テンプレート推奨" in result
+
+    @pytest.mark.asyncio
+    async def test_evaluate_task_speed(self, beekeeper):
+        """低複雑性+低リスク+高緊急度でSpeedを推奨"""
+        # Act
+        result = await beekeeper._internal_evaluate_task(complexity=1, risk=1, urgency=5)
+
+        # Assert
+        assert "SPEED" in result
+
+    @pytest.mark.asyncio
+    async def test_evaluate_task_quality(self, beekeeper):
+        """高複雑性でQualityを推奨"""
+        # Act
+        result = await beekeeper._internal_evaluate_task(complexity=5, risk=3, urgency=2)
+
+        # Assert
+        assert "QUALITY" in result
+        assert "GuardBee=有" in result
+
+    @pytest.mark.asyncio
+    async def test_delegate_with_swarming_context(self, beekeeper, ar):
+        """コンテキストにSwarming特徴量が含まれるとSwarming評価が行われる"""
+        # Arrange: Hive/Colonyを作成
+        hive_result = await beekeeper.handle_create_hive({"name": "テスト", "goal": "テスト"})
+        hive_id = hive_result["hive_id"]
+        colony_result = await beekeeper.handle_create_colony(
+            {"hive_id": hive_id, "name": "チーム", "domain": "開発"}
+        )
+        colony_id = colony_result["colony_id"]
+
+        with patch(
+            "hiveforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
+            new_callable=AsyncMock,
+            return_value={"status": "completed", "result": "ok", "llm_output": "done"},
+        ):
+            # Act: Swarming特徴量付きでタスク委譲
+            result = await beekeeper._delegate_to_queen(
+                colony_id=colony_id,
+                task="ログインページ作成",
+                context={"complexity": 4, "risk": 3, "urgency": 2},
+            )
+
+        # Assert: タスク完了
+        assert "タスク完了" in result or "一部タスク完了" in result
+
+    @pytest.mark.asyncio
+    async def test_swarming_engine_accessible(self, beekeeper):
+        """BeekeeperがSwarmingEngineを保持している"""
+        # Assert
+        assert beekeeper._swarming_engine is not None

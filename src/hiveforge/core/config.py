@@ -217,6 +217,27 @@ class SentinelConfig(BaseModel):
     auto_suspend: bool = Field(default=True, description="critical時にColonyを自動一時停止するか")
 
 
+class SwarmingTemplateConfig(BaseModel):
+    """個別テンプレートのカスタマイズ設定"""
+
+    min_workers: int | None = Field(default=None, ge=1)
+    max_workers: int | None = Field(default=None, ge=1)
+    guard_bee: bool | None = Field(default=None)
+    reviewer: bool | None = Field(default=None)
+    sentinel: bool | None = Field(default=None)
+    retry_limit: int | None = Field(default=None, ge=1)
+
+
+class SwarmingConfig(BaseModel):
+    """Swarming Protocol設定（M3-2追加）"""
+
+    enabled: bool = Field(default=True, description="Swarming Protocolを有効にするか")
+    default_template: str = Field(default="balanced", description="デフォルトテンプレート")
+    templates: dict[str, SwarmingTemplateConfig] = Field(
+        default_factory=dict, description="テンプレートカスタマイズ"
+    )
+
+
 class HiveForgeSettings(BaseSettings):
     """HiveForge全体設定
 
@@ -241,6 +262,7 @@ class HiveForgeSettings(BaseSettings):
     conflict: ConflictConfig = Field(default_factory=ConflictConfig)
     conference: ConferenceConfig = Field(default_factory=ConferenceConfig)
     sentinel: SentinelConfig = Field(default_factory=SentinelConfig)
+    swarming: SwarmingConfig = Field(default_factory=SwarmingConfig)
 
     @classmethod
     def from_yaml(cls, config_path: Path | str | None = None) -> "HiveForgeSettings":

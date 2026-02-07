@@ -167,6 +167,42 @@ sentinel:
   auto_suspend: true                  # critical時にColonyを自動一時停止するか
 
 # =============================================================================
+# Swarming Protocol設定（M3-2追加）
+# タスク特性に応じた適応的Colony編成
+# =============================================================================
+swarming:
+  enabled: true                       # Swarming Protocolを有効にするか
+  default_template: "balanced"        # デフォルトテンプレート (speed/balanced/quality/recovery)
+
+  # テンプレートカスタマイズ
+  # 各テンプレートのパラメータを上書きできる
+  templates:
+    speed:
+      min_workers: 1
+      max_workers: 1
+      guard_bee: false
+      reviewer: false
+      retry_limit: 1
+    balanced:
+      min_workers: 2
+      max_workers: 3
+      guard_bee: true
+      reviewer: false
+      retry_limit: 3
+    quality:
+      min_workers: 3
+      max_workers: 5
+      guard_bee: true
+      reviewer: true
+      retry_limit: 5
+    recovery:
+      min_workers: 1
+      max_workers: 2
+      guard_bee: true
+      reviewer: false
+      retry_limit: 5
+
+# =============================================================================
 # 衝突検出・解決設定
 # 複数Colony間のリソース競合を管理
 # =============================================================================

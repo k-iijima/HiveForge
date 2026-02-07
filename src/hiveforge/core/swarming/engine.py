@@ -22,6 +22,18 @@ class SwarmingEngine:
     ルールベースの選択ロジックで、将来的にHoneycombデータ駆動に移行可能。
     """
 
+    def __init__(
+        self,
+        templates: dict[TemplateName, ColonyTemplate] | None = None,
+    ) -> None:
+        """初期化
+
+        Args:
+            templates: カスタマイズ済テンプレート辞書。
+                       Noneの場合はデフォルトのCOLONY_TEMPLATESを使用。
+        """
+        self._templates = templates or COLONY_TEMPLATES
+
     def select_template(self, features: SwarmingFeatures) -> ColonyTemplate:
         """特徴量からテンプレートを選択
 
@@ -39,7 +51,7 @@ class SwarmingEngine:
             選択されたColonyテンプレート
         """
         template_name = self._evaluate_rules(features)
-        template = COLONY_TEMPLATES[template_name]
+        template = self._templates[template_name]
 
         logger.info(
             f"テンプレート選択: {template_name.value} "
@@ -49,7 +61,7 @@ class SwarmingEngine:
 
     def select_template_for_recovery(self) -> ColonyTemplate:
         """障害復旧用テンプレートを選択"""
-        return COLONY_TEMPLATES[TemplateName.RECOVERY]
+        return self._templates[TemplateName.RECOVERY]
 
     def evaluate(self, features: SwarmingFeatures) -> dict[str, Any]:
         """特徴量からテンプレート選択の評価結果を返す
@@ -58,7 +70,7 @@ class SwarmingEngine:
         Beekeeperがユーザーに提案する際に使用。
         """
         template_name = self._evaluate_rules(features)
-        template = COLONY_TEMPLATES[template_name]
+        template = self._templates[template_name]
         reason = self._explain_selection(features, template_name)
 
         return {

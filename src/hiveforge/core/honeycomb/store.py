@@ -107,7 +107,5 @@ class HoneycombStore:
                     data = json.loads(line)
                     episodes.append(Episode(**data))
                 except (json.JSONDecodeError, ValueError) as e:
-                    logger.warning(
-                        f"Episode読み込みエラー: {path}:{line_num}: {e}"
-                    )
+                    logger.warning(f"Episode読み込みエラー: {path}:{line_num}: {e}")
         return episodes

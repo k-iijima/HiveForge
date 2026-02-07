@@ -6,7 +6,7 @@
 """
 
 from .models import SwarmingFeatures, TemplateName
-from .templates import ColonyTemplate, COLONY_TEMPLATES
+from .templates import ColonyTemplate, COLONY_TEMPLATES, apply_config_overrides
 from .engine import SwarmingEngine
 
 __all__ = [
@@ -15,4 +15,5 @@ __all__ = [
     "SwarmingEngine",
     "SwarmingFeatures",
     "TemplateName",
+    "apply_config_overrides",
 ]
