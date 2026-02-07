@@ -84,6 +84,10 @@ HiveForgeは「**信頼できる部品を、信頼できる組み合わせ方を
 │  │  │  Guard Bee（品質検証）                     [M3-3] │  │  │
 │  │  │  - 証拠ベースの合格/差戻し判定                    │  │  │
 │  │  └──────────────────────────────────────────────┘  │  │
+│  │  ┌──────────────────────────────────────────────┐  │  │
+│  │  │  Forager Bee（探索的テスト）               [M3-4] │  │  │
+│  │  │  - 影響グラフ探索・違和感検知 → Guard Beeへ証拠    │  │  │
+│  │  └──────────────────────────────────────────────┘  │  │
 │  │  ┌─────────────┐ ┌─────────────┐ ┌────────────┐  │  │
 │  │  │Colony: UI/UX│ │Colony: API  │ │Colony:Infra│  │  │
 │  │  │ Queen Bee   │ │ Queen Bee   │ │ Queen Bee  │  │  │
@@ -139,6 +143,7 @@ HiveForgeは「**信頼できる部品を、信頼できる組み合わせ方を
 | **VS Code拡張** (コマンド) | Hive/Colony操作 | 🔄 API接続コード作成済、確認中 (M2-1) |
 | **Swarming Protocol Engine** | タスク適応的Colony編成 | ❌ 未実装 → M3-2 |
 | **Guard Bee** | 品質検証エージェント | ❌ 未実装 → M3-3 |
+| **Forager Bee** | 探索的テスト・影響分析・違和感検知 | ❌ 未実装 → M3-4 |
 | **Honeycomb** | 実行履歴・学習基盤 | ❌ 未実装 → M3-1 |
 | **Scout Bee** | 過去実績に基づく編成最適化 | ❌ 未実装 → M3-6 |
 | **Waggle Dance** | I/O構造化検証 | ❌ 未実装 → M3-5 |
@@ -888,9 +893,10 @@ logging:
 - [x] Colony優先度: 静的設定ベースのリソース配分
 - [ ] Swarming Protocol Engine: タスク適応的Colony編成 (M3-2)
 - [ ] Guard Bee: 品質検証エージェント (M3-3)
+- [ ] Forager Bee: 探索的テスト・影響分析 (M3-4)
 - [ ] Honeycomb: 実行履歴・学習基盤 (M3-1)
-- [ ] Scout Bee: 過去実績に基づく編成最適化 (M3-6)
-- [ ] Waggle Dance: I/O構造化検証 (M3-5)
+- [ ] Scout Bee: 過去実績に基づく編成最適化 (M3-7)
+- [ ] Waggle Dance: I/O構造化検証 (M3-6)
 - [ ] LLM Orchestrator: 自律的なタスク分解・実行 (M4-2)
 - [ ] Artifact管理: 成果物の保存と参照
 - [ ] 因果リンクの自動設定（[Issue #001](issues/001-lineage-auto-parents.md)）
