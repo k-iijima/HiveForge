@@ -33,18 +33,18 @@
 | **Queen Bee** | ⚠️ スタブ | `_plan_tasks()` が固定1タスク返却 |
 | **Worker Bee** | ✅ 完了 | ツール実行, リトライ, Trust |
 | **Sentinel Hornet** | ✅ M2-0完了 | 4検出パターン (ループ/暴走/コスト/セキュリティ) |
-| **VS Code拡張** (コマンド) | 🔄 M2-1進行中 | Hive/Colony操作のAPI接続コード作成済、コンパイル未確認 |
+| **VS Code拡張** (コマンド) | ✅ M2-1完了 | Hive/Colony操作のAPI接続コード作成済、TSコンパイル+Lint確認済 |
 | **VS Code拡張** (TreeView) | ✅ 完了 | Activity Hierarchy API連動 |
 | **VS Code拡張** (Hive Monitor) | ✅ 完了 | リアルタイムWebview |
 | **Agent UI / VLM / VLM Tester** | ✅ 完了 | — |
-| **Swarming Protocol Engine** | ❌ 未実装 | v1.5で新規追加 |
-| **Guard Bee** | ❌ 未実装 | v1.5で新規追加 |
-| **Honeycomb** | ❌ 未実装 | v1.5で新規追加 |
+| **Swarming Protocol Engine** | ✅ M3-2完了 | 3軸特徴量、4テンプレート、Beekeeper統合、Config対応 |
+| **Guard Bee** | ✅ M3-3完了 | Evidence-first品質検証、2層検証(L1/L2)、5組込ルール |
+| **Honeycomb** | ✅ M3-1完了 | Episodeモデル、JSONL永続化、KPI算出 |
 | **Scout Bee** | ❌ 未実装 | v1.5で新規追加 |
 | **Forager Bee** | ❌ 未実装 | v1.5.1で新規追加 |
 | **Referee Bee** | ❌ 未実装 | v1.5.2で新規追加（大量生成→自動選抜パラダイム） |
 | **Waggle Dance** | ❌ 未実装 | v1.5で新規追加 |
-| **KPI Calculator** | ❌ 未実装 | v1.5で新規追加 |
+| **KPI Calculator** | ✅ M3-1完了 | HoneycombのKPICalculatorとして実装済 |
 | **LLM Orchestrator** | ❌ 未実装 | M4で実装予定 |
 
 ---
@@ -55,8 +55,8 @@
 
 ```
 M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)    → M5 (運用)
- ■■■■■■■■■■     ■■■■░░░░░░     ░░░░░░░░░░         ░░░░░░░░░░     ░░░░░░░░░░
- 完了              進行中         v1.5 新規          タスク分解      プロダクション
+ ■■■■■■■■■■     ■■■■■■■■■■     ■■■■■■░░░░         ░░░░░░░░░░     ░░░░░░░░░░
+ 完了              完了             v1.5 進行中        タスク分解      プロダクション
 ```
 
 ### 2.2 完了マイルストーン
@@ -99,7 +99,7 @@ M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)  
 - 設定ベース閾値 (`hiveforge.config.yaml`)
 - **コミット**: `c942f65`, `522013e`
 
-#### M2-1: VS Code拡張のAPI接続 🔄 進行中
+#### M2-1: VS Code拡張のAPI接続 ✅ 完了
 
 | タスク | 内容 | 状態 |
 |--------|------|------|
@@ -107,14 +107,14 @@ M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)  
 | M2-1-b | `colonyCommands.ts` — createColony/startColony/completeColony → API | ✅ 実装済 |
 | M2-1-c | `client.ts` — Hive/Colony API メソッド追加 | ✅ 実装済 |
 | M2-1-d | エラーハンドリング | ✅ 実装済 |
-| M2-1-e | TypeScriptコンパイル確認 | ⬜ 未確認 |
+| M2-1-e | TypeScriptコンパイル確認 | ✅ 確認済 |
 | M2-1-f | 動作確認テスト | ⬜ 未実施 |
 
 **完了条件**:
 - VS Code拡張からHive/Colonyの作成・取得・終了ができる
 - API接続失敗時にユーザーへ適切なエラー通知が出る
 
-#### M2-2: Beekeeper → Queen Bee → Worker Bee統合 ⬜ 未着手
+#### M2-2: Beekeeper → Queen Bee → Worker Bee統合 ✅ 完了
 
 | タスク | 内容 |
 |--------|------|
