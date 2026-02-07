@@ -56,7 +56,7 @@ Worker × N案生成 → Forager探索拡張 → Referee多面的採点 → Guar
 | 用語 | 説明 |
 |------|------|
 | **Hive** | プロジェクト全体の環境 |
-| **Beekeeper** | ユーザーとの対話窓口、Colony間調整 |
+| **Beekeeper** | ユーザーとの対話窓口、複数Hive統括 |
 | **Colony** | 専門領域のエージェント群（UI/UX, API等） |
 | **Queen Bee** | Colonyの統括エージェント |
 | **Worker Bee** | 実務を行う専門エージェント（N案並列生成可） |

@@ -22,11 +22,11 @@
 |------|------|------|
 | 🏠 Hive | Hive | プロジェクト全体の環境（複数Colonyを含む） |
 | 🐝 Colony | Colony | 専門領域を担当するエージェント群れ |
-| 👑 Queen Bee | Queen Bee | Colonyの調停エージェント（1体/Colony） |
+| 👑 Queen Bee | Queen Bee | Colonyの統括・調停エージェント（1体/Colony） |
 | 🐝 Worker Bee | Worker Bee | 実務を担当する個別エージェント |
 | 🐝 Sentinel Hornet | Sentinel Hornet | Hive内監視・異常検出・強制停止エージェント（v5.3追加） |
 | 🛡️ Guard Bee | Guard Bee | 成果物の品質・コンプライアンス検証エージェント（v1.5追加） |
-| 🐝 Forager Bee | Forager Bee | 探索的テスト・変更影響分析・違和感検知エージェント（v1.5.1追加） |
+| 🌻 Forager Bee | Forager Bee | 探索的テスト・変更影響分析・違和感検知エージェント（v1.5.1追加） |
 | ⚖️ Referee Bee | Referee Bee | N案候補の多面的採点・生存選抜エージェント（v1.5.2追加） |
 | 🔍 Scout Bee | Scout Bee | 過去実績に基づくColony編成最適化（v1.5追加） |
 | 🍯 Honeycomb | Honeycomb | 実行履歴の蓄積と学習基盤（v1.5追加） |
@@ -42,7 +42,7 @@
 |---------|------------------|
 | Hive（巣箱） | プロジェクト全体。1つの目標に向かう環境 |
 | Colony（群れ） | 専門領域のチーム。UI/UX、API、Dataなど |
-| Queen Bee（女王蜂） | Colonyの統括。Worker Beeに指示を出し、結果を統合 |
+| Queen Bee（女王蜂） | Colonyの統括・調停。Worker Beeに指示を出し、結果を統合 |
 | Worker Bee（働き蜂） | 実務担当。コード生成、調査、レビューなど |
 | Sentinel Hornet（スズメバチ） | Hive内監視・異常検出・強制停止 |
 | Beekeeper（養蜂家） | ユーザーの代理。必要に応じてHive/Colonyを作成・廃止 |
