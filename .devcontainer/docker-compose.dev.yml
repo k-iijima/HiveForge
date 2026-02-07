@@ -4,9 +4,11 @@ services:
       context: ..
       dockerfile: .devcontainer/Dockerfile.dev
     volumes:
-      # WSL Ubuntu内のパスでワークスペースをマウント
+      # WSL Docker環境用：Windowsパスを/mnt/形式に変換
+      # Docker Desktop with WSL backend では /mnt/d/... 形式が必要
       - /mnt/d/projects/biz/HiveForge:/workspace/HiveForge:cached
-      - hiveforge-venv:/workspace/HiveForge/.venv
+      # .venvは/home/vscode/.venv に配置してpipのユーザーインストールと分離
+      - hiveforge-venv:/home/vscode/.venv
       - /var/run/docker.sock:/var/run/docker.sock
     command: sleep infinity
     user: vscode
@@ -69,18 +71,19 @@ services:
     environment:
       - PASSWORD=hiveforge
     volumes:
-      - /mnt/d/projects/biz/HiveForge:/workspace/HiveForge
+      # 名前付きボリュームを使用（Windowsパス問題を回避）
+      - hiveforge-workspace:/workspace/HiveForge
     command: ["--bind-addr", "0.0.0.0:8080", "--auth", "password", "/workspace/HiveForge"]
     restart: unless-stopped
     networks:
       - hiveforge-dev-net
 
-  # Playwright MCP Server（公式Dockerイメージ使用）
+  # Playwright MCP Server（ローカルDockerfile使用）
   # ローカルにPlaywrightをインストールせずにMCP経由でブラウザ操作可能
   playwright-mcp:
     build:
-      context: https://github.com/microsoft/playwright-mcp.git
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: Dockerfile.playwright-mcp
     container_name: hiveforge-playwright-mcp
     ports:
       - "8931:8931"
@@ -96,6 +99,8 @@ services:
 
 volumes:
   hiveforge-venv:
+  hiveforge-workspace:
+    # code-server用のワークスペースボリューム
   ollama_models:
     name: hiveforge_ollama_models
 

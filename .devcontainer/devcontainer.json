@@ -1,21 +1,17 @@
 {
-  "name": "HiveForge Dev (GPU)",
-  // Ubuntu WSL の Docker を使用（GPU サポート）
+  "name": "HiveForge Dev",
+  // Docker Desktop または WSL Docker で動作
   // 
   // 使用方法:
-  // 1. PowerShell で実行: wsl -d Ubuntu -e sudo service docker start
+  // 1. Docker Desktop を起動
   // 2. VS Code で: Dev Containers: Reopen in Container
-  //
-  // または: scripts\start-wsl-docker.cmd を実行
   "dockerComposeFile": [
     "docker-compose.dev.yml"
   ],
   "service": "hiveforge-dev",
   "workspaceFolder": "/workspace/HiveForge",
-  // Windows から実行時に Ubuntu WSL の Docker を起動
-  "initializeCommand": {
-    "start-docker": "wsl -d Ubuntu -e sudo service docker start"
-  },
+  // ワークスペースマウントはdocker-compose.dev.ymlで定義（WSLパス形式）
+  // Docker ComposeモードではここでのworkspaceMountは機能しないため削除
   "customizations": {
     "vscode": {
       "extensions": [
@@ -50,7 +46,7 @@
       }
     }
   },
-  "postCreateCommand": "pip install -e '.[dev]' && mkdir -p /workspace/HiveForge/Vault && sudo chown -R vscode:vscode /workspace/HiveForge/Vault",
+  "postCreateCommand": "cd /workspace/HiveForge && pip install -e '.[dev]' && mkdir -p /workspace/HiveForge/Vault && sudo chown -R vscode:vscode /workspace/HiveForge/Vault",
   "postStartCommand": "sudo chown root:docker /var/run/docker.sock 2>/dev/null || true; bash .devcontainer/start-ollama.sh || true",
   "waitFor": "postCreateCommand",
   "remoteEnv": {

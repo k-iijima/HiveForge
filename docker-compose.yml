@@ -19,11 +19,11 @@ services:
       timeout: 10s
       retries: 3
 
-  # Playwright MCP Server (公式Dockerイメージ使用)
+  # Playwright MCP Server（ローカルDockerfile使用）
   playwright-mcp:
     build:
-      context: https://github.com/microsoft/playwright-mcp.git
-      dockerfile: Dockerfile
+      context: .devcontainer
+      dockerfile: Dockerfile.playwright-mcp
     ports:
       - "8931:8931"
     volumes:
