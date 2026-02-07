@@ -73,7 +73,15 @@ Worker × N案生成 → Forager探索拡張 → Referee多面的採点 → Guar
 
 ## 開発ステータス
 
-各コンポーネントの基盤スケルトンが完成し、コンポーネント間の接続・統合を進めている段階です。
+**M3（適応的協調）完了** — Honeycomb, Swarming Protocol, Guard Bee, Forager Bee, Referee Bee, Sentinel Hornet拡張, Waggle Dance, Scout Bee がすべて実装・テスト済み。次はM4（自律的タスク分解 — LLM統合）。
+
+| マイルストーン | 状態 |
+|--|--|
+| M1: 基盤固め | ✅ 完了 |
+| M2: 接続 | M2-0/M2-1 完了、M2-2/M2-3 未着手 |
+| M3: 適応的協調 | ✅ 全完了 (M3-1〜M3-8) |
+| M4: 自律 | 次の優先 |
+| M5: 運用品質 | 計画中 |
 
 詳細: [docs/DEVELOPMENT_PLAN_v2.md](docs/DEVELOPMENT_PLAN_v2.md)
 
@@ -144,12 +152,22 @@ hiveforge serve
 ```
 src/hiveforge/
 ├── core/              # コア基盤（イベント、AR、状態機械）
+│   ├── events/        #   84 EventType (パッケージ化済)
+│   ├── ar/            #   Akashic Record (JSONL永続化)
+│   ├── state/         #   5状態機械
+│   ├── honeycomb/     #   実行履歴・学習基盤 (M3-1)
+│   └── swarming/      #   Swarming Protocol (M3-2)
 ├── api/               # REST API (FastAPI)
 ├── mcp_server/        # MCP Server
 ├── beekeeper/         # Beekeeper層
-├── sentinel_hornet/   # Sentinel Hornet（監視・異常検出・強制停止）
+├── sentinel_hornet/   # Sentinel Hornet（7パターン+KPI劣化+ロールバック/隔離）
 ├── queen_bee/         # Queen Bee層
 ├── worker_bee/        # Worker Bee層
+├── guard_bee/         # Guard Bee（Evidence-first品質検証, M3-3）
+├── forager_bee/       # Forager Bee（探索的テスト・影響分析, M3-4）
+├── referee_bee/       # Referee Bee（多面的採点・選抜, M3-5）
+├── scout_bee/         # Scout Bee（編成最適化, M3-8）
+├── waggle_dance/      # Waggle Dance（I/O検証, M3-7）
 ├── llm/               # LLM統合（AgentRunner, プロンプト管理）
 ├── agent_ui/          # Agent UI MCPサーバー
 ├── vlm/               # VLM（画像解析）

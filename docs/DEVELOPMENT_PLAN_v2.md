@@ -7,45 +7,47 @@
 
 ---
 
-## 1. 現状の事実認定（2026-02-08 時点）
+## 1. 現状の事実認定（2026-02-07 更新）
 
 ### 1.1 計測済みメトリクス
 
 | 指標 | 実測値 | 備考 |
 |------|--------|------|
-| **ユニットテスト** | `pytest` で確認 | 固定値は記載しない（CIで自動取得） |
+| **ユニットテスト** | `pytest` で確認（参考: 1712件 @ 2026-02-07） | 固定値は記載しない（CIで自動取得） |
 | **カバレッジ** | `pytest --cov` で確認 | 同上 |
 | **Lint (Ruff)** | ✅ All passed | — |
+| **EventType数** | 84 | `core/events/types.py` |
 
 > テスト件数・カバレッジは**計測値のみを正とし**、ドキュメントに固定値を書かない。
 
 ### 1.2 コンポーネント別の実装実態
 
-| コンポーネント | ステータス | 詳細 |
-|---------------|-----------|------|
-| **Hive Core** (イベント, AR, 状態機械) | ✅ 完了 | 51 EventType, 5状態機械, ハッシュ連鎖 |
-| **Hive/Colony AR永続化** | ✅ M1-1完了 | HiveStore + HiveAggregate, JSONL永続化 |
-| **API Server** (FastAPI REST) | ✅ 完了 | Hive/Colony CRUD が AR永続化と接続済み |
-| **MCP Server** (Copilot連携) | ✅ 完了 | 全ツール実装・テスト済 |
-| **CLI** | ✅ 完了 | `hiveforge chat` 等 |
-| **Beekeeper server** | ✅ M1-2完了 | 全ハンドラ実装済（イベントソーシング連携） |
-| **Beekeeper handler** | ✅ 完了 | — |
-| **Queen Bee** | ⚠️ スタブ | `_plan_tasks()` が固定1タスク返却 |
-| **Worker Bee** | ✅ 完了 | ツール実行, リトライ, Trust |
-| **Sentinel Hornet** | ✅ M3-6完了 | 4検出パターン + KPI劣化検出 + ロールバック/隔離 |
-| **VS Code拡張** (コマンド) | ✅ M2-1完了 | Hive/Colony操作のAPI接続コード作成済、TSコンパイル+Lint確認済 |
-| **VS Code拡張** (TreeView) | ✅ 完了 | Activity Hierarchy API連動 |
-| **VS Code拡張** (Hive Monitor) | ✅ 完了 | リアルタイムWebview |
-| **Agent UI / VLM / VLM Tester** | ✅ 完了 | — |
-| **Swarming Protocol Engine** | ✅ M3-2完了 | 3軸特徴量、4テンプレート、Beekeeper統合、Config対応 |
-| **Guard Bee** | ✅ M3-3完了 | Evidence-first品質検証、2層検証(L1/L2)、5組込ルール |
-| **Honeycomb** | ✅ M3-1完了 | Episodeモデル、JSONL永続化、KPI算出 |
-| **Scout Bee** | ✅ M3-8完了 | 類似エピソード検索、テンプレート成功率分析、最適化提案 |
-| **Forager Bee** | ✅ M3-4完了 | 変更影響グラフ、シナリオ生成、探索実行、違和感検知 |
-| **Referee Bee** | ✅ M3-5完了 | 5次元スコアリング、Differential Testing、トーナメント選抜 |
-| **Waggle Dance** | ✅ M3-7完了 | Pydanticスキーマ検証、バリデーションミドルウェア、ARイベント記録 |
-| **KPI Calculator** | ✅ M3-1完了 | HoneycombのKPICalculatorとして実装済 |
-| **LLM Orchestrator** | ❌ 未実装 | M4で実装予定 |
+| コンポーネント | ステータス | 詳細 | 既知の制約 |
+|---------------|-----------|------|------------|
+| **Hive Core** (イベント, AR, 状態機械) | ✅ 完了 | 84 EventType, 5状態機械, ハッシュ連鎖 | — |
+| **Hive/Colony AR永続化** | ✅ M1-1完了 | HiveStore + HiveAggregate, JSONL永続化 | — |
+| **API Server** (FastAPI REST) | ✅ 完了 | Hive/Colony CRUD が AR永続化と接続済み | 認証は未有効化 (`auth.enabled: false`) |
+| **MCP Server** (Copilot連携) | ✅ 完了 | 全ツール実装・テスト済 | — |
+| **CLI** | ✅ 完了 | `hiveforge chat` 等 | mypy strict未対応 (M1-3) |
+| **Beekeeper server** | ✅ M1-2完了 | 全ハンドラ実装済 | **`_ask_user()` はスタブ** — ユーザー入力を実際に待たず即応答を返す (→ M2-2で解消) |
+| **Beekeeper handler** | ✅ 完了 | — | — |
+| **Queen Bee** | ⚠️ **スタブ** | 基盤完了 | **`_plan_tasks()` が固定1タスク返却** — LLMタスク分解未実装 (→ M4-1) |
+| **Worker Bee** | ✅ 完了 | ツール実行, リトライ, Trust | — |
+| **Sentinel Hornet** | ✅ M3-6完了 | 7検出パターン + KPI劣化検出 + ロールバック/隔離 | KPI劣化検出は`_calc_incident_rate()`が暫定ロジック (§8参照) |
+| **VS Code拡張** (コマンド) | ✅ M2-1完了 | API接続コード作成済、TSコンパイル+Lint確認済 | **実際のE2E動作テスト未実施** (M2-1-f) |
+| **VS Code拡張** (TreeView) | ✅ 完了 | Activity Hierarchy API連動 | — |
+| **VS Code拡張** (Hive Monitor) | ✅ 完了 | リアルタイムWebview | — |
+| **Agent UI / VLM / VLM Tester** | ✅ 完了 | — | VLM画像入力のbase64判定は仮定ベース |
+| **Swarming Protocol Engine** | ✅ M3-2完了 | 3軸特徴量、4テンプレート、Beekeeper統合、Config対応 | ルールベース選択、将来Honeycombデータ駆動に移行予定 |
+| **Guard Bee** | ✅ M3-3完了 | Evidence-first品質検証、2層検証(L1/L2)、5組込ルール | — |
+| **Honeycomb** | ✅ M3-1完了 | Episodeモデル、JSONL永続化、KPI算出 | `_calc_correctness()` / `_calc_incident_rate()` が暫定ロジック (§8参照) |
+| **Scout Bee** | ✅ M3-8完了 | 類似エピソード検索、テンプレート成功率分析、最適化提案 | 特徴量レンジ1〜5を固定仮定、コールドスタート時は`balanced`固定 |
+| **Forager Bee** | ✅ M3-4完了 | 変更影響グラフ、シナリオ生成、探索実行、違和感検知 | **`_run_single()` はスタブ** — 全シナリオを無条件pass (→ M4-2でLLM統合後に実装) |
+| **Referee Bee** | ✅ M3-5完了 | 5次元スコアリング、Differential Testing、トーナメント選抜 | — |
+| **Waggle Dance** | ✅ M3-7完了 | Pydanticスキーマ検証、バリデーションミドルウェア、ARイベント記録 | — |
+| **KPI Calculator** | ✅ M3-1完了 | HoneycombのKPICalculatorとして実装済 | 2指標が暫定ロジック (§8参照) |
+| **LLM Orchestrator** | ❌ 未実装 | M4で実装予定 | — |
+| **介入・エスカレーション** | ⚠️ 暫定 | API/MCPハンドラ実装済 | **インメモリストア** — プロセス再起動で消失 (§8参照) |
 
 ---
 
@@ -358,25 +360,24 @@ M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)  
 
 ---
 
-## 4. 優先順位
+## 4. 優先順位（2026-02-07 更新）
+
+M1〜M3完了。次は M4（自律）。
 
 ```
      高
-      │  M2-1 (VS Code API接続)     ← ユーザー体験（進行中）
+      │  M4-1 (タスク分解)           ← 本来の価値提供 ★次に着手
+      │  M4-2 (LLM Orchestrator)    ← マルチWorker並列実行
       │  M2-2 (エージェント統合)     ← E2E動作
-      │  M3-1 (Honeycomb)           ← v1.5学習基盤
-      │  M3-2 (Swarming Protocol)   ← v1.5適応的編成
-      │  M3-3 (Guard Bee)           ← v1.5品質検証
-      │  M3-4 (Forager Bee)         ← v1.5探索的テスト
-      │  M3-5 (Referee Bee)         ← v1.5.2 大量生成→自動選抜
-      │  M3-6 (Sentinel Hornet拡張) ← v1.5執行機能追加
-      │  M4-1 (タスク分解)           ← 本来の価値提供
-      │  M3-7 (Waggle Dance)       ← I/O構造化
-      │  M3-8 (Scout Bee)           ← 最適化（データ蓄積後）
+      │  M2-3 (MCP→Beekeeper連携)  ← Copilot統合
       │  M1-3 (型安全)              ← 長期信頼性（並行）
+      │  M1-4 (カバレッジ改善)       ← 品質基盤（並行）
       │  M5   (運用品質)            ← プロダクション
      低
 ```
+
+> M2-1は完了だがE2E動作テスト未実施。M2-2/M2-3が本格的な接続テスト。
+> M4-1 (`_plan_tasks()` LLM化) が最も大きなインパクトを持つ。
 
 ---
 
@@ -461,3 +462,67 @@ M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)  
 - セキュリティ・安定性が確保されている
 - KPIダッシュボードで健全性が可視化
 - CI/CDが完全自動化されている
+
+---
+
+## 8. 技術的負債一覧（2026-02-07 精査）
+
+> コードベース全体を精査し、スタブ・暫定実装・仮決め・ハードコード等をすべて列挙。
+> 再開時にどこから手をつけるかが一目でわかることを目的とする。
+
+### 8.1 クリティカルスタブ（機能が実質的に動作しない）
+
+| # | ファイル | 箇所 | 現状 | 解消マイルストーン |
+|---|---------|------|------|-------------------|
+| S-01 | `queen_bee/server.py:389-398` | `_plan_tasks()` | 固定1タスク `[{"task_id": ..., "goal": goal}]` を返却。LLMタスク分解なし | M4-1 |
+| S-02 | `beekeeper/server.py:728-734` | `_ask_user()` | ユーザー入力を実際に待たず即応答を返却 (`# TODO: VS Code拡張に通知してユーザー入力を待つ`) | M2-2 |
+| S-03 | `forager_bee/explorer.py:43-52` | `_run_single()` | 全シナリオを無条件 `passed=True` で返却。LLM統合後に実装 | M4-2 |
+
+### 8.2 暫定ロジック（動作するが精度が不十分）
+
+| # | ファイル | 箇所 | 現状 | 改善タイミング |
+|---|---------|------|------|---------------|
+| P-01 | `core/honeycomb/kpi.py:86-91` | `_calc_correctness()` | 「Guard Beeが未実装のため成功/全体比率」のコメントがあるが、Guard Bee実装済。接続が未配線 | M4以降 |
+| P-02 | `core/honeycomb/kpi.py:129-134` | `_calc_incident_rate()` | 「Sentinel Hornet介入の直接計測は未実装」— 失敗系エピソード比率で代替 | M4以降 |
+| P-03 | `core/honeycomb/recorder.py:174-178` | `_calculate_kpi_scores()` | `lead_time`のみ計算。他KPI(`correctness`等)は未計算 | M4以降 |
+| P-04 | `queen_bee/communication.py:253` | デッドロック検出 | 「簡易版」ラベル付き。完全なサイクル検出ではなく近似 | M4以降 |
+| P-05 | `vlm/analyzer.py:78` | UI要素抽出 | キーワードマッチングによる簡易実装 | 必要時 |
+
+### 8.3 インメモリストア（プロセス再起動で消失）
+
+| # | ファイル | 箇所 | 現状 | 解消方法 |
+|---|---------|------|------|---------|
+| M-01 | `mcp_server/handlers/intervention.py:24-25` | `_interventions: dict` | Phase 1 インメモリ。永続化なし | AR永続化に移行 |
+| M-02 | `api/routes/interventions.py:69-73` | `_interventions`, `_escalations`, `_feedbacks` | モジュール変数として保持 | AR永続化に移行 |
+| M-03 | `core/state/conference.py:89` | `ConferenceStore` | インメモリ dict | AR永続化に移行 |
+
+### 8.4 ハードコード・仮定
+
+| # | ファイル | 箇所 | 現状 | 意図 |
+|---|---------|------|------|------|
+| H-01 | `scout_bee/matcher.py:54` | 特徴量レンジ | 1〜5 固定仮定 | Swarming特徴量の実態に合わせて変更可能 |
+| H-02 | `scout_bee/matcher.py:65` | 欠損特徴量 | デフォルト3.0（中間値） | コールドスタート時の安全策 |
+| H-03 | `scout_bee/scout.py:15-16` | デフォルトテンプレート | `_DEFAULT_TEMPLATE = "balanced"` | コールドスタート時のフォールバック |
+| H-04 | `core/rate_limiter.py:37` | トークン上限 | `tokens_per_minute: int = 90000` (GPT-4想定) | 他モデルではconfigで上書き可能 |
+| H-05 | `core/rate_limiter.py:273-278` | 不明モデル | 保守的デフォルト (RPM=20, TPM=40000) | 安全側に倒す設計 |
+| H-06 | `core/models/action_class.py:80` | 不明ツール | `REVERSIBLE` として分類 | 安全側に倒す設計 |
+| H-07 | `vlm/ollama_client.py:102` | 画像入力 | 文字列はbase64と仮定 | ファイルパス等の区別なし |
+| H-08 | `llm/prompts.py:20-100` | システムプロンプト | YAML未設定時のインラインフォールバック | `default_prompts/`の設定で上書き可能 |
+
+### 8.5 将来拡張ノート（コード内コメント）
+
+| # | ファイル | コメント |
+|---|---------|---------|
+| N-01 | `core/swarming/engine.py:22` | 「将来的にHoneycombデータ駆動に移行可能」 |
+| N-02 | `core/models/action_class.py:70` | `params` 引数は現在未使用（将来拡張用） |
+
+### 8.6 優先度まとめ
+
+| 優先度 | 項目 | 理由 |
+|--------|------|------|
+| **🔴 最優先** | S-01 `_plan_tasks()` | M4-1の主目標。これなしでは自律動作不可 |
+| **🔴 最優先** | S-02 `_ask_user()` | M2-2の主目標。ユーザーインタラクション未接続 |
+| **🟡 次点** | S-03 `_run_single()` | M4-2でLLM統合後に自然解消 |
+| **🟡 次点** | P-01〜P-03 KPI暫定 | Guard Bee/Sentinel接続配線で改善 |
+| **🟢 低** | M-01〜M-03 インメモリ | POCでは問題なし。プロダクション化(M5)時に対応 |
+| **🟢 低** | H-01〜H-08 ハードコード | 現時点で意図的な仮定。必要時にconfig化 |

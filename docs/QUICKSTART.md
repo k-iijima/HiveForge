@@ -90,6 +90,8 @@ pip install -e ".[dev]"
 | POST | `/runs/{run_id}/tasks` | Task作成 |
 | GET | `/runs/{run_id}/events` | イベント一覧 |
 | GET | `/runs/{run_id}/events/{id}/lineage` | 因果リンク |
+| POST | `/guard-bee/verify` | Guard Bee品質検証 |
+| GET | `/guard-bee/reports/{run_id}` | Guard Bee検証レポート |
 
 ---
 
@@ -166,6 +168,13 @@ Copilot Chatで `@hiveforge` を使用（要: VS Code再読み込み）:
 | `emergency_stop` | 緊急停止 |
 | `get_lineage` | 因果リンク取得 |
 | `record_decision` | Decision記録 |
+
+### Guard Bee（品質検証）
+
+| ツール | 説明 |
+|--------|------|
+| `verify_colony` | Colony成果物をGuard Beeで品質検証 |
+| `get_guard_report` | Guard Bee検証レポート取得 |
 
 ### Copilot Chat MCP設定
 

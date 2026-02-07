@@ -131,41 +131,52 @@ HiveForgeは「**信頼できる部品を、信頼できる組み合わせ方を
 
 ### 2.1 コンポーネント一覧
 
-| コンポーネント | 役割 | 実装状況 |
-|----------------|------|----------|
-| **Hive Core** | イベント管理・状態機械・投影 | ✅ 実装済・テスト済 |
-| **API Server** | REST API エンドポイント | ✅ Hive/Colony CRUD が AR永続化と接続済み (M1-1完了) |
-| **MCP Server** | Copilot Chat連携 | ✅ 実装済・テスト済 |
-| **CLI** | コマンドラインインターフェース | ✅ 実装済（型注釈不足 → M1-3） |
-| **Beekeeper** | ユーザー窓口・Hive統括 | ✅ 全ハンドラ実装済 (M1-2完了) |
-| **Queen Bee** | Colony統括・タスク分解 | ⚠️ 基盤完了、タスク分解スタブ → M4-1 |
-| **Worker Bee** | タスク実行（MCPサブプロセス） | ✅ 実装済（ツール実行, リトライ, Trust） |
-| **Sentinel Hornet** | Hive内監視・異常検出・強制停止 | ✅ 4検出パターン実装済 (M2-0完了) |
-| **LLM Orchestrator** | 自律的タスク分解・実行 | ❌ 未実装 → M4-2 |
-| **VS Code拡張** (TreeView) | Activity階層表示 | ✅ API接続済 |
-| **VS Code拡張** (Hive Monitor) | リアルタイム活動可視化 | ✅ 実装済 |
-| **VS Code拡張** (コマンド) | Hive/Colony操作 | 🔄 API接続コード作成済、確認中 (M2-1) |
-| **Swarming Protocol Engine** | タスク適応的Colony編成 | ❌ 未実装 → M3-2 |
-| **Guard Bee** | 品質検証エージェント | ❌ 未実装 → M3-3 |
-| **Forager Bee** | 探索的テスト・影響分析・違和感検知 | ❌ 未実装 → M3-4 |
-| **Referee Bee** | N案候補の多面的採点・生存選抜 | ❌ 未実装 → M3-5 |
-| **Honeycomb** | 実行履歴・学習基盤 | ❌ 未実装 → M3-1 |
-| **Scout Bee** | 過去実績に基づく編成最適化 | ❌ 未実装 → M3-8 |
-| **Waggle Dance** | I/O構造化検証 | ❌ 未実装 → M3-7 |
-| **Agent UI** | ブラウザ自動操作MCPサーバー | ✅ 実装済 |
-| **VLM** | 画像解析・画面認識 | ✅ 実装済 |
-| **VLM Tester** | Playwright + VLMによるE2Eテスト | ✅ 実装済 |
-| **Silence Detector** | 沈黙検出 | ✅ 実装済 |
+| コンポーネント | 役割 | 実装状況 | 既知の制約 |
+|----------------|------|----------|------------|
+| **Hive Core** | イベント管理・状態機械・投影 | ✅ 完了 | — |
+| **API Server** | REST API エンドポイント | ✅ 完了 | 認証は未有効化 (`auth.enabled: false`) |
+| **MCP Server** | Copilot Chat連携 | ✅ 完了 | — |
+| **CLI** | コマンドラインインターフェース | ✅ 完了 | mypy strict未対応 (M1-3) |
+| **Beekeeper** | ユーザー窓口・Hive統括 | ✅ M1-2完了 | `_ask_user()` はスタブ (→ M2-2) |
+| **Queen Bee** | Colony統括・タスク分解 | ⚠️ 基盤完了 | `_plan_tasks()` 固定1タスク返却 (→ M4-1) |
+| **Worker Bee** | タスク実行（MCPサブプロセス） | ✅ 完了 | — |
+| **Sentinel Hornet** | Hive内監視・異常検出・強制停止 | ✅ M3-6完了 | 7検出パターン + KPI劣化検出 + ロールバック/隔離。`_calc_incident_rate()` は暫定ロジック |
+| **Honeycomb** | 実行履歴・学習基盤 | ✅ M3-1完了 | `_calc_correctness()` / `_calc_incident_rate()` が暫定ロジック |
+| **Swarming Protocol Engine** | タスク適応的Colony編成 | ✅ M3-2完了 | ルールベース選択。将来Honeycombデータ駆動に移行予定 |
+| **Guard Bee** | Evidence-first品質検証 | ✅ M3-3完了 | 2層検証(L1/L2)、5組込ルール |
+| **Forager Bee** | 探索的テスト・影響分析・違和感検知 | ✅ M3-4完了 | `_run_single()` はスタブ（全シナリオ無条件pass → M4-2） |
+| **Referee Bee** | N案候補の多面的採点・生存選抜 | ✅ M3-5完了 | 5次元スコアリング、Differential Testing、トーナメント |
+| **Scout Bee** | 過去実績に基づく編成最適化 | ✅ M3-8完了 | 特徴量レンジ1〜5固定仮定、コールドスタート時は`balanced`固定 |
+| **Waggle Dance** | I/O構造化検証 | ✅ M3-7完了 | Pydanticスキーマ検証、バリデーションミドルウェア、ARイベント記録 |
+| **LLM Orchestrator** | 自律的タスク分解・実行 | ❌ 未実装 | → M4-2 |
+| **VS Code拡張** (TreeView) | Activity階層表示 | ✅ 完了 | — |
+| **VS Code拡張** (Hive Monitor) | リアルタイム活動可視化 | ✅ 完了 | — |
+| **VS Code拡張** (コマンド) | Hive/Colony操作 | ✅ M2-1完了 | API接続コード作成済。E2E動作テスト未実施 (M2-1-f) |
+| **介入・エスカレーション** | API/MCPハンドラ | ⚠️ 暫定 | **インメモリストア** — プロセス再起動で消失 |
+| **Agent UI** | ブラウザ自動操作MCPサーバー | ✅ 完了 | — |
+| **VLM** | 画像解析・画面認識 | ✅ 完了 | String画像入力のbase64判定は仮定ベース |
+| **VLM Tester** | Playwright + VLMによるE2Eテスト | ✅ 完了 | — |
+| **Silence Detector** | 沈黙検出 | ✅ 完了 | — |
 
 > 各コンポーネントの詳細な実態とギャップは [DEVELOPMENT_PLAN_v2.md](DEVELOPMENT_PLAN_v2.md) §1.2 を参照。
 > マイルストーン（M1〜M5）の記号は同計画の §3 に対応。
+> 既知の制約の詳細は [DEVELOPMENT_PLAN_v2.md](DEVELOPMENT_PLAN_v2.md) §8 技術的負債一覧を参照。
 
 ### 2.2 モジュール依存関係
 
 ```
 hiveforge/
 ├── core/                  # コアモジュール（他から参照される）
-│   ├── events.py         # イベントモデル
+│   ├── events/           # イベントモデル（M3-6でパッケージ化）
+│   │   ├── base.py           # BaseEvent
+│   │   ├── types.py          # EventType enum (84種)
+│   │   ├── run.py            # Run関連イベント
+│   │   ├── hive.py           # Hive/Colony関連イベント
+│   │   ├── worker.py         # Worker Beeイベント
+│   │   ├── decision.py       # Decisionイベント
+│   │   ├── operation.py      # Operation Failure/Timeout
+│   │   ├── guard.py          # Guard Beeイベント
+│   │   └── registry.py       # イベントレジストリ
 │   ├── config.py         # 設定管理
 │   ├── activity_bus.py   # Activity Bus
 │   ├── lineage.py        # 因果リンク
@@ -179,11 +190,20 @@ hiveforge/
 │   │   ├── projections.py    # Run状態投影
 │   │   ├── hive_storage.py   # Hive/Colony永続化
 │   │   └── hive_projections.py # Hive/Colony投影
-│   └── state/            # 状態機械
-│       ├── machines.py        # Run/Task/Requirement SM
-│       ├── projections.py     # 状態投影
-│       ├── colony_progress.py # Colony進捗追跡
-│       └── conference.py      # Conference状態
+│   ├── state/            # 状態機械
+│   │   ├── machines.py        # Run/Task/Requirement SM
+│   │   ├── projections.py     # 状態投影
+│   │   ├── colony_progress.py # Colony進捗追跡
+│   │   └── conference.py      # Conference状態
+│   ├── honeycomb/        # 実行履歴・学習基盤 (M3-1)
+│   │   ├── models.py         # Episode, KPIScore等
+│   │   ├── store.py          # EpisodeStore (JSONL永続化)
+│   │   ├── recorder.py       # EpisodeRecorder
+│   │   └── kpi.py            # KPICalculator（lead_time他）
+│   └── swarming/         # Swarming Protocol (M3-2)
+│       ├── models.py         # SwarmingFeatures, SwarmingTemplate
+│       ├── engine.py         # SwarmingEngine（テンプレート選択）
+│       └── templates.py      # 4テンプレート定義
 ├── api/                   # REST API（coreに依存）
 │   ├── server.py         # FastAPIアプリ
 │   ├── dependencies.py   # 依存性注入（AppState）
@@ -226,6 +246,40 @@ hiveforge/
 │   ├── retry.py          # リトライ制御
 │   ├── tools.py          # ツール定義
 │   └── trust.py          # Trust Level制御
+├── sentinel_hornet/       # Sentinel Hornet (M2-0 + M3-6)
+│   ├── __init__.py       # SentinelHornet公開API
+│   └── monitor.py        # 7検出パターン + KPI劣化 + ロールバック/隔離
+├── guard_bee/             # Guard Bee (M3-3)
+│   ├── __init__.py
+│   ├── models.py         # VerificationRequest, VerificationResult等
+│   ├── rules.py          # 5組込ルール
+│   └── verifier.py       # 2層検証 (L1 structural / L2 semantic)
+├── forager_bee/           # Forager Bee (M3-4)
+│   ├── __init__.py
+│   ├── models.py         # ImpactNode, Scenario等
+│   ├── graph_builder.py  # 変更影響グラフ構築
+│   ├── scenario_generator.py # シナリオ自動生成
+│   ├── explorer.py       # 探索実行（_run_single はスタブ）
+│   ├── anomaly_detector.py   # 違和感検知
+│   └── reporter.py       # レポート生成
+├── referee_bee/           # Referee Bee (M3-5)
+│   ├── __init__.py
+│   ├── models.py         # CandidateSolution, ScoreCard等
+│   ├── scoring.py        # 5次元スコアリング
+│   ├── diff_tester.py    # Differential Testing
+│   ├── tournament.py     # トーナメント選抜
+│   └── reporter.py       # 比較レポート
+├── scout_bee/             # Scout Bee (M3-8)
+│   ├── __init__.py
+│   ├── models.py         # ScoutProposal等
+│   ├── matcher.py        # 類似エピソード検索
+│   ├── analyzer.py       # テンプレート成功率分析
+│   └── scout.py          # 最適化提案生成
+├── waggle_dance/          # Waggle Dance (M3-7)
+│   ├── __init__.py
+│   ├── models.py         # WaggleDanceSchema等
+│   ├── validator.py      # Pydanticスキーマ検証
+│   └── recorder.py       # ARイベント記録
 ├── llm/                   # LLM統合（coreに依存）
 │   ├── client.py         # LLMクライアント
 │   ├── runner.py         # AgentRunner
@@ -405,18 +459,22 @@ class BaseEvent(BaseModel):
 | | `task.completed` / `task.failed` / `task.blocked` / `task.unblocked` | Task終了系 |
 | **Requirement** | `requirement.created` / `requirement.approved` / `requirement.rejected` | 確認要請 |
 | **Hive/Colony** | `hive.created` / `hive.closed` | Hiveライフサイクル |
-| | `colony.created` / `colony.started` / `colony.completed` / `colony.failed` | Colonyライフサイクル |
+| | `colony.created` / `colony.started` / `colony.suspended` / `colony.completed` / `colony.failed` | Colonyライフサイクル |
 | **Conference** | `conference.started` / `conference.ended` | 会議ライフサイクル |
 | **Decision** | `decision.proposal.created` / `decision.recorded` / `decision.applied` / `decision.superseded` | 意思決定 |
 | **Conflict** | `conflict.detected` / `conflict.resolved` | Colony間衝突 |
 | **Intervention** | `intervention.user_direct` / `intervention.queen_escalation` / `intervention.beekeeper_feedback` | 直接介入・エスカレーション |
 | **Worker** | `worker.assigned` / `worker.started` / `worker.progress` / `worker.completed` / `worker.failed` | Worker Bee実行 |
 | **Operation** | `operation.timeout` / `operation.failed` | 標準失敗・タイムアウト |
+| **Sentinel Hornet** | `sentinel.alert_raised` / `sentinel.report` | 基本アラート・レポート (M2-0) |
+| | `sentinel.rollback` / `sentinel.quarantine` / `sentinel.kpi_degradation` | 執行アクション (M3-6) |
+| **Guard Bee** | `guard.verification_requested` / `guard.passed` / `guard.conditional_passed` / `guard.failed` | Evidence-first検証 (M3-3) |
+| **Waggle Dance** | `waggle_dance.validated` / `waggle_dance.violation` | I/O構造化検証 (M3-7) |
 | **LLM** | `llm.request` / `llm.response` | LLM連携 |
 | **System** | `system.heartbeat` / `system.error` / `system.silence_detected` / `system.emergency_stop` | システム |
 | **Unknown** | （任意の文字列） | 前方互換用（`UnknownEvent`として読み込み） |
 
-> イベント型の正式なスキーマ定義・payload仕様は [v5-hive-design.md §3](design/v5-hive-design.md) を参照。
+> 全84 EventType。イベント型の正式なスキーマ定義・payload仕様は [v5-hive-design.md §3](design/v5-hive-design.md) を参照。
 
 ### 4.3 RunProjection（状態投影）
 
@@ -652,7 +710,16 @@ HiveForge/
 │   ├── silence.py           # 沈黙検出
 │   ├── core/                # コアモジュール
 │   │   ├── config.py        # 設定管理
-│   │   ├── events.py        # イベントモデル
+│   │   ├── events/          # イベントモデル (84 EventType)
+│   │   │   ├── base.py          # BaseEvent
+│   │   │   ├── types.py         # EventType enum
+│   │   │   ├── run.py           # Run/Task/Requirement
+│   │   │   ├── hive.py          # Hive/Colony/Conference/Conflict
+│   │   │   ├── worker.py        # Worker Beeイベント
+│   │   │   ├── decision.py      # Decisionイベント
+│   │   │   ├── operation.py     # Failure/Timeout
+│   │   │   ├── guard.py         # Guard Beeイベント
+│   │   │   └── registry.py      # イベントレジストリ
 │   │   ├── activity_bus.py  # Activity Bus
 │   │   ├── lineage.py       # 因果リンク
 │   │   ├── policy_gate.py   # ポリシーゲート
@@ -665,11 +732,20 @@ HiveForge/
 │   │   │   ├── projections.py   # Run状態投影
 │   │   │   ├── hive_storage.py  # Hive/Colony永続化
 │   │   │   └── hive_projections.py # Hive/Colony投影
-│   │   └── state/           # 状態機械
-│   │       ├── machines.py       # Run/Task/Requirement SM
-│   │       ├── projections.py    # 状態投影
-│   │       ├── colony_progress.py # Colony進捗追跡
-│   │       └── conference.py     # Conference状態
+│   │   ├── state/           # 状態機械
+│   │   │   ├── machines.py       # Run/Task/Requirement SM
+│   │   │   ├── projections.py    # 状態投影
+│   │   │   ├── colony_progress.py # Colony進捗追跡
+│   │   │   └── conference.py     # Conference状態
+│   │   ├── honeycomb/       # 実行履歴・学習基盤 (M3-1)
+│   │   │   ├── models.py        # Episode, KPIScore等
+│   │   │   ├── store.py         # EpisodeStore (JSONL永続化)
+│   │   │   ├── recorder.py      # EpisodeRecorder
+│   │   │   └── kpi.py           # KPICalculator
+│   │   └── swarming/        # Swarming Protocol (M3-2)
+│   │       ├── models.py        # SwarmingFeatures, Template
+│   │       ├── engine.py        # SwarmingEngine
+│   │       └── templates.py     # 4テンプレート定義
 │   ├── api/                 # REST API
 │   │   ├── server.py        # FastAPIアプリ
 │   │   ├── dependencies.py  # 依存性注入（AppState）
@@ -712,6 +788,34 @@ HiveForge/
 │   │   ├── retry.py         # リトライ制御
 │   │   ├── tools.py         # ツール定義
 │   │   └── trust.py         # Trust Level制御
+│   ├── sentinel_hornet/     # Sentinel Hornet (M2-0 + M3-6)
+│   │   └── monitor.py       # 7パターン + KPI劣化 + ロールバック/隔離
+│   ├── guard_bee/           # Guard Bee (M3-3)
+│   │   ├── models.py        # VerificationRequest/Result
+│   │   ├── rules.py         # 5組込ルール
+│   │   └── verifier.py      # 2層検証 (L1/L2)
+│   ├── forager_bee/         # Forager Bee (M3-4)
+│   │   ├── models.py        # ImpactNode, Scenario等
+│   │   ├── graph_builder.py # 変更影響グラフ
+│   │   ├── scenario_generator.py # シナリオ生成
+│   │   ├── explorer.py      # 探索実行
+│   │   ├── anomaly_detector.py   # 違和感検知
+│   │   └── reporter.py      # レポート生成
+│   ├── referee_bee/         # Referee Bee (M3-5)
+│   │   ├── models.py        # ScoreCard, Tournament等
+│   │   ├── scoring.py       # 5次元スコアリング
+│   │   ├── diff_tester.py   # Differential Testing
+│   │   ├── tournament.py    # トーナメント選抜
+│   │   └── reporter.py      # 比較レポート
+│   ├── scout_bee/           # Scout Bee (M3-8)
+│   │   ├── models.py        # ScoutProposal等
+│   │   ├── matcher.py       # 類似エピソード検索
+│   │   ├── analyzer.py      # テンプレート成功率分析
+│   │   └── scout.py         # 最適化提案
+│   ├── waggle_dance/        # Waggle Dance (M3-7)
+│   │   ├── models.py        # WaggleDanceSchema等
+│   │   ├── validator.py     # Pydanticスキーマ検証
+│   │   └── recorder.py      # ARイベント記録
 │   ├── llm/                 # LLM統合
 │   │   ├── client.py        # LLMクライアント
 │   │   ├── runner.py        # AgentRunner
@@ -864,9 +968,9 @@ logging:
 | マイルストーン | 目標 | ステータス |
 |---------------|------|----------|
 | M1: 基盤固め | AR移行、スタブ解消 | ✅ 完了（M1-1, M1-2） |
-| M2: 接続 | Sentinel Hornet、VS Code↔API、エージェント間E2E | 🔄 進行中（M2-0完了、M2-1進行中、M2-2/M2-3未着手） |
-| M3: 適応的協調 | Swarming Protocol、Guard Bee、Honeycomb、Forager Bee、Referee Bee等 | 計画中（v1.5新規、M3-1〜M3-8） |
-| M4: 自律 | LLMタスク分解、Orchestrator | 計画中 |
+| M2: 接続 | Sentinel Hornet、VS Code↔API、エージェント間E2E | 🔄 M2-0/M2-1完了、M2-2/M2-3未着手 |
+| M3: 適応的協調 | Honeycomb, Swarming, Guard Bee, Forager Bee, Referee Bee, Sentinel拡張, Waggle Dance, Scout Bee | ✅ 完了（M3-1〜M3-8全完了） |
+| M4: 自律 | LLMタスク分解、Orchestrator | 未着手（次の優先） |
 | M5: 運用品質 | セキュリティ、KPIダッシュボード、CI/CD | 計画中 |
 
 ### 11.3 ゲート条件
@@ -896,15 +1000,15 @@ logging:
 - [x] Worker Bee: MCPサブプロセスベースのWorker
 - [x] Queen Bee連携: タスク割り当て、進捗集約、リトライ
 - [x] Colony優先度: 静的設定ベースのリソース配分
-- [ ] Honeycomb: 実行履歴・学習基盤 (M3-1)
-- [ ] Swarming Protocol Engine: タスク適応的Colony編成 (M3-2)
-- [ ] Guard Bee: 品質検証エージェント (M3-3)
-- [ ] Forager Bee: 探索的テスト・影響分析 (M3-4)
-- [ ] Referee Bee: N案多面的採点・生存選抜 (M3-5)
-- [ ] Sentinel Hornet拡張: KPI監視 + 執行アクション (M3-6)
-- [ ] Waggle Dance: I/O構造化検証 (M3-7)
-- [ ] Scout Bee: 過去実績に基づく編成最適化 (M3-8)
-- [ ] Queen Bee タスク分解: LLMタスク分解実装 (M4-1)
+- [x] Honeycomb: 実行履歴・学習基盤 (M3-1) ✅
+- [x] Swarming Protocol Engine: タスク適応的Colony編成 (M3-2) ✅
+- [x] Guard Bee: Evidence-first品質検証 (M3-3) ✅
+- [x] Forager Bee: 探索的テスト・影響分析「違和感検知」 (M3-4) ✅
+- [x] Referee Bee: N案多面的採点・トーナメント選抜 (M3-5) ✅
+- [x] Sentinel Hornet拡張: KPI劣化検出 + ロールバック/隔離 (M3-6) ✅
+- [x] Waggle Dance: I/O構造化検証 (M3-7) ✅
+- [x] Scout Bee: 過去実績に基づく編成最適化 (M3-8) ✅
+- [ ] Queen Bee タスク分解: LLMタスク分解実装 (M4-1) — 次の優先
 - [ ] LLM Orchestrator: 自律的なタスク分解・実行 (M4-2)
 - [ ] Artifact管理: 成果物の保存と参照
 - [ ] 因果リンクの自動設定（[Issue #001](issues/001-lineage-auto-parents.md)）
