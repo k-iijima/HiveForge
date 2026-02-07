@@ -60,8 +60,8 @@ export function activate(context: vscode.ExtensionContext) {
     registerFilterCommands(context, providers);
     registerTaskCommands(context, client, refresh);
     registerDecisionCommands(context);
-    registerHiveCommands(context);
-    registerColonyCommands(context);
+    registerHiveCommands(context, client);
+    registerColonyCommands(context, client);
 
     // Hive Monitor コマンド
     context.subscriptions.push(

@@ -27,6 +27,7 @@
 | 🐝 Sentinel Hornet | Sentinel Hornet | Hive内監視・異常検出・強制停止エージェント（v5.3追加） |
 | 🛡️ Guard Bee | Guard Bee | 成果物の品質・コンプライアンス検証エージェント（v1.5追加） |
 | 🐝 Forager Bee | Forager Bee | 探索的テスト・変更影響分析・違和感検知エージェント（v1.5.1追加） |
+| ⚖️ Referee Bee | Referee Bee | N案候補の多面的採点・生存選抜エージェント（v1.5.2追加） |
 | 🔍 Scout Bee | Scout Bee | 過去実績に基づくColony編成最適化（v1.5追加） |
 | 🍯 Honeycomb | Honeycomb | 実行履歴の蓄積と学習基盤（v1.5追加） |
 | 💃 Waggle Dance | Waggle Dance | エージェント間I/Oの構造化通信プロトコル（v1.5追加） |
@@ -47,6 +48,7 @@
 | Beekeeper（養蜂家） | ユーザーの代理。必要に応じてHive/Colonyを作成・廃止 |
 | Guard Bee（門番蜂） | 成果物の品質検証。証拠ベースの合格/差戻し（v1.5） |
 | Forager Bee（採餌蜂） | 探索的テスト・影響分析・違和感検知。Guard Beeへ証拠を提供（v1.5.1） |
+| Referee Bee（審判蜂） | N案候補の多面的自動採点・生存選抜トーナメント（v1.5.2） |
 | Scout Bee（偵察蜂） | 過去実績から最適なColony編成を提案（v1.5） |
 | Honeycomb（巣房） | 実行履歴の蓄積と学習基盤（v1.5） |
 | Waggle Dance（ワグルダンス） | エージェント間I/Oの構造化通信（v1.5） |

@@ -210,21 +210,11 @@ class SentinelConfig(BaseModel):
     """Sentinel Hornet設定（M2-0追加）"""
 
     enabled: bool = Field(default=True, description="Sentinel Hornetを有効にするか")
-    max_event_rate: int = Field(
-        default=50, ge=1, description="レートウィンドウ内の最大イベント数"
-    )
-    rate_window_seconds: int = Field(
-        default=60, ge=1, description="レート計測ウィンドウ（秒）"
-    )
-    max_loop_count: int = Field(
-        default=5, ge=1, description="ループ検出閾値"
-    )
-    max_cost: float = Field(
-        default=100.0, ge=0, description="最大コスト（ドル）"
-    )
-    auto_suspend: bool = Field(
-        default=True, description="critical時にColonyを自動一時停止するか"
-    )
+    max_event_rate: int = Field(default=50, ge=1, description="レートウィンドウ内の最大イベント数")
+    rate_window_seconds: int = Field(default=60, ge=1, description="レート計測ウィンドウ（秒）")
+    max_loop_count: int = Field(default=5, ge=1, description="ループ検出閾値")
+    max_cost: float = Field(default=100.0, ge=0, description="最大コスト（ドル）")
+    auto_suspend: bool = Field(default=True, description="critical時にColonyを自動一時停止するか")
 
 
 class HiveForgeSettings(BaseSettings):

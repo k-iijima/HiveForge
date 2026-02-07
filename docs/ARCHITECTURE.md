@@ -144,9 +144,10 @@ HiveForgeは「**信頼できる部品を、信頼できる組み合わせ方を
 | **Swarming Protocol Engine** | タスク適応的Colony編成 | ❌ 未実装 → M3-2 |
 | **Guard Bee** | 品質検証エージェント | ❌ 未実装 → M3-3 |
 | **Forager Bee** | 探索的テスト・影響分析・違和感検知 | ❌ 未実装 → M3-4 |
-| **Honeycomb** | 実行履歴・学習基盤 | ❌ 未実装 → M3-1 |
-| **Scout Bee** | 過去実績に基づく編成最適化 | ❌ 未実装 → M3-7 |
-| **Waggle Dance** | I/O構造化検証 | ❌ 未実装 → M3-6 |
+| **Referee Bee** | N案候補の多面的採点・生存選抜 | ✔ 未実装 → M3-5 |
+| **Honeycomb** | 実行履歴・学習基盤 | ✔ 未実装 → M3-1 |
+| **Scout Bee** | 過去実績に基づく編成最適化 | ✔ 未実装 → M3-8 |
+| **Waggle Dance** | I/O構造化検証 | ✔ 未実装 → M3-7 |
 | **Agent UI** | ブラウザ自動操作MCPサーバー | ✅ 実装済 |
 | **VLM** | 画像解析・画面認識 | ✅ 実装済 |
 | **VLM Tester** | Playwright + VLMによるE2Eテスト | ✅ 実装済 |
@@ -894,9 +895,10 @@ logging:
 - [ ] Swarming Protocol Engine: タスク適応的Colony編成 (M3-2)
 - [ ] Guard Bee: 品質検証エージェント (M3-3)
 - [ ] Forager Bee: 探索的テスト・影響分析 (M3-4)
+- [ ] Referee Bee: N案多面的採点・生存選抜 (M3-5)
 - [ ] Honeycomb: 実行履歴・学習基盤 (M3-1)
-- [ ] Scout Bee: 過去実績に基づく編成最適化 (M3-7)
-- [ ] Waggle Dance: I/O構造化検証 (M3-6)
+- [ ] Scout Bee: 過去実績に基づく編成最適化 (M3-8)
+- [ ] Waggle Dance: I/O構造化検証 (M3-7)
 - [ ] LLM Orchestrator: 自律的なタスク分解・実行 (M4-2)
 - [ ] Artifact管理: 成果物の保存と参照
 - [ ] 因果リンクの自動設定（[Issue #001](issues/001-lineage-auto-parents.md)）

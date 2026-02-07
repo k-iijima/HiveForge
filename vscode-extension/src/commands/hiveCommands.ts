@@ -5,9 +5,11 @@
  */
 
 import * as vscode from 'vscode';
+import { HiveForgeClient } from '../client';
 import { HiveTreeDataProvider } from '../views/hiveTreeView';
 
 let hiveTreeProvider: HiveTreeDataProvider | undefined;
+let apiClient: HiveForgeClient | undefined;
 
 /**
  * Hive TreeProviderを設定
@@ -20,6 +22,11 @@ export function setHiveTreeProvider(provider: HiveTreeDataProvider): void {
  * Hiveを作成
  */
 export async function createHive(): Promise<void> {
+    if (!apiClient) {
+        vscode.window.showErrorMessage('HiveForge: サーバーに接続されていません');
+        return;
+    }
+
     const name = await vscode.window.showInputBox({
         prompt: 'Hiveの名前を入力',
         placeHolder: '新しいHive',
@@ -40,19 +47,48 @@ export async function createHive(): Promise<void> {
         placeHolder: 'このHiveの目的',
     });
 
-    // TODO: API経由でHiveを作成（POST /hives）
-    // 現在はリフレッシュのみ（Activity APIからの階層取得に依存）
-    vscode.window.showInformationMessage(`Hive "${name}" の作成をリクエストしました`);
-    hiveTreeProvider?.refresh();
+    try {
+        const result = await apiClient.createHive(name, description);
+        vscode.window.showInformationMessage(`Hive 「${name}」を作成しました (${result.hive_id})`);
+        hiveTreeProvider?.refresh();
+    } catch (error: unknown) {
+        const message = extractErrorMessage(error);
+        vscode.window.showErrorMessage(`Hive作成に失敗: ${message}`);
+    }
 }
 
 /**
  * Hiveを終了
  */
 export async function closeHive(hiveId?: string): Promise<void> {
-    if (!hiveId) {
-        vscode.window.showErrorMessage('Hive IDが指定されていません');
+    if (!apiClient) {
+        vscode.window.showErrorMessage('HiveForge: サーバーに接続されていません');
         return;
+    }
+
+    if (!hiveId) {
+        // Hive選択ダイアログ
+        try {
+            const hives = await apiClient.getHives();
+            const activeHives = hives.filter(h => h.status !== 'closed');
+            if (activeHives.length === 0) {
+                vscode.window.showInformationMessage('終了可能なHiveがありません');
+                return;
+            }
+
+            const selected = await vscode.window.showQuickPick(
+                activeHives.map(h => ({ label: h.name, description: h.hive_id, hiveId: h.hive_id })),
+                { placeHolder: '終了するHiveを選択' }
+            );
+            if (!selected) {
+                return;
+            }
+            hiveId = selected.hiveId;
+        } catch (error: unknown) {
+            const message = extractErrorMessage(error);
+            vscode.window.showErrorMessage(`Hive一覧の取得に失敗: ${message}`);
+            return;
+        }
     }
 
     const confirm = await vscode.window.showWarningMessage(
@@ -62,9 +98,14 @@ export async function closeHive(hiveId?: string): Promise<void> {
     );
 
     if (confirm === '終了') {
-        // TODO: MCP経由でHiveを終了
-        vscode.window.showInformationMessage('Hiveを終了しました');
-        hiveTreeProvider?.refresh();
+        try {
+            await apiClient.closeHive(hiveId);
+            vscode.window.showInformationMessage('Hiveを終了しました');
+            hiveTreeProvider?.refresh();
+        } catch (error: unknown) {
+            const message = extractErrorMessage(error);
+            vscode.window.showErrorMessage(`Hive終了に失敗: ${message}`);
+        }
     }
 }
 
@@ -79,10 +120,40 @@ export function refreshHives(): void {
 /**
  * Hiveコマンドを登録
  */
-export function registerHiveCommands(context: vscode.ExtensionContext): void {
+export function registerHiveCommands(
+    context: vscode.ExtensionContext,
+    client: HiveForgeClient
+): void {
+    apiClient = client;
     context.subscriptions.push(
         vscode.commands.registerCommand('hiveforge.createHive', createHive),
         vscode.commands.registerCommand('hiveforge.closeHive', closeHive),
         vscode.commands.registerCommand('hiveforge.refreshHives', refreshHives)
     );
+}
+
+/**
+ * Axiosエラーからメッセージを抽出
+ */
+function extractErrorMessage(error: unknown): string {
+    const axiosError = error as {
+        response?: { status?: number; data?: { detail?: string | { message?: string } } };
+        message?: string;
+    };
+    if (axiosError.response?.data?.detail) {
+        const detail = axiosError.response.data.detail;
+        if (typeof detail === 'string') {
+            return detail;
+        }
+        if (typeof detail === 'object' && detail.message) {
+            return detail.message;
+        }
+    }
+    if (axiosError.response?.status) {
+        return `HTTP ${axiosError.response.status}`;
+    }
+    if (axiosError.message) {
+        return axiosError.message;
+    }
+    return String(error);
 }

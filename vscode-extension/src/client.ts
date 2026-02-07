@@ -99,6 +99,32 @@ export interface HealthResponse {
     active_runs: number;
 }
 
+export interface HiveResponse {
+    hive_id: string;
+    name: string;
+    description: string | null;
+    status: string;
+    colonies: string[];
+}
+
+export interface HiveCloseResponse {
+    hive_id: string;
+    status: 'closed';
+}
+
+export interface ColonyResponse {
+    colony_id: string;
+    hive_id: string;
+    name: string;
+    goal: string | null;
+    status: string;
+}
+
+export interface ColonyStatusResponse {
+    colony_id: string;
+    status: string;
+}
+
 export class HiveForgeClient {
     private client: AxiosInstance;
     private currentRunId?: string;
@@ -272,5 +298,63 @@ export class HiveForgeClient {
 
     getStreamUrl(): string {
         return `${this.client.defaults.baseURL}/activity/stream`;
+    }
+
+    // Hive API
+    async getHives(): Promise<HiveResponse[]> {
+        const response = await this.client.get<HiveResponse[]>('/hives');
+        return response.data;
+    }
+
+    async getHive(hiveId: string): Promise<HiveResponse> {
+        const response = await this.client.get<HiveResponse>(`/hives/${hiveId}`);
+        return response.data;
+    }
+
+    async createHive(name: string, description?: string): Promise<HiveResponse> {
+        const response = await this.client.post<HiveResponse>('/hives', {
+            name,
+            description: description || null,
+        });
+        return response.data;
+    }
+
+    async closeHive(hiveId: string): Promise<HiveCloseResponse> {
+        const response = await this.client.post<HiveCloseResponse>(`/hives/${hiveId}/close`);
+        return response.data;
+    }
+
+    // Colony API
+    async getColonies(hiveId: string): Promise<ColonyResponse[]> {
+        const response = await this.client.get<ColonyResponse[]>(
+            `/hives/${hiveId}/colonies`
+        );
+        return response.data;
+    }
+
+    async createColony(
+        hiveId: string,
+        name: string,
+        goal?: string
+    ): Promise<ColonyResponse> {
+        const response = await this.client.post<ColonyResponse>(
+            `/hives/${hiveId}/colonies`,
+            { name, goal: goal || null }
+        );
+        return response.data;
+    }
+
+    async startColony(colonyId: string): Promise<ColonyStatusResponse> {
+        const response = await this.client.post<ColonyStatusResponse>(
+            `/colonies/${colonyId}/start`
+        );
+        return response.data;
+    }
+
+    async completeColony(colonyId: string): Promise<ColonyStatusResponse> {
+        const response = await this.client.post<ColonyStatusResponse>(
+            `/colonies/${colonyId}/complete`
+        );
+        return response.data;
     }
 }

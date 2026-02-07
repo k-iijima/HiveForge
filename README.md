@@ -2,16 +2,20 @@
 
 > マルチエージェント協調開発システム
 
-HiveForgeは、LLMを活用した自律型ソフトウェア開発支援システムです。複数の専門エージェント（Beekeeper, Queen Bee, Worker Bee）が協調し、VS Code + GitHub Copilot Chat と連携してソフトウェア開発を支援します。
+HiveForgeは、LLMを活用した自律型ソフトウェア開発支援システムです。複数の専門エージェント（Beekeeper, Queen Bee, Worker Bee, Sentinel Hornet, Guard Bee, Forager Bee, Referee Bee）が協調し、VS Code + GitHub Copilot Chat と連携してソフトウェア開発を支援します。
 
 ## 特徴
 
-- **マルチエージェント協調**: Beekeeper（調整役）、Queen Bee（Colony統括）、Worker Bee（実務）の階層構造
+- **マルチエージェント協調**: Beekeeper（調整役）、Queen Bee（Colony統括）、Worker Bee（実務）、Sentinel Hornet（監視・執行）、Guard Bee（品質検証）、Forager Bee（探索的テスト）、Referee Bee（多面的採点・選抜）の階層構造
+- **大量生成→自動検証→生存選抜**: 「1回で正解を出す」から「N案並列生成 + 厳密な自動審判」へのパラダイムシフト
 - **Hive/Colony階層**: 複数のRunを専門領域（Colony）で組織化
+- **Swarming Protocol**: タスク特性に応じた適応的Colony編成
 - **Akashic Record (AR)**: 全イベントを追記保存する不変ログ
+- **Honeycomb**: 実行履歴からの学習・改善基盤
 - **因果追跡 (Lineage)**: 任意の成果物から「なぜ」を遡及可能
 - **状態機械**: Hive/Colony/Run/Task/Requirement の厳密な状態管理
 - **信頼レベル制御**: ActionClass × TrustLevel による承認制御
+- **Evidence-first**: 証拠に基づく判断原則（diff, テスト結果, 根拠）
 - **MCP対応**: GitHub Copilot Chat から直接操作可能
 - **VS Code統合**: 拡張機能でダッシュボード・イベントログ表示
 
@@ -20,23 +24,31 @@ HiveForgeは、LLMを活用した自律型ソフトウェア開発支援シス�
 ```
 Hive（プロジェクト）
  │
- ├── Beekeeper（調整エージェント）
+ ├── Beekeeper（調整エージェント）─── Swarming Protocol（適応的Colony編成）
+ │
+ ├── Sentinel Hornet（監視・異常検出・強制停止）
  │
  ├── Colony: UI/UX
  │    ├── Queen Bee（Colony統括）
- │    ├── Worker Bee: Designer
- │    ├── Worker Bee: A11y
+ │    ├── Worker Bee: Designer × N案並列
  │    └── Run → Task...
  │
  ├── Colony: API
  │    ├── Queen Bee
- │    ├── Worker Bee: Backend
+ │    ├── Worker Bee: Backend × N案並列
  │    └── Run → Task...
  │
- └── Colony: Infra
-      ├── Queen Bee
-      ├── Worker Bee: Docker
-      └── Run → Task...
+ ├── Forager Bee（探索的テスト・影響分析）
+ ├── Referee Bee（多面的採点・自動選抜）
+ ├── Guard Bee（最終品質ゲート）
+ │
+ └── Honeycomb（実行履歴・学習）+ Scout Bee（編成最適化）
+```
+
+### パイプライン（大量生成→選抜）
+
+```
+Worker × N案生成 → Forager探索拡張 → Referee多面的採点 → Guard最終ゲート → Sentinel本番監視
 ```
 
 ### 用語
@@ -47,7 +59,15 @@ Hive（プロジェクト）
 | **Beekeeper** | ユーザーとの対話窓口、Colony間調整 |
 | **Colony** | 専門領域のエージェント群（UI/UX, API等） |
 | **Queen Bee** | Colonyの統括エージェント |
-| **Worker Bee** | 実務を行う専門エージェント |
+| **Worker Bee** | 実務を行う専門エージェント（N案並列生成可） |
+| **Sentinel Hornet** | Hive内監視・異常検出・強制停止の一体型エージェント |
+| **Guard Bee** | 最終品質ゲート（PASS/CONDITIONAL_PASS/FAIL） |
+| **Forager Bee** | 探索的テスト・変更影響分析・違和感検知 |
+| **Referee Bee** | N案の多面的自動採点・生存選抜（トーナメント） |
+| **Scout Bee** | 過去実績に基づくColony編成最適化 |
+| **Swarming Protocol** | タスク適応的Colony編成プロトコル |
+| **Honeycomb** | 実行履歴からの学習基盤 |
+| **Waggle Dance** | エージェント間の構造化通信プロトコル |
 | **Run** | 実行単位（タスクの集合） |
 | **Task** | 個別の作業項目 |
 
@@ -55,7 +75,7 @@ Hive（プロジェクト）
 
 各コンポーネントの基盤スケルトンが完成し、コンポーネント間の接続・統合を進めている段階です。
 
-詳細: [docs/DEVELOPMENT_PLAN_v1.md](docs/DEVELOPMENT_PLAN_v1.md)
+詳細: [docs/DEVELOPMENT_PLAN_v2.md](docs/DEVELOPMENT_PLAN_v2.md)
 
 テスト実行: `pytest tests --ignore=tests/e2e -q`
 
@@ -127,6 +147,7 @@ src/hiveforge/
 ├── api/               # REST API (FastAPI)
 ├── mcp_server/        # MCP Server
 ├── beekeeper/         # Beekeeper層
+├── sentinel_hornet/   # Sentinel Hornet（監視・異常検出・強制停止）
 ├── queen_bee/         # Queen Bee層
 ├── worker_bee/        # Worker Bee層
 ├── llm/               # LLM統合（AgentRunner, プロンプト管理）
@@ -146,10 +167,10 @@ Vault/                 # イベントログ (gitignore)
 | ドキュメント | 役割 | 説明 |
 |--------------|------|------|
 | [AGENTS.md](AGENTS.md) | 規約 | AI開発ガイドライン |
-| [docs/コンセプト_v5.md](docs/コンセプト_v5.md) | **なぜ** | 設計思想・ビジョン・ユースケース |
+| [docs/コンセプト_v6.md](docs/コンセプト_v6.md) | **なぜ** | 設計思想・ビジョン・ユースケース |
 | [docs/design/v5-hive-design.md](docs/design/v5-hive-design.md) | **何を** | 詳細設計・スキーマ・プロトコル（Single Source of Truth） |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | **今どうなっている** | 実装の現況・コンポーネント構成 |
-| [docs/DEVELOPMENT_PLAN_v1.md](docs/DEVELOPMENT_PLAN_v1.md) | **次に何をする** | 開発計画・マイルストーン |
+| [docs/DEVELOPMENT_PLAN_v2.md](docs/DEVELOPMENT_PLAN_v2.md) | **次に何をする** | 開発計画・マイルストーン |
 | [docs/QUICKSTART.md](docs/QUICKSTART.md) | 手順 | 動作確認手順書 |
 
 > ドキュメント間の不整合を防ぐため、各情報に**正規の記載場所**を定めています。

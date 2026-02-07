@@ -5,9 +5,11 @@
  */
 
 import * as vscode from 'vscode';
+import { HiveForgeClient } from '../client';
 import { HiveTreeDataProvider } from '../views/hiveTreeView';
 
 let hiveTreeProvider: HiveTreeDataProvider | undefined;
+let apiClient: HiveForgeClient | undefined;
 
 /**
  * Hive TreeProviderを設定
@@ -20,9 +22,34 @@ export function setHiveTreeProviderForColony(provider: HiveTreeDataProvider): vo
  * Colonyを作成
  */
 export async function createColony(hiveId?: string): Promise<void> {
-    if (!hiveId) {
-        vscode.window.showErrorMessage('Hive IDが指定されていません');
+    if (!apiClient) {
+        vscode.window.showErrorMessage('HiveForge: サーバーに接続されていません');
         return;
+    }
+
+    // Hiveが指定されていない場合は選択ダイアログ
+    if (!hiveId) {
+        try {
+            const hives = await apiClient.getHives();
+            const activeHives = hives.filter(h => h.status !== 'closed');
+            if (activeHives.length === 0) {
+                vscode.window.showErrorMessage('アクティブなHiveがありません。先にHiveを作成してください。');
+                return;
+            }
+
+            const selected = await vscode.window.showQuickPick(
+                activeHives.map(h => ({ label: h.name, description: h.hive_id, hiveId: h.hive_id })),
+                { placeHolder: 'Colonyを作成するHiveを選択' }
+            );
+            if (!selected) {
+                return;
+            }
+            hiveId = selected.hiveId;
+        } catch (error: unknown) {
+            const message = extractErrorMessage(error);
+            vscode.window.showErrorMessage(`Hive一覧の取得に失敗: ${message}`);
+            return;
+        }
     }
 
     const name = await vscode.window.showInputBox({
@@ -45,47 +72,111 @@ export async function createColony(hiveId?: string): Promise<void> {
         placeHolder: 'このColonyで達成したいこと',
     });
 
-    // TODO: API経由でColonyを作成（POST /colonies）
-    // 現在はリフレッシュのみ（Activity APIからの階層取得に依存）
-    vscode.window.showInformationMessage(`Colony "${name}" の作成をリクエストしました`);
-    hiveTreeProvider?.refresh();
+    try {
+        const result = await apiClient.createColony(hiveId, name, goal);
+        vscode.window.showInformationMessage(
+            `Colony 「${name}」を作成しました (${result.colony_id})`
+        );
+        hiveTreeProvider?.refresh();
+    } catch (error: unknown) {
+        const message = extractErrorMessage(error);
+        vscode.window.showErrorMessage(`Colony作成に失敗: ${message}`);
+    }
 }
 
 /**
  * Colonyを開始
  */
 export async function startColony(colonyId?: string): Promise<void> {
+    if (!apiClient) {
+        vscode.window.showErrorMessage('HiveForge: サーバーに接続されていません');
+        return;
+    }
+
     if (!colonyId) {
         vscode.window.showErrorMessage('Colony IDが指定されていません');
         return;
     }
 
-    // TODO: MCP経由でColonyを開始
-    vscode.window.showInformationMessage('Colonyを開始しました');
-    hiveTreeProvider?.refresh();
+    try {
+        await apiClient.startColony(colonyId);
+        vscode.window.showInformationMessage('Colonyを開始しました');
+        hiveTreeProvider?.refresh();
+    } catch (error: unknown) {
+        const message = extractErrorMessage(error);
+        vscode.window.showErrorMessage(`Colony開始に失敗: ${message}`);
+    }
 }
 
 /**
  * Colonyを完了
  */
 export async function completeColony(colonyId?: string): Promise<void> {
+    if (!apiClient) {
+        vscode.window.showErrorMessage('HiveForge: サーバーに接続されていません');
+        return;
+    }
+
     if (!colonyId) {
         vscode.window.showErrorMessage('Colony IDが指定されていません');
         return;
     }
 
-    // TODO: MCP経由でColonyを完了
-    vscode.window.showInformationMessage('Colonyを完了しました');
-    hiveTreeProvider?.refresh();
+    const confirm = await vscode.window.showWarningMessage(
+        'Colonyを完了しますか？',
+        { modal: true },
+        '完了する'
+    );
+
+    if (confirm === '完了する') {
+        try {
+            await apiClient.completeColony(colonyId);
+            vscode.window.showInformationMessage('Colonyを完了しました');
+            hiveTreeProvider?.refresh();
+        } catch (error: unknown) {
+            const message = extractErrorMessage(error);
+            vscode.window.showErrorMessage(`Colony完了に失敗: ${message}`);
+        }
+    }
 }
 
 /**
  * Colonyコマンドを登録
  */
-export function registerColonyCommands(context: vscode.ExtensionContext): void {
+export function registerColonyCommands(
+    context: vscode.ExtensionContext,
+    client: HiveForgeClient
+): void {
+    apiClient = client;
     context.subscriptions.push(
         vscode.commands.registerCommand('hiveforge.createColony', createColony),
         vscode.commands.registerCommand('hiveforge.startColony', startColony),
         vscode.commands.registerCommand('hiveforge.completeColony', completeColony)
     );
+}
+
+/**
+ * Axiosエラーからメッセージを抽出
+ */
+function extractErrorMessage(error: unknown): string {
+    const axiosError = error as {
+        response?: { status?: number; data?: { detail?: string | { message?: string } } };
+        message?: string;
+    };
+    if (axiosError.response?.data?.detail) {
+        const detail = axiosError.response.data.detail;
+        if (typeof detail === 'string') {
+            return detail;
+        }
+        if (typeof detail === 'object' && detail.message) {
+            return detail.message;
+        }
+    }
+    if (axiosError.response?.status) {
+        return `HTTP ${axiosError.response.status}`;
+    }
+    if (axiosError.message) {
+        return axiosError.message;
+    }
+    return String(error);
 }
