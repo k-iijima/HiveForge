@@ -161,7 +161,7 @@ def get_prompt_from_config(
 def get_beekeeper_config(
     vault_path: str | Path = "./Vault",
     hive_id: str = "0",
-) -> "BeekeeperConfig | None":
+) -> BeekeeperConfig | None:
     """Beekeeper設定を取得"""
     from hiveforge.llm.prompt_config import PromptLoader
 
@@ -172,7 +172,7 @@ def get_queen_bee_config(
     vault_path: str | Path = "./Vault",
     hive_id: str = "0",
     colony_id: str = "0",
-) -> "QueenBeeConfig | None":
+) -> QueenBeeConfig | None:
     """Queen Bee設定を取得"""
     from hiveforge.llm.prompt_config import PromptLoader
 
@@ -184,7 +184,7 @@ def get_worker_bee_config(
     vault_path: str | Path = "./Vault",
     hive_id: str = "0",
     colony_id: str = "0",
-) -> "WorkerBeeConfig | None":
+) -> WorkerBeeConfig | None:
     """Worker Bee設定を取得"""
     from hiveforge.llm.prompt_config import PromptLoader
 

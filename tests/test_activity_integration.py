@@ -7,7 +7,6 @@ AAAパターン（Arrange-Act-Assert）を使用。
 
 from __future__ import annotations
 
-import json
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -19,9 +18,8 @@ from hiveforge.core.activity_bus import (
     AgentInfo,
     AgentRole,
 )
-from hiveforge.llm.client import LLMClient, LLMResponse, Message, ToolCall
-from hiveforge.llm.runner import AgentRunner, AgentContext, RunResult, ToolDefinition
-
+from hiveforge.llm.client import LLMClient, LLMResponse, ToolCall
+from hiveforge.llm.runner import AgentRunner, ToolDefinition
 
 # =============================================================================
 # フィクスチャ

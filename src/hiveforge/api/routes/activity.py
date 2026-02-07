@@ -85,7 +85,7 @@ async def stream_events():
                     event = await asyncio.wait_for(queue.get(), timeout=15.0)
                     data = json.dumps(event.to_dict(), ensure_ascii=False)
                     yield f"data: {data}\n\n"
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     yield ": keep-alive\n\n"
         finally:
             bus.unsubscribe(handler)

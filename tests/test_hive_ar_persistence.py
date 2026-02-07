@@ -7,9 +7,7 @@ HiveStoreにイベントを書き込み、新しいHiveStoreインスタンス�
 
 from pathlib import Path
 
-import pytest
-
-from hiveforge.core.ar.hive_projections import HiveAggregate, build_hive_aggregate
+from hiveforge.core.ar.hive_projections import build_hive_aggregate
 from hiveforge.core.ar.hive_storage import HiveStore
 from hiveforge.core.events import (
     ColonyCompletedEvent,

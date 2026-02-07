@@ -384,19 +384,21 @@ class TestDispatchTool:
 
 
 # Worker Projection テスト
-from hiveforge.worker_bee.projections import (
-    WorkerProjection,
-    WorkerPoolProjection,
-    WorkerState as ProjectionWorkerState,
-    build_worker_projection,
-    build_worker_pool_projection,
-)
 from hiveforge.core.events import (
-    WorkerStartedEvent,
-    WorkerProgressEvent,
+    WorkerAssignedEvent,
     WorkerCompletedEvent,
     WorkerFailedEvent,
-    WorkerAssignedEvent,
+    WorkerProgressEvent,
+    WorkerStartedEvent,
+)
+from hiveforge.worker_bee.projections import (
+    WorkerPoolProjection,
+    WorkerProjection,
+    build_worker_pool_projection,
+    build_worker_projection,
+)
+from hiveforge.worker_bee.projections import (
+    WorkerState as ProjectionWorkerState,
 )
 
 
@@ -694,7 +696,6 @@ class TestWorkerPoolProjection:
 
 
 # Worker Bee Projection 追加テスト
-from hiveforge.worker_bee.projections import WorkerProjection, WorkerPoolProjection
 
 
 class TestWorkerProjectionEdgeCases:
@@ -716,13 +717,14 @@ class TestWorkerProjectionEdgeCases:
 
 
 # Worker Process Manager テスト
-from hiveforge.worker_bee.process import (
-    WorkerProcess,
-    WorkerProcessState,
-    WorkerPoolConfig,
-    WorkerProcessManager,
-)
 import pytest
+
+from hiveforge.worker_bee.process import (
+    WorkerPoolConfig,
+    WorkerProcess,
+    WorkerProcessManager,
+    WorkerProcessState,
+)
 
 
 class TestWorkerProcess:
@@ -916,15 +918,16 @@ class TestWorkerProcessManager:
 
 
 # Tool Executor テスト
+import pytest
+
 from hiveforge.worker_bee.tools import (
-    ToolDefinition,
     ToolCategory,
-    ToolStatus,
-    ToolResult,
+    ToolDefinition,
     ToolExecutor,
+    ToolResult,
+    ToolStatus,
     create_builtin_tools,
 )
-import pytest
 
 
 class TestToolDefinition:
@@ -1155,12 +1158,10 @@ class TestToolExecutor:
 
 # Retry Executor テスト
 from hiveforge.worker_bee.retry import (
+    RetryExecutor,
     RetryPolicy,
     RetryStrategy,
-    RetryExecutor,
-    RetryResult,
     TimeoutConfig,
-    TimeoutBehavior,
     create_default_retry_policy,
     create_no_retry_policy,
 )
@@ -1371,14 +1372,14 @@ class TestHelpers:
 # ActionClass・TrustLevel テスト
 from hiveforge.worker_bee.trust import (
     ActionClass,
-    TrustLevel,
-    ConfirmationResult,
     ConfirmationRequest,
     ConfirmationResponse,
+    ConfirmationResult,
+    TrustLevel,
     TrustManager,
-    requires_confirmation,
-    get_max_action_class,
     create_default_tool_classes,
+    get_max_action_class,
+    requires_confirmation,
 )
 
 
@@ -1617,7 +1618,8 @@ class TestWorkerBeeAgentRunnerPromptContext:
         ARのvault_pathとworker_idを渡す。
         """
         # Arrange: LLMクライアントをモックで事前設定
-        from unittest.mock import MagicMock, AsyncMock
+        from unittest.mock import AsyncMock, MagicMock
+
         from hiveforge.llm.client import LLMClient
 
         mock_client = MagicMock(spec=LLMClient)
@@ -1636,9 +1638,10 @@ class TestWorkerBeeAgentRunnerPromptContext:
     async def test_agent_runner_receives_agent_info(self, worker_bee):
         """Worker BeeのAgentRunnerにAgentInfoが設定される"""
         # Arrange
-        from unittest.mock import MagicMock, AsyncMock
-        from hiveforge.llm.client import LLMClient
+        from unittest.mock import AsyncMock, MagicMock
+
         from hiveforge.core.activity_bus import AgentRole
+        from hiveforge.llm.client import LLMClient
 
         mock_client = MagicMock(spec=LLMClient)
         mock_client.chat = AsyncMock()

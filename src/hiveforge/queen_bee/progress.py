@@ -6,7 +6,6 @@ Worker Beeからの進捗報告を集約し、全体進捗を計算する。
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
 
 from ..core.events import BaseEvent, EventType
 from ..worker_bee.projections import WorkerPoolProjection, build_worker_pool_projection

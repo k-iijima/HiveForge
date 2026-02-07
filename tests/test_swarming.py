@@ -15,13 +15,11 @@ from hiveforge.core.swarming.models import SwarmingFeatures, TemplateName
 from hiveforge.core.swarming.templates import (
     BALANCED_TEMPLATE,
     COLONY_TEMPLATES,
-    ColonyTemplate,
     QUALITY_TEMPLATE,
     RECOVERY_TEMPLATE,
     SPEED_TEMPLATE,
     apply_config_overrides,
 )
-
 
 # =========================================================================
 # SwarmingFeatures モデルのテスト

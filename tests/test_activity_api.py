@@ -7,7 +7,6 @@ AAAパターン（Arrange-Act-Assert）を使用。
 
 from __future__ import annotations
 
-import json
 from unittest.mock import MagicMock, patch
 
 import pytest

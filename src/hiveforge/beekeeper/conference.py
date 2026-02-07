@@ -3,10 +3,12 @@
 複数Colony間での合意形成会議機能。
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable
+from typing import Any
+
 from ulid import ULID
 
 

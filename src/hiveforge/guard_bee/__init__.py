@@ -12,11 +12,11 @@ from .models import (
     VerificationLevel,
 )
 from .rules import (
+    AllTestsPassRule,
     CoverageThresholdRule,
     DiffExistsRule,
     LintCleanRule,
     RuleRegistry,
-    AllTestsPassRule,
     TypeCheckRule,
     VerificationRule,
 )

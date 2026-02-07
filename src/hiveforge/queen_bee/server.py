@@ -7,7 +7,7 @@ LLMを使用してタスク分解と進捗管理を行う。
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from ..core import AkashicRecord, generate_event_id
@@ -18,8 +18,8 @@ from ..core.events import (
     RunFailedEvent,
     RunStartedEvent,
     TaskAssignedEvent,
-    TaskCreatedEvent,
     TaskCompletedEvent,
+    TaskCreatedEvent,
     TaskFailedEvent,
 )
 from ..worker_bee.server import WorkerBeeMCPServer, WorkerState
@@ -525,8 +525,8 @@ class QueenBeeMCPServer:
     async def _get_agent_runner(self):
         """AgentRunnerを取得（遅延初期化）"""
         if self._agent_runner is None:
-            from ..llm.runner import AgentRunner
             from ..core.activity_bus import AgentInfo, AgentRole
+            from ..llm.runner import AgentRunner
 
             client = await self._get_llm_client()
             agent_info = AgentInfo(

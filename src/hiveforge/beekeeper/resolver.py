@@ -3,13 +3,15 @@
 検出された衝突を解決するためのストラテジーとリゾルバー。
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable
+from typing import Any
+
 from ulid import ULID
 
-from .conflict import Conflict, ConflictSeverity, ConflictType
+from .conflict import Conflict, ConflictType
 
 
 class ResolutionStrategy(str, Enum):

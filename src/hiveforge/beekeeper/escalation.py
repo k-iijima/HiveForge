@@ -6,7 +6,7 @@ Queen BeeがBeekeeperをバイパスしてユーザーに直接報告する機�
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -57,7 +57,7 @@ class Escalation:
     description: str = ""
     context: dict[str, Any] = field(default_factory=dict)
     suggested_actions: list[str] = field(default_factory=list)
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     acknowledged_at: datetime | None = None
     resolved_at: datetime | None = None
     resolution: str | None = None
@@ -70,7 +70,7 @@ class EscalationResponse:
     escalation_id: str
     action: str  # acknowledge, resolve, dismiss
     comment: str = ""
-    responded_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    responded_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 class EscalationManager:
@@ -140,7 +140,7 @@ class EscalationManager:
 
         escalation = self._escalations[escalation_id]
         escalation.status = EscalationStatus.ACKNOWLEDGED
-        escalation.acknowledged_at = datetime.now(timezone.utc)
+        escalation.acknowledged_at = datetime.now(UTC)
 
         return True
 
@@ -151,7 +151,7 @@ class EscalationManager:
 
         escalation = self._escalations[escalation_id]
         escalation.status = EscalationStatus.RESOLVED
-        escalation.resolved_at = datetime.now(timezone.utc)
+        escalation.resolved_at = datetime.now(UTC)
         escalation.resolution = resolution
 
         # 履歴に移動
@@ -167,7 +167,7 @@ class EscalationManager:
 
         escalation = self._escalations[escalation_id]
         escalation.status = EscalationStatus.DISMISSED
-        escalation.resolved_at = datetime.now(timezone.utc)
+        escalation.resolved_at = datetime.now(UTC)
         escalation.resolution = f"Dismissed: {reason}" if reason else "Dismissed"
 
         # 履歴に移動

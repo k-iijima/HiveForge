@@ -16,7 +16,7 @@ from ..worker_bee.projections import (
     WorkerState,
     build_worker_pool_projection,
 )
-from .server import QueenBeeMCPServer, ManagedWorker
+from .server import ManagedWorker, QueenBeeMCPServer
 
 
 @dataclass

@@ -3,9 +3,9 @@
 ツールの危険度分類と信頼レベルに基づく承認制御。
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Callable
 
 
 class ActionClass(str, Enum):

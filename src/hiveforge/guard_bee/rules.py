@@ -272,7 +272,7 @@ class RuleRegistry:
         return [r.name for r in self._rules]
 
     @classmethod
-    def create_default(cls, coverage_threshold: float = 80.0) -> "RuleRegistry":
+    def create_default(cls, coverage_threshold: float = 80.0) -> RuleRegistry:
         """デフォルトのL1ルールセットを構築"""
         registry = cls()
         registry.register(DiffExistsRule())

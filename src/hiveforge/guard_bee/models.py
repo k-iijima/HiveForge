@@ -6,7 +6,7 @@ Evidence-first原則: 意見ではなく証拠で判定する。
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -62,7 +62,7 @@ class Evidence(BaseModel):
     source: str = Field(..., description="証拠の出所（ファイルパス、ツール名等）")
     content: dict[str, Any] = Field(default_factory=dict, description="証拠データ")
     collected_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="証拠収集日時",
     )
 
@@ -76,9 +76,7 @@ class RuleResult(BaseModel):
     level: VerificationLevel = Field(..., description="検証レベル")
     passed: bool = Field(..., description="合格したか")
     message: str = Field(default="", description="結果メッセージ")
-    evidence_type: EvidenceType | None = Field(
-        default=None, description="使用した証拠の種類"
-    )
+    evidence_type: EvidenceType | None = Field(default=None, description="使用した証拠の種類")
     details: dict[str, Any] = Field(default_factory=dict, description="詳細データ")
 
 
@@ -95,20 +93,16 @@ class GuardBeeReport(BaseModel):
     task_id: str = Field(..., description="検証対象Task ID")
     run_id: str = Field(..., description="Run ID")
     verdict: Verdict = Field(..., description="最終判定")
-    rule_results: tuple[RuleResult, ...] = Field(
-        default=(), description="個別ルールの結果"
-    )
+    rule_results: tuple[RuleResult, ...] = Field(default=(), description="個別ルールの結果")
     evidence_count: int = Field(default=0, ge=0, description="収集した証拠数")
     l1_passed: bool = Field(default=False, description="L1（ルール検証）合格")
     l2_passed: bool = Field(default=False, description="L2（文脈検証）合格")
-    remand_reason: str | None = Field(
-        default=None, description="差戻し理由（FAILの場合）"
-    )
+    remand_reason: str | None = Field(default=None, description="差戻し理由（FAILの場合）")
     improvement_instructions: list[str] = Field(
         default_factory=list, description="改善指示（FAIL/CONDITIONAL_PASSの場合）"
     )
     verified_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="検証日時",
     )
 

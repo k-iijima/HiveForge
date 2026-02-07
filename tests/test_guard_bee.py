@@ -9,8 +9,6 @@ M3-3 完了条件:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
 import pytest
 
 from hiveforge.core import AkashicRecord
@@ -24,15 +22,14 @@ from hiveforge.guard_bee.models import (
     VerificationLevel,
 )
 from hiveforge.guard_bee.rules import (
+    AllTestsPassRule,
     CoverageThresholdRule,
     DiffExistsRule,
     LintCleanRule,
     RuleRegistry,
-    AllTestsPassRule,
     TypeCheckRule,
 )
 from hiveforge.guard_bee.verifier import GuardBeeVerifier
-
 
 # =========================================================================
 # Verdict / VerificationLevel 列挙型テスト
@@ -210,11 +207,13 @@ class TestLintCleanRule:
         """エラー0/警告0でPASS"""
         # Arrange
         rule = LintCleanRule()
-        evidence = [Evidence(
-            evidence_type=EvidenceType.LINT_RESULT,
-            source="ruff",
-            content={"errors": 0, "warnings": 0},
-        )]
+        evidence = [
+            Evidence(
+                evidence_type=EvidenceType.LINT_RESULT,
+                source="ruff",
+                content={"errors": 0, "warnings": 0},
+            )
+        ]
 
         # Act
         result = rule.verify(evidence, {})
@@ -225,11 +224,13 @@ class TestLintCleanRule:
     def test_fail_when_errors(self):
         """エラーがあればFAIL"""
         rule = LintCleanRule()
-        evidence = [Evidence(
-            evidence_type=EvidenceType.LINT_RESULT,
-            source="ruff",
-            content={"errors": 3, "warnings": 0},
-        )]
+        evidence = [
+            Evidence(
+                evidence_type=EvidenceType.LINT_RESULT,
+                source="ruff",
+                content={"errors": 3, "warnings": 0},
+            )
+        ]
         result = rule.verify(evidence, {})
         assert result.passed is False
 
@@ -246,33 +247,39 @@ class TestTestPassRule:
     def test_pass_when_all_pass(self):
         """全テストパスでPASS"""
         rule = AllTestsPassRule()
-        evidence = [Evidence(
-            evidence_type=EvidenceType.TEST_RESULT,
-            source="pytest",
-            content={"total": 100, "passed": 100, "failed": 0},
-        )]
+        evidence = [
+            Evidence(
+                evidence_type=EvidenceType.TEST_RESULT,
+                source="pytest",
+                content={"total": 100, "passed": 100, "failed": 0},
+            )
+        ]
         result = rule.verify(evidence, {})
         assert result.passed is True
 
     def test_fail_when_some_fail(self):
         """失敗テストがあるとFAIL"""
         rule = AllTestsPassRule()
-        evidence = [Evidence(
-            evidence_type=EvidenceType.TEST_RESULT,
-            source="pytest",
-            content={"total": 100, "passed": 98, "failed": 2},
-        )]
+        evidence = [
+            Evidence(
+                evidence_type=EvidenceType.TEST_RESULT,
+                source="pytest",
+                content={"total": 100, "passed": 98, "failed": 2},
+            )
+        ]
         result = rule.verify(evidence, {})
         assert result.passed is False
 
     def test_fail_when_no_tests(self):
         """テスト0件でFAIL"""
         rule = AllTestsPassRule()
-        evidence = [Evidence(
-            evidence_type=EvidenceType.TEST_RESULT,
-            source="pytest",
-            content={"total": 0, "passed": 0, "failed": 0},
-        )]
+        evidence = [
+            Evidence(
+                evidence_type=EvidenceType.TEST_RESULT,
+                source="pytest",
+                content={"total": 0, "passed": 0, "failed": 0},
+            )
+        ]
         result = rule.verify(evidence, {})
         assert result.passed is False
 
@@ -283,44 +290,52 @@ class TestCoverageThresholdRule:
     def test_pass_above_threshold(self):
         """閾値以上でPASS"""
         rule = CoverageThresholdRule(threshold=80.0)
-        evidence = [Evidence(
-            evidence_type=EvidenceType.TEST_COVERAGE,
-            source="pytest-cov",
-            content={"coverage_percent": 95.0},
-        )]
+        evidence = [
+            Evidence(
+                evidence_type=EvidenceType.TEST_COVERAGE,
+                source="pytest-cov",
+                content={"coverage_percent": 95.0},
+            )
+        ]
         result = rule.verify(evidence, {})
         assert result.passed is True
 
     def test_fail_below_threshold(self):
         """閾値未満でFAIL"""
         rule = CoverageThresholdRule(threshold=80.0)
-        evidence = [Evidence(
-            evidence_type=EvidenceType.TEST_COVERAGE,
-            source="pytest-cov",
-            content={"coverage_percent": 70.0},
-        )]
+        evidence = [
+            Evidence(
+                evidence_type=EvidenceType.TEST_COVERAGE,
+                source="pytest-cov",
+                content={"coverage_percent": 70.0},
+            )
+        ]
         result = rule.verify(evidence, {})
         assert result.passed is False
 
     def test_pass_exactly_at_threshold(self):
         """閾値ちょうどでPASS"""
         rule = CoverageThresholdRule(threshold=80.0)
-        evidence = [Evidence(
-            evidence_type=EvidenceType.TEST_COVERAGE,
-            source="pytest-cov",
-            content={"coverage_percent": 80.0},
-        )]
+        evidence = [
+            Evidence(
+                evidence_type=EvidenceType.TEST_COVERAGE,
+                source="pytest-cov",
+                content={"coverage_percent": 80.0},
+            )
+        ]
         result = rule.verify(evidence, {})
         assert result.passed is True
 
     def test_custom_threshold(self):
         """カスタム閾値"""
         rule = CoverageThresholdRule(threshold=50.0)
-        evidence = [Evidence(
-            evidence_type=EvidenceType.TEST_COVERAGE,
-            source="pytest-cov",
-            content={"coverage_percent": 60.0},
-        )]
+        evidence = [
+            Evidence(
+                evidence_type=EvidenceType.TEST_COVERAGE,
+                source="pytest-cov",
+                content={"coverage_percent": 60.0},
+            )
+        ]
         result = rule.verify(evidence, {})
         assert result.passed is True
 
@@ -331,22 +346,26 @@ class TestDiffExistsRule:
     def test_pass_with_diff(self):
         """差分ありでPASS"""
         rule = DiffExistsRule()
-        evidence = [Evidence(
-            evidence_type=EvidenceType.DIFF,
-            source="git",
-            content={"files_changed": 3},
-        )]
+        evidence = [
+            Evidence(
+                evidence_type=EvidenceType.DIFF,
+                source="git",
+                content={"files_changed": 3},
+            )
+        ]
         result = rule.verify(evidence, {})
         assert result.passed is True
 
     def test_fail_no_diff(self):
         """差分なしでFAIL"""
         rule = DiffExistsRule()
-        evidence = [Evidence(
-            evidence_type=EvidenceType.DIFF,
-            source="git",
-            content={"files_changed": 0},
-        )]
+        evidence = [
+            Evidence(
+                evidence_type=EvidenceType.DIFF,
+                source="git",
+                content={"files_changed": 0},
+            )
+        ]
         result = rule.verify(evidence, {})
         assert result.passed is False
 
@@ -357,11 +376,13 @@ class TestTypeCheckRule:
     def test_pass_no_errors(self):
         """エラー0でPASS"""
         rule = TypeCheckRule()
-        evidence = [Evidence(
-            evidence_type=EvidenceType.TYPE_CHECK,
-            source="mypy",
-            content={"errors": 0},
-        )]
+        evidence = [
+            Evidence(
+                evidence_type=EvidenceType.TYPE_CHECK,
+                source="mypy",
+                content={"errors": 0},
+            )
+        ]
         result = rule.verify(evidence, {})
         assert result.passed is True
 
@@ -374,11 +395,13 @@ class TestTypeCheckRule:
     def test_fail_with_errors(self):
         """型エラーありでFAIL"""
         rule = TypeCheckRule()
-        evidence = [Evidence(
-            evidence_type=EvidenceType.TYPE_CHECK,
-            source="mypy",
-            content={"errors": 5},
-        )]
+        evidence = [
+            Evidence(
+                evidence_type=EvidenceType.TYPE_CHECK,
+                source="mypy",
+                content={"errors": 5},
+            )
+        ]
         result = rule.verify(evidence, {})
         assert result.passed is False
 
@@ -563,25 +586,19 @@ class TestGuardBeeVerifier:
     def test_report_has_evidence_count(self, verifier):
         """レポートに証拠数が記録される"""
         evidence = self._make_passing_evidence()
-        report = verifier.verify(
-            colony_id="c1", task_id="t1", run_id="r1", evidence=evidence
-        )
+        report = verifier.verify(colony_id="c1", task_id="t1", run_id="r1", evidence=evidence)
         assert report.evidence_count == 4
 
     def test_report_has_rule_results(self, verifier):
         """レポートに全ルール結果が記録される"""
         evidence = self._make_passing_evidence()
-        report = verifier.verify(
-            colony_id="c1", task_id="t1", run_id="r1", evidence=evidence
-        )
+        report = verifier.verify(colony_id="c1", task_id="t1", run_id="r1", evidence=evidence)
         # デフォルト5ルール
         assert len(report.rule_results) == 5
 
     def test_empty_evidence_fails(self, verifier):
         """証拠なしでFAIL"""
-        report = verifier.verify(
-            colony_id="c1", task_id="t1", run_id="r1", evidence=[]
-        )
+        report = verifier.verify(colony_id="c1", task_id="t1", run_id="r1", evidence=[])
         assert report.verdict == Verdict.FAIL
 
     def test_actor_format(self, verifier, ar):
@@ -603,16 +620,16 @@ class TestGuardBeeVerifier:
         registry.register(LintCleanRule())
 
         verifier = GuardBeeVerifier(ar=ar, rule_registry=registry)
-        evidence = [Evidence(
-            evidence_type=EvidenceType.LINT_RESULT,
-            source="ruff",
-            content={"errors": 0, "warnings": 0},
-        )]
+        evidence = [
+            Evidence(
+                evidence_type=EvidenceType.LINT_RESULT,
+                source="ruff",
+                content={"errors": 0, "warnings": 0},
+            )
+        ]
 
         # Act
-        report = verifier.verify(
-            colony_id="c1", task_id="t1", run_id="r1", evidence=evidence
-        )
+        report = verifier.verify(colony_id="c1", task_id="t1", run_id="r1", evidence=evidence)
 
         # Assert
         assert report.verdict == Verdict.PASS

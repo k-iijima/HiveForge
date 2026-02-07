@@ -6,13 +6,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
 from ulid import ULID
-
-from ..core.events import BaseEvent, EventType
 
 
 class SessionState(str, Enum):
@@ -46,21 +44,21 @@ class BeekeeperSession:
     state: SessionState = SessionState.IDLE
     active_colonies: dict[str, ActiveColony] = field(default_factory=dict)
     context: dict[str, Any] = field(default_factory=dict)
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     last_activity: datetime | None = None
 
     def activate(self, hive_id: str) -> None:
         """セッションをアクティブ化"""
         self.hive_id = hive_id
         self.state = SessionState.ACTIVE
-        self.last_activity = datetime.now(timezone.utc)
+        self.last_activity = datetime.now(UTC)
 
     def add_colony(self, colony_id: str, queen_bee_id: str | None = None) -> None:
         """Colonyを追加"""
         self.active_colonies[colony_id] = ActiveColony(
             colony_id=colony_id,
             queen_bee_id=queen_bee_id,
-            last_interaction=datetime.now(timezone.utc),
+            last_interaction=datetime.now(UTC),
         )
 
     def remove_colony(self, colony_id: str) -> None:
@@ -70,32 +68,32 @@ class BeekeeperSession:
     def set_busy(self) -> None:
         """処理中に設定"""
         self.state = SessionState.BUSY
-        self.last_activity = datetime.now(timezone.utc)
+        self.last_activity = datetime.now(UTC)
 
     def set_waiting_user(self) -> None:
         """ユーザー入力待ちに設定"""
         self.state = SessionState.WAITING_USER
-        self.last_activity = datetime.now(timezone.utc)
+        self.last_activity = datetime.now(UTC)
 
     def set_active(self) -> None:
         """アクティブに設定"""
         self.state = SessionState.ACTIVE
-        self.last_activity = datetime.now(timezone.utc)
+        self.last_activity = datetime.now(UTC)
 
     def suspend(self) -> None:
         """一時停止"""
         self.state = SessionState.SUSPENDED
-        self.last_activity = datetime.now(timezone.utc)
+        self.last_activity = datetime.now(UTC)
 
     def resume(self) -> None:
         """再開"""
         self.state = SessionState.ACTIVE
-        self.last_activity = datetime.now(timezone.utc)
+        self.last_activity = datetime.now(UTC)
 
     def update_context(self, key: str, value: Any) -> None:
         """コンテキストを更新"""
         self.context[key] = value
-        self.last_activity = datetime.now(timezone.utc)
+        self.last_activity = datetime.now(UTC)
 
     def get_context(self, key: str, default: Any = None) -> Any:
         """コンテキストを取得"""
@@ -115,7 +113,7 @@ class UserInstruction:
     content: str = ""
     target_colony: str | None = None
     priority: str = "normal"
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 @dataclass
@@ -127,7 +125,7 @@ class BeekeeperResponse:
     content: str = ""
     status: str = "success"
     data: dict[str, Any] = field(default_factory=dict)
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 class BeekeeperSessionManager:

@@ -4,8 +4,7 @@ import pytest
 
 from hiveforge.core import AkashicRecord
 from hiveforge.core.events import EventType
-from hiveforge.queen_bee import TaskDispatcher, TaskAssignment
-from hiveforge.worker_bee.projections import WorkerState
+from hiveforge.queen_bee import TaskDispatcher
 
 
 @pytest.fixture
@@ -224,14 +223,14 @@ class TestReassignTask:
 
 
 # Progress Collector テスト
-from hiveforge.queen_bee.progress import ProgressCollector, TaskProgress
 from hiveforge.core.events import (
     WorkerAssignedEvent,
-    WorkerStartedEvent,
-    WorkerProgressEvent,
     WorkerCompletedEvent,
     WorkerFailedEvent,
+    WorkerProgressEvent,
+    WorkerStartedEvent,
 )
+from hiveforge.queen_bee.progress import ProgressCollector, TaskProgress
 
 
 class TestProgressCollector:
@@ -549,7 +548,6 @@ from hiveforge.queen_bee.retry import (
     RetryManager,
     RetryPolicy,
     RetryStrategy,
-    TaskRetryState,
 )
 
 
@@ -682,10 +680,8 @@ class TestRetryStateManagement:
 
 # Colony Scheduler テスト
 from hiveforge.queen_bee.scheduler import (
-    ColonyScheduler,
-    ColonyConfig,
     ColonyPriority,
-    ResourceAllocation,
+    ColonyScheduler,
 )
 
 
@@ -856,8 +852,8 @@ class TestPreemption:
 # Colony Communication テスト
 from hiveforge.queen_bee.communication import (
     ColonyMessenger,
-    MessageType,
     MessagePriority,
+    MessageType,
     ResourceConflict,
 )
 
@@ -1198,7 +1194,7 @@ class TestProgressCollectorEdgeCases:
 
     def test_get_failed_tasks_empty(self):
         """失敗タスクがない場合"""
-        from hiveforge.queen_bee.progress import ProgressCollector, TaskProgress
+        from hiveforge.queen_bee.progress import ProgressCollector
 
         collector = ProgressCollector()
         collector._task_progress["task-1"] = TaskProgress(
@@ -1210,7 +1206,7 @@ class TestProgressCollectorEdgeCases:
 
     def test_overall_progress_with_completed(self):
         """完了タスクを含む進捗計算"""
-        from hiveforge.queen_bee.progress import ProgressCollector, TaskProgress
+        from hiveforge.queen_bee.progress import ProgressCollector
 
         collector = ProgressCollector()
         collector._task_progress["task-1"] = TaskProgress(

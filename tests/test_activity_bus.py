@@ -7,8 +7,6 @@ AAAパターン（Arrange-Act-Assert）を使用。
 
 from __future__ import annotations
 
-import asyncio
-
 import pytest
 
 from hiveforge.core.activity_bus import (
@@ -18,7 +16,6 @@ from hiveforge.core.activity_bus import (
     AgentInfo,
     AgentRole,
 )
-
 
 # =============================================================================
 # ActivityType テスト

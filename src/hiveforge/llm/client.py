@@ -12,7 +12,7 @@ from typing import Any, Literal
 import httpx
 
 from ..core.config import LLMConfig, get_settings
-from ..core.rate_limiter import RateLimiter, RateLimitConfig, get_rate_limiter_registry
+from ..core.rate_limiter import RateLimitConfig, RateLimiter, get_rate_limiter_registry
 
 
 @dataclass

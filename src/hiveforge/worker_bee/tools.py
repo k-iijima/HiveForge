@@ -4,10 +4,12 @@ Worker Beeが外部ツールを実行するための基盤。
 """
 
 import asyncio
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable
+from typing import Any
+
 from ulid import ULID
 
 
@@ -202,7 +204,7 @@ class ToolExecutor:
             result.output = output
             result.status = ToolStatus.COMPLETED
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             result.status = ToolStatus.TIMEOUT
             result.error = f"Timeout after {tool.timeout_seconds}s"
 

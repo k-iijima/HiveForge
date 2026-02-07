@@ -1,19 +1,16 @@
 """Beekeeperテスト"""
 
-import pytest
+from hiveforge.beekeeper.handler import BeekeeperHandler
+from hiveforge.beekeeper.projection import (
+    BeekeeperProjection,
+    build_beekeeper_projection,
+    build_hive_overview,
+)
 from hiveforge.beekeeper.session import (
     BeekeeperSession,
     BeekeeperSessionManager,
     SessionState,
-    UserInstruction,
 )
-from hiveforge.beekeeper.projection import (
-    BeekeeperProjection,
-    build_beekeeper_projection,
-    HiveOverview,
-    build_hive_overview,
-)
-from hiveforge.beekeeper.handler import BeekeeperHandler, InstructionResult
 from hiveforge.core.events import BaseEvent, EventType
 
 
@@ -329,10 +326,10 @@ class TestBeekeeperHandler:
 # Escalation テスト
 from hiveforge.beekeeper.escalation import (
     Escalation,
-    EscalationType,
+    EscalationManager,
     EscalationSeverity,
     EscalationStatus,
-    EscalationManager,
+    EscalationType,
 )
 
 
@@ -555,9 +552,9 @@ class TestEscalationManager:
 # Conflict Detection テスト
 from hiveforge.beekeeper.conflict import (
     Conflict,
-    ConflictType,
-    ConflictSeverity,
     ConflictDetector,
+    ConflictSeverity,
+    ConflictType,
     ResourceClaim,
 )
 
@@ -642,7 +639,7 @@ class TestConflictDetector:
         conflict = detector.register_claim(claim2)
 
         assert conflict is not None
-        assert ConflictType.FILE_CONFLICT == conflict.conflict_type
+        assert conflict.conflict_type == ConflictType.FILE_CONFLICT
         assert len(conflict.colony_ids) == 2
 
     def test_conflict_write_delete(self):
@@ -836,11 +833,11 @@ class TestConflictDetector:
 
 # Conflict Resolver テスト
 from hiveforge.beekeeper.resolver import (
-    ResolutionStrategy,
-    ResolutionStatus,
-    ResolutionResult,
-    MergeRule,
     ConflictResolver,
+    MergeRule,
+    ResolutionResult,
+    ResolutionStatus,
+    ResolutionStrategy,
 )
 
 
@@ -1106,12 +1103,10 @@ class TestConflictResolver:
 
 # Conference テスト
 from hiveforge.beekeeper.conference import (
-    ConferenceSession,
-    ConferenceStatus,
     ConferenceAgenda,
     ConferenceManager,
-    Opinion,
-    Vote,
+    ConferenceSession,
+    ConferenceStatus,
     VoteType,
 )
 

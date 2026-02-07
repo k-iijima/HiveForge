@@ -4,10 +4,12 @@
 """
 
 import asyncio
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, TypeVar
+from typing import Any, TypeVar
+
 from ulid import ULID
 
 T = TypeVar("T")
@@ -186,7 +188,7 @@ class RetryExecutor:
                 result.result = output
                 break
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 attempt.error = f"Timeout after {timeout.timeout_seconds}s"
                 attempt.ended_at = datetime.now()
                 attempt.duration_ms = (attempt.ended_at - attempt.started_at).total_seconds() * 1000

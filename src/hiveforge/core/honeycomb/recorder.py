@@ -7,7 +7,6 @@ ARイベントからEpisodeを自動生成する。
 from __future__ import annotations
 
 import logging
-import time
 from typing import Any
 
 from ...core import AkashicRecord, generate_event_id
@@ -126,7 +125,7 @@ class EpisodeRecorder:
 
         if len(timestamps) >= 2:
             # ISO形式のタイムスタンプから秒数を計算
-            from datetime import datetime, timezone
+            from datetime import datetime
 
             try:
                 first = datetime.fromisoformat(timestamps[0])

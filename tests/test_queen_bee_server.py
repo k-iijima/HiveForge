@@ -3,8 +3,7 @@
 import pytest
 
 from hiveforge.core import AkashicRecord
-from hiveforge.queen_bee.server import QueenBeeMCPServer, ManagedWorker
-from hiveforge.worker_bee.server import WorkerState
+from hiveforge.queen_bee.server import QueenBeeMCPServer
 
 
 @pytest.fixture
@@ -291,7 +290,8 @@ class TestQueenBeeAgentRunnerPromptContext:
         ARのvault_pathとColony IDを渡す。
         """
         # Arrange: LLMクライアントをモックで事前設定
-        from unittest.mock import MagicMock, AsyncMock
+        from unittest.mock import AsyncMock, MagicMock
+
         from hiveforge.llm.client import LLMClient
 
         mock_client = MagicMock(spec=LLMClient)
@@ -310,9 +310,10 @@ class TestQueenBeeAgentRunnerPromptContext:
     async def test_agent_runner_receives_agent_info(self, queen_bee):
         """Queen BeeのAgentRunnerにAgentInfoが設定される"""
         # Arrange
-        from unittest.mock import MagicMock, AsyncMock
-        from hiveforge.llm.client import LLMClient
+        from unittest.mock import AsyncMock, MagicMock
+
         from hiveforge.core.activity_bus import AgentRole
+        from hiveforge.llm.client import LLMClient
 
         mock_client = MagicMock(spec=LLMClient)
         mock_client.chat = AsyncMock()

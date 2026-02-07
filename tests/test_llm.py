@@ -1,20 +1,20 @@
 """LLMモジュールのテスト"""
 
 import json
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from hiveforge.llm.client import LLMClient, LLMResponse, Message, ToolCall
-from hiveforge.llm.runner import AgentRunner, AgentContext, RunResult, ToolDefinition
-from hiveforge.llm.prompts import get_system_prompt, get_prompt_from_config, WORKER_BEE_SYSTEM
+from hiveforge.llm.prompts import WORKER_BEE_SYSTEM, get_system_prompt
+from hiveforge.llm.runner import AgentContext, AgentRunner, RunResult
 from hiveforge.llm.tools import (
     READ_FILE_TOOL,
     WRITE_FILE_TOOL,
-    LIST_DIRECTORY_TOOL,
     get_basic_tools,
+    list_directory_handler,
     read_file_handler,
     write_file_handler,
-    list_directory_handler,
 )
 
 

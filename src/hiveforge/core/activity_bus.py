@@ -10,10 +10,11 @@ from __future__ import annotations
 
 import logging
 from collections import deque
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Any, Callable, Awaitable
+from typing import Any
 from uuid import uuid4
 
 logger = logging.getLogger(__name__)
@@ -94,7 +95,7 @@ class ActivityEvent:
     agent: AgentInfo
     summary: str
     detail: dict[str, Any] = field(default_factory=dict)
-    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     event_id: str = field(default_factory=lambda: str(uuid4())[:8])
 
     def to_dict(self) -> dict[str, Any]:

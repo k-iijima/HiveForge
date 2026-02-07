@@ -7,12 +7,13 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Awaitable
+from typing import Any
 
-from .client import LLMClient, LLMResponse, Message, ToolCall
-from .prompts import get_prompt_from_config, get_system_prompt
 from ..core.activity_bus import ActivityBus, ActivityEvent, ActivityType, AgentInfo
+from .client import LLMClient, Message, ToolCall
+from .prompts import get_prompt_from_config, get_system_prompt
 
 logger = logging.getLogger(__name__)
 

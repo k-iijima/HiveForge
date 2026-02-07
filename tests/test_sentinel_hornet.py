@@ -12,12 +12,8 @@ M2-0: Hive内監視エージェント
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from unittest.mock import MagicMock, patch
-
-import pytest
 
 from hiveforge.core.events import BaseEvent, EventType
-
 
 # ===========================================================================
 # 前提条件テスト: ColonyState.SUSPENDED + colony.suspended イベント

@@ -14,8 +14,6 @@ from typing import Any
 from ..core import AkashicRecord, generate_event_id
 from ..core.config import LLMConfig
 from ..core.events import (
-    EventType,
-    WorkerAssignedEvent,
     WorkerCompletedEvent,
     WorkerFailedEvent,
     WorkerProgressEvent,
@@ -322,9 +320,9 @@ class WorkerBeeMCPServer:
     async def _get_agent_runner(self):
         """AgentRunnerを取得（遅延初期化）"""
         if self._agent_runner is None:
+            from ..core.activity_bus import AgentInfo, AgentRole
             from ..llm.runner import AgentRunner
             from ..llm.tools import get_basic_tools
-            from ..core.activity_bus import AgentInfo, AgentRole
 
             client = await self._get_llm_client()
             agent_info = AgentInfo(

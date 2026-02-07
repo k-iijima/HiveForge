@@ -24,7 +24,7 @@ from ..core.events import (
 )
 from ..core.swarming import SwarmingEngine, SwarmingFeatures
 from ..queen_bee.server import QueenBeeMCPServer
-from .session import BeekeeperSession, BeekeeperSessionManager, SessionState
+from .session import BeekeeperSession, BeekeeperSessionManager
 
 logger = logging.getLogger(__name__)
 
@@ -576,9 +576,8 @@ class BeekeeperMCPServer:
     async def _get_agent_runner(self):
         """AgentRunnerを取得（遅延初期化）"""
         if self._agent_runner is None:
-            from ..llm.runner import AgentRunner
-            from ..llm.tools import ToolDefinition
             from ..core.activity_bus import AgentInfo, AgentRole
+            from ..llm.runner import AgentRunner
 
             client = await self._get_llm_client()
             agent_info = AgentInfo(

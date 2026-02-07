@@ -7,10 +7,9 @@ GuardBeeReportを生成する。
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
 from typing import Any
 
-from ..core import AkashicRecord, generate_event_id
+from ..core import AkashicRecord
 from ..core.events import BaseEvent, EventType
 from .models import (
     Evidence,
