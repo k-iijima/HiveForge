@@ -87,6 +87,10 @@ class EventType(StrEnum):
     SENTINEL_QUARANTINE = "sentinel.quarantine"
     SENTINEL_KPI_DEGRADATION = "sentinel.kpi_degradation"
 
+    # Waggle Dance イベント（M3-7追加）
+    WAGGLE_DANCE_VALIDATED = "waggle_dance.validated"
+    WAGGLE_DANCE_VIOLATION = "waggle_dance.violation"
+
     # Guard Bee イベント（M3-3追加）
     GUARD_VERIFICATION_REQUESTED = "guard.verification_requested"
     GUARD_PASSED = "guard.passed"
