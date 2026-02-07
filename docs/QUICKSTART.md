@@ -93,7 +93,7 @@ pip install -e ".[dev]"
 
 ---
 
-## Hive/Colony操作（v5.2新機能）
+## Hive/Colony操作
 
 Hive/Colonyは複数のRunを組織化する階層構造です。
 

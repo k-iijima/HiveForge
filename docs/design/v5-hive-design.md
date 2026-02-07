@@ -26,8 +26,8 @@
 | 🐝 Worker Bee | Worker Bee | 実務を担当する個別エージェント |
 | 🐝 Sentinel Hornet | Sentinel Hornet | Hive内監視・異常検出・強制停止エージェント（v5.3追加） |
 | 🛡️ Guard Bee | Guard Bee | 成果物の品質・コンプライアンス検証エージェント（v1.5追加） |
-| � Forager Bee | Forager Bee | 探索的テスト・変更影響分析・違和感検知エージェント（v1.5.1追加） |
-| �🔍 Scout Bee | Scout Bee | 過去実績に基づくColony編成最適化（v1.5追加） |
+| 🐝 Forager Bee | Forager Bee | 探索的テスト・変更影響分析・違和感検知エージェント（v1.5.1追加） |
+| 🔍 Scout Bee | Scout Bee | 過去実績に基づくColony編成最適化（v1.5追加） |
 | 🍯 Honeycomb | Honeycomb | 実行履歴の蓄積と学習基盤（v1.5追加） |
 | 💃 Waggle Dance | Waggle Dance | エージェント間I/Oの構造化通信プロトコル（v1.5追加） |
 | 🐝 Swarming Protocol | Swarming Protocol | タスク適応的Colony編成プロトコル（v1.5追加） |
@@ -91,12 +91,16 @@ Queen BeeがBeekeeperの動作に問題を感じた場合、ユーザーに直�
 
 ```python
 class EscalationType(Enum):
-    BEEKEEPER_CONFUSION = "beekeeper_confusion"   # Beekeeperが混乱している
-    BEEKEEPER_TIMEOUT = "beekeeper_timeout"       # Beekeeperが応答しない
-    CONTEXT_LOSS = "context_loss"                 # コンテキストが失われた
-    INSTRUCTION_CONFLICT = "instruction_conflict" # 指示が矛盾している
-    RESOURCE_CONCERN = "resource_concern"         # リソース（コスト/時間）の懸念
+    BEEKEEPER_CONFLICT = "beekeeper_conflict"     # Beekeeperとの見解の相違
+    RESOURCE_SHORTAGE = "resource_shortage"       # リソース不足
+    TECHNICAL_BLOCKER = "technical_blocker"       # 技術的な阻害要因
+    SCOPE_CLARIFICATION = "scope_clarification"   # スコープ明確化の必要
+    PRIORITY_DISPUTE = "priority_dispute"         # 優先順位の不一致
+    EXTERNAL_DEPENDENCY = "external_dependency"   # 外部依存の問題
 ```
+
+> **実装注記**: `beekeeper/escalation.py` には別途ドメイン専用の `EscalationType`（`BEEKEEPER_CONFUSION`, `BEEKEEPER_TIMEOUT` 等 8メンバー）が存在する。
+> 上記はイベント記録（`core/events.py`）およびMCPツールで使用される正式な値。
 
 **直訴の流れ**:
 1. Queen Beeが問題を検知
@@ -288,9 +292,10 @@ class ColonyState(Enum):
     SUSPENDED = "suspended" # 一時停止中（Sentinel Hornet強制停止用）
 ```
 
-> **実装状況**: 現在の実装は `PENDING`/`IN_PROGRESS`/`COMPLETED`/`FAILED` の4状態。
+> **実装状況**: 現在の実装は `PENDING`/`IN_PROGRESS`/`COMPLETED`/`FAILED`/`SUSPENDED` の5状態。
 > `IDLE`/`ACTIVE` は名称差として `PENDING`/`IN_PROGRESS` に対応。
 > `SUSPENDED` は M2-0（Sentinel Hornet）で実装済み。
+> SUSPENDED→IN_PROGRESSの再開には `COLONY_STARTED` イベントを再利用（専用の `COLONY_RESUMED` は未実装）。
 
 ### 2.2 状態遷移図
 
@@ -361,8 +366,8 @@ class EventType(Enum):
     COLONY_ACTIVATED = "colony.activated"    # 実装では COLONY_STARTED = "colony.started"
     COLONY_COMPLETED = "colony.completed"
     COLONY_FAILED = "colony.failed"
-    COLONY_SUSPENDED = "colony.suspended"    # M2-0で実装予定
-    COLONY_RESUMED = "colony.resumed"        # M2-0で実装予定
+    COLONY_SUSPENDED = "colony.suspended"
+    # COLONY_RESUMED は未実装。SUSPENDED→IN_PROGRESS遷移には COLONY_STARTED を再利用
     
     # エージェント間通信（v5追加、M2で実装予定）
     OPINION_REQUESTED = "agent.opinion_requested"
