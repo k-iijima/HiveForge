@@ -166,7 +166,7 @@ class TestQueenBeeLifecycleEvents:
             run_id = "test-run-001"
 
             # Act
-            result = await queen_bee.handle_execute_goal(
+            _result = await queen_bee.handle_execute_goal(
                 {"run_id": run_id, "goal": "Hello World作成"}
             )
 

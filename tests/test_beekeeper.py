@@ -118,7 +118,7 @@ class TestBeekeeperSessionManager:
         """アクティブセッション取得"""
         manager = BeekeeperSessionManager()
         session1 = manager.create_session("hive-1")
-        session2 = manager.create_session()
+        _session2 = manager.create_session()
 
         active = manager.get_active_sessions()
         assert len(active) == 1
@@ -324,7 +324,7 @@ class TestBeekeeperHandler:
 
 
 # Escalation テスト
-from hiveforge.beekeeper.escalation import (
+from hiveforge.beekeeper.escalation import (  # noqa: E402
     Escalation,
     EscalationManager,
     EscalationSeverity,
@@ -396,7 +396,9 @@ class TestEscalationManager:
         result = manager.acknowledge(escalation.escalation_id)
 
         assert result is True
-        assert manager.get_escalation(escalation.escalation_id).status == EscalationStatus.ACKNOWLEDGED
+        assert (
+            manager.get_escalation(escalation.escalation_id).status == EscalationStatus.ACKNOWLEDGED
+        )
 
     def test_resolve(self):
         """直訴を解決済みに"""
@@ -550,7 +552,7 @@ class TestEscalationManager:
 
 
 # Conflict Detection テスト
-from hiveforge.beekeeper.conflict import (
+from hiveforge.beekeeper.conflict import (  # noqa: E402
     Conflict,
     ConflictDetector,
     ConflictSeverity,
@@ -832,7 +834,7 @@ class TestConflictDetector:
 
 
 # Conflict Resolver テスト
-from hiveforge.beekeeper.resolver import (
+from hiveforge.beekeeper.resolver import (  # noqa: E402
     ConflictResolver,
     MergeRule,
     ResolutionResult,
@@ -1102,7 +1104,7 @@ class TestConflictResolver:
 
 
 # Conference テスト
-from hiveforge.beekeeper.conference import (
+from hiveforge.beekeeper.conference import (  # noqa: E402
     ConferenceAgenda,
     ConferenceManager,
     ConferenceSession,
@@ -1302,7 +1304,7 @@ class TestConferenceManager:
         """進行中セッション一覧"""
         manager = ConferenceManager()
         s1 = manager.create_session(hive_id="hive-1", topic="t1", participants=["c1"])
-        s2 = manager.create_session(hive_id="hive-1", topic="t2", participants=["c2"])
+        _s2 = manager.create_session(hive_id="hive-1", topic="t2", participants=["c2"])
 
         manager.start_session(s1.session_id)
 
@@ -1332,7 +1334,7 @@ class TestConferenceManager:
         """統計情報"""
         manager = ConferenceManager()
         s1 = manager.create_session(hive_id="hive-1", topic="t1", participants=["c1"])
-        s2 = manager.create_session(hive_id="hive-1", topic="t2", participants=["c2"])
+        _s2 = manager.create_session(hive_id="hive-1", topic="t2", participants=["c2"])
 
         manager.start_session(s1.session_id)
         manager.start_voting(s1.session_id)

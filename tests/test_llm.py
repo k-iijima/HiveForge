@@ -591,3 +591,473 @@ class TestAgentRunnerPromptIntegration:
         )
         system_msg = [m for m in messages if m.role == "system"][0]
         assert system_msg.content == custom_prompt
+
+
+# ==================== LLMClient テスト ====================
+
+
+class TestLLMClient:
+    """LLMClient統合テスト（HTTPモック）"""
+
+    @pytest.fixture
+    def llm_config(self):
+        """テスト用LLM設定"""
+        from hiveforge.core.config import LLMConfig
+
+        return LLMConfig(
+            provider="openai",
+            model="gpt-4o",
+            api_key_env="TEST_API_KEY",
+            max_tokens=1024,
+            temperature=0.5,
+        )
+
+    @pytest.fixture
+    def mock_rate_limiter(self):
+        """モックレートリミッター"""
+        limiter = AsyncMock()
+        limiter.wait = AsyncMock()
+        limiter.acquire = AsyncMock()
+        # context manager をモック
+        ctx = AsyncMock()
+        ctx.__aenter__ = AsyncMock(return_value=None)
+        ctx.__aexit__ = AsyncMock(return_value=False)
+        limiter.acquire.return_value = ctx
+        limiter.handle_429 = AsyncMock()
+        return limiter
+
+    @pytest.fixture
+    def client(self, llm_config, mock_rate_limiter):
+        """テスト用LLMClient"""
+        return LLMClient(config=llm_config, rate_limiter=mock_rate_limiter)
+
+    def test_get_api_key_success(self, client, monkeypatch):
+        """環境変数からAPIキーを取得できる"""
+        # Arrange
+        monkeypatch.setenv("TEST_API_KEY", "sk-test-12345")
+
+        # Act
+        api_key = client._get_api_key()
+
+        # Assert
+        assert api_key == "sk-test-12345"
+
+    def test_get_api_key_missing(self, client, monkeypatch):
+        """環境変数が未設定の場合エラー"""
+        # Arrange
+        monkeypatch.delenv("TEST_API_KEY", raising=False)
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="TEST_API_KEY"):
+            client._get_api_key()
+
+    @pytest.mark.asyncio
+    async def test_close_with_client(self, client):
+        """HTTPクライアントを閉じる"""
+        # Arrange: httpクライアント作成
+        mock_http = AsyncMock()
+        client._http_client = mock_http
+
+        # Act
+        await client.close()
+
+        # Assert
+        mock_http.aclose.assert_called_once()
+        assert client._http_client is None
+
+    @pytest.mark.asyncio
+    async def test_close_without_client(self, client):
+        """クライアント未作成時はcloseしても安全"""
+        # Arrange
+        assert client._http_client is None
+
+        # Act - 例外が出ないこと
+        await client.close()
+
+        # Assert
+        assert client._http_client is None
+
+    @pytest.mark.asyncio
+    async def test_get_client_creates_once(self, client):
+        """HTTPクライアントは1回だけ作成される"""
+        # Act
+        client1 = await client._get_client()
+        client2 = await client._get_client()
+
+        # Assert
+        assert client1 is client2
+
+        # Cleanup
+        await client.close()
+
+    @pytest.mark.asyncio
+    async def test_chat_openai(self, client, monkeypatch):
+        """OpenAI APIを正しく呼び出す"""
+        # Arrange
+        monkeypatch.setenv("TEST_API_KEY", "sk-test")
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json.return_value = {
+            "choices": [
+                {
+                    "message": {"content": "Hello!", "role": "assistant"},
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 5},
+        }
+
+        mock_http = AsyncMock()
+        mock_http.post = AsyncMock(return_value=mock_response)
+        client._http_client = mock_http
+
+        # Act
+        messages = [Message(role="user", content="Hi")]
+        response = await client.chat(messages)
+
+        # Assert
+        assert response.content == "Hello!"
+        assert response.finish_reason == "stop"
+        assert response.usage == {"prompt_tokens": 10, "completion_tokens": 5}
+        assert response.tool_calls == []
+        mock_http.post.assert_called_once()
+        call_url = mock_http.post.call_args[0][0]
+        assert "openai" in call_url
+
+    @pytest.mark.asyncio
+    async def test_chat_openai_with_tool_calls(self, client, monkeypatch):
+        """OpenAI APIのツール呼び出しレスポンスをパースできる"""
+        # Arrange
+        monkeypatch.setenv("TEST_API_KEY", "sk-test")
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json.return_value = {
+            "choices": [
+                {
+                    "message": {
+                        "content": None,
+                        "role": "assistant",
+                        "tool_calls": [
+                            {
+                                "id": "tc-1",
+                                "type": "function",
+                                "function": {
+                                    "name": "read_file",
+                                    "arguments": '{"path": "test.txt"}',
+                                },
+                            }
+                        ],
+                    },
+                    "finish_reason": "tool_calls",
+                }
+            ],
+        }
+
+        mock_http = AsyncMock()
+        mock_http.post = AsyncMock(return_value=mock_response)
+        client._http_client = mock_http
+
+        # Act
+        messages = [Message(role="user", content="Read test.txt")]
+        response = await client.chat(messages)
+
+        # Assert
+        assert response.content is None
+        assert len(response.tool_calls) == 1
+        assert response.tool_calls[0].name == "read_file"
+        assert response.tool_calls[0].arguments == {"path": "test.txt"}
+        assert response.has_tool_calls
+
+    @pytest.mark.asyncio
+    async def test_chat_anthropic(self, client, monkeypatch):
+        """Anthropic APIを正しく呼び出す"""
+        # Arrange
+        client.config = client.config.model_copy(
+            update={"provider": "anthropic", "api_key_env": "TEST_API_KEY"}
+        )
+        monkeypatch.setenv("TEST_API_KEY", "sk-ant-test")
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json.return_value = {
+            "content": [{"type": "text", "text": "Bonjour!"}],
+            "stop_reason": "end_turn",
+            "usage": {"input_tokens": 10, "output_tokens": 5},
+        }
+
+        mock_http = AsyncMock()
+        mock_http.post = AsyncMock(return_value=mock_response)
+        client._http_client = mock_http
+
+        # Act
+        messages = [
+            Message(role="system", content="You are helpful."),
+            Message(role="user", content="Hi"),
+        ]
+        response = await client.chat(messages)
+
+        # Assert
+        assert response.content == "Bonjour!"
+        assert response.finish_reason == "end_turn"
+        call_url = mock_http.post.call_args[0][0]
+        assert "anthropic" in call_url
+
+    @pytest.mark.asyncio
+    async def test_chat_anthropic_with_tool_calls(self, client, monkeypatch):
+        """Anthropic APIのツール呼び出しレスポンスをパースできる"""
+        # Arrange
+        client.config = client.config.model_copy(
+            update={"provider": "anthropic", "api_key_env": "TEST_API_KEY"}
+        )
+        monkeypatch.setenv("TEST_API_KEY", "sk-ant-test")
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json.return_value = {
+            "content": [
+                {"type": "text", "text": "Let me read that."},
+                {
+                    "type": "tool_use",
+                    "id": "tc-1",
+                    "name": "read_file",
+                    "input": {"path": "test.txt"},
+                },
+            ],
+            "stop_reason": "tool_use",
+        }
+
+        mock_http = AsyncMock()
+        mock_http.post = AsyncMock(return_value=mock_response)
+        client._http_client = mock_http
+
+        # Act
+        messages = [Message(role="user", content="Read test.txt")]
+        response = await client.chat(messages)
+
+        # Assert
+        assert response.content == "Let me read that."
+        assert len(response.tool_calls) == 1
+        assert response.tool_calls[0].name == "read_file"
+
+    @pytest.mark.asyncio
+    async def test_chat_anthropic_tool_result_message(self, client, monkeypatch):
+        """Anthropicでtoolロールメッセージが正しく変換される"""
+        # Arrange
+        client.config = client.config.model_copy(
+            update={"provider": "anthropic", "api_key_env": "TEST_API_KEY"}
+        )
+        monkeypatch.setenv("TEST_API_KEY", "sk-ant-test")
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json.return_value = {
+            "content": [{"type": "text", "text": "Got it."}],
+            "stop_reason": "end_turn",
+        }
+
+        mock_http = AsyncMock()
+        mock_http.post = AsyncMock(return_value=mock_response)
+        client._http_client = mock_http
+
+        # Act: tool結果メッセージを含めて呼び出す
+        messages = [
+            Message(role="user", content="Read file"),
+            Message(
+                role="assistant",
+                content="Reading...",
+                tool_calls=[ToolCall(id="tc-1", name="read_file", arguments={"path": "a.txt"})],
+            ),
+            Message(role="tool", content='{"content": "hello"}', tool_call_id="tc-1"),
+        ]
+        response = await client.chat(messages)
+
+        # Assert
+        assert response.content == "Got it."
+        # リクエストボディを検証
+        call_body = mock_http.post.call_args[1]["json"]
+        # toolメッセージはuserロールに変換される
+        tool_msg = [
+            m
+            for m in call_body["messages"]
+            if m.get("role") == "user" and isinstance(m.get("content"), list)
+        ]
+        assert len(tool_msg) == 1
+
+    @pytest.mark.asyncio
+    async def test_chat_anthropic_with_tools_definition(self, client, monkeypatch):
+        """Anthropicでツール定義が正しく変換される"""
+        # Arrange
+        client.config = client.config.model_copy(
+            update={"provider": "anthropic", "api_key_env": "TEST_API_KEY"}
+        )
+        monkeypatch.setenv("TEST_API_KEY", "sk-ant-test")
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json.return_value = {
+            "content": [{"type": "text", "text": "OK"}],
+            "stop_reason": "end_turn",
+        }
+
+        mock_http = AsyncMock()
+        mock_http.post = AsyncMock(return_value=mock_response)
+        client._http_client = mock_http
+
+        # Act
+        tools = [
+            {
+                "function": {
+                    "name": "test_tool",
+                    "description": "A test tool",
+                    "parameters": {"type": "object", "properties": {"x": {"type": "string"}}},
+                }
+            }
+        ]
+        await client.chat([Message(role="user", content="Hi")], tools=tools)
+
+        # Assert
+        call_body = mock_http.post.call_args[1]["json"]
+        assert "tools" in call_body
+        assert call_body["tools"][0]["name"] == "test_tool"
+
+    @pytest.mark.asyncio
+    async def test_chat_unsupported_provider(self, client, monkeypatch):
+        """未サポートのプロバイダーでエラー"""
+        # Arrange
+        monkeypatch.setenv("TEST_API_KEY", "sk-test")
+        # providerを無理やり変更（Pydanticバリデーション回避）
+        object.__setattr__(client.config, "provider", "unknown")
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="未サポート"):
+            await client.chat([Message(role="user", content="Hi")])
+
+    @pytest.mark.asyncio
+    async def test_chat_openai_with_tools_and_tool_choice(self, client, monkeypatch):
+        """OpenAI APIにtools/tool_choiceを渡せる"""
+        # Arrange
+        monkeypatch.setenv("TEST_API_KEY", "sk-test")
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json.return_value = {
+            "choices": [
+                {
+                    "message": {"content": "OK", "role": "assistant"},
+                    "finish_reason": "stop",
+                }
+            ],
+        }
+
+        mock_http = AsyncMock()
+        mock_http.post = AsyncMock(return_value=mock_response)
+        client._http_client = mock_http
+
+        # Act
+        tools = [{"function": {"name": "test", "parameters": {}}}]
+        tool_choice = "auto"
+        await client.chat(
+            [Message(role="user", content="Hi")],
+            tools=tools,
+            tool_choice=tool_choice,
+        )
+
+        # Assert
+        call_body = mock_http.post.call_args[1]["json"]
+        assert "tools" in call_body
+        assert call_body["tool_choice"] == "auto"
+
+    @pytest.mark.asyncio
+    async def test_chat_openai_message_with_tool_call_id(self, client, monkeypatch):
+        """tool_call_idを含むメッセージが正しく変換される"""
+        # Arrange
+        monkeypatch.setenv("TEST_API_KEY", "sk-test")
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json.return_value = {
+            "choices": [
+                {
+                    "message": {"content": "Done", "role": "assistant"},
+                    "finish_reason": "stop",
+                }
+            ],
+        }
+
+        mock_http = AsyncMock()
+        mock_http.post = AsyncMock(return_value=mock_response)
+        client._http_client = mock_http
+
+        # Act
+        messages = [
+            Message(role="user", content="Do something"),
+            Message(
+                role="assistant",
+                content=None,
+                tool_calls=[ToolCall(id="tc-1", name="test", arguments={"a": 1})],
+            ),
+            Message(role="tool", content="result", tool_call_id="tc-1"),
+        ]
+        await client.chat(messages)
+
+        # Assert
+        call_body = mock_http.post.call_args[1]["json"]
+        tool_msg = [m for m in call_body["messages"] if m.get("tool_call_id") == "tc-1"]
+        assert len(tool_msg) == 1
+
+
+# ==================== run_command_handler テスト ====================
+
+
+class TestRunCommandHandler:
+    """run_command_handlerのテスト"""
+
+    @pytest.mark.asyncio
+    async def test_run_simple_command(self):
+        """シンプルなコマンドを実行できる"""
+        from hiveforge.llm.tools import run_command_handler
+
+        # Act
+        result_str = await run_command_handler("echo hello")
+        result = json.loads(result_str)
+
+        # Assert
+        assert result["exit_code"] == 0
+        assert "hello" in result["stdout"]
+
+    @pytest.mark.asyncio
+    async def test_run_failing_command(self):
+        """失敗するコマンドの結果を取得できる"""
+        from hiveforge.llm.tools import run_command_handler
+
+        # Act
+        result_str = await run_command_handler("false")
+        result = json.loads(result_str)
+
+        # Assert
+        assert result["exit_code"] != 0
+
+    @pytest.mark.asyncio
+    async def test_list_directory_not_dir(self, tmp_path):
+        """ファイルをディレクトリとして開けない"""
+        # Arrange
+        file_path = tmp_path / "test.txt"
+        file_path.write_text("hello")
+
+        # Act
+        result_str = await list_directory_handler(str(file_path))
+        result = json.loads(result_str)
+
+        # Assert
+        assert "error" in result
+        assert "ディレクトリではありません" in result["error"]

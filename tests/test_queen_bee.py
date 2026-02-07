@@ -223,14 +223,14 @@ class TestReassignTask:
 
 
 # Progress Collector テスト
-from hiveforge.core.events import (
+from hiveforge.core.events import (  # noqa: E402
     WorkerAssignedEvent,
     WorkerCompletedEvent,
     WorkerFailedEvent,
     WorkerProgressEvent,
     WorkerStartedEvent,
 )
-from hiveforge.queen_bee.progress import ProgressCollector, TaskProgress
+from hiveforge.queen_bee.progress import ProgressCollector, TaskProgress  # noqa: E402
 
 
 class TestProgressCollector:
@@ -417,20 +417,34 @@ class TestOverallProgress:
         collector = ProgressCollector()
         events = [
             WorkerAssignedEvent(
-                run_id="run-1", task_id="task-1", worker_id="worker-1",
-                actor="queen", payload={},
+                run_id="run-1",
+                task_id="task-1",
+                worker_id="worker-1",
+                actor="queen",
+                payload={},
             ),
             WorkerAssignedEvent(
-                run_id="run-1", task_id="task-2", worker_id="worker-2",
-                actor="queen", payload={},
+                run_id="run-1",
+                task_id="task-2",
+                worker_id="worker-2",
+                actor="queen",
+                payload={},
             ),
             WorkerProgressEvent(
-                run_id="run-1", task_id="task-1", worker_id="worker-1",
-                actor="worker-1", progress=100, payload={},
+                run_id="run-1",
+                task_id="task-1",
+                worker_id="worker-1",
+                actor="worker-1",
+                progress=100,
+                payload={},
             ),
             WorkerProgressEvent(
-                run_id="run-1", task_id="task-2", worker_id="worker-2",
-                actor="worker-2", progress=50, payload={},
+                run_id="run-1",
+                task_id="task-2",
+                worker_id="worker-2",
+                actor="worker-2",
+                progress=50,
+                payload={},
             ),
         ]
 
@@ -455,16 +469,25 @@ class TestCompletionStats:
         collector = ProgressCollector()
         events = [
             WorkerAssignedEvent(
-                run_id="run-1", task_id="task-1", worker_id="worker-1",
-                actor="queen", payload={},
+                run_id="run-1",
+                task_id="task-1",
+                worker_id="worker-1",
+                actor="queen",
+                payload={},
             ),
             WorkerAssignedEvent(
-                run_id="run-1", task_id="task-2", worker_id="worker-2",
-                actor="queen", payload={},
+                run_id="run-1",
+                task_id="task-2",
+                worker_id="worker-2",
+                actor="queen",
+                payload={},
             ),
             WorkerCompletedEvent(
-                run_id="run-1", task_id="task-1", worker_id="worker-1",
-                actor="worker-1", payload={},
+                run_id="run-1",
+                task_id="task-1",
+                worker_id="worker-1",
+                actor="worker-1",
+                payload={},
             ),
         ]
 
@@ -482,12 +505,18 @@ class TestCompletionStats:
         collector = ProgressCollector()
         events = [
             WorkerAssignedEvent(
-                run_id="run-1", task_id="task-1", worker_id="worker-1",
-                actor="queen", payload={},
+                run_id="run-1",
+                task_id="task-1",
+                worker_id="worker-1",
+                actor="queen",
+                payload={},
             ),
             WorkerCompletedEvent(
-                run_id="run-1", task_id="task-1", worker_id="worker-1",
-                actor="worker-1", payload={},
+                run_id="run-1",
+                task_id="task-1",
+                worker_id="worker-1",
+                actor="worker-1",
+                payload={},
             ),
         ]
 
@@ -503,8 +532,11 @@ class TestCompletionStats:
         collector = ProgressCollector()
         events = [
             WorkerAssignedEvent(
-                run_id="run-1", task_id="task-1", worker_id="worker-1",
-                actor="queen", payload={},
+                run_id="run-1",
+                task_id="task-1",
+                worker_id="worker-1",
+                actor="queen",
+                payload={},
             ),
         ]
 
@@ -525,12 +557,19 @@ class TestCompletionStats:
         collector = ProgressCollector()
         events = [
             WorkerAssignedEvent(
-                run_id="run-1", task_id="task-1", worker_id="worker-1",
-                actor="queen", payload={},
+                run_id="run-1",
+                task_id="task-1",
+                worker_id="worker-1",
+                actor="queen",
+                payload={},
             ),
             WorkerFailedEvent(
-                run_id="run-1", task_id="task-1", worker_id="worker-1",
-                actor="worker-1", reason="Error", payload={},
+                run_id="run-1",
+                task_id="task-1",
+                worker_id="worker-1",
+                actor="worker-1",
+                reason="Error",
+                payload={},
             ),
         ]
 
@@ -544,7 +583,7 @@ class TestCompletionStats:
 
 
 # Retry Manager テスト
-from hiveforge.queen_bee.retry import (
+from hiveforge.queen_bee.retry import (  # noqa: E402
     RetryManager,
     RetryPolicy,
     RetryStrategy,
@@ -603,9 +642,7 @@ class TestRetryDelay:
 
     def test_exponential_backoff(self):
         """指数バックオフ"""
-        manager = RetryManager(
-            policy=RetryPolicy(backoff_seconds=1.0, backoff_multiplier=2.0)
-        )
+        manager = RetryManager(policy=RetryPolicy(backoff_seconds=1.0, backoff_multiplier=2.0))
         manager.record_failure("task-1", "worker-1", "Error")
         # 1回目失敗後: 1.0 * 2^0 = 1.0
         assert manager.get_retry_delay("task-1") == 1.0
@@ -620,9 +657,7 @@ class TestExcludedWorkers:
 
     def test_different_worker_strategy(self):
         """DIFFERENT_WORKER戦略で失敗Workerを除外"""
-        manager = RetryManager(
-            policy=RetryPolicy(strategy=RetryStrategy.DIFFERENT_WORKER)
-        )
+        manager = RetryManager(policy=RetryPolicy(strategy=RetryStrategy.DIFFERENT_WORKER))
         manager.record_failure("task-1", "worker-1", "Error")
 
         excluded = manager.get_excluded_workers("task-1")
@@ -630,9 +665,7 @@ class TestExcludedWorkers:
 
     def test_same_worker_strategy(self):
         """SAME_WORKER戦略では除外なし"""
-        manager = RetryManager(
-            policy=RetryPolicy(strategy=RetryStrategy.SAME_WORKER)
-        )
+        manager = RetryManager(policy=RetryPolicy(strategy=RetryStrategy.SAME_WORKER))
         manager.record_failure("task-1", "worker-1", "Error")
 
         excluded = manager.get_excluded_workers("task-1")
@@ -640,9 +673,7 @@ class TestExcludedWorkers:
 
     def test_any_worker_strategy(self):
         """ANY_WORKER戦略では除外なし"""
-        manager = RetryManager(
-            policy=RetryPolicy(strategy=RetryStrategy.ANY_WORKER)
-        )
+        manager = RetryManager(policy=RetryPolicy(strategy=RetryStrategy.ANY_WORKER))
         manager.record_failure("task-1", "worker-1", "Error")
 
         excluded = manager.get_excluded_workers("task-1")
@@ -679,7 +710,7 @@ class TestRetryStateManagement:
 
 
 # Colony Scheduler テスト
-from hiveforge.queen_bee.scheduler import (
+from hiveforge.queen_bee.scheduler import (  # noqa: E402
     ColonyPriority,
     ColonyScheduler,
 )
@@ -850,7 +881,7 @@ class TestPreemption:
 
 
 # Colony Communication テスト
-from hiveforge.queen_bee.communication import (
+from hiveforge.queen_bee.communication import (  # noqa: E402
     ColonyMessenger,
     MessagePriority,
     MessageType,
@@ -1218,3 +1249,73 @@ class TestProgressCollectorEdgeCases:
 
         overall = collector.get_overall_progress()
         assert overall == 75  # (100 + 50) / 2
+
+    def test_get_task_progress_existing(self):
+        """存在するタスクの進捗取得"""
+        from hiveforge.queen_bee.progress import ProgressCollector
+
+        # Arrange
+        collector = ProgressCollector()
+        collector._task_progress["task-1"] = TaskProgress(
+            task_id="task-1", worker_id="worker-1", status="in_progress", progress=50
+        )
+
+        # Act & Assert
+        progress = collector.get_task_progress("task-1")
+        assert progress is not None
+        assert progress.progress == 50
+
+    def test_get_task_progress_nonexistent(self):
+        """存在しないタスクの進捗はNone"""
+        from hiveforge.queen_bee.progress import ProgressCollector
+
+        collector = ProgressCollector()
+        assert collector.get_task_progress("nonexistent") is None
+
+    def test_get_pending_tasks(self):
+        """保留中タスクの取得"""
+        from hiveforge.queen_bee.progress import ProgressCollector
+
+        collector = ProgressCollector()
+        collector._task_progress["task-1"] = TaskProgress(
+            task_id="task-1", worker_id="w1", status="pending"
+        )
+        collector._task_progress["task-2"] = TaskProgress(
+            task_id="task-2", worker_id="w2", status="in_progress", progress=50
+        )
+
+        pending = collector.get_pending_tasks()
+        assert len(pending) == 1
+        assert pending[0].task_id == "task-1"
+
+    def test_get_in_progress_tasks(self):
+        """進行中タスクの取得"""
+        from hiveforge.queen_bee.progress import ProgressCollector
+
+        collector = ProgressCollector()
+        collector._task_progress["task-1"] = TaskProgress(
+            task_id="task-1", worker_id="w1", status="pending"
+        )
+        collector._task_progress["task-2"] = TaskProgress(
+            task_id="task-2", worker_id="w2", status="in_progress", progress=50
+        )
+
+        in_progress = collector.get_in_progress_tasks()
+        assert len(in_progress) == 1
+        assert in_progress[0].task_id == "task-2"
+
+    def test_process_event_without_task_id_ignored(self):
+        """task_idがないイベントは無視される"""
+        from hiveforge.core.events import BaseEvent, EventType
+        from hiveforge.queen_bee.progress import ProgressCollector
+
+        collector = ProgressCollector()
+
+        # Arrange: task_idなしのイベント
+        event = BaseEvent(type=EventType.WORKER_ASSIGNED, data={})
+
+        # Act
+        collector._process_event(event)
+
+        # Assert: 何もtask_progressに追加されない
+        assert len(collector._task_progress) == 0

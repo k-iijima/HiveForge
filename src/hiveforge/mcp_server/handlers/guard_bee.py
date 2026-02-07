@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from ...guard_bee.models import Evidence, EvidenceType, Verdict
+from ...guard_bee.models import Evidence, EvidenceType
 from ...guard_bee.verifier import GuardBeeVerifier
 from .base import BaseHandler
 

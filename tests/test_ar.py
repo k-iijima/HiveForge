@@ -805,7 +805,7 @@ class TestHiveStore:
 
 
 # HiveStore追加テスト
-from hiveforge.core.ar.hive_storage import HiveStore
+from hiveforge.core.ar.hive_storage import HiveStore  # noqa: E402
 
 
 class TestHiveStoreBasics:
@@ -829,12 +829,8 @@ class TestHiveStoreBasics:
         from hiveforge.core.events import BaseEvent, EventType
 
         store = HiveStore(tmp_path)
-        store.append(
-            BaseEvent(type=EventType.HIVE_CREATED, data={}), "hive-1"
-        )
-        store.append(
-            BaseEvent(type=EventType.HIVE_CREATED, data={}), "hive-2"
-        )
+        store.append(BaseEvent(type=EventType.HIVE_CREATED, data={}), "hive-1")
+        store.append(BaseEvent(type=EventType.HIVE_CREATED, data={}), "hive-2")
 
         hives = store.list_hives()
         assert "hive-1" in hives
@@ -845,12 +841,8 @@ class TestHiveStoreBasics:
         from hiveforge.core.events import BaseEvent, EventType
 
         store = HiveStore(tmp_path)
-        store.append(
-            BaseEvent(type=EventType.HIVE_CREATED, data={}), "hive-1"
-        )
-        store.append(
-            BaseEvent(type=EventType.COLONY_CREATED, data={}), "hive-1"
-        )
+        store.append(BaseEvent(type=EventType.HIVE_CREATED, data={}), "hive-1")
+        store.append(BaseEvent(type=EventType.COLONY_CREATED, data={}), "hive-1")
 
         count = store.count_events("hive-1")
         assert count == 2
@@ -872,12 +864,8 @@ class TestHiveStoreBasics:
         from hiveforge.core.events import BaseEvent, EventType
 
         store = HiveStore(tmp_path)
-        event1 = store.append(
-            BaseEvent(type=EventType.HIVE_CREATED, data={}), "hive-1"
-        )
-        event2 = store.append(
-            BaseEvent(type=EventType.COLONY_CREATED, data={}), "hive-1"
-        )
+        _event1 = store.append(BaseEvent(type=EventType.HIVE_CREATED, data={}), "hive-1")
+        _event2 = store.append(BaseEvent(type=EventType.COLONY_CREATED, data={}), "hive-1")
 
         # 2番目のイベントのprev_hashが1番目のhashを指す
         events = list(store.replay("hive-1"))

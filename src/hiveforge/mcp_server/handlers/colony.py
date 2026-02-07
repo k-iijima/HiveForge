@@ -10,11 +10,11 @@ from typing import TYPE_CHECKING, Any
 
 from ...core.ar.hive_projections import build_hive_aggregate
 from ...core.ar.hive_storage import HiveStore
-from ...core.events import ColonyStartedEvent, ColonyCompletedEvent
+from ...core.events import ColonyCompletedEvent, ColonyStartedEvent
 from .base import BaseHandler
 
 if TYPE_CHECKING:
-    from ..server import HiveForgeMCPServer
+    pass
 
 
 class ColonyHandlers(BaseHandler):

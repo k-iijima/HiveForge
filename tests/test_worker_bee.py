@@ -384,20 +384,20 @@ class TestDispatchTool:
 
 
 # Worker Projection テスト
-from hiveforge.core.events import (
+from hiveforge.core.events import (  # noqa: E402
     WorkerAssignedEvent,
     WorkerCompletedEvent,
     WorkerFailedEvent,
     WorkerProgressEvent,
     WorkerStartedEvent,
 )
-from hiveforge.worker_bee.projections import (
+from hiveforge.worker_bee.projections import (  # noqa: E402
     WorkerPoolProjection,
     WorkerProjection,
     build_worker_pool_projection,
     build_worker_projection,
 )
-from hiveforge.worker_bee.projections import (
+from hiveforge.worker_bee.projections import (  # noqa: E402
     WorkerState as ProjectionWorkerState,
 )
 
@@ -717,9 +717,9 @@ class TestWorkerProjectionEdgeCases:
 
 
 # Worker Process Manager テスト
-import pytest
+import pytest  # noqa: E402
 
-from hiveforge.worker_bee.process import (
+from hiveforge.worker_bee.process import (  # noqa: E402
     WorkerPoolConfig,
     WorkerProcess,
     WorkerProcessManager,
@@ -821,7 +821,7 @@ class TestWorkerProcessManager:
     async def test_get_running_workers(self):
         """稼働中Worker一覧"""
         manager = WorkerProcessManager()
-        w1 = await manager.start_worker(worker_id="worker-1", colony_id="colony-1")
+        _w1 = await manager.start_worker(worker_id="worker-1", colony_id="colony-1")
         w2 = await manager.start_worker(worker_id="worker-2", colony_id="colony-1")
         await manager.stop_worker(w2.process_id)
 
@@ -833,7 +833,7 @@ class TestWorkerProcessManager:
     async def test_get_stats(self):
         """統計情報"""
         manager = WorkerProcessManager()
-        w1 = await manager.start_worker(worker_id="worker-1", colony_id="colony-1")
+        _w1 = await manager.start_worker(worker_id="worker-1", colony_id="colony-1")
         w2 = await manager.start_worker(worker_id="worker-2", colony_id="colony-1")
         await manager.stop_worker(w2.process_id)
 
@@ -916,11 +916,176 @@ class TestWorkerProcessManager:
         healthy = await manager.check_health("nonexistent")
         assert healthy is False
 
+    @pytest.mark.asyncio
+    async def test_start_worker_with_command(self):
+        """コマンド付きでWorkerを起動（サブプロセス）"""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        # Arrange
+        manager = WorkerProcessManager()
+        mock_process = MagicMock()
+        mock_process.pid = 12345
+
+        with patch(
+            "asyncio.create_subprocess_exec", new_callable=AsyncMock, return_value=mock_process
+        ):
+            # Act
+            worker = await manager.start_worker(
+                worker_id="worker-1",
+                colony_id="colony-1",
+                command=["python", "-c", "print('hello')"],
+            )
+
+            # Assert
+            assert worker.state == WorkerProcessState.RUNNING
+            assert worker.pid == 12345
+
+    @pytest.mark.asyncio
+    async def test_start_worker_with_command_failure(self):
+        """コマンド起動失敗時はCRASHED状態になる"""
+        from unittest.mock import AsyncMock, patch
+
+        # Arrange
+        manager = WorkerProcessManager()
+        crashed_workers = []
+        manager.set_callbacks(on_crashed=lambda w: crashed_workers.append(w))
+
+        with patch(
+            "asyncio.create_subprocess_exec",
+            new_callable=AsyncMock,
+            side_effect=FileNotFoundError("not found"),
+        ):
+            # Act
+            worker = await manager.start_worker(
+                worker_id="worker-1",
+                colony_id="colony-1",
+                command=["nonexistent_command"],
+            )
+
+            # Assert
+            assert worker.state == WorkerProcessState.CRASHED
+            assert "not found" in worker.last_error
+            assert len(crashed_workers) == 1
+
+    @pytest.mark.asyncio
+    async def test_stop_worker_with_process(self):
+        """サブプロセスのあるWorkerを停止"""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        # Arrange
+        manager = WorkerProcessManager()
+        mock_process = MagicMock()
+        mock_process.pid = 12345
+        mock_process.terminate = MagicMock()
+        mock_process.wait = AsyncMock()
+
+        with (
+            patch(
+                "asyncio.create_subprocess_exec", new_callable=AsyncMock, return_value=mock_process
+            ),
+            patch("asyncio.wait_for", new_callable=AsyncMock),
+        ):
+            worker = await manager.start_worker(
+                worker_id="worker-1", colony_id="colony-1", command=["echo", "hi"]
+            )
+
+            # Act
+            result = await manager.stop_worker(worker.process_id)
+
+            # Assert
+            assert result is True
+            mock_process.terminate.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_stop_worker_force_kill(self):
+        """force=Trueでkillする"""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        # Arrange
+        manager = WorkerProcessManager()
+        mock_process = MagicMock()
+        mock_process.pid = 12345
+        mock_process.kill = MagicMock()
+        mock_process.wait = AsyncMock()
+
+        with (
+            patch(
+                "asyncio.create_subprocess_exec", new_callable=AsyncMock, return_value=mock_process
+            ),
+            patch("asyncio.wait_for", new_callable=AsyncMock),
+        ):
+            worker = await manager.start_worker(
+                worker_id="worker-1", colony_id="colony-1", command=["echo", "hi"]
+            )
+
+            # Act
+            result = await manager.stop_worker(worker.process_id, force=True)
+
+            # Assert
+            assert result is True
+            mock_process.kill.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_health_check_crashed_process(self):
+        """プロセスが終了している場合はCRASHED"""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        # Arrange
+        manager = WorkerProcessManager()
+        crashed_workers = []
+        manager.set_callbacks(on_crashed=lambda w: crashed_workers.append(w))
+
+        mock_process = MagicMock()
+        mock_process.pid = 12345
+        mock_process.returncode = 1  # 終了済み
+
+        with patch(
+            "asyncio.create_subprocess_exec", new_callable=AsyncMock, return_value=mock_process
+        ):
+            worker = await manager.start_worker(
+                worker_id="worker-1", colony_id="colony-1", command=["echo", "hi"]
+            )
+
+            # Act
+            healthy = await manager.check_health(worker.process_id)
+
+            # Assert
+            assert healthy is False
+            assert worker.state == WorkerProcessState.CRASHED
+            assert len(crashed_workers) == 1
+
+    @pytest.mark.asyncio
+    async def test_get_all_workers(self):
+        """全Worker一覧取得"""
+        # Arrange
+        manager = WorkerProcessManager()
+        await manager.start_worker(worker_id="w1", colony_id="c1")
+        await manager.start_worker(worker_id="w2", colony_id="c1")
+
+        # Act
+        all_workers = manager.get_all_workers()
+
+        # Assert
+        assert len(all_workers) == 2
+
+    @pytest.mark.asyncio
+    async def test_stop_health_check_loop(self):
+        """ヘルスチェックループ停止"""
+        # Arrange
+        manager = WorkerProcessManager()
+        manager._running = True
+
+        # Act
+        manager.stop_health_check_loop()
+
+        # Assert
+        assert manager._running is False
+
 
 # Tool Executor テスト
-import pytest
+import pytest  # noqa: E402
 
-from hiveforge.worker_bee.tools import (
+from hiveforge.worker_bee.tools import (  # noqa: E402
     ToolCategory,
     ToolDefinition,
     ToolExecutor,
@@ -1157,7 +1322,7 @@ class TestToolExecutor:
 
 
 # Retry Executor テスト
-from hiveforge.worker_bee.retry import (
+from hiveforge.worker_bee.retry import (  # noqa: E402
     RetryExecutor,
     RetryPolicy,
     RetryStrategy,
@@ -1369,8 +1534,146 @@ class TestHelpers:
         assert policy.max_retries == 0
 
 
+class TestRetryPolicyLinear:
+    """RetryPolicyの追加テスト（線形遅延、ジッター等）"""
+
+    def test_get_delay_linear(self):
+        """線形遅延"""
+        policy = RetryPolicy(
+            strategy=RetryStrategy.LINEAR,
+            initial_delay=1.0,
+            jitter=False,
+        )
+        # Assert: linear = initial_delay * (attempt + 1)
+        assert policy.get_delay(0) == 1.0
+        assert policy.get_delay(1) == 2.0
+        assert policy.get_delay(2) == 3.0
+
+    def test_get_delay_none_strategy(self):
+        """NONE戦略は常に0.0"""
+        policy = RetryPolicy(strategy=RetryStrategy.NONE, jitter=False)
+        assert policy.get_delay(0) == 0.0
+        assert policy.get_delay(5) == 0.0
+
+    def test_get_delay_with_jitter(self):
+        """ジッター付き遅延は範囲内"""
+        policy = RetryPolicy(
+            strategy=RetryStrategy.FIXED,
+            initial_delay=10.0,
+            jitter=True,
+        )
+        # Act: ジッターは 0.5〜1.5 倍
+        delay = policy.get_delay(0)
+
+        # Assert: 5.0 ≤ delay ≤ 15.0
+        assert 5.0 <= delay <= 15.0
+
+
+class TestRetryExecutorAdditional:
+    """RetryExecutorの追加テスト（未カバー分岐）"""
+
+    @pytest.mark.asyncio
+    async def test_execute_fallback_failure(self):
+        """フォールバックも失敗する場合"""
+        executor = RetryExecutor(create_no_retry_policy())
+
+        async def fail_op():
+            raise ValueError("Primary failed")
+
+        async def failing_fallback():
+            raise RuntimeError("Fallback also failed")
+
+        # Act
+        result = await executor.execute_with_fallback(fail_op, failing_fallback)
+
+        # Assert
+        assert not result.success
+        assert "Fallback failed" in result.error
+
+    @pytest.mark.asyncio
+    async def test_execute_with_sync_fallback(self):
+        """同期フォールバック関数"""
+        executor = RetryExecutor(create_no_retry_policy())
+
+        async def fail_op():
+            raise ValueError("Primary failed")
+
+        def sync_fallback():
+            return "sync fallback result"
+
+        # Act
+        result = await executor.execute_with_fallback(fail_op, sync_fallback)
+
+        # Assert
+        assert result.success
+        assert result.result == "sync fallback result"
+
+    @pytest.mark.asyncio
+    async def test_timeout_with_retry_behavior(self):
+        """タイムアウト時にリトライする挙動"""
+        from hiveforge.worker_bee.retry import TimeoutBehavior
+
+        policy = RetryPolicy(
+            strategy=RetryStrategy.FIXED,
+            max_retries=1,
+            initial_delay=0.01,
+            jitter=False,
+        )
+        executor = RetryExecutor(policy)
+
+        call_count = 0
+
+        async def slow_then_fast():
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                await asyncio.sleep(10)
+            return "fast"
+
+        timeout = TimeoutConfig(
+            timeout_seconds=0.05,
+            behavior=TimeoutBehavior.RETRY,
+        )
+        result = await executor.execute(slow_then_fast, timeout)
+
+        # Assert: 1回目タイムアウト、2回目成功
+        assert result.success
+        assert result.result == "fast"
+        assert call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_timeout_listeners_called(self):
+        """タイムアウト時にリスナーが呼ばれる"""
+        timeouts = []
+
+        executor = RetryExecutor(create_no_retry_policy())
+        executor.add_listener(on_timeout=lambda e: timeouts.append(e))
+
+        async def slow_op():
+            await asyncio.sleep(10)
+
+        timeout = TimeoutConfig(timeout_seconds=0.05)
+        await executor.execute(slow_op, timeout)
+
+        # Assert
+        assert len(timeouts) == 1
+        assert "Timeout" in timeouts[0]
+
+    @pytest.mark.asyncio
+    async def test_set_policy(self):
+        """ポリシーを後から変更できる"""
+        executor = RetryExecutor()
+
+        # Act
+        new_policy = create_no_retry_policy()
+        executor.set_policy(new_policy)
+
+        # Assert
+        assert executor._policy.strategy == RetryStrategy.NONE
+
+
 # ActionClass・TrustLevel テスト
-from hiveforge.worker_bee.trust import (
+from hiveforge.worker_bee.trust import (  # noqa: E402
     ActionClass,
     ConfirmationRequest,
     ConfirmationResponse,

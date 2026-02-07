@@ -13,7 +13,7 @@ from ...core.ar.hive_storage import HiveStore
 from .base import BaseHandler
 
 if TYPE_CHECKING:
-    from ..server import HiveForgeMCPServer
+    pass
 
 
 class HiveHandlers(BaseHandler):

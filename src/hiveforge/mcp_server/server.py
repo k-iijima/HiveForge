@@ -20,9 +20,9 @@ from mcp.types import (
     ToolsCapability,
 )
 
+from ..beekeeper.server import BeekeeperMCPServer
 from ..core import AkashicRecord, get_settings
 from ..core.ar.hive_storage import HiveStore
-from ..beekeeper.server import BeekeeperMCPServer
 from .handlers import (
     ColonyHandlers,
     ConferenceHandlers,

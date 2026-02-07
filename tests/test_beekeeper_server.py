@@ -1,5 +1,7 @@
 """Beekeeper MCPサーバーのテスト"""
 
+import contextlib
+
 import pytest
 
 from hiveforge.beekeeper.server import BeekeeperMCPServer
@@ -58,10 +60,8 @@ class TestSendMessage:
 
         # Act - LLMなしでも基本的なセッション作成は動作する
         # (LLMがないとエラーになるが、セッションは作成される)
-        try:
+        with contextlib.suppress(Exception):
             await beekeeper.handle_send_message({"message": "Hello"})
-        except Exception:
-            pass
 
         # Assert - セッションが作成された
         assert beekeeper.current_session is not None
@@ -100,7 +100,7 @@ class TestGetStatus:
         """作成済みHiveの情報がステータスに含まれる"""
         # Arrange: Hiveを作成
         hive_result = await beekeeper.handle_create_hive({"name": "StatusTest", "goal": "Testing"})
-        hive_id = hive_result["hive_id"]
+        _hive_id = hive_result["hive_id"]
 
         # Act
         result = await beekeeper.handle_get_status({})
