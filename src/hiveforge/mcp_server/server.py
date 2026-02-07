@@ -25,6 +25,7 @@ from .handlers import (
     ColonyHandlers,
     ConferenceHandlers,
     DecisionHandlers,
+    GuardBeeHandlers,
     HiveHandlers,
     InterventionHandlers,
     LineageHandlers,
@@ -66,6 +67,7 @@ class HiveForgeMCPServer:
         self._decision_handlers = DecisionHandlers(self)
         self._conference_handlers = ConferenceHandlers(self)
         self._intervention_handlers = InterventionHandlers(self)
+        self._guard_bee_handlers = GuardBeeHandlers(self)
 
         self._setup_handlers()
 
@@ -170,6 +172,11 @@ class HiveForgeMCPServer:
             return await self._intervention_handlers.handle_list_escalations(arguments)
         elif name == "get_escalation":
             return await self._intervention_handlers.handle_get_escalation(arguments)
+        # Guard Bee関連
+        elif name == "verify_colony":
+            return await self._guard_bee_handlers.handle_verify_colony(arguments)
+        elif name == "get_guard_report":
+            return await self._guard_bee_handlers.handle_get_guard_report(arguments)
         else:
             return {"error": f"Unknown tool: {name}"}
 

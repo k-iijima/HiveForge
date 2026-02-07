@@ -17,6 +17,7 @@ from .routes import (
     colonies_router,
     conferences_router,
     events_router,
+    guard_bee_router,
     hive_colonies_router,
     hives_router,
     interventions_router,
@@ -86,3 +87,4 @@ app.include_router(runs_router)
 app.include_router(tasks_router)
 app.include_router(requirements_router)
 app.include_router(events_router)
+app.include_router(guard_bee_router)

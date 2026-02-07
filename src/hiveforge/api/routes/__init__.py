@@ -8,6 +8,7 @@ from .colonies import hive_colonies_router
 from .colonies import router as colonies_router
 from .conferences import router as conferences_router
 from .events import router as events_router
+from .guard_bee import router as guard_bee_router
 from .hives import router as hives_router
 from .interventions import router as interventions_router
 from .requirements import router as requirements_router
@@ -17,6 +18,7 @@ from .tasks import router as tasks_router
 
 __all__ = [
     "activity_router",
+    "guard_bee_router",
     "hives_router",
     "colonies_router",
     "hive_colonies_router",

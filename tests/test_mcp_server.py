@@ -1456,7 +1456,11 @@ class TestDispatchConferenceTools:
         # Act
         result = await mcp_server._dispatch_tool(
             "start_conference",
-            {"hive_id": hive_result["hive_id"], "topic": "Design Review", "participants": ["ui", "api"]},
+            {
+                "hive_id": hive_result["hive_id"],
+                "topic": "Design Review",
+                "participants": ["ui", "api"],
+            },
         )
 
         # Assert
@@ -1471,9 +1475,7 @@ class TestDispatchConferenceTools:
     @pytest.mark.asyncio
     async def test_dispatch_get_conference(self, mcp_server):
         """get_conferenceをディスパッチ"""
-        result = await mcp_server._dispatch_tool(
-            "get_conference", {"conference_id": "nonexistent"}
-        )
+        result = await mcp_server._dispatch_tool("get_conference", {"conference_id": "nonexistent"})
         # エラーでも成功でもOK（パス通過確認）
         assert result is not None
 
@@ -1559,9 +1561,7 @@ class TestDispatchInterventionTools:
     @pytest.mark.asyncio
     async def test_dispatch_get_escalation(self, mcp_server):
         """get_escalationをディスパッチ"""
-        result = await mcp_server._dispatch_tool(
-            "get_escalation", {"escalation_id": "nonexistent"}
-        )
+        result = await mcp_server._dispatch_tool("get_escalation", {"escalation_id": "nonexistent"})
         assert result is not None
 
 
@@ -1610,17 +1610,13 @@ class TestColonyHandlerEdgeCases:
     @pytest.mark.asyncio
     async def test_list_colonies_nonexistent_hive(self, mcp_server):
         """存在しないHiveのColony一覧はエラー"""
-        result = await mcp_server._colony_handlers.handle_list_colonies(
-            {"hive_id": "nonexistent"}
-        )
+        result = await mcp_server._colony_handlers.handle_list_colonies({"hive_id": "nonexistent"})
         assert "error" in result
 
     @pytest.mark.asyncio
     async def test_start_colony_nonexistent(self, mcp_server):
         """存在しないColonyの開始はエラー"""
-        result = await mcp_server._colony_handlers.handle_start_colony(
-            {"colony_id": "nonexistent"}
-        )
+        result = await mcp_server._colony_handlers.handle_start_colony({"colony_id": "nonexistent"})
         assert "error" in result
 
     @pytest.mark.asyncio
@@ -1650,3 +1646,380 @@ class TestConferenceHandlerEdgeCases:
             {"conference_id": "nonexistent"}
         )
         assert "error" in result or result is not None
+
+
+# =============================================================================
+# Guard Bee MCP テスト
+# =============================================================================
+
+
+class TestHandleVerifyColony:
+    """verify_colony ツールのテスト"""
+
+    @pytest.mark.asyncio
+    async def test_verify_colony_pass(self, mcp_server):
+        """全証拠が合格する場合PASSが返る
+
+        diff + テスト全合格 + カバレッジ十分 + Lintクリーンで
+        verdict=pass のレポートが返される。
+        """
+        # Arrange: Run開始
+        await mcp_server._handle_start_run({"goal": "Guard Beeテスト"})
+
+        # Act: 検証実行
+        result = await mcp_server._guard_bee_handlers.handle_verify_colony(
+            {
+                "colony_id": "colony-001",
+                "task_id": "task-001",
+                "evidence": [
+                    {
+                        "evidence_type": "diff",
+                        "source": "git",
+                        "content": {"files_changed": 3},
+                    },
+                    {
+                        "evidence_type": "test_result",
+                        "source": "pytest",
+                        "content": {"total": 50, "passed": 50, "failed": 0},
+                    },
+                    {
+                        "evidence_type": "test_coverage",
+                        "source": "coverage",
+                        "content": {"coverage_percent": 95.0},
+                    },
+                    {
+                        "evidence_type": "lint_result",
+                        "source": "ruff",
+                        "content": {"errors": 0, "warnings": 0},
+                    },
+                ],
+            }
+        )
+
+        # Assert
+        assert result["verdict"] == "pass"
+        assert result["l1_passed"] is True
+        assert result["colony_id"] == "colony-001"
+        assert result["task_id"] == "task-001"
+        assert result["evidence_count"] == 4
+
+    @pytest.mark.asyncio
+    async def test_verify_colony_fail(self, mcp_server):
+        """テスト失敗がある場合FAILが返る"""
+        # Arrange
+        await mcp_server._handle_start_run({"goal": "失敗テスト"})
+
+        # Act
+        result = await mcp_server._guard_bee_handlers.handle_verify_colony(
+            {
+                "colony_id": "colony-002",
+                "task_id": "task-002",
+                "evidence": [
+                    {
+                        "evidence_type": "diff",
+                        "source": "git",
+                        "content": {"files_changed": 1},
+                    },
+                    {
+                        "evidence_type": "test_result",
+                        "source": "pytest",
+                        "content": {"total": 20, "passed": 15, "failed": 5},
+                    },
+                ],
+            }
+        )
+
+        # Assert
+        assert result["verdict"] == "fail"
+        assert result["l1_passed"] is False
+        assert result["remand_reason"] is not None
+
+    @pytest.mark.asyncio
+    async def test_verify_colony_no_run(self, mcp_server):
+        """Runなしの場合エラーが返る"""
+        # Act（Run開始せずに検証）
+        result = await mcp_server._guard_bee_handlers.handle_verify_colony(
+            {
+                "colony_id": "colony-001",
+                "task_id": "task-001",
+                "evidence": [],
+            }
+        )
+
+        # Assert
+        assert "error" in result
+
+    @pytest.mark.asyncio
+    async def test_verify_colony_missing_colony_id(self, mcp_server):
+        """colony_id未指定の場合エラー"""
+        await mcp_server._handle_start_run({"goal": "テスト"})
+
+        result = await mcp_server._guard_bee_handlers.handle_verify_colony(
+            {"task_id": "task-001", "evidence": []}
+        )
+        assert "error" in result
+
+    @pytest.mark.asyncio
+    async def test_verify_colony_missing_task_id(self, mcp_server):
+        """task_id未指定の場合エラー"""
+        await mcp_server._handle_start_run({"goal": "テスト"})
+
+        result = await mcp_server._guard_bee_handlers.handle_verify_colony(
+            {"colony_id": "colony-001", "evidence": []}
+        )
+        assert "error" in result
+
+    @pytest.mark.asyncio
+    async def test_verify_colony_missing_evidence(self, mcp_server):
+        """evidence未指定の場合エラー"""
+        await mcp_server._handle_start_run({"goal": "テスト"})
+
+        result = await mcp_server._guard_bee_handlers.handle_verify_colony(
+            {"colony_id": "colony-001", "task_id": "task-001"}
+        )
+        assert "error" in result
+
+    @pytest.mark.asyncio
+    async def test_verify_colony_invalid_evidence_type(self, mcp_server):
+        """無効なevidence_typeの場合エラー"""
+        await mcp_server._handle_start_run({"goal": "テスト"})
+
+        result = await mcp_server._guard_bee_handlers.handle_verify_colony(
+            {
+                "colony_id": "colony-001",
+                "task_id": "task-001",
+                "evidence": [
+                    {
+                        "evidence_type": "invalid_type",
+                        "source": "test",
+                        "content": {},
+                    }
+                ],
+            }
+        )
+        assert "error" in result
+
+    @pytest.mark.asyncio
+    async def test_verify_colony_with_context(self, mcp_server):
+        """追加コンテキスト付きの検証"""
+        await mcp_server._handle_start_run({"goal": "コンテキストテスト"})
+
+        result = await mcp_server._guard_bee_handlers.handle_verify_colony(
+            {
+                "colony_id": "colony-001",
+                "task_id": "task-001",
+                "evidence": [
+                    {
+                        "evidence_type": "diff",
+                        "source": "git",
+                        "content": {"files_changed": 1},
+                    },
+                    {
+                        "evidence_type": "test_result",
+                        "source": "pytest",
+                        "content": {"total": 10, "passed": 10, "failed": 0},
+                    },
+                    {
+                        "evidence_type": "test_coverage",
+                        "source": "coverage",
+                        "content": {"coverage_percent": 85.0},
+                    },
+                    {
+                        "evidence_type": "lint_result",
+                        "source": "ruff",
+                        "content": {"errors": 0, "warnings": 0},
+                    },
+                ],
+                "context": {"design_intent": "リファクタリング"},
+            }
+        )
+
+        assert result["verdict"] == "pass"
+        assert "rule_results" in result
+
+
+class TestHandleGetGuardReport:
+    """get_guard_report ツールのテスト"""
+
+    @pytest.mark.asyncio
+    async def test_get_guard_report_after_verify(self, mcp_server):
+        """検証実行後にレポートが取得できる"""
+        # Arrange: Run開始 + 検証実行
+        await mcp_server._handle_start_run({"goal": "レポートテスト"})
+
+        await mcp_server._guard_bee_handlers.handle_verify_colony(
+            {
+                "colony_id": "colony-rpt",
+                "task_id": "task-rpt",
+                "evidence": [
+                    {
+                        "evidence_type": "diff",
+                        "source": "git",
+                        "content": {"files_changed": 2},
+                    },
+                    {
+                        "evidence_type": "test_result",
+                        "source": "pytest",
+                        "content": {"total": 30, "passed": 30, "failed": 0},
+                    },
+                    {
+                        "evidence_type": "test_coverage",
+                        "source": "coverage",
+                        "content": {"coverage_percent": 90.0},
+                    },
+                    {
+                        "evidence_type": "lint_result",
+                        "source": "ruff",
+                        "content": {"errors": 0, "warnings": 0},
+                    },
+                ],
+            }
+        )
+
+        # Act
+        result = await mcp_server._guard_bee_handlers.handle_get_guard_report({})
+
+        # Assert
+        assert result["count"] >= 1
+        reports = result["reports"]
+        assert len(reports) >= 1
+        assert reports[0]["colony_id"] == "colony-rpt"
+        assert reports[0]["verdict"] in ["pass", "conditional_pass", "fail"]
+
+    @pytest.mark.asyncio
+    async def test_get_guard_report_empty(self, mcp_server):
+        """検証未実施のRunでは空レポート"""
+        await mcp_server._handle_start_run({"goal": "空レポートテスト"})
+
+        result = await mcp_server._guard_bee_handlers.handle_get_guard_report({})
+
+        assert result["count"] == 0
+        assert result["reports"] == []
+
+    @pytest.mark.asyncio
+    async def test_get_guard_report_no_run(self, mcp_server):
+        """Runなしの場合エラー"""
+        result = await mcp_server._guard_bee_handlers.handle_get_guard_report({})
+        assert "error" in result
+
+    @pytest.mark.asyncio
+    async def test_get_guard_report_multiple(self, mcp_server):
+        """複数検証後に全レポートが返る"""
+        await mcp_server._handle_start_run({"goal": "複数検証テスト"})
+
+        for i in range(3):
+            await mcp_server._guard_bee_handlers.handle_verify_colony(
+                {
+                    "colony_id": f"colony-{i}",
+                    "task_id": f"task-{i}",
+                    "evidence": [
+                        {
+                            "evidence_type": "diff",
+                            "source": "git",
+                            "content": {"files_changed": 1},
+                        },
+                        {
+                            "evidence_type": "test_result",
+                            "source": "pytest",
+                            "content": {"total": 10, "passed": 10, "failed": 0},
+                        },
+                        {
+                            "evidence_type": "test_coverage",
+                            "source": "coverage",
+                            "content": {"coverage_percent": 85.0},
+                        },
+                        {
+                            "evidence_type": "lint_result",
+                            "source": "ruff",
+                            "content": {"errors": 0, "warnings": 0},
+                        },
+                    ],
+                }
+            )
+
+        result = await mcp_server._guard_bee_handlers.handle_get_guard_report({})
+        assert result["count"] == 3
+
+
+class TestGuardBeeDispatch:
+    """Guard Beeツールのディスパッチテスト"""
+
+    @pytest.mark.asyncio
+    async def test_dispatch_verify_colony(self, mcp_server):
+        """verify_colony がディスパッチされる"""
+        await mcp_server._dispatch_tool("start_run", {"goal": "ディスパッチテスト"})
+
+        result = await mcp_server._dispatch_tool(
+            "verify_colony",
+            {
+                "colony_id": "colony-d",
+                "task_id": "task-d",
+                "evidence": [
+                    {
+                        "evidence_type": "diff",
+                        "source": "git",
+                        "content": {"files_changed": 1},
+                    },
+                    {
+                        "evidence_type": "test_result",
+                        "source": "pytest",
+                        "content": {"total": 10, "passed": 10, "failed": 0},
+                    },
+                    {
+                        "evidence_type": "test_coverage",
+                        "source": "coverage",
+                        "content": {"coverage_percent": 90.0},
+                    },
+                    {
+                        "evidence_type": "lint_result",
+                        "source": "ruff",
+                        "content": {"errors": 0, "warnings": 0},
+                    },
+                ],
+            },
+        )
+        assert "verdict" in result
+
+    @pytest.mark.asyncio
+    async def test_dispatch_get_guard_report(self, mcp_server):
+        """get_guard_report がディスパッチされる"""
+        await mcp_server._dispatch_tool("start_run", {"goal": "ディスパッチテスト"})
+
+        result = await mcp_server._dispatch_tool("get_guard_report", {})
+        assert "reports" in result
+        assert "count" in result
+
+
+class TestGuardBeeToolDefinitions:
+    """Guard Beeツール定義の存在確認テスト"""
+
+    def test_verify_colony_tool_defined(self):
+        """verify_colonyツールが定義されている"""
+        from hiveforge.mcp_server.tools import get_tool_definitions
+
+        tools = get_tool_definitions()
+        tool_names = [t.name for t in tools]
+        assert "verify_colony" in tool_names
+
+    def test_get_guard_report_tool_defined(self):
+        """get_guard_reportツールが定義されている"""
+        from hiveforge.mcp_server.tools import get_tool_definitions
+
+        tools = get_tool_definitions()
+        tool_names = [t.name for t in tools]
+        assert "get_guard_report" in tool_names
+
+    def test_verify_colony_schema_has_required_fields(self):
+        """verify_colonyスキーマに必須フィールドがある"""
+        from hiveforge.mcp_server.tools import get_tool_definitions
+
+        tools = get_tool_definitions()
+        verify_tool = next(t for t in tools if t.name == "verify_colony")
+        assert "colony_id" in verify_tool.inputSchema["properties"]
+        assert "task_id" in verify_tool.inputSchema["properties"]
+        assert "evidence" in verify_tool.inputSchema["properties"]
+        assert set(verify_tool.inputSchema["required"]) == {
+            "colony_id",
+            "task_id",
+            "evidence",
+        }
