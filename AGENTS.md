@@ -159,6 +159,7 @@ src/hiveforge/
 ├── api/            # FastAPI サーバー
 ├── mcp_server/     # MCP Server
 ├── beekeeper/      # Beekeeper（ユーザー窓口・調整）
+├── sentinel_hornet/ # Sentinel Hornet（監視・異常検出・強制停止）
 ├── queen_bee/      # Queen Bee（Colony統括）
 ├── worker_bee/     # Worker Bee（タスク実行）
 ├── llm/            # LLM統合（AgentRunner, プロンプト管理）

@@ -2,6 +2,9 @@
 
 > Phase 0: 設計検証の成果物
 > **本書は状態機械・イベント型・通信プロトコルの正式定義（Single Source of Truth）です。**
+>
+> 設計思想・ビジョンは [コンセプト_v6.md](../コンセプト_v6.md) を参照。
+> 開発計画は [DEVELOPMENT_PLAN_v2.md](../DEVELOPMENT_PLAN_v2.md) を参照。
 
 作成日: 2026-02-01
 ステータス: **Reviewed**（レビュー完了）
@@ -21,7 +24,12 @@
 | 🐝 Colony | Colony | 専門領域を担当するエージェント群れ |
 | 👑 Queen Bee | Queen Bee | Colonyの調停エージェント（1体/Colony） |
 | 🐝 Worker Bee | Worker Bee | 実務を担当する個別エージェント |
-| 🐝 Sentinel Hornet | Sentinel Hornet | Hive内監視エージェント（v5.3追加） |
+| 🐝 Sentinel Hornet | Sentinel Hornet | Hive内監視・異常検出・強制停止エージェント（v5.3追加） |
+| 🛡️ Guard Bee | Guard Bee | 成果物の品質・コンプライアンス検証エージェント（v1.5追加） |
+| 🔍 Scout Bee | Scout Bee | 過去実績に基づくColony編成最適化（v1.5追加） |
+| 🍯 Honeycomb | Honeycomb | 実行履歴の蓄積と学習基盤（v1.5追加） |
+| 💃 Waggle Dance | Waggle Dance | エージェント間I/Oの構造化通信プロトコル（v1.5追加） |
+| 🐝 Swarming Protocol | Swarming Protocol | タスク適応的Colony編成プロトコル（v1.5追加） |
 | 🧑‍🌾 Beekeeper | Beekeeper | ユーザーと対話し、Hive/Colonyを管理 |
 | 📋 Run | Run | Colony内の作業単位（v4から継続） |
 | ✅ Task | Task | Run内の個別タスク（v4から継続） |
@@ -34,7 +42,13 @@
 | Colony（群れ） | 専門領域のチーム。UI/UX、API、Dataなど |
 | Queen Bee（女王蜂） | Colonyの統括。Worker Beeに指示を出し、結果を統合 |
 | Worker Bee（働き蜂） | 実務担当。コード生成、調査、レビューなど |
+| Sentinel Hornet（スズメバチ） | Hive内監視・異常検出・強制停止 |
 | Beekeeper（養蜂家） | ユーザーの代理。必要に応じてHive/Colonyを作成・廃止 |
+| Guard Bee（門番蜂） | 成果物の品質検証。証拠ベースの合格/差戻し（v1.5） |
+| Scout Bee（偵察蜂） | 過去実績から最適なColony編成を提案（v1.5） |
+| Honeycomb（巣房） | 実行履歴の蓄積と学習基盤（v1.5） |
+| Waggle Dance（ワグルダンス） | エージェント間I/Oの構造化通信（v1.5） |
+| Swarming（分蜂） | タスク特性に応じた適応的Colony編成（v1.5） |
 
 ### ユーザーの権限モデル
 
@@ -274,7 +288,7 @@ class ColonyState(Enum):
 
 > **実装状況**: 現在の実装は `PENDING`/`IN_PROGRESS`/`COMPLETED`/`FAILED` の4状態。
 > `IDLE`/`ACTIVE` は名称差として `PENDING`/`IN_PROGRESS` に対応。
-> `SUSPENDED` は M2-0（Sentinel Hornet）実装時に追加予定。
+> `SUSPENDED` は M2-0（Sentinel Hornet）で実装済み。
 
 ### 2.2 状態遷移図
 
@@ -1220,7 +1234,7 @@ def parse_event(data: dict[str, Any] | str) -> BaseEvent:
 ## 10. Phase 1 実装タスク
 
 > **注**: 以下はPhase 0設計検証時のタスク分解であり、当時の文脈として保持しています。
-> 現在の開発計画・タスク管理は [DEVELOPMENT_PLAN_v1.md](../DEVELOPMENT_PLAN_v1.md)（マイルストーンM1〜M4）を参照してください。
+> 現在の開発計画・タスク管理は [DEVELOPMENT_PLAN_v2.md](../DEVELOPMENT_PLAN_v2.md)（マイルストーンM1〜M5）を参照してください。
 
 ### 10.0 実装順序（依存関係を考慮）
 
