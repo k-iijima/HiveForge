@@ -3,7 +3,7 @@
 > Phase 0: 設計検証の成果物
 
 作成日: 2026-02-01
-ステータス: **Reviewed** (レビュー完了・Phase 1着手可能)
+ステータス: **Reviewed**（レビュー完了）
 フィードバック対応: 
   - 2026-02-01: Decision Protocol, Project Contract, Action Class, Conflict Detection 追加
   - 2026-02-01: Conference エンティティ化, Decision scope/owner, Conflict category/severity, Policy Gate, UnknownEvent前方互換
@@ -20,6 +20,7 @@
 | 🐝 Colony | Colony | 専門領域を担当するエージェント群れ |
 | 👑 Queen Bee | Queen Bee | Colonyの調停エージェント（1体/Colony） |
 | 🐝 Worker Bee | Worker Bee | 実務を担当する個別エージェント |
+| 🐝 Sentinel Hornet | Sentinel Hornet | Hive内監視エージェント（v5.3追加） |
 | 🧑‍🌾 Beekeeper | Beekeeper | ユーザーと対話し、Hive/Colonyを管理 |
 | 📋 Run | Run | Colony内の作業単位（v4から継続） |
 | ✅ Task | Task | Run内の個別タスク（v4から継続） |
@@ -1214,6 +1215,9 @@ def parse_event(data: dict[str, Any] | str) -> BaseEvent:
 ---
 
 ## 10. Phase 1 実装タスク
+
+> **注**: 以下はPhase 0設計検証時のタスク分解であり、当時の文脈として保持しています。
+> 現在の開発計画・タスク管理は [DEVELOPMENT_PLAN_v1.md](../DEVELOPMENT_PLAN_v1.md)（マイルストーンM1〜M4）を参照してください。
 
 ### 10.0 実装順序（依存関係を考慮）
 
