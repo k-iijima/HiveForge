@@ -153,13 +153,23 @@ pip install -e ".[dev]"
 src/hiveforge/
 ├── core/           # コアロジック（イベント、状態機械、AR）
 │   ├── events.py   # イベントモデル
+│   ├── models/     # ドメインモデル（ActionClass等）
 │   ├── ar/         # Akashic Record（永続化）
 │   └── state/      # 状態機械
 ├── api/            # FastAPI サーバー
 ├── mcp_server/     # MCP Server
+├── beekeeper/      # Beekeeper（ユーザー窓口・調整）
+├── queen_bee/      # Queen Bee（Colony統括）
+├── worker_bee/     # Worker Bee（タスク実行）
+├── llm/            # LLM統合（AgentRunner, プロンプト管理）
+├── agent_ui/       # Agent UI MCPサーバー
+├── vlm/            # VLM（画像解析）
+├── vlm_tester/     # VLM Tester（E2Eテスト支援）
+├── silence.py      # 沈黙検出
 └── cli.py          # CLIツール
 
 tests/              # テストコード（実装と1:1対応）
+vscode-extension/   # VS Code拡張機能
 ```
 
 ## テスト実行

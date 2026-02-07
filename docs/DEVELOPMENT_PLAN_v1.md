@@ -293,7 +293,7 @@ M0 (現在)  → M1 (基盤固め) → M2 (接続) → M3 (自律) → M4 (運�
 |-------------|------|
 | `docs/IMPLEMENTATION_STATUS.md` | アーカイブ（古い数値を含むため） |
 | `docs/ROADMAP.md` | 本計画に統合、アーカイブ |
-| `docs/SESSION_STATUS.md` | セッション記録として保持、ステータス参照先を本計画に変更 |
+| `docs/SESSION_STATUS.md` | アーカイブ済（`docs/archive/`に移動）。セッション記録、ステータス参照先は本計画 |
 | `docs/TECH_DEBT.md` | 本計画 M1 セクションに統合、アーカイブ |
 
 ### 4.3 更新すべきドキュメント

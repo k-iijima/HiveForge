@@ -124,10 +124,10 @@ AgentRunner.run()
    - Hive/Colony/Worker設定のツリービュー
    - 重複する設定の統合
 
-3. **git push**
+4. **git push**
    - 8コミットがローカルのみ
 
-4. **その他の機能拡張**
+5. **その他の機能拡張**
    - 名前付きWorker Bee（coder, reviewer等）の実装
    - 複数Colony管理
 

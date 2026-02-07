@@ -16,7 +16,7 @@
 8. [因果リンク（Lineage）](#8-因果リンクlineage)
 9. [ディレクトリ構造](#9-ディレクトリ構造)
 10. [設定](#10-設定)
-11. [フェーズゲート条件](#11-フェーズゲート条件)
+11. [開発計画・ゲート条件](#11-開発計画ゲート条件)
 12. [今後の拡張](#12-今後の拡張)
 
 ---
@@ -104,25 +104,72 @@ hiveforge/
 ├── core/                  # コアモジュール（他から参照される）
 │   ├── events.py         # イベントモデル
 │   ├── config.py         # 設定管理
+│   ├── activity_bus.py   # Activity Bus
+│   ├── lineage.py        # 因果リンク
+│   ├── policy_gate.py    # ポリシーゲート
+│   ├── rate_limiter.py   # レートリミッター
+│   ├── models/           # ドメインモデル
+│   │   ├── action_class.py
+│   │   └── project_contract.py
 │   ├── ar/               # Akashic Record
-│   │   ├── storage.py    # 永続化
-│   │   └── projections.py # 状態投影
+│   │   ├── storage.py        # Run永続化
+│   │   ├── projections.py    # Run状態投影
+│   │   ├── hive_storage.py   # Hive/Colony永続化
+│   │   └── hive_projections.py # Hive/Colony投影
 │   └── state/            # 状態機械
-│       └── machines.py   # Run/Task/Requirement SM
+│       ├── machines.py        # Run/Task/Requirement SM
+│       ├── projections.py     # 状態投影
+│       ├── colony_progress.py # Colony進捗追跡
+│       └── conference.py      # Conference状態
 ├── api/                   # REST API（coreに依存）
 │   ├── server.py         # FastAPIアプリ
 │   ├── dependencies.py   # 依存性注入（AppState）
 │   ├── helpers.py        # 後方互換エクスポート
+│   ├── models.py         # APIモデル
 │   └── routes/           # エンドポイント
 │       ├── runs.py       # Run関連
 │       ├── tasks.py      # Task関連
 │       ├── events.py     # Event関連
 │       ├── requirements.py # Requirement関連
+│       ├── hives.py      # Hive CRUD
+│       ├── colonies.py   # Colony CRUD
+│       ├── activity.py   # Activity API
+│       ├── conferences.py # Conference API
+│       ├── interventions.py # Intervention API
 │       └── system.py     # ヘルスチェック等
 ├── mcp_server/            # MCP Server（coreに依存）
 │   ├── server.py
 │   ├── tools.py          # ツール定義
 │   └── handlers/         # ハンドラー実装
+├── beekeeper/             # Beekeeper層（core, llmに依存）
+│   ├── server.py         # MCPサーバー
+│   ├── handler.py        # コアハンドラー
+│   ├── session.py        # セッション管理
+│   ├── projection.py     # 状態投影
+│   ├── conference.py     # Conference機能
+│   ├── conflict.py       # 衝突検出
+│   ├── escalation.py     # エスカレーション
+│   └── resolver.py       # 衝突解決
+├── queen_bee/             # Queen Bee層（core, llmに依存）
+│   ├── server.py         # MCPサーバー
+│   ├── communication.py  # エージェント間通信
+│   ├── progress.py       # 進捗管理
+│   ├── retry.py          # リトライ制御
+│   └── scheduler.py      # Colonyスケジューラー
+├── worker_bee/            # Worker Bee層（core, llmに依存）
+│   ├── server.py         # MCPサーバー
+│   ├── process.py        # タスク実行
+│   ├── projections.py    # 投影
+│   ├── retry.py          # リトライ制御
+│   ├── tools.py          # ツール定義
+│   └── trust.py          # Trust Level制御
+├── llm/                   # LLM統合（coreに依存）
+│   ├── client.py         # LLMクライアント
+│   ├── runner.py         # AgentRunner
+│   ├── tools.py          # LLMツール
+│   ├── prompts.py        # プロンプト取得
+│   ├── prompt_config.py  # プロンプト設定スキーマ
+│   └── default_prompts/  # デフォルトプロンプトYAML
 ├── agent_ui/              # Agent UI MCPサーバー
 │   ├── server.py         # サーバー本体
 │   ├── session.py        # ブラウザセッション管理
@@ -135,7 +182,8 @@ hiveforge/
 │   ├── server.py         # MCPサーバー
 │   ├── playwright_mcp_client.py
 │   ├── vlm_client.py
-│   └── hybrid_analyzer.py
+│   ├── hybrid_analyzer.py
+│   └── ...               # その他分析・実行モジュール
 ├── silence.py             # 沈黙検出（coreに依存）
 └── cli.py                 # CLI（api, mcp_serverに依存）
 ```
@@ -144,7 +192,7 @@ hiveforge/
 
 ## 3. 階層モデル（Hive/Colony）
 
-### 12.1 概念
+### 3.1 概念
 
 HiveForgeは4層の階層構造でプロジェクトを管理します：
 
@@ -158,7 +206,7 @@ Hive（組織単位・プロジェクト）
  └── Colony
 ```
 
-### 12.2 Hive（巣）
+### 3.2 Hive（巣）
 
 **定義**: プロジェクト全体を管理する最上位の組織単位
 
@@ -186,7 +234,7 @@ created → active → closed
 - `get_hive` - Hive詳細
 - `close_hive` - Hive終了
 
-### 12.3 Colony（コロニー）
+### 3.3 Colony（コロニー）
 
 **定義**: 特定の目標を持つ作業グループ。複数のRunを含む。
 
@@ -216,7 +264,7 @@ created → running → completed
 - `start_colony` - Colony開始
 - `complete_colony` - Colony完了
 
-### 12.4 Run-Colony紐付け
+### 3.4 Run-Colony紐付け
 
 イベントには`colony_id`フィールドがあり、RunをColonyに紐付けます：
 
@@ -231,7 +279,7 @@ class BaseEvent(BaseModel):
 
 ## 4. データモデル
 
-### 12.1 BaseEvent（イベント基底クラス）
+### 4.1 BaseEvent（イベント基底クラス）
 
 すべてのイベントの基底となるイミュータブルなモデル:
 
@@ -254,7 +302,7 @@ class BaseEvent(BaseModel):
         ...
 ```
 
-### 12.2 イベント型一覧
+### 4.2 イベント型一覧
 
 | カテゴリ | イベント型 | 説明 |
 |----------|------------|------|
@@ -279,7 +327,7 @@ class BaseEvent(BaseModel):
 | | `system.silence_detected` | 沈黙検出 |
 | | `system.emergency_stop` | 緊急停止 |
 
-### 12.3 RunProjection（状態投影）
+### 4.3 RunProjection（状態投影）
 
 イベントから導出される現在状態:
 
@@ -296,7 +344,7 @@ class RunProjection:
     last_heartbeat: datetime | None   # 最終ハートビート
 ```
 
-### 12.4 TaskProjection
+### 4.4 TaskProjection
 
 ```python
 class TaskProjection:
@@ -311,9 +359,9 @@ class TaskProjection:
 
 ---
 
-## 4. API仕様
+## 5. API仕様
 
-### 12.1 REST API エンドポイント
+### 5.1 REST API エンドポイント
 
 #### System
 
@@ -380,7 +428,7 @@ class TaskProjection:
 | GET | `/runs/{run_id}/events` | イベント一覧取得 |
 | GET | `/runs/{run_id}/events/{event_id}/lineage` | 因果リンク取得 |
 
-### 12.2 MCP ツール一覧
+### 5.2 MCP ツール一覧
 
 | ツール | 説明 | パラメータ |
 |--------|------|------------|
@@ -399,9 +447,9 @@ class TaskProjection:
 
 ---
 
-## 5. 状態機械
+## 6. 状態機械
 
-### 12.1 RunStateMachine
+### 6.1 RunStateMachine
 
 ```
               ┌───────────────────┐
@@ -422,7 +470,7 @@ class TaskProjection:
 | RUNNING | FAILED | `run.failed` |
 | RUNNING | ABORTED | `run.aborted`, `system.emergency_stop` |
 
-### 12.2 TaskStateMachine
+### 6.2 TaskStateMachine
 
 ```
 ┌─────────┐                          
@@ -452,7 +500,7 @@ class TaskProjection:
             └──────────┘
 ```
 
-### 12.3 RequirementStateMachine
+### 6.3 RequirementStateMachine
 
 ```
 ┌─────────┐
@@ -469,9 +517,9 @@ class TaskProjection:
 
 ---
 
-## 6. イベントシステム
+## 7. イベントシステム
 
-### 12.1 イベント永続化
+### 7.1 イベント永続化
 
 イベントはJSONL形式でファイルに追記保存:
 
@@ -481,7 +529,7 @@ Vault/
     └── events.jsonl    # 1行1イベント
 ```
 
-### 12.2 ハッシュ連鎖
+### 7.2 ハッシュ連鎖
 
 各イベントは前のイベントのハッシュを保持し、改ざん検知を可能に:
 
@@ -491,7 +539,7 @@ event[0] ─hash─▶ event[1] ─hash─▶ event[2] ─hash─▶ ...
         prev_hash      prev_hash      prev_hash
 ```
 
-### 12.3 ハッシュ計算
+### 7.3 ハッシュ計算
 
 1. イベントデータから`hash`フィールドを除外
 2. JCS (RFC 8785) で正規化
@@ -507,9 +555,9 @@ def compute_hash(data: dict[str, Any]) -> str:
 
 ---
 
-## 7. 因果リンク（Lineage）
+## 8. 因果リンク（Lineage）
 
-### 12.1 概要
+### 8.1 概要
 
 各イベントは`parents`フィールドで親イベントを参照し、因果関係を記録:
 
@@ -518,7 +566,7 @@ class TaskCreatedEvent(BaseEvent):
     parents: list[str] = ["run_started_event_id"]  # 親イベントのID
 ```
 
-### 12.2 探索方向
+### 8.2 探索方向
 
 | 方向 | 説明 | 実装方式 |
 |------|------|----------|
@@ -526,7 +574,7 @@ class TaskCreatedEvent(BaseEvent):
 | `descendants` | 子孫（子方向） | 全イベント走査 |
 | `both` | 両方向 | 上記の組み合わせ |
 
-### 12.3 APIレスポンス例
+### 8.3 APIレスポンス例
 
 ```json
 {
@@ -537,16 +585,16 @@ class TaskCreatedEvent(BaseEvent):
 }
 ```
 
-### 12.4 制限
+### 8.4 制限
 
 - `max_depth`: 探索深度制限（デフォルト: 10）
 - `truncated`: 制限により切り詰められた場合`true`
 
 ---
 
-## 8. ディレクトリ構造
+## 9. ディレクトリ構造
 
-### 12.1 プロジェクト構造
+### 9.1 プロジェクト構造
 
 ```
 HiveForge/
@@ -555,28 +603,74 @@ HiveForge/
 │   ├── cli.py               # CLIエントリポイント
 │   ├── silence.py           # 沈黙検出
 │   ├── core/                # コアモジュール
-│   │   ├── __init__.py
 │   │   ├── config.py        # 設定管理
 │   │   ├── events.py        # イベントモデル
+│   │   ├── activity_bus.py  # Activity Bus
+│   │   ├── lineage.py       # 因果リンク
+│   │   ├── policy_gate.py   # ポリシーゲート
+│   │   ├── rate_limiter.py  # レートリミッター
+│   │   ├── models/          # ドメインモデル
+│   │   │   ├── action_class.py
+│   │   │   └── project_contract.py
 │   │   ├── ar/              # Akashic Record
-│   │   │   ├── storage.py   # 永続化
-│   │   │   └── projections.py # 状態投影
+│   │   │   ├── storage.py       # Run永続化
+│   │   │   ├── projections.py   # Run状態投影
+│   │   │   ├── hive_storage.py  # Hive/Colony永続化
+│   │   │   └── hive_projections.py # Hive/Colony投影
 │   │   └── state/           # 状態機械
-│   │       └── machines.py
+│   │       ├── machines.py       # Run/Task/Requirement SM
+│   │       ├── projections.py    # 状態投影
+│   │       ├── colony_progress.py # Colony進捗追跡
+│   │       └── conference.py     # Conference状態
 │   ├── api/                 # REST API
 │   │   ├── server.py        # FastAPIアプリ
 │   │   ├── dependencies.py  # 依存性注入（AppState）
 │   │   ├── helpers.py       # 後方互換エクスポート
+│   │   ├── models.py        # APIモデル
 │   │   └── routes/          # エンドポイント
 │   │       ├── runs.py
 │   │       ├── tasks.py
 │   │       ├── events.py
 │   │       ├── requirements.py
+│   │       ├── hives.py         # Hive CRUD
+│   │       ├── colonies.py      # Colony CRUD
+│   │       ├── activity.py      # Activity API
+│   │       ├── conferences.py   # Conference API
+│   │       ├── interventions.py # Intervention API
 │   │       └── system.py
 │   ├── mcp_server/          # MCP Server
 │   │   ├── server.py
 │   │   ├── tools.py         # ツール定義
 │   │   └── handlers/        # ハンドラー実装
+│   ├── beekeeper/           # Beekeeper層
+│   │   ├── server.py        # MCPサーバー
+│   │   ├── handler.py       # コアハンドラー
+│   │   ├── session.py       # セッション管理
+│   │   ├── projection.py    # 状態投影
+│   │   ├── conference.py    # Conference機能
+│   │   ├── conflict.py      # 衝突検出
+│   │   ├── escalation.py    # エスカレーション
+│   │   └── resolver.py      # 衝突解決
+│   ├── queen_bee/           # Queen Bee層
+│   │   ├── server.py        # MCPサーバー
+│   │   ├── communication.py # エージェント間通信
+│   │   ├── progress.py      # 進捗管理
+│   │   ├── retry.py         # リトライ制御
+│   │   └── scheduler.py     # Colony スケジューラー
+│   ├── worker_bee/          # Worker Bee層
+│   │   ├── server.py        # MCPサーバー
+│   │   ├── process.py       # タスク実行
+│   │   ├── projections.py   # 投影
+│   │   ├── retry.py         # リトライ制御
+│   │   ├── tools.py         # ツール定義
+│   │   └── trust.py         # Trust Level制御
+│   ├── llm/                 # LLM統合
+│   │   ├── client.py        # LLMクライアント
+│   │   ├── runner.py        # AgentRunner
+│   │   ├── tools.py         # LLMツール
+│   │   ├── prompts.py       # プロンプト取得
+│   │   ├── prompt_config.py # プロンプト設定スキーマ
+│   │   └── default_prompts/ # デフォルトプロンプトYAML
 │   ├── agent_ui/            # Agent UI MCPサーバー
 │   │   ├── server.py        # サーバー本体
 │   │   ├── session.py       # ブラウザセッション管理
@@ -589,23 +683,18 @@ HiveForge/
 │       ├── server.py        # MCPサーバー
 │       ├── playwright_mcp_client.py
 │       ├── vlm_client.py
-│       └── hybrid_analyzer.py
-├── tests/                   # Pythonテスト（401件）
+│       ├── hybrid_analyzer.py
+│       ├── action_executor.py
+│       ├── local_analyzers.py
+│       ├── screen_capture.py
+│       └── vlm_providers.py
+├── tests/                   # Pythonテスト（`pytest` で件数確認）
 │   ├── conftest.py
-│   ├── test_events.py
-│   ├── test_ar.py
-│   ├── test_projections.py
-│   ├── test_state_machines.py
-│   ├── test_silence.py
-│   ├── test_cli.py
-│   ├── test_api.py
-│   ├── test_mcp_server.py
-│   ├── test_agent_ui.py
-│   ├── test_vlm.py
-│   ├── test_vlm_tester.py
+│   ├── test_*.py            # 各モジュール対応テスト
 │   └── e2e/                 # E2Eテスト
 │       ├── test_hiveforge_visual.py
-│       └── test_hiveforge_extension.py
+│       ├── test_hiveforge_extension.py
+│       └── test_hive_flow.py
 ├── vscode-extension/        # VS Code拡張
 │   ├── package.json
 │   ├── tsconfig.json
@@ -613,40 +702,55 @@ HiveForge/
 │       ├── extension.ts
 │       ├── client.ts        # APIクライアント
 │       ├── commands/        # コマンド実装
+│       │   ├── hiveCommands.ts
+│       │   ├── colonyCommands.ts
+│       │   ├── runCommands.ts
+│       │   ├── taskCommands.ts
+│       │   ├── requirementCommands.ts
+│       │   ├── decisionCommands.ts
+│       │   └── filterCommands.ts
 │       ├── providers/       # TreeViewプロバイダー
 │       ├── views/           # Webviewパネル
+│       │   ├── dashboardPanel.ts
+│       │   ├── hiveMonitorPanel.ts
+│       │   ├── hiveTreeView.ts
+│       │   ├── agentMonitorPanel.ts
+│       │   └── requirementDetailView.ts
 │       ├── utils/           # ユーティリティ
-│       └── test/            # テスト（17件）
+│       └── test/            # テスト
 │           ├── client.test.ts
 │           ├── html.test.ts
 │           └── vscode-mock.ts
 ├── docs/                    # ドキュメント
+│   ├── ARCHITECTURE.md
+│   ├── DEVELOPMENT_PLAN_v1.md
 │   ├── QUICKSTART.md
-│   └── ARCHITECTURE.md
+│   ├── VLM_TESTER.md
+│   ├── コンセプト_v5.md
+│   └── archive/             # 旧ドキュメント
 ├── Vault/                   # イベントログ（gitignore）
 ├── AGENTS.md                # AI開発ガイドライン
-├── docs/コンセプト_v4.md      # コンセプト（作業用仕様・最新版）
-├── docs/コンセプト_v3.md      # コンセプト（v3・ベースライン）
 ├── pyproject.toml           # Pythonプロジェクト設定
 ├── hiveforge.config.yaml    # 実行時設定
 ├── docker-compose.yml       # Docker設定
 └── Dockerfile
 ```
 
-### 12.2 Vault構造
+### 9.2 Vault構造
 
 ```
 Vault/
-├── {run_id}/
+├── hive-{hive_id}/
 │   └── events.jsonl         # イベントログ（1行1イベント）
+├── meta-decisions/          # 意思決定メタデータ
 └── ...
 ```
 
 ---
 
-## 9. 設定
+## 10. 設定
 
-### 12.1 hiveforge.config.yaml
+### 10.1 hiveforge.config.yaml
 
 ```yaml
 hive:
@@ -682,7 +786,7 @@ logging:
   events_max_file_size_mb: 100
 ```
 
-### 12.2 環境変数
+### 10.2 環境変数
 
 | 変数名 | 説明 | デフォルト |
 |--------|------|------------|
@@ -692,14 +796,14 @@ logging:
 
 ---
 
-## 10. 開発計画・ゲート条件
+## 11. 開発計画・ゲート条件
 
-### 10.1 概要
+### 11.1 概要
 
 開発の進捗管理はフェーズベースからマイルストーンベースに移行しました。
 詳細は [DEVELOPMENT_PLAN_v1.md](DEVELOPMENT_PLAN_v1.md) を参照してください。
 
-### 10.2 マイルストーン
+### 11.2 マイルストーン
 
 | マイルストーン | 目標 | ステータス |
 |---------------|------|----------|
@@ -708,7 +812,7 @@ logging:
 | M3: 自律 | LLMタスク分解、Orchestrator | 計画中 |
 | M4: 運用品質 | セキュリティ、CI/CD、ドキュメント | 計画中 |
 
-### 10.3 ゲート条件
+### 11.3 ゲート条件
 
 以下は各マイルストーンの通過に必要な要件ゲートです:
 
@@ -728,9 +832,9 @@ logging:
 
 ---
 
-## 11. 今後の拡張
+## 12. 今後の拡張
 
-### 11.1 主要な計画
+### 12.1 主要な計画
 
 - [x] Worker Bee: MCPサブプロセスベースのWorker
 - [x] Queen Bee連携: タスク割り当て、進捗集約、リトライ
@@ -740,14 +844,14 @@ logging:
 - [ ] 因果リンクの自動設定（[Issue #001](issues/001-lineage-auto-parents.md)）
 - [ ] イベント署名: 改ざん者の特定
 
-### 11.2 VS Code拡張の拡充
+### 12.2 VS Code拡張の拡充
 
 - [x] Hive Monitor: リアルタイム活動可視化（Webview）
 - [x] TreeView: Activity Hierarchy API連動
 - [ ] 因果グラフ可視化（Webview）
 - [ ] リアルタイムイベントストリーム
 
-### 11.3 スケーラビリティ
+### 12.3 スケーラビリティ
 
 - [ ] エンティティ別チェーン（並列書き込み対応）
 - [ ] イベントアーカイブ

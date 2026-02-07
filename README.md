@@ -97,21 +97,15 @@ hiveforge serve
 
 ### VS Code MCP設定
 
-`.vscode/settings.json`:
+`.vscode/mcp.json`:
 
 ```json
 {
-  "mcp": {
-    "servers": {
-      "hiveforge": {
-        "type": "stdio",
-        "command": "python",
-        "args": ["-m", "hiveforge.mcp_server"],
-        "cwd": "${workspaceFolder}",
-        "env": {
-          "HIVEFORGE_VAULT_PATH": "${workspaceFolder}/Vault"
-        }
-      }
+  "servers": {
+    "hiveforge": {
+      "command": "hiveforge",
+      "args": ["mcp"],
+      "env": {}
     }
   }
 }
@@ -135,9 +129,11 @@ src/hiveforge/
 ├── beekeeper/         # Beekeeper層
 ├── queen_bee/         # Queen Bee層
 ├── worker_bee/        # Worker Bee層
+├── llm/               # LLM統合（AgentRunner, プロンプト管理）
 ├── agent_ui/          # Agent UI MCPサーバー
 ├── vlm/               # VLM（画像解析）
 ├── vlm_tester/        # E2Eテスト支援
+├── silence.py         # 沈黙検出
 └── cli.py             # CLI
 
 vscode-extension/      # VS Code拡張

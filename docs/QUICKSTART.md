@@ -31,7 +31,7 @@ devcontainer内で **F5キー** を押すとAPIサーバーが起動します。
 ## テスト
 
 ```bash
-pytest           # 全テスト（401件）
+pytest           # 全テスト（E2E除く）
 pytest -v        # 詳細表示
 ```
 
@@ -172,11 +172,9 @@ VS CodeでMCPサーバーをCopilot Chatに登録するには、`.vscode/mcp.jso
 {
   "servers": {
     "hiveforge": {
-      "command": "python",
-      "args": ["-m", "hiveforge.mcp_server"],
-      "env": {
-        "HIVEFORGE_VAULT_PATH": "${workspaceFolder}/Vault"
-      }
+      "command": "hiveforge",
+      "args": ["mcp"],
+      "env": {}
     }
   }
 }
@@ -190,21 +188,7 @@ VS CodeでMCPサーバーをCopilot Chatに登録するには、`.vscode/mcp.jso
 
 #### devcontainer内での設定
 
-devcontainer使用時は、`HIVEFORGE_VAULT_PATH` を `/workspace/HiveForge/Vault` に設定：
-
-```json
-{
-  "servers": {
-    "hiveforge": {
-      "command": "python",
-      "args": ["-m", "hiveforge.mcp_server"],
-      "env": {
-        "HIVEFORGE_VAULT_PATH": "/workspace/HiveForge/Vault"
-      }
-    }
-  }
-}
-```
+devcontainer使用時は上記設定がそのまま利用可能です（`hiveforge` コマンドがパスに含まれるため）。
 
 > **Note:** `@hiveforge`が出ない場合は `Developer: Reload Window` を実行
 
