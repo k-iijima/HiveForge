@@ -3,10 +3,11 @@
 検出された衝突を解決するためのストラテジーとリゾルバー。
 """
 
+import contextlib
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from ulid import ULID
@@ -14,7 +15,7 @@ from ulid import ULID
 from .conflict import Conflict, ConflictType
 
 
-class ResolutionStrategy(str, Enum):
+class ResolutionStrategy(StrEnum):
     """解決戦略"""
 
     FIRST_COME = "first_come"  # 先着優先
@@ -26,7 +27,7 @@ class ResolutionStrategy(str, Enum):
     LOCK_AND_QUEUE = "lock_and_queue"  # ロック＆キュー
 
 
-class ResolutionStatus(str, Enum):
+class ResolutionStatus(StrEnum):
     """解決ステータス"""
 
     PENDING = "pending"
@@ -245,10 +246,8 @@ class ConflictResolver:
     def _notify_resolved(self, result: ResolutionResult) -> None:
         """解決を通知"""
         for listener in self._on_resolved:
-            try:
+            with contextlib.suppress(Exception):
                 listener(result)
-            except Exception:
-                pass
 
     def get_resolution(self, resolution_id: str) -> ResolutionResult | None:
         """解決結果取得"""

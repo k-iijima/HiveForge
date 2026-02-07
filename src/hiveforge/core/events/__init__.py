@@ -8,16 +8,6 @@
 """
 
 # --- 列挙型 ---
-from .types import (
-    ConflictCategory,
-    ConflictSeverity,
-    DecisionScope,
-    EscalationType,
-    EventType,
-    FailureReason,
-    RiskLevel,
-)
-
 # --- 基底クラス・ユーティリティ ---
 from .base import (
     BaseEvent,
@@ -25,6 +15,26 @@ from .base import (
     _serialize_value,
     compute_hash,
     generate_event_id,
+)
+
+# --- Decision / Conference / Conflict ---
+from .decision import (
+    ConferenceEndedEvent,
+    ConferenceStartedEvent,
+    ConflictDetectedEvent,
+    ConflictResolvedEvent,
+    DecisionAppliedEvent,
+    DecisionRecordedEvent,
+    DecisionSupersededEvent,
+    ProposalCreatedEvent,
+)
+
+# --- Guard Bee ---
+from .guard import (
+    GuardConditionalPassedEvent,
+    GuardFailedEvent,
+    GuardPassedEvent,
+    GuardVerificationRequestedEvent,
 )
 
 # --- Hive / Colony ---
@@ -35,6 +45,25 @@ from .hive import (
     ColonyStartedEvent,
     HiveClosedEvent,
     HiveCreatedEvent,
+)
+
+# --- Operation / Intervention / System ---
+from .operation import (
+    BeekeeperFeedbackEvent,
+    EmergencyStopEvent,
+    ErrorEvent,
+    HeartbeatEvent,
+    OperationFailedEvent,
+    OperationTimeoutEvent,
+    QueenEscalationEvent,
+    SilenceDetectedEvent,
+    UserDirectInterventionEvent,
+)
+
+# --- レジストリ ---
+from .registry import (
+    EVENT_TYPE_MAP,
+    parse_event,
 )
 
 # --- Run / Task / Requirement ---
@@ -54,30 +83,14 @@ from .run import (
     TaskProgressedEvent,
     TaskUnblockedEvent,
 )
-
-# --- Decision / Conference / Conflict ---
-from .decision import (
-    ConferenceEndedEvent,
-    ConferenceStartedEvent,
-    ConflictDetectedEvent,
-    ConflictResolvedEvent,
-    DecisionAppliedEvent,
-    DecisionRecordedEvent,
-    DecisionSupersededEvent,
-    ProposalCreatedEvent,
-)
-
-# --- Operation / Intervention / System ---
-from .operation import (
-    BeekeeperFeedbackEvent,
-    EmergencyStopEvent,
-    ErrorEvent,
-    HeartbeatEvent,
-    OperationFailedEvent,
-    OperationTimeoutEvent,
-    QueenEscalationEvent,
-    SilenceDetectedEvent,
-    UserDirectInterventionEvent,
+from .types import (
+    ConflictCategory,
+    ConflictSeverity,
+    DecisionScope,
+    EscalationType,
+    EventType,
+    FailureReason,
+    RiskLevel,
 )
 
 # --- Worker Bee ---
@@ -87,20 +100,6 @@ from .worker import (
     WorkerFailedEvent,
     WorkerProgressEvent,
     WorkerStartedEvent,
-)
-
-# --- Guard Bee ---
-from .guard import (
-    GuardConditionalPassedEvent,
-    GuardFailedEvent,
-    GuardPassedEvent,
-    GuardVerificationRequestedEvent,
-)
-
-# --- レジストリ ---
-from .registry import (
-    EVENT_TYPE_MAP,
-    parse_event,
 )
 
 __all__ = [
@@ -115,6 +114,7 @@ __all__ = [
     # 基底
     "BaseEvent",
     "UnknownEvent",
+    "_serialize_value",
     "compute_hash",
     "generate_event_id",
     # Hive/Colony

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from ..core import AkashicRecord, generate_event_id
@@ -23,7 +23,7 @@ from ..core.events import (
 logger = logging.getLogger(__name__)
 
 
-class WorkerState(str, Enum):
+class WorkerState(StrEnum):
     """Worker Beeの状態"""
 
     IDLE = "idle"  # タスク待ち

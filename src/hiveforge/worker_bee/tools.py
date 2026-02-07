@@ -4,16 +4,17 @@ Worker Beeが外部ツールを実行するための基盤。
 """
 
 import asyncio
+import contextlib
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from ulid import ULID
 
 
-class ToolCategory(str, Enum):
+class ToolCategory(StrEnum):
     """ツールカテゴリ"""
 
     FILE_SYSTEM = "file_system"  # ファイル操作
@@ -25,7 +26,7 @@ class ToolCategory(str, Enum):
     CUSTOM = "custom"  # カスタムツール
 
 
-class ToolStatus(str, Enum):
+class ToolStatus(StrEnum):
     """ツール実行ステータス"""
 
     PENDING = "pending"
@@ -183,10 +184,8 @@ class ToolExecutor:
 
         # 開始通知
         for listener in self._on_started:
-            try:
+            with contextlib.suppress(Exception):
                 listener(invocation)
-            except Exception:
-                pass
 
         try:
             # タイムアウト付き実行
@@ -222,10 +221,8 @@ class ToolExecutor:
 
         # 完了通知
         for listener in self._on_completed:
-            try:
+            with contextlib.suppress(Exception):
                 listener(result)
-            except Exception:
-                pass
 
         return result
 

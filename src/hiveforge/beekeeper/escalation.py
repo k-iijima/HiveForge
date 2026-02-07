@@ -7,13 +7,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from ulid import ULID
 
 
-class EscalationType(str, Enum):
+class EscalationType(StrEnum):
     """直訴のタイプ"""
 
     BEEKEEPER_CONFUSION = "beekeeper_confusion"  # Beekeeperが混乱している
@@ -26,7 +26,7 @@ class EscalationType(str, Enum):
     SECURITY_CONCERN = "security_concern"  # セキュリティ上の懸念
 
 
-class EscalationSeverity(str, Enum):
+class EscalationSeverity(StrEnum):
     """直訴の重要度"""
 
     INFO = "info"  # 情報提供
@@ -34,7 +34,7 @@ class EscalationSeverity(str, Enum):
     CRITICAL = "critical"  # 緊急
 
 
-class EscalationStatus(str, Enum):
+class EscalationStatus(StrEnum):
     """直訴のステータス"""
 
     PENDING = "pending"  # 未対応

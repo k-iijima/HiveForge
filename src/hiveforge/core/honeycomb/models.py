@@ -6,13 +6,12 @@ Pydanticで厳格な型検証を行う。
 
 from __future__ import annotations
 
-from enum import Enum
-from typing import Literal
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class Outcome(str, Enum):
+class Outcome(StrEnum):
     """エピソードの結果"""
 
     SUCCESS = "success"
@@ -20,7 +19,7 @@ class Outcome(str, Enum):
     PARTIAL = "partial"
 
 
-class FailureClass(str, Enum):
+class FailureClass(StrEnum):
     """失敗分類
 
     | 分類 | 説明 |

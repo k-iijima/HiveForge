@@ -6,14 +6,14 @@ Evidence-first原則: 意見ではなく証拠で判定する。
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class Verdict(str, Enum):
+class Verdict(StrEnum):
     """検証判定結果
 
     3値判定:
@@ -27,7 +27,7 @@ class Verdict(str, Enum):
     FAIL = "fail"
 
 
-class VerificationLevel(str, Enum):
+class VerificationLevel(StrEnum):
     """検証レベル
 
     - L1: ルール検証（機械判定: lint, カバレッジ閾値, スキーマ準拠）
@@ -38,7 +38,7 @@ class VerificationLevel(str, Enum):
     L2 = "L2"
 
 
-class EvidenceType(str, Enum):
+class EvidenceType(StrEnum):
     """証拠の種類"""
 
     DIFF = "diff"
@@ -62,7 +62,7 @@ class Evidence(BaseModel):
     source: str = Field(..., description="証拠の出所（ファイルパス、ツール名等）")
     content: dict[str, Any] = Field(default_factory=dict, description="証拠データ")
     collected_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="証拠収集日時",
     )
 
@@ -102,7 +102,7 @@ class GuardBeeReport(BaseModel):
         default_factory=list, description="改善指示（FAIL/CONDITIONAL_PASSの場合）"
     )
     verified_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="検証日時",
     )
 

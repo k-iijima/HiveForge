@@ -15,11 +15,11 @@ Trust Level:
     - Level 3: 完全委任
 """
 
-from enum import Enum
+from enum import Enum, StrEnum
 from typing import Any
 
 
-class ActionClass(str, Enum):
+class ActionClass(StrEnum):
     """操作の分類（リスクレベル）"""
 
     READ_ONLY = "read_only"  # 読み取り専用、副作用なし

@@ -7,13 +7,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from ulid import ULID
 
 
-class SessionState(str, Enum):
+class SessionState(StrEnum):
     """セッション状態"""
 
     IDLE = "idle"  # 待機中

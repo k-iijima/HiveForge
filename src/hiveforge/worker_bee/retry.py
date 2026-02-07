@@ -4,10 +4,11 @@
 """
 
 import asyncio
+import contextlib
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any, TypeVar
 
 from ulid import ULID
@@ -15,7 +16,7 @@ from ulid import ULID
 T = TypeVar("T")
 
 
-class RetryStrategy(str, Enum):
+class RetryStrategy(StrEnum):
     """リトライ戦略"""
 
     NONE = "none"  # リトライなし
@@ -24,7 +25,7 @@ class RetryStrategy(str, Enum):
     LINEAR = "linear"  # 線形増加
 
 
-class TimeoutBehavior(str, Enum):
+class TimeoutBehavior(StrEnum):
     """タイムアウト時の振る舞い"""
 
     FAIL = "fail"  # 即失敗
@@ -197,10 +198,8 @@ class RetryExecutor:
 
                 # タイムアウト通知
                 for listener in self._on_timeout:
-                    try:
+                    with contextlib.suppress(Exception):
                         listener(attempt.error)
-                    except Exception:
-                        pass
 
                 if timeout.behavior == TimeoutBehavior.FAIL:
                     result.error = attempt.error
@@ -223,10 +222,8 @@ class RetryExecutor:
 
             # リトライ通知
             for listener in self._on_retry:
-                try:
+                with contextlib.suppress(Exception):
                     listener(attempt)
-                except Exception:
-                    pass
 
             # リトライ遅延
             delay = self._policy.get_delay(attempt_num)

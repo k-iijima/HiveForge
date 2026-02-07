@@ -3,16 +3,17 @@
 複数Colony間での合意形成会議機能。
 """
 
+import contextlib
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from ulid import ULID
 
 
-class ConferenceStatus(str, Enum):
+class ConferenceStatus(StrEnum):
     """会議ステータス"""
 
     PENDING = "pending"  # 開始待ち
@@ -22,7 +23,7 @@ class ConferenceStatus(str, Enum):
     CANCELLED = "cancelled"  # キャンセル
 
 
-class VoteType(str, Enum):
+class VoteType(StrEnum):
     """投票タイプ"""
 
     APPROVE = "approve"  # 賛成
@@ -142,10 +143,8 @@ class ConferenceManager:
         session.started_at = datetime.now()
 
         for listener in self._on_started:
-            try:
+            with contextlib.suppress(Exception):
                 listener(session)
-            except Exception:
-                pass
 
         return True
 
@@ -240,10 +239,8 @@ class ConferenceManager:
         session.ended_at = datetime.now()
 
         for listener in self._on_concluded:
-            try:
+            with contextlib.suppress(Exception):
                 listener(session)
-            except Exception:
-                pass
 
         return True
 

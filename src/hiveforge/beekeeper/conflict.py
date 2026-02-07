@@ -3,15 +3,18 @@
 複数ColonyのオペレーションがリソースやファイルでConflictする可能性を検出。
 """
 
+from __future__ import annotations
+
+import contextlib
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from ulid import ULID
 
 
-class ConflictType(str, Enum):
+class ConflictType(StrEnum):
     """衝突タイプ"""
 
     FILE_CONFLICT = "file_conflict"  # 同一ファイルへの変更
@@ -22,7 +25,7 @@ class ConflictType(str, Enum):
     SEMANTIC_CONFLICT = "semantic_conflict"  # 意味的な競合（同じ機能を別実装）
 
 
-class ConflictSeverity(str, Enum):
+class ConflictSeverity(StrEnum):
     """衝突の深刻度"""
 
     LOW = "low"  # 自動解決可能
@@ -119,15 +122,14 @@ class ConflictDetector:
             return True
 
         # 書き込みと削除は競合
-        if "delete" in (claim1.operation, claim2.operation):
-            if "write" in (claim1.operation, claim2.operation):
-                return True
-
-        # 削除同士は競合
-        if claim1.operation == "delete" and claim2.operation == "delete":
+        if "delete" in (claim1.operation, claim2.operation) and "write" in (
+            claim1.operation,
+            claim2.operation,
+        ):
             return True
 
-        return False
+        # 削除同士は競合
+        return claim1.operation == "delete" and claim2.operation == "delete"
 
     def _create_conflict(
         self,
@@ -177,10 +179,8 @@ class ConflictDetector:
     def _notify_conflict(self, conflict: Conflict) -> None:
         """衝突を通知"""
         for listener in self._on_conflict_detected:
-            try:
+            with contextlib.suppress(Exception):
                 listener(conflict)
-            except Exception:
-                pass  # リスナーエラーは無視
 
     def release_claim(self, colony_id: str, resource_id: str) -> bool:
         """リソース要求を解放"""

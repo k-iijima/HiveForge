@@ -6,7 +6,6 @@ BaseEvent, UnknownEvent, generate_event_id, compute_hash の定義。
 from __future__ import annotations
 
 import hashlib
-import json
 from datetime import UTC, datetime
 from enum import Enum
 from typing import Any

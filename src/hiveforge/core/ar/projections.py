@@ -7,13 +7,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from ..events import BaseEvent
 
 
-class TaskState(str, Enum):
+class TaskState(StrEnum):
     """タスク状態"""
 
     PENDING = "pending"
@@ -23,7 +23,7 @@ class TaskState(str, Enum):
     FAILED = "failed"
 
 
-class RunState(str, Enum):
+class RunState(StrEnum):
     """Run状態"""
 
     RUNNING = "running"
@@ -32,7 +32,7 @@ class RunState(str, Enum):
     ABORTED = "aborted"
 
 
-class RequirementState(str, Enum):
+class RequirementState(StrEnum):
     """要件状態"""
 
     PENDING = "pending"
@@ -40,7 +40,7 @@ class RequirementState(str, Enum):
     REJECTED = "rejected"
 
 
-class HiveState(str, Enum):
+class HiveState(StrEnum):
     """Hive状態
 
     Hiveは複数のColonyを管理する最上位コンテナ。
@@ -54,7 +54,7 @@ class HiveState(str, Enum):
     CLOSED = "closed"
 
 
-class ColonyState(str, Enum):
+class ColonyState(StrEnum):
     """Colony状態
 
     ColonyはHive内のサブプロジェクト単位。

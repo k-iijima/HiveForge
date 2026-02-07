@@ -18,6 +18,16 @@ from ..worker_bee.projections import (
 )
 from .server import ManagedWorker, QueenBeeMCPServer
 
+__all__ = [
+    "ManagedWorker",
+    "QueenBeeMCPServer",
+    "TaskAssignment",
+    "WorkerPoolProjection",
+    "WorkerProjection",
+    "WorkerState",
+    "build_worker_pool_projection",
+]
+
 
 @dataclass
 class TaskAssignment:

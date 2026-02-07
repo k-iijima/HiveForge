@@ -7,12 +7,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from ..core.events import BaseEvent, EventType
 
 
-class WorkerState(str, Enum):
+class WorkerState(StrEnum):
     """Worker Beeの状態"""
 
     IDLE = "idle"

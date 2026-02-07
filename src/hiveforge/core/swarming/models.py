@@ -5,12 +5,12 @@ SwarmingFeatures（入力特徴量）の定義。
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class TemplateName(str, Enum):
+class TemplateName(StrEnum):
     """Colonyテンプレート名"""
 
     SPEED = "speed"

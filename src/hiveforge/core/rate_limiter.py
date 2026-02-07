@@ -7,11 +7,11 @@ Token Bucket方式 + 並行リクエスト制限を実装。
 import asyncio
 import time
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class RateLimitStrategy(str, Enum):
+class RateLimitStrategy(StrEnum):
     """レート制限戦略"""
 
     TOKEN_BUCKET = "token_bucket"  # トークンバケット方式
@@ -120,7 +120,7 @@ class RateLimiter:
             tokens: 消費するトークン数（通常は1）
 
         Raises:
-            RateLimitExceeded: 日次制限を超えた場合
+            RateLimitExceededError: 日次制限を超えた場合
         """
         async with self._lock:
             self._reset_minute_window()
@@ -132,7 +132,7 @@ class RateLimiter:
                 self._config.requests_per_day > 0
                 and self._state.request_count_day >= self._config.requests_per_day
             ):
-                raise RateLimitExceeded(
+                raise RateLimitExceededError(
                     "Daily request limit exceeded",
                     retry_after=self._seconds_until_day_reset(),
                 )
@@ -240,7 +240,7 @@ class RateLimitContext:
         self._limiter.release()
 
 
-class RateLimitExceeded(Exception):
+class RateLimitExceededError(Exception):
     """レート制限超過例外"""
 
     def __init__(self, message: str, retry_after: float = 0.0):

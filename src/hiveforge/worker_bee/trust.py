@@ -5,10 +5,10 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 
-class ActionClass(str, Enum):
+class ActionClass(StrEnum):
     """アクションの危険度分類
 
     Safe -> Careful -> Dangerous -> Critical の順に危険度が上がる
@@ -40,7 +40,7 @@ class ActionClass(str, Enum):
         return not self < other
 
 
-class TrustLevel(str, Enum):
+class TrustLevel(StrEnum):
     """エージェントの信頼レベル
 
     Untrusted -> Limited -> Standard -> Elevated -> Full の順に信頼度が上がる
@@ -81,7 +81,7 @@ class TrustLevel(str, Enum):
         return not self < other
 
 
-class ConfirmationResult(str, Enum):
+class ConfirmationResult(StrEnum):
     """承認結果"""
 
     APPROVED = "approved"

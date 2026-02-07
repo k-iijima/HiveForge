@@ -5,13 +5,13 @@
 """
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from ulid import ULID
 
 
-class MessageType(str, Enum):
+class MessageType(StrEnum):
     """Colony間メッセージタイプ"""
 
     REQUEST = "request"
@@ -20,7 +20,7 @@ class MessageType(str, Enum):
     BROADCAST = "broadcast"
 
 
-class MessagePriority(str, Enum):
+class MessagePriority(StrEnum):
     """メッセージ優先度"""
 
     URGENT = "urgent"
@@ -213,9 +213,7 @@ class ResourceConflict:
         if resource_id not in self._locks:
             self._locks[resource_id] = colony_id
             return True
-        if self._locks[resource_id] == colony_id:
-            return True  # 既に保持
-        return False
+        return self._locks[resource_id] == colony_id
 
     def release(self, resource_id: str, colony_id: str) -> str | None:
         """リソースを解放し、次の待機Colonyを返す"""

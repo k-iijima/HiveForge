@@ -9,7 +9,7 @@ from hiveforge.core.rate_limiter import (
     RateLimitConfig,
     RateLimiter,
     RateLimiterRegistry,
-    RateLimitExceeded,
+    RateLimitExceededError,
     get_anthropic_rate_limit,
     get_openai_rate_limit,
     get_rate_limiter_registry,
@@ -160,7 +160,7 @@ class TestRateLimiter:
             await limiter.wait()
 
         # Assert: 制限超過で例外
-        with pytest.raises(RateLimitExceeded) as exc_info:
+        with pytest.raises(RateLimitExceededError) as exc_info:
             await limiter.wait()
 
         assert "Daily request limit exceeded" in str(exc_info.value)

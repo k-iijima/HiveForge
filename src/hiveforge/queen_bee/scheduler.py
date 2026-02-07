@@ -6,10 +6,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 
-class ColonyPriority(str, Enum):
+class ColonyPriority(StrEnum):
     """Colony優先度"""
 
     CRITICAL = "critical"  # 最優先
@@ -144,7 +144,7 @@ class ColonyScheduler:
         # 残りを優先度に応じて配分
         if remaining > 0:
             total_weight = sum(PRIORITY_WEIGHT[c.priority] for c in sorted_colonies)
-            for i, colony in enumerate(sorted_colonies):
+            for colony in sorted_colonies:
                 if remaining <= 0:
                     break
 

@@ -5,10 +5,10 @@ EventType enum と関連する列挙型（ConflictCategory等）を定義。
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class EventType(str, Enum):
+class EventType(StrEnum):
     """イベント種別"""
 
     # Hive イベント
@@ -95,7 +95,7 @@ class EventType(str, Enum):
     EMERGENCY_STOP = "system.emergency_stop"
 
 
-class ConflictCategory(str, Enum):
+class ConflictCategory(StrEnum):
     """衝突カテゴリ（v5.2追加）"""
 
     ASSUMPTION = "assumption"
@@ -104,7 +104,7 @@ class ConflictCategory(str, Enum):
     CONSTRAINT = "constraint"
 
 
-class ConflictSeverity(str, Enum):
+class ConflictSeverity(StrEnum):
     """衝突の深刻度（v5.2追加）"""
 
     LOW = "low"
@@ -113,7 +113,7 @@ class ConflictSeverity(str, Enum):
     BLOCKER = "blocker"
 
 
-class EscalationType(str, Enum):
+class EscalationType(StrEnum):
     """エスカレーション種別（v5.2追加）"""
 
     BEEKEEPER_CONFLICT = "beekeeper_conflict"
@@ -124,7 +124,7 @@ class EscalationType(str, Enum):
     EXTERNAL_DEPENDENCY = "external_dependency"
 
 
-class DecisionScope(str, Enum):
+class DecisionScope(StrEnum):
     """決定の適用範囲（v5.2追加）"""
 
     HIVE = "hive"
@@ -133,7 +133,7 @@ class DecisionScope(str, Enum):
     TASK = "task"
 
 
-class RiskLevel(str, Enum):
+class RiskLevel(StrEnum):
     """リスクレベル（v5.2追加）"""
 
     LOW = "low"
@@ -141,7 +141,7 @@ class RiskLevel(str, Enum):
     HIGH = "high"
 
 
-class FailureReason(str, Enum):
+class FailureReason(StrEnum):
     """失敗理由の標準分類"""
 
     TIMEOUT = "timeout"

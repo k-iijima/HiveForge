@@ -6,13 +6,13 @@
 これにより、判定ロジックが散在して事故するリスクを軽減する。
 """
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from hiveforge.core.models.action_class import ActionClass, TrustLevel
 
 
-class PolicyDecision(str, Enum):
+class PolicyDecision(StrEnum):
     """Policy Gateの判定結果"""
 
     ALLOW = "allow"  # 実行許可

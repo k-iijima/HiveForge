@@ -6,10 +6,10 @@ Worker Bee失敗時のリトライ戦略を管理する。
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 
-class RetryStrategy(str, Enum):
+class RetryStrategy(StrEnum):
     """リトライ戦略"""
 
     NONE = "none"  # リトライしない

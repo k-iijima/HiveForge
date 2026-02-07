@@ -82,7 +82,7 @@ class EpisodeRecorder:
             kpi_scores=kpi_scores,
             parent_episode_ids=parent_episode_ids or [],
             goal=goal,
-            metadata={k: v for k, v in (metadata or {}).items()},
+            metadata=dict((metadata or {}).items()),
         )
 
         self.store.append(episode)

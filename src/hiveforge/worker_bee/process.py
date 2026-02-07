@@ -7,13 +7,13 @@ import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from ulid import ULID
 
 
-class WorkerProcessState(str, Enum):
+class WorkerProcessState(StrEnum):
     """Worker プロセスの状態"""
 
     STARTING = "starting"  # 起動中
@@ -218,14 +218,13 @@ class WorkerProcessManager:
             return False
 
         process = self._processes.get(process_id)
-        if process:
-            if process.returncode is not None:
-                # プロセス終了
-                worker.state = WorkerProcessState.CRASHED
-                worker.last_error = f"Process exited with code {process.returncode}"
-                if self._on_worker_crashed:
-                    self._on_worker_crashed(worker)
-                return False
+        if process and process.returncode is not None:
+            # プロセス終了
+            worker.state = WorkerProcessState.CRASHED
+            worker.last_error = f"Process exited with code {process.returncode}"
+            if self._on_worker_crashed:
+                self._on_worker_crashed(worker)
+            return False
 
         return worker.state == WorkerProcessState.RUNNING
 
@@ -239,9 +238,8 @@ class WorkerProcessManager:
                     continue
 
                 healthy = await self.check_health(process_id)
-                if not healthy and self._config.auto_restart:
-                    if worker.can_restart():
-                        await self.restart_worker(process_id)
+                if not healthy and self._config.auto_restart and worker.can_restart():
+                    await self.restart_worker(process_id)
 
             await asyncio.sleep(self._config.health_check_interval)
 
