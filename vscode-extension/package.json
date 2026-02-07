@@ -22,6 +22,11 @@
         "icon": "$(dashboard)"
       },
       {
+        "command": "hiveforge.showAgentMonitor",
+        "title": "HiveForge: Agent Monitorを表示",
+        "icon": "$(pulse)"
+      },
+      {
         "command": "hiveforge.startRun",
         "title": "HiveForge: 新しいRunを開始",
         "icon": "$(add)"
@@ -246,6 +251,11 @@
         },
         {
           "command": "hiveforge.showDashboard",
+          "when": "view == hiveforge.runs",
+          "group": "inline@0"
+        },
+        {
+          "command": "hiveforge.showAgentMonitor",
           "when": "view == hiveforge.runs",
           "group": "inline@0"
         },

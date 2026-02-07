@@ -49,6 +49,35 @@ export interface HiveEvent {
     parents?: string[];
 }
 
+// Activity Monitor 型定義
+export interface ActivityEvent {
+    event_id: string;
+    activity_type: string;
+    agent: AgentInfo;
+    summary: string;
+    detail: Record<string, unknown>;
+    timestamp: string;
+}
+
+export interface AgentInfo {
+    agent_id: string;
+    role: string;
+    hive_id: string;
+    colony_id?: string;
+}
+
+export interface ActivityHierarchy {
+    [hiveId: string]: {
+        beekeeper: AgentInfo | null;
+        colonies: {
+            [colonyId: string]: {
+                queen_bee: AgentInfo | null;
+                workers: AgentInfo[];
+            };
+        };
+    };
+}
+
 export interface RunStatus {
     run_id: string;
     goal: string;
@@ -221,5 +250,27 @@ export class HiveForgeClient {
     // Heartbeat
     async sendHeartbeat(runId: string, message?: string): Promise<void> {
         await this.client.post(`/runs/${runId}/heartbeat`, { message });
+    }
+
+    // Activity Monitor
+    async getRecentActivity(limit: number = 100): Promise<ActivityEvent[]> {
+        const response = await this.client.get<{ events: ActivityEvent[] }>('/activity/recent', {
+            params: { limit },
+        });
+        return response.data.events;
+    }
+
+    async getActivityHierarchy(): Promise<ActivityHierarchy> {
+        const response = await this.client.get<{ hierarchy: ActivityHierarchy }>('/activity/hierarchy');
+        return response.data.hierarchy;
+    }
+
+    async getActiveAgents(): Promise<AgentInfo[]> {
+        const response = await this.client.get<{ agents: AgentInfo[] }>('/activity/agents');
+        return response.data.agents;
+    }
+
+    getStreamUrl(): string {
+        return `${this.client.defaults.baseURL}/activity/stream`;
     }
 }

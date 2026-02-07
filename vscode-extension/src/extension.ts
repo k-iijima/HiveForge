@@ -13,6 +13,7 @@ import { DecisionsProvider } from './providers/decisionsProvider';
 import { HiveForgeClient } from './client';
 import { registerRunCommands, registerRequirementCommands, registerFilterCommands, registerTaskCommands, registerDecisionCommands, Providers } from './commands';
 import { HiveTreeDataProvider } from './views/hiveTreeView';
+import { AgentMonitorPanel } from './views/agentMonitorPanel';
 import { registerHiveCommands, setHiveTreeProvider } from './commands/hiveCommands';
 import { registerColonyCommands, setHiveTreeProviderForColony } from './commands/colonyCommands';
 
@@ -59,6 +60,13 @@ export function activate(context: vscode.ExtensionContext) {
     registerDecisionCommands(context);
     registerHiveCommands(context);
     registerColonyCommands(context);
+
+    // Agent Monitor コマンド
+    context.subscriptions.push(
+        vscode.commands.registerCommand('hiveforge.showAgentMonitor', () => {
+            AgentMonitorPanel.createOrShow(context.extensionUri, client);
+        })
+    );
 
     // 自動更新を設定
     setupAutoRefresh(config);

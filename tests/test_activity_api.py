@@ -147,11 +147,13 @@ class TestActivityHierarchy:
         # Arrange: エージェントを開始
         bus = ActivityBus.get_instance()
         agent = _make_agent(role=AgentRole.QUEEN_BEE, agent_id="queen-1")
-        await bus.emit(ActivityEvent(
-            activity_type=ActivityType.AGENT_STARTED,
-            agent=agent,
-            summary="Queen Bee started",
-        ))
+        await bus.emit(
+            ActivityEvent(
+                activity_type=ActivityType.AGENT_STARTED,
+                agent=agent,
+                summary="Queen Bee started",
+            )
+        )
 
         # Act
         response = client.get("/activity/hierarchy")
@@ -186,11 +188,13 @@ class TestActivityAgents:
         # Arrange
         bus = ActivityBus.get_instance()
         agent = _make_agent(agent_id="worker-1")
-        await bus.emit(ActivityEvent(
-            activity_type=ActivityType.AGENT_STARTED,
-            agent=agent,
-            summary="Worker started",
-        ))
+        await bus.emit(
+            ActivityEvent(
+                activity_type=ActivityType.AGENT_STARTED,
+                agent=agent,
+                summary="Worker started",
+            )
+        )
 
         # Act
         response = client.get("/activity/agents")
