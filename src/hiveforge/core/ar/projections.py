@@ -60,12 +60,14 @@ class ColonyState(str, Enum):
     ColonyはHive内のサブプロジェクト単位。
     - PENDING: 開始待ち
     - IN_PROGRESS: 実行中
+    - SUSPENDED: 一時停止（Sentinel Hornetによる強制停止）
     - COMPLETED: 完了
     - FAILED: 失敗
     """
 
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
+    SUSPENDED = "suspended"
     COMPLETED = "completed"
     FAILED = "failed"
 

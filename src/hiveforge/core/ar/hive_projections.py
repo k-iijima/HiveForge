@@ -152,6 +152,15 @@ class HiveAggregate:
         colony.error = event.payload.get("error", "")
         colony.completed_at = event.timestamp
 
+    def _apply_colony_suspended(self, event: BaseEvent) -> None:
+        """Colony一時停止イベントを適用"""
+        colony_id = event.payload.get("colony_id", "")
+        if colony_id not in self._projection.colonies:
+            return
+
+        colony = self._projection.colonies[colony_id]
+        colony.state = ColonyState.SUSPENDED
+
     # イベントタイプからハンドラへのマッピング
     _handlers = {
         EventType.HIVE_CREATED: _apply_hive_created,
@@ -160,6 +169,7 @@ class HiveAggregate:
         EventType.COLONY_STARTED: _apply_colony_started,
         EventType.COLONY_COMPLETED: _apply_colony_completed,
         EventType.COLONY_FAILED: _apply_colony_failed,
+        EventType.COLONY_SUSPENDED: _apply_colony_suspended,
     }
 
 

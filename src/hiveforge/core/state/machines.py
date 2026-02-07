@@ -250,6 +250,9 @@ class ColonyStateMachine(StateMachine):
     - PENDING -> IN_PROGRESS (開始時)
     - IN_PROGRESS -> COMPLETED (全Run完了時)
     - IN_PROGRESS -> FAILED (致命的エラー時)
+    - IN_PROGRESS -> SUSPENDED (Sentinel Hornetによる強制停止)
+    - SUSPENDED -> IN_PROGRESS (再開時)
+    - SUSPENDED -> FAILED (失敗終了時)
     """
 
     def __init__(self):
@@ -260,5 +263,15 @@ class ColonyStateMachine(StateMachine):
             Transition(ColonyState.IN_PROGRESS, ColonyState.COMPLETED, EventType.COLONY_COMPLETED),
             # IN_PROGRESS -> FAILED: 致命的エラー時
             Transition(ColonyState.IN_PROGRESS, ColonyState.FAILED, EventType.COLONY_FAILED),
+            # IN_PROGRESS -> SUSPENDED: Sentinel Hornet強制停止
+            Transition(
+                ColonyState.IN_PROGRESS, ColonyState.SUSPENDED, EventType.COLONY_SUSPENDED
+            ),
+            # SUSPENDED -> IN_PROGRESS: 再開
+            Transition(
+                ColonyState.SUSPENDED, ColonyState.IN_PROGRESS, EventType.COLONY_STARTED
+            ),
+            # SUSPENDED -> FAILED: 失敗終了
+            Transition(ColonyState.SUSPENDED, ColonyState.FAILED, EventType.COLONY_FAILED),
         ]
         super().__init__(ColonyState.PENDING, transitions)

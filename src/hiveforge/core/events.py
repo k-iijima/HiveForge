@@ -27,6 +27,7 @@ class EventType(str, Enum):
     # Colony イベント
     COLONY_CREATED = "colony.created"
     COLONY_STARTED = "colony.started"
+    COLONY_SUSPENDED = "colony.suspended"
     COLONY_COMPLETED = "colony.completed"
     COLONY_FAILED = "colony.failed"
 
@@ -85,6 +86,10 @@ class EventType(str, Enum):
     # LLM イベント
     LLM_REQUEST = "llm.request"
     LLM_RESPONSE = "llm.response"
+
+    # Sentinel Hornet イベント（M2-0追加）
+    SENTINEL_ALERT_RAISED = "sentinel.alert_raised"
+    SENTINEL_REPORT = "sentinel.report"
 
     # システムイベント
     HEARTBEAT = "system.heartbeat"
