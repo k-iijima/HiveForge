@@ -95,6 +95,60 @@ class TestGetStatus:
         assert result["session"] is not None
         assert result["session"]["hive_id"] == "hive-1"
 
+    @pytest.mark.asyncio
+    async def test_get_status_returns_hive_data(self, beekeeper):
+        """作成済みHiveの情報がステータスに含まれる"""
+        # Arrange: Hiveを作成
+        hive_result = await beekeeper.handle_create_hive({"name": "StatusTest", "goal": "Testing"})
+        hive_id = hive_result["hive_id"]
+
+        # Act
+        result = await beekeeper.handle_get_status({})
+
+        # Assert
+        assert result["status"] == "success"
+        assert len(result["hives"]) >= 1
+        hive_names = {h["name"] for h in result["hives"]}
+        assert "StatusTest" in hive_names
+
+    @pytest.mark.asyncio
+    async def test_get_status_specific_hive(self, beekeeper):
+        """特定Hiveのステータスを取得"""
+        # Arrange: Hiveを作成
+        hive_result = await beekeeper.handle_create_hive(
+            {"name": "SpecificHive", "goal": "Specific"}
+        )
+        hive_id = hive_result["hive_id"]
+
+        # Act
+        result = await beekeeper.handle_get_status({"hive_id": hive_id})
+
+        # Assert
+        assert result["status"] == "success"
+        assert len(result["hives"]) == 1
+        assert result["hives"][0]["name"] == "SpecificHive"
+
+    @pytest.mark.asyncio
+    async def test_get_status_includes_colonies(self, beekeeper):
+        """ステータスにColony情報が含まれる"""
+        # Arrange: Hive + Colony作成
+        hive_result = await beekeeper.handle_create_hive({"name": "WithColonies", "goal": "Test"})
+        hive_id = hive_result["hive_id"]
+        await beekeeper.handle_create_colony(
+            {
+                "hive_id": hive_id,
+                "name": "Col1",
+                "domain": "Domain1",
+            }
+        )
+
+        # Act
+        result = await beekeeper.handle_get_status({"hive_id": hive_id, "include_colonies": True})
+
+        # Assert
+        assert result["colonies"] is not None
+        assert len(result["colonies"]) == 1
+
 
 class TestCreateHive:
     """create_hiveハンドラのテスト"""
@@ -131,6 +185,19 @@ class TestCreateHive:
         assert beekeeper.current_session is not None
         assert beekeeper.current_session.hive_id == result["hive_id"]
         assert beekeeper.current_session.state == SessionState.ACTIVE
+
+    @pytest.mark.asyncio
+    async def test_create_hive_persists_event(self, beekeeper):
+        """Hive作成時にHiveStoreにイベントが永続化される"""
+        # Act
+        result = await beekeeper.handle_create_hive({"name": "PersistTest", "goal": "Persist"})
+        hive_id = result["hive_id"]
+
+        # Assert: HiveStoreにイベントが記録されている
+        events = list(beekeeper.hive_store.replay(hive_id))
+        assert len(events) == 1
+        assert events[0].type.value == "hive.created"
+        assert events[0].payload["name"] == "PersistTest"
 
 
 class TestCreateColony:
@@ -175,6 +242,35 @@ class TestCreateColony:
         # Assert
         assert result["colony_id"] in beekeeper.current_session.active_colonies
 
+    @pytest.mark.asyncio
+    async def test_create_colony_hive_not_found(self, beekeeper):
+        """存在しないHiveにColony作成するとエラー"""
+        # Act
+        result = await beekeeper.handle_create_colony(
+            {"hive_id": "nonexistent", "name": "Col", "domain": "dom"}
+        )
+
+        # Assert
+        assert result["status"] == "error"
+        assert "not found" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_create_colony_persists_event(self, beekeeper):
+        """Colony作成時にイベントがHiveStoreに永続化される"""
+        # Arrange
+        hive_result = await beekeeper.handle_create_hive({"name": "Test", "goal": "Test"})
+        hive_id = hive_result["hive_id"]
+
+        # Act
+        await beekeeper.handle_create_colony(
+            {"hive_id": hive_id, "name": "Workers", "domain": "Work"}
+        )
+
+        # Assert: HiveStoreにcolony.createdイベントが追加されている
+        events = list(beekeeper.hive_store.replay(hive_id))
+        event_types = [e.type.value for e in events]
+        assert "colony.created" in event_types
+
 
 class TestListHives:
     """list_hivesハンドラのテスト"""
@@ -189,19 +285,79 @@ class TestListHives:
         assert result["status"] == "success"
         assert result["hives"] == []
 
+    @pytest.mark.asyncio
+    async def test_list_hives_returns_created_hives(self, beekeeper):
+        """作成したHiveが一覧に表示される"""
+        # Arrange: Hiveを2つ作成
+        await beekeeper.handle_create_hive({"name": "Hive1", "goal": "Goal1"})
+        await beekeeper.handle_create_hive({"name": "Hive2", "goal": "Goal2"})
+
+        # Act
+        result = await beekeeper.handle_list_hives({})
+
+        # Assert
+        assert result["status"] == "success"
+        assert len(result["hives"]) == 2
+        names = {h["name"] for h in result["hives"]}
+        assert names == {"Hive1", "Hive2"}
+
 
 class TestListColonies:
     """list_coloniesハンドラのテスト"""
 
     @pytest.mark.asyncio
-    async def test_list_colonies_empty(self, beekeeper):
-        """Colonyなしで一覧取得"""
+    async def test_list_colonies_hive_not_found(self, beekeeper):
+        """存在しないHiveのColony一覧はエラー"""
         # Act
         result = await beekeeper.handle_list_colonies({"hive_id": "hive-1"})
 
         # Assert
+        assert result["status"] == "error"
+        assert "not found" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_list_colonies_empty(self, beekeeper):
+        """HiveにColonyがない場合は空リスト"""
+        # Arrange: Hiveを作成
+        hive_result = await beekeeper.handle_create_hive({"name": "Test", "goal": "Test"})
+        hive_id = hive_result["hive_id"]
+
+        # Act
+        result = await beekeeper.handle_list_colonies({"hive_id": hive_id})
+
+        # Assert
         assert result["status"] == "success"
         assert result["colonies"] == []
+
+    @pytest.mark.asyncio
+    async def test_list_colonies_returns_created_colonies(self, beekeeper):
+        """作成したColonyが一覧に表示される"""
+        # Arrange: Hive + Colonyを作成
+        hive_result = await beekeeper.handle_create_hive({"name": "Test", "goal": "Test"})
+        hive_id = hive_result["hive_id"]
+        await beekeeper.handle_create_colony(
+            {
+                "hive_id": hive_id,
+                "name": "Frontend",
+                "domain": "UI",
+            }
+        )
+        await beekeeper.handle_create_colony(
+            {
+                "hive_id": hive_id,
+                "name": "Backend",
+                "domain": "API",
+            }
+        )
+
+        # Act
+        result = await beekeeper.handle_list_colonies({"hive_id": hive_id})
+
+        # Assert
+        assert result["status"] == "success"
+        assert len(result["colonies"]) == 2
+        names = {c["name"] for c in result["colonies"]}
+        assert names == {"Frontend", "Backend"}
 
 
 class TestApproveReject:
@@ -223,6 +379,18 @@ class TestApproveReject:
         assert result["request_id"] == "req-1"
 
     @pytest.mark.asyncio
+    async def test_approve_persists_event(self, beekeeper):
+        """承認時にRequirementApprovedイベントがARに永続化される"""
+        # Act
+        await beekeeper.handle_approve({"request_id": "req-1", "comment": "OK"})
+
+        # Assert: ARにイベントが記録されている
+        events = list(beekeeper.ar.replay("req-1"))
+        assert len(events) == 1
+        assert events[0].type.value == "requirement.approved"
+        assert events[0].payload["comment"] == "OK"
+
+    @pytest.mark.asyncio
     async def test_reject(self, beekeeper):
         """拒否"""
         # Act
@@ -236,6 +404,18 @@ class TestApproveReject:
         # Assert
         assert result["status"] == "rejected"
         assert result["reason"] == "Too risky"
+
+    @pytest.mark.asyncio
+    async def test_reject_persists_event(self, beekeeper):
+        """拒否時にRequirementRejectedイベントがARに永続化される"""
+        # Act
+        await beekeeper.handle_reject({"request_id": "req-2", "reason": "Unsafe"})
+
+        # Assert: ARにイベントが記録されている
+        events = list(beekeeper.ar.replay("req-2"))
+        assert len(events) == 1
+        assert events[0].type.value == "requirement.rejected"
+        assert events[0].payload["reason"] == "Unsafe"
 
 
 class TestEmergencyStop:
@@ -272,6 +452,68 @@ class TestEmergencyStop:
         assert result["status"] == "stopped"
         assert result["scope"] == "colony"
         assert result["target_id"] == "colony-1"
+
+    @pytest.mark.asyncio
+    async def test_emergency_stop_persists_event(self, beekeeper):
+        """緊急停止時にEmergencyStopイベントがARに永続化される"""
+        # Act
+        await beekeeper.handle_emergency_stop({"reason": "Critical"})
+
+        # Assert: ARにイベントが記録されている
+        events = list(beekeeper.ar.replay("system"))
+        assert len(events) == 1
+        assert events[0].type.value == "system.emergency_stop"
+        assert events[0].payload["reason"] == "Critical"
+
+    @pytest.mark.asyncio
+    async def test_emergency_stop_suspends_session(self, beekeeper):
+        """緊急停止でセッションが一時停止される"""
+        # Arrange: セッションを作成
+        beekeeper.current_session = beekeeper.session_manager.create_session()
+        beekeeper.current_session.set_active()
+
+        # Act
+        await beekeeper.handle_emergency_stop({"reason": "Suspend test"})
+
+        # Assert
+        assert beekeeper.current_session.state == SessionState.SUSPENDED
+
+    @pytest.mark.asyncio
+    async def test_emergency_stop_all_closes_queens(self, beekeeper):
+        """scope=allの緊急停止で全Queen Beeが閉じられる"""
+        # Arrange: Queen Beeを作成
+        from hiveforge.queen_bee.server import QueenBeeMCPServer
+
+        queen = QueenBeeMCPServer(colony_id="colony-1", ar=beekeeper.ar)
+        beekeeper._queens["colony-1"] = queen
+
+        # Act
+        await beekeeper.handle_emergency_stop({"reason": "All stop"})
+
+        # Assert
+        assert len(beekeeper._queens) == 0
+
+    @pytest.mark.asyncio
+    async def test_emergency_stop_colony_closes_target_only(self, beekeeper):
+        """scope=colonyの緊急停止で対象Colonyのみ閉じられる"""
+        # Arrange: 2つのQueen Beeを作成
+        from hiveforge.queen_bee.server import QueenBeeMCPServer
+
+        beekeeper._queens["colony-1"] = QueenBeeMCPServer(colony_id="colony-1", ar=beekeeper.ar)
+        beekeeper._queens["colony-2"] = QueenBeeMCPServer(colony_id="colony-2", ar=beekeeper.ar)
+
+        # Act
+        await beekeeper.handle_emergency_stop(
+            {
+                "reason": "Target stop",
+                "scope": "colony",
+                "target_id": "colony-1",
+            }
+        )
+
+        # Assert: colony-1のみ閉じられる
+        assert "colony-1" not in beekeeper._queens
+        assert "colony-2" in beekeeper._queens
 
 
 class TestDispatchTool:

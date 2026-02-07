@@ -12,7 +12,16 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ..core import AkashicRecord, generate_event_id
+from ..core.ar.hive_projections import build_hive_aggregate
+from ..core.ar.hive_storage import HiveStore
 from ..core.config import LLMConfig
+from ..core.events import (
+    ColonyCreatedEvent,
+    EmergencyStopEvent,
+    HiveCreatedEvent,
+    RequirementApprovedEvent,
+    RequirementRejectedEvent,
+)
 from ..queen_bee.server import QueenBeeMCPServer
 from .session import BeekeeperSession, BeekeeperSessionManager, SessionState
 
@@ -29,6 +38,7 @@ class BeekeeperMCPServer:
     """
 
     ar: AkashicRecord
+    hive_store: HiveStore | None = None
     session_manager: BeekeeperSessionManager = field(default_factory=BeekeeperSessionManager)
     llm_config: LLMConfig | None = None  # エージェント別LLM設定
     current_session: BeekeeperSession | None = None
@@ -38,6 +48,9 @@ class BeekeeperMCPServer:
         self._llm_client = None
         self._agent_runner = None
         self._queens: dict[str, QueenBeeMCPServer] = {}  # colony_id -> Queen Bee
+        # HiveStoreが未設定の場合、ARと同じVaultパスで作成
+        if self.hive_store is None:
+            self.hive_store = HiveStore(self.ar.vault_path)
 
     def get_tool_definitions(self) -> list[dict[str, Any]]:
         """MCPツール定義を取得
@@ -220,7 +233,12 @@ class BeekeeperMCPServer:
             }
 
     async def handle_get_status(self, arguments: dict[str, Any]) -> dict[str, Any]:
-        """ステータス取得ハンドラ"""
+        """ステータス取得ハンドラ
+
+        HiveStore投影から実データを取得する。
+        hive_idが指定されていればそのHiveの詳細を、
+        なければ全Hiveの概要を返す。
+        """
         hive_id = arguments.get("hive_id")
         include_colonies = arguments.get("include_colonies", True)
 
@@ -234,15 +252,72 @@ class BeekeeperMCPServer:
                 "active_colonies": list(self.current_session.active_colonies.keys()),
             }
 
+        assert self.hive_store is not None
+
+        # Hive情報をHiveStore投影から取得
+        hives_data: list[dict[str, Any]] = []
+        colonies_data: list[dict[str, Any]] | None = [] if include_colonies else None
+
+        if hive_id:
+            # 特定Hiveの詳細
+            events = list(self.hive_store.replay(hive_id))
+            if events:
+                aggregate = build_hive_aggregate(hive_id, events)
+                hive_info: dict[str, Any] = {
+                    "hive_id": hive_id,
+                    "name": aggregate.name,
+                    "status": aggregate.state.value,
+                }
+                if include_colonies and colonies_data is not None:
+                    for cid, colony in aggregate.colonies.items():
+                        colonies_data.append(
+                            {
+                                "colony_id": cid,
+                                "hive_id": hive_id,
+                                "goal": colony.goal,
+                                "status": colony.state.value,
+                            }
+                        )
+                    hive_info["colony_count"] = len(aggregate.colonies)
+                hives_data.append(hive_info)
+        else:
+            # 全Hiveの概要
+            for h_id in self.hive_store.list_hives():
+                events = list(self.hive_store.replay(h_id))
+                if events:
+                    aggregate = build_hive_aggregate(h_id, events)
+                    hive_info = {
+                        "hive_id": h_id,
+                        "name": aggregate.name,
+                        "status": aggregate.state.value,
+                        "colony_count": len(aggregate.colonies),
+                    }
+                    hives_data.append(hive_info)
+
+                    if include_colonies and colonies_data is not None:
+                        for cid, colony in aggregate.colonies.items():
+                            colonies_data.append(
+                                {
+                                    "colony_id": cid,
+                                    "hive_id": h_id,
+                                    "goal": colony.goal,
+                                    "status": colony.state.value,
+                                }
+                            )
+
         return {
             "status": "success",
             "session": session_info,
-            "hives": [],  # TODO: AR/Projectionから取得
-            "colonies": [] if include_colonies else None,
+            "hives": hives_data,
+            "colonies": colonies_data,
         }
 
     async def handle_create_hive(self, arguments: dict[str, Any]) -> dict[str, Any]:
-        """Hive作成ハンドラ"""
+        """Hive作成ハンドラ
+
+        HiveCreatedイベントを発行し、HiveStoreに永続化する。
+        セッションをこのHiveにアクティブ化する。
+        """
         name = arguments.get("name", "")
         goal = arguments.get("goal", "")
 
@@ -253,7 +328,18 @@ class BeekeeperMCPServer:
             self.current_session = self.session_manager.create_session()
         self.current_session.activate(hive_id)
 
-        # TODO: HiveCreatedイベントを発行
+        # HiveCreatedイベントを発行してHiveStoreに永続化
+        assert self.hive_store is not None
+        event = HiveCreatedEvent(
+            run_id=hive_id,
+            actor="beekeeper",
+            payload={
+                "hive_id": hive_id,
+                "name": name,
+                "description": goal,
+            },
+        )
+        self.hive_store.append(event, hive_id)
 
         return {
             "status": "created",
@@ -263,10 +349,23 @@ class BeekeeperMCPServer:
         }
 
     async def handle_create_colony(self, arguments: dict[str, Any]) -> dict[str, Any]:
-        """Colony作成ハンドラ"""
+        """Colony作成ハンドラ
+
+        ColonyCreatedイベントを発行し、HiveStoreに永続化する。
+        Hiveの存在確認を行い、セッションにColonyを追加する。
+        """
         hive_id = arguments.get("hive_id", "")
         name = arguments.get("name", "")
         domain = arguments.get("domain", "")
+
+        # Hiveの存在確認
+        assert self.hive_store is not None
+        events = list(self.hive_store.replay(hive_id))
+        if not events:
+            return {
+                "status": "error",
+                "error": f"Hive {hive_id} not found",
+            }
 
         colony_id = generate_event_id()
 
@@ -274,7 +373,18 @@ class BeekeeperMCPServer:
         if self.current_session:
             self.current_session.add_colony(colony_id)
 
-        # TODO: ColonyCreatedイベントを発行
+        # ColonyCreatedイベントを発行してHiveStoreに永続化
+        event = ColonyCreatedEvent(
+            run_id=colony_id,
+            actor="beekeeper",
+            payload={
+                "colony_id": colony_id,
+                "hive_id": hive_id,
+                "name": name,
+                "goal": domain,
+            },
+        )
+        self.hive_store.append(event, hive_id)
 
         return {
             "status": "created",
@@ -285,29 +395,88 @@ class BeekeeperMCPServer:
         }
 
     async def handle_list_hives(self, arguments: dict[str, Any]) -> dict[str, Any]:
-        """Hive一覧ハンドラ"""
-        # TODO: AR/Projectionから取得
+        """Hive一覧ハンドラ
+
+        HiveStore投影から全Hiveの一覧を取得する。
+        """
+        assert self.hive_store is not None
+        hives: list[dict[str, Any]] = []
+
+        for hive_id in self.hive_store.list_hives():
+            events = list(self.hive_store.replay(hive_id))
+            if events:
+                aggregate = build_hive_aggregate(hive_id, events)
+                hives.append(
+                    {
+                        "hive_id": hive_id,
+                        "name": aggregate.name,
+                        "status": aggregate.state.value,
+                        "colony_count": len(aggregate.colonies),
+                    }
+                )
+
         return {
             "status": "success",
-            "hives": [],
+            "hives": hives,
         }
 
     async def handle_list_colonies(self, arguments: dict[str, Any]) -> dict[str, Any]:
-        """Colony一覧ハンドラ"""
+        """Colony一覧ハンドラ
+
+        HiveStore投影から指定HiveのColony一覧を取得する。
+        """
         hive_id = arguments.get("hive_id", "")
-        # TODO: AR/Projectionから取得
+
+        assert self.hive_store is not None
+        events = list(self.hive_store.replay(hive_id))
+        if not events:
+            return {
+                "status": "error",
+                "error": f"Hive {hive_id} not found",
+            }
+
+        aggregate = build_hive_aggregate(hive_id, events)
+        colonies: list[dict[str, Any]] = []
+        for cid, colony in aggregate.colonies.items():
+            colonies.append(
+                {
+                    "colony_id": cid,
+                    "hive_id": hive_id,
+                    "name": colony.metadata.get("name", colony.goal),
+                    "goal": colony.goal,
+                    "status": colony.state.value,
+                }
+            )
+
         return {
             "status": "success",
             "hive_id": hive_id,
-            "colonies": [],
+            "colonies": colonies,
         }
 
     async def handle_approve(self, arguments: dict[str, Any]) -> dict[str, Any]:
-        """承認ハンドラ"""
+        """承認ハンドラ
+
+        RequirementApprovedイベントを発行してARに記録する。
+        Requirement（承認待ち操作）のrequest_idをrun_idとして使用する。
+        """
         request_id = arguments.get("request_id", "")
         comment = arguments.get("comment", "")
 
-        # TODO: 承認処理を実装
+        # RequirementApprovedイベントを発行
+        event = RequirementApprovedEvent(
+            run_id=request_id,
+            actor="beekeeper",
+            payload={
+                "request_id": request_id,
+                "comment": comment,
+                "decided_by": "user",
+            },
+        )
+        self.ar.append(event, request_id)
+
+        logger.info(f"承認: request_id={request_id}, comment={comment}")
+
         return {
             "status": "approved",
             "request_id": request_id,
@@ -315,11 +484,27 @@ class BeekeeperMCPServer:
         }
 
     async def handle_reject(self, arguments: dict[str, Any]) -> dict[str, Any]:
-        """拒否ハンドラ"""
+        """拒否ハンドラ
+
+        RequirementRejectedイベントを発行してARに記録する。
+        """
         request_id = arguments.get("request_id", "")
         reason = arguments.get("reason", "")
 
-        # TODO: 拒否処理を実装
+        # RequirementRejectedイベントを発行
+        event = RequirementRejectedEvent(
+            run_id=request_id,
+            actor="beekeeper",
+            payload={
+                "request_id": request_id,
+                "reason": reason,
+                "decided_by": "user",
+            },
+        )
+        self.ar.append(event, request_id)
+
+        logger.info(f"拒否: request_id={request_id}, reason={reason}")
+
         return {
             "status": "rejected",
             "request_id": request_id,
@@ -327,13 +512,45 @@ class BeekeeperMCPServer:
         }
 
     async def handle_emergency_stop(self, arguments: dict[str, Any]) -> dict[str, Any]:
-        """緊急停止ハンドラ"""
+        """緊急停止ハンドラ
+
+        EmergencyStopイベントを発行してARに記録する。
+        セッションを一時停止状態にし、全Queen Beeを閉じる。
+        scope=hive/colonyの場合は対象を限定する。
+        """
         reason = arguments.get("reason", "")
         scope = arguments.get("scope", "all")
         target_id = arguments.get("target_id")
 
-        # TODO: 緊急停止処理を実装
         logger.warning(f"緊急停止: {reason} (scope={scope}, target={target_id})")
+
+        # EmergencyStopイベントを発行
+        event = EmergencyStopEvent(
+            run_id=target_id or "system",
+            actor="beekeeper",
+            payload={
+                "reason": reason,
+                "scope": scope,
+                "target_id": target_id,
+            },
+        )
+        # ARに記録（対象IDがあればそのストリームに、なければ"system"に）
+        self.ar.append(event, target_id or "system")
+
+        # セッションを一時停止
+        if self.current_session:
+            self.current_session.suspend()
+
+        # scope=all の場合、全Queen Beeを閉じる
+        if scope == "all":
+            for queen in self._queens.values():
+                await queen.close()
+            self._queens.clear()
+        elif scope == "colony" and target_id:
+            # 対象Colonyのみ閉じる
+            if target_id in self._queens:
+                await self._queens[target_id].close()
+                del self._queens[target_id]
 
         return {
             "status": "stopped",
