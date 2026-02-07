@@ -51,20 +51,13 @@ Hive（プロジェクト）
 | **Run** | 実行単位（タスクの集合） |
 | **Task** | 個別の作業項目 |
 
-## 実装状況
+## 開発ステータス
 
-| フェーズ | 内容 | 状態 |
-|---------|------|------|
-| Phase 1 | Hive/Colony基盤、イベント、状態機械 | ✅ 完了 |
-| Phase 2 | Worker Bee基盤、Queen Bee連携 | ✅ 完了 |
-| Phase 3 | Beekeeper基盤、Escalation | ✅ 完了 |
-| Phase 4 | 衝突検出・解決、Conference | ✅ 完了 |
-| Phase 5 | ツール実行、リトライ、TrustLevel | ✅ 完了 |
-| Phase 6+ | 統合テスト、UI強化 | 🔜 計画中 |
+各コンポーネントの基盤スケルトンが完成し、コンポーネント間の接続・統合を進めている段階です。
 
-**テスト**: 1092 passed / カバレッジ 96%
+詳細: [docs/DEVELOPMENT_PLAN_v1.md](docs/DEVELOPMENT_PLAN_v1.md)
 
-詳細: [docs/IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md)
+テスト実行: `pytest tests --ignore=tests/e2e -q`
 
 ## クイックスタート
 
@@ -148,7 +141,7 @@ src/hiveforge/
 └── cli.py             # CLI
 
 vscode-extension/      # VS Code拡張
-tests/                 # テスト (1092件)
+tests/                 # テスト
 Vault/                 # イベントログ (gitignore)
 ```
 
@@ -157,10 +150,10 @@ Vault/                 # イベントログ (gitignore)
 | ドキュメント | 説明 |
 |--------------|------|
 | [AGENTS.md](AGENTS.md) | AI開発ガイドライン |
-| [docs/IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md) | 実装状況サマリー |
+| [docs/DEVELOPMENT_PLAN_v1.md](docs/DEVELOPMENT_PLAN_v1.md) | 開発計画・進捗の正 |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | アーキテクチャ設計書 |
 | [docs/QUICKSTART.md](docs/QUICKSTART.md) | 動作確認手順書 |
-| [docs/design/v5-hive-design.md](docs/design/v5-hive-design.md) | v5設計ドキュメント |
+| [docs/コンセプト_v5.md](docs/コンセプト_v5.md) | 設計思想・概念モデル |
 
 ## テスト実行
 

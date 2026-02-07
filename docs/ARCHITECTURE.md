@@ -692,86 +692,62 @@ logging:
 
 ---
 
-## 10. フェーズゲート条件
+## 10. 開発計画・ゲート条件
 
-### 12.1 概要
+### 10.1 概要
 
-HiveForge の開発はフェーズに分かれており、各フェーズを完了するためには「ゲート条件」を満たす必要があります。これにより、早期フェーズの成果物が安定していることを確認してから次のフェーズに進むことができます。
+開発の進捗管理はフェーズベースからマイルストーンベースに移行しました。
+詳細は [DEVELOPMENT_PLAN_v1.md](DEVELOPMENT_PLAN_v1.md) を参照してください。
 
-### 12.2 フェーズ一覧
+### 10.2 マイルストーン
 
-| フェーズ | 名称 | 主な成果物 |
-|----------|------|------------|
-| Phase 1 | 基盤構築 | イベントソーシング、AR、状態機械 |
-| Phase 2 | Hive構造 | Hive/Colony階層、Colony状態機械 |
-| Phase 3 | Queen Bee | Colony代表エージェント、Opinion集約 |
-| Phase 4 | Beekeeper | 横断調整、Conferenceモード |
-| Phase 5 | Worker Bee | 実タスク実行、ツール連携 |
-| Phase 6 | 自律運用 | 自動並列実行、障害回復 |
-| Phase 7 | 継続改善 | 回顧・提案・承認サイクル |
+| マイルストーン | 目標 | ステータス |
+|---------------|------|----------|
+| M1: 基盤固め | AR移行、スタブ解消、型安全 | 🔄 進行中 |
+| M2: 接続 | VS Code↔API、エージェント間E2E | 計画中 |
+| M3: 自律 | LLMタスク分解、Orchestrator | 計画中 |
+| M4: 運用品質 | セキュリティ、CI/CD、ドキュメント | 計画中 |
 
-### 12.3 ゲート条件詳細
+### 10.3 ゲート条件
 
-#### Phase 6 ゲート条件（自律運用への移行）
+以下は各マイルストーンの通過に必要な要件ゲートです:
 
-Phase 5 完了後、Phase 6 に進むための必須条件:
-
-| ID | 条件 | 検証方法 |
-|----|------|----------|
-| G6-01 | Colony間衝突検出機能が実装済み | `CONFLICT_DETECTED` イベントが発行可能 |
-| G6-02 | 衝突解決プロトコルが定義済み | `CONFLICT_RESOLVED` イベントとマージルール |
-| G6-03 | 標準失敗理由の分類が完了 | `FailureReason` enum の使用 |
-| G6-04 | タイムアウト検出が実装済み | `OPERATION_TIMEOUT` イベント発行 |
-| G6-05 | Action Classが実装済み | `ActionClass`, `TrustLevel` による分類 |
-| G6-06 | 確認要求マトリクスが定義済み | `requires_confirmation()` 関数 |
-| G6-07 | Conference モードが動作 | `CONFERENCE_STARTED/ENDED` イベント |
-
-#### Phase 7 ゲート条件（継続改善への移行）
-
-Phase 6 完了後、Phase 7 に進むための必須条件:
-
-| ID | 条件 | 検証方法 |
-|----|------|----------|
-| G7-01 | Decision Protocolが実装済み | `PROPOSAL_CREATED`, `DECISION_APPLIED` イベント |
-| G7-02 | 決定の上書き履歴が追跡可能 | `DECISION_SUPERSEDED` イベント |
-| G7-03 | ProjectContractが定義済み | 目標・制約・非目標・決定の構造化共有 |
-| G7-04 | 因果リンクで決定を遡及可能 | `parents` フィールドによるリンク |
-| G7-05 | 全ての失敗がイベント化 | `OPERATION_FAILED` + 理由コード |
-
-### 12.4 現在のステータス（v5.1）
-
-Phase 2（Worker Bee）の完了状況:
-
-| 要件 | ステータス | 実装 |
-|------|----------|------|
-| Worker Bee基盤 | ✅ 完了 | `worker_bee/server.py`, `projections.py` |
-| Queen Bee連携 | ✅ 完了 | `queen_bee/__init__.py`, `progress.py`, `retry.py` |
-| Colony優先度スケジューラ | ✅ 完了 | `queen_bee/scheduler.py` |
-| Colony間通信 | ✅ 完了 | `queen_bee/communication.py` |
-| デッドロック検出 | ✅ 完了 | `queen_bee/communication.py` |
-
-テスト: 931件、カバレッジ: 96%
+| ID | 条件 | 検証方法 | 状態 |
+|----|------|----------|------|
+| G-01 | Colony間衝突検出が実装済み | `CONFLICT_DETECTED` イベント発行可能 | ✅ |
+| G-02 | 衝突解決プロトコルが定義済み | `CONFLICT_RESOLVED` イベントとマージルール | ✅ |
+| G-03 | 標準失敗理由の分類が完了 | `FailureReason` enum の使用 | ✅ |
+| G-04 | タイムアウト検出が実装済み | `OPERATION_TIMEOUT` イベント発行 | ✅ |
+| G-05 | Action Classが実装済み | `ActionClass`, `TrustLevel` による分類 | ✅ |
+| G-06 | 確認要求マトリクスが定義済み | `requires_confirmation()` 関数 | ✅ |
+| G-07 | Conference モードが動作 | `CONFERENCE_STARTED/ENDED` イベント | ✅ |
+| G-08 | Hive/ColonyがAR永続化 | サーバー再起動後もデータ維持 | M1 |
+| G-09 | Beekeeperの全ハンドラが実装 | TODOスタブがゼロ | M1 |
+| G-10 | E2Eエージェントチェーンが動作 | Beekeeper→Queen→Worker完走 | M2 |
+| G-11 | LLMタスク分解が動作 | 抽象目標→複数タスク自動分解 | M3 |
 
 ---
 
 ## 11. 今後の拡張
 
-### 12.1 主要な計画
+### 11.1 主要な計画
 
 - [x] Worker Bee: MCPサブプロセスベースのWorker
 - [x] Queen Bee連携: タスク割り当て、進捗集約、リトライ
 - [x] Colony優先度: 静的設定ベースのリソース配分
-- [ ] LLM Orchestrator: 自律的なタスク分解・実行
+- [ ] LLM Orchestrator: 自律的なタスク分解・実行 (M3)
 - [ ] Artifact管理: 成果物の保存と参照
 - [ ] 因果リンクの自動設定（[Issue #001](issues/001-lineage-auto-parents.md)）
 - [ ] イベント署名: 改ざん者の特定
 
-### 12.2 VS Code拡張の拡充
+### 11.2 VS Code拡張の拡充
 
+- [x] Hive Monitor: リアルタイム活動可視化（Webview）
+- [x] TreeView: Activity Hierarchy API連動
 - [ ] 因果グラフ可視化（Webview）
 - [ ] リアルタイムイベントストリーム
 
-### 12.3 スケーラビリティ
+### 11.3 スケーラビリティ
 
 - [ ] エンティティ別チェーン（並列書き込み対応）
 - [ ] イベントアーカイブ
@@ -781,7 +757,7 @@ Phase 2（Worker Bee）の完了状況:
 
 ## 参照
 
+- [DEVELOPMENT_PLAN_v1.md](DEVELOPMENT_PLAN_v1.md) - 開発計画（進捗の正）
 - [QUICKSTART.md](QUICKSTART.md) - 動作確認手順
 - [AGENTS.md](../AGENTS.md) - AI開発ガイドライン
-- [コンセプト_v4.md](%E3%82%B3%E3%83%B3%E3%82%BB%E3%83%97%E3%83%88_v4.md) - コンセプト（作業用仕様・最新版）
-- [コンセプト_v3.md](%E3%82%B3%E3%83%B3%E3%82%BB%E3%83%97%E3%83%88_v3.md) - コンセプト（v3・ベースライン）
+- [コンセプト_v5.md](%E3%82%B3%E3%83%B3%E3%82%BB%E3%83%97%E3%83%88_v5.md) - 設計思想（最新版）
