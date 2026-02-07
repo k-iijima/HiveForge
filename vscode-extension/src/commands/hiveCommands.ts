@@ -40,19 +40,10 @@ export async function createHive(): Promise<void> {
         placeHolder: 'このHiveの目的',
     });
 
-    // TODO: MCP経由でHiveを作成
-    // 今はモックでTreeViewに追加
-    if (hiveTreeProvider) {
-        const hiveId = `hive-${Date.now()}`;
-        hiveTreeProvider.addHive({
-            hive_id: hiveId,
-            name: name,
-            description: description || undefined,
-            status: 'active',
-            colonies: [],
-        });
-        vscode.window.showInformationMessage(`Hive "${name}" を作成しました`);
-    }
+    // TODO: API経由でHiveを作成（POST /hives）
+    // 現在はリフレッシュのみ（Activity APIからの階層取得に依存）
+    vscode.window.showInformationMessage(`Hive "${name}" の作成をリクエストしました`);
+    hiveTreeProvider?.refresh();
 }
 
 /**

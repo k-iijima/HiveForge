@@ -45,19 +45,10 @@ export async function createColony(hiveId?: string): Promise<void> {
         placeHolder: 'このColonyで達成したいこと',
     });
 
-    // TODO: MCP経由でColonyを作成
-    // 今はモックでTreeViewに追加
-    if (hiveTreeProvider) {
-        const colonyId = `colony-${Date.now()}`;
-        hiveTreeProvider.addColony({
-            colony_id: colonyId,
-            hive_id: hiveId,
-            name: name,
-            goal: goal || undefined,
-            status: 'created',
-        });
-        vscode.window.showInformationMessage(`Colony "${name}" を作成しました`);
-    }
+    // TODO: API経由でColonyを作成（POST /colonies）
+    // 現在はリフレッシュのみ（Activity APIからの階層取得に依存）
+    vscode.window.showInformationMessage(`Colony "${name}" の作成をリクエストしました`);
+    hiveTreeProvider?.refresh();
 }
 
 /**
