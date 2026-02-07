@@ -1,12 +1,33 @@
-# セッションステータス - 2026/02/01
+# セッションステータス - 2026/02/07
 
 ## 概要
 
-HiveForgeプロジェクトのエージェント間通信アーキテクチャとプロンプトカスタマイズ機能の実装が完了。
+HiveForgeプロジェクトのプロンプトYAML統合が完了。各エージェント（Beekeeper, Queen Bee, Worker Bee）が
+YAML設定ファイルからカスタムプロンプトを読み込めるようになった。
 
 ## 完了した作業
 
-### 1. エージェント間通信フロー（全て実装・動作確認済み）
+### 今回のセッション (2026/02/07)
+
+1. **devcontainer改善のコミット＆push**
+   - Docker Desktop対応（GPU専用 → 汎用化）
+   - Playwright MCP ServerをローカルDockerfileでビルド
+   - 10コミット分をorigin/masterにpush
+
+2. **プロンプトYAML統合**（全エージェント）
+   - `AgentRunner`に`vault_path`, `hive_id`, `colony_id`, `worker_name`パラメータ追加
+   - `_resolve_system_prompt()`メソッドでYAML → デフォルトのフォールバック
+   - Beekeeper: `vault_path`を渡す
+   - Queen Bee: `vault_path` + `colony_id`を渡す
+   - Worker Bee: `vault_path` + `worker_id`を渡す
+   - テスト10件追加（7件AgentRunner + 3件サーバー）
+
+3. **hiveforge.config.yaml整理**
+   - agentsセクションにプロンプトYAML読み込み優先順位を記載
+   - ファイル命名規則と配置例を追加
+   - ガバナンス設定とプロンプト設定の役割分担を明確化
+
+### 前回セッション (〜2026/02/01)
 
 ```
 User → Beekeeper → Queen Bee → Worker Bee
@@ -63,24 +84,8 @@ Vault/hives/                  # カスタマイズ配置先
 ## Git状態
 
 ```
-ブランチ: master
-origin/masterより8コミット先行
-
-最新コミット:
-9aae887 feat(llm): パッケージ内にデフォルトプロンプトYAMLを配置
-2f5e7ed feat(llm): プロンプトをYAMLでカスタマイズ可能に
-23f4a9d fix(beekeeper): LLM出力を応答に含める
-4a7cb1c feat(beekeeper): Beekeeper → Queen Bee接続実装
-91f4de2 feat(queen_bee): Queen Bee MCPサーバー実装
-007b8a0 feat(cli): chatコマンド追加（Beekeeper対話）
-c9aeeed feat(beekeeper): Beekeeper MCPサーバー実装
-005a234 feat(worker_bee): MCP経由でのLLM実行統合
+ブランチ: master（origin/masterと同期済み）
 ```
-
-## テスト状況
-
-- **ユニットテスト**: 1247件 全てパス
-- **E2Eテスト**: 別途（VLM環境が必要）
 
 ## 動作確認済みコマンド
 
@@ -90,14 +95,33 @@ hiveforge chat "カレントディレクトリのファイル一覧を表示し�
 # → Beekeeper → Queen Bee → Worker Bee → list_directory → 結果表示
 ```
 
+## プロンプト読み込みフロー（完成版）
+
+```
+AgentRunner.run()
+  → _resolve_system_prompt()
+    → vault_pathあり? → get_prompt_from_config()
+      → PromptLoader._find_config_file()
+        → 1. Vault/hives/{hive_id}/colonies/{colony_id}/
+        → 2. Vault/hives/{hive_id}/
+        → 3. src/hiveforge/llm/default_prompts/
+        → 4. ハードコードフォールバック
+    → vault_pathなし? → get_system_prompt() (後方互換)
+```
+
 ## 次に検討すべき作業
 
-1. **プロンプトYAMLの実際の統合**
-   - 各エージェントのサーバーで`get_prompt_from_config()`を使用するよう更新
-   - 現状はハードコードプロンプトを使用中
+1. **hive_idの引き回し**
+   - Beekeeper/Queen Beeが実行時にhive_idを受け取り、AgentRunnerに渡す
+   - 現状はデフォルト"0"を使用
 
-2. **hiveforge.config.yaml整理**
-   - agents設定とYAMLファイル設定の関係整理
+2. **プロンプトYAMLの実運用テスト**
+   - 実際のVaultにカスタムプロンプトを配置して動作確認
+   - `hiveforge chat`コマンドでの統合テスト
+
+3. **VS Code拡張連携**
+   - プロンプトYAML編集UIの提供
+   - Hive/Colony/Worker設定のツリービュー
    - 重複する設定の統合
 
 3. **git push**
