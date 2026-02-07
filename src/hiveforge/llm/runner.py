@@ -3,6 +3,8 @@
 LLM + ツール実行ループを管理。
 """
 
+from __future__ import annotations
+
 import json
 import logging
 from dataclasses import dataclass, field
@@ -10,6 +12,7 @@ from typing import Any, Callable, Awaitable
 
 from .client import LLMClient, LLMResponse, Message, ToolCall
 from .prompts import get_prompt_from_config, get_system_prompt
+from ..core.activity_bus import ActivityBus, ActivityEvent, ActivityType, AgentInfo
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +73,7 @@ class AgentRunner:
         hive_id: str = "0",
         colony_id: str = "0",
         worker_name: str = "default",
+        agent_info: AgentInfo | None = None,
     ):
         """初期化
 
@@ -81,6 +85,7 @@ class AgentRunner:
             hive_id: Hive ID
             colony_id: Colony ID
             worker_name: Worker Beeの名前
+            agent_info: ActivityBus用エージェント情報（None=イベント発行しない）
         """
         self.client = client
         self.agent_type = agent_type
@@ -89,6 +94,7 @@ class AgentRunner:
         self.hive_id = hive_id
         self.colony_id = colony_id
         self.worker_name = worker_name
+        self.agent_info = agent_info
         self.tools: dict[str, ToolDefinition] = {}
 
     def register_tool(self, tool: ToolDefinition) -> None:
@@ -118,6 +124,24 @@ class AgentRunner:
     def get_tool_definitions(self) -> list[dict[str, Any]]:
         """OpenAI形式のツール定義リストを取得"""
         return [tool.to_openai_format() for tool in self.tools.values()]
+
+    async def _emit_activity(
+        self,
+        activity_type: ActivityType,
+        summary: str,
+        detail: dict[str, Any] | None = None,
+    ) -> None:
+        """ActivityBusにイベントを発行する（agent_info設定時のみ）"""
+        if self.agent_info is None:
+            return
+        bus = ActivityBus.get_instance()
+        event = ActivityEvent(
+            activity_type=activity_type,
+            agent=self.agent_info,
+            summary=summary,
+            detail=detail or {},
+        )
+        await bus.emit(event)
 
     async def run(
         self,
@@ -149,11 +173,30 @@ class AgentRunner:
             logger.debug(f"反復 {iteration + 1}/{self.max_iterations}")
 
             try:
-                # LLM呼び出し
+                # LLM呼び出し - リクエストイベント発行
+                await self._emit_activity(
+                    ActivityType.LLM_REQUEST,
+                    f"LLMリクエスト (反復 {iteration + 1})",
+                    {"message_count": len(messages)},
+                )
+
                 response = await self.client.chat(
                     messages=messages,
                     tools=tool_definitions,
                     tool_choice="auto" if tool_definitions else None,
+                )
+
+                # LLMレスポンスイベント発行
+                content_summary = (response.content or "")[:100]
+                tool_count = len(response.tool_calls) if response.tool_calls else 0
+                await self._emit_activity(
+                    ActivityType.LLM_RESPONSE,
+                    content_summary if content_summary else f"ツール呼び出し {tool_count}件",
+                    {
+                        "has_tool_calls": response.has_tool_calls,
+                        "tool_count": tool_count,
+                        "finish_reason": response.finish_reason,
+                    },
                 )
 
                 # ツール呼び出しがある場合
@@ -193,6 +236,11 @@ class AgentRunner:
 
             except Exception as e:
                 logger.exception(f"エージェント実行エラー: {e}")
+                await self._emit_activity(
+                    ActivityType.AGENT_ERROR,
+                    str(e),
+                    {"error_type": type(e).__name__},
+                )
                 return RunResult(
                     success=False,
                     output="",
@@ -226,13 +274,36 @@ class AgentRunner:
         if not tool:
             return json.dumps({"error": f"未知のツール: {tool_call.name}"})
 
+        # MCP_TOOL_CALLイベント発行
+        await self._emit_activity(
+            ActivityType.MCP_TOOL_CALL,
+            f"ツール呼び出し: {tool_call.name}",
+            {"tool_name": tool_call.name, "arguments": tool_call.arguments},
+        )
+
         try:
             logger.info(f"ツール実行: {tool_call.name}({tool_call.arguments})")
             result = await tool.handler(**tool_call.arguments)
             logger.info(
                 f"ツール結果: {result[:100]}..." if len(result) > 100 else f"ツール結果: {result}"
             )
+
+            # MCP_TOOL_RESULTイベント発行（成功）
+            await self._emit_activity(
+                ActivityType.MCP_TOOL_RESULT,
+                f"ツール結果: {tool_call.name}",
+                {"tool_name": tool_call.name, "result_length": len(result)},
+            )
+
             return result
         except Exception as e:
             logger.exception(f"ツール実行エラー: {tool_call.name}")
+
+            # MCP_TOOL_RESULTイベント発行（エラー）
+            await self._emit_activity(
+                ActivityType.MCP_TOOL_RESULT,
+                f"ツールエラー: {tool_call.name}",
+                {"tool_name": tool_call.name, "error": str(e)},
+            )
+
             return json.dumps({"error": str(e)})
