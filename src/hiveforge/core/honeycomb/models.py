@@ -95,7 +95,7 @@ class Episode(BaseModel):
     template_used: str = Field(default="balanced", description="使用したColonyテンプレート")
 
     # 入力: タスク特徴量（Swarming Protocolスコア）
-    # SwarmingFeaturesがまだ未実装のためdictで保持
+    # SwarmingFeaturesの値をdictで保持（complexity, risk, urgency）
     task_features: dict[str, float] = Field(
         default_factory=dict,
         description="タスク特徴量（SwarmingFeatures）",

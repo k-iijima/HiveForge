@@ -23,7 +23,7 @@
 
 | コンポーネント | ステータス | 詳細 |
 |---------------|-----------|------|
-| **Hive Core** (イベント, AR, 状態機械) | ✅ 完了 | 47 EventType, 5状態機械, ハッシュ連鎖 |
+| **Hive Core** (イベント, AR, 状態機械) | ✅ 完了 | 51 EventType, 5状態機械, ハッシュ連鎖 |
 | **Hive/Colony AR永続化** | ✅ M1-1完了 | HiveStore + HiveAggregate, JSONL永続化 |
 | **API Server** (FastAPI REST) | ✅ 完了 | Hive/Colony CRUD が AR永続化と接続済み |
 | **MCP Server** (Copilot連携) | ✅ 完了 | 全ツール実装・テスト済 |
@@ -183,12 +183,12 @@ M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)  
 
 | タスク | 内容 | 対象ファイル |
 |--------|------|-------------|
-| M3-3-a | Guard Bee データモデル | `guard_bee/models.py` |
-| M3-3-b | 検証ルール定義フレームワーク | `guard_bee/rules.py` |
-| M3-3-c | 検証実行エンジン | `guard_bee/verifier.py` |
-| M3-3-d | 合格/差戻しフロー | `guard_bee/verifier.py` |
-| M3-3-e | Honeycomb との連携（検証結果記録） | `guard_bee/verifier.py` |
-| M3-3-f | MCP / API エンドポイント | `api/routes/guard_bee.py` |
+| M3-3-a | Guard Bee データモデル | `guard_bee/models.py` | ✅ |
+| M3-3-b | 検証ルール定義フレームワーク | `guard_bee/rules.py` | ✅ |
+| M3-3-c | 検証実行エンジン | `guard_bee/verifier.py` | ✅ |
+| M3-3-d | 合格/差戻しフロー | `guard_bee/verifier.py` | ✅ |
+| M3-3-e | Honeycomb との連携（検証結果記録） | `guard_bee/verifier.py` | ✅ |
+| M3-3-f | MCP / API エンドポイント | `api/routes/guard_bee.py` | ⬜ 未着手 |
 
 **完了条件**:
 - Colonyの成果物がGuard Beeによって検証される
