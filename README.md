@@ -6,7 +6,7 @@ HiveForgeは、LLMを活用した自律型ソフトウェア開発支援シス�
 
 ## 特徴
 
-- **マルチエージェント協調**: Beekeeper（調整役）、Queen Bee（Colony統括）、Worker Bee（実務）、Sentinel Hornet（監視・執行）、Guard Bee（品質検証）、Forager Bee（探索的テスト）、Referee Bee（多面的採点・選抜）の階層構造
+- **マルチエージェント協調**: Beekeeper（Hive統括）、Queen Bee（Colony統括）、Worker Bee（実務）、Sentinel Hornet（監視・執行）、Guard Bee（品質検証）、Forager Bee（探索的テスト）、Referee Bee（多面的採点・選抜）の階層構造
 - **大量生成→自動検証→生存選抜**: 「1回で正解を出す」から「N案並列生成 + 厳密な自動審判」へのパラダイムシフト
 - **Hive/Colony階層**: 複数のRunを専門領域（Colony）で組織化
 - **Swarming Protocol**: タスク特性に応じた適応的Colony編成
