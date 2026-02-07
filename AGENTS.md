@@ -158,7 +158,7 @@ src/hiveforge/
 │   └── state/      # 状態機械
 ├── api/            # FastAPI サーバー
 ├── mcp_server/     # MCP Server
-├── beekeeper/      # Beekeeper（ユーザー窓口・調整）
+├── beekeeper/      # Beekeeper（ユーザー窓口・Hive統括）
 ├── sentinel_hornet/ # Sentinel Hornet（監視・異常検出・強制停止）
 ├── queen_bee/      # Queen Bee（Colony統括）
 ├── worker_bee/     # Worker Bee（タスク実行）

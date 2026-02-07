@@ -137,7 +137,7 @@ HiveForgeは「**信頼できる部品を、信頼できる組み合わせ方を
 | **API Server** | REST API エンドポイント | ✅ Hive/Colony CRUD が AR永続化と接続済み (M1-1完了) |
 | **MCP Server** | Copilot Chat連携 | ✅ 実装済・テスト済 |
 | **CLI** | コマンドラインインターフェース | ✅ 実装済（型注釈不足 → M1-3） |
-| **Beekeeper** | ユーザー窓口・Colony間調整 | ✅ 全ハンドラ実装済 (M1-2完了) |
+| **Beekeeper** | ユーザー窓口・Hive統括 | ✅ 全ハンドラ実装済 (M1-2完了) |
 | **Queen Bee** | Colony統括・タスク分解 | ⚠️ 基盤完了、タスク分解スタブ → M4-1 |
 | **Worker Bee** | タスク実行（MCPサブプロセス） | ✅ 実装済（ツール実行, リトライ, Trust） |
 | **Sentinel Hornet** | Hive内監視・異常検出・強制停止 | ✅ 4検出パターン実装済 (M2-0完了) |
@@ -896,13 +896,15 @@ logging:
 - [x] Worker Bee: MCPサブプロセスベースのWorker
 - [x] Queen Bee連携: タスク割り当て、進捗集約、リトライ
 - [x] Colony優先度: 静的設定ベースのリソース配分
+- [ ] Honeycomb: 実行履歴・学習基盤 (M3-1)
 - [ ] Swarming Protocol Engine: タスク適応的Colony編成 (M3-2)
 - [ ] Guard Bee: 品質検証エージェント (M3-3)
 - [ ] Forager Bee: 探索的テスト・影響分析 (M3-4)
 - [ ] Referee Bee: N案多面的採点・生存選抜 (M3-5)
-- [ ] Honeycomb: 実行履歴・学習基盤 (M3-1)
-- [ ] Scout Bee: 過去実績に基づく編成最適化 (M3-8)
+- [ ] Sentinel Hornet拡張: KPI監視 + 執行アクション (M3-6)
 - [ ] Waggle Dance: I/O構造化検証 (M3-7)
+- [ ] Scout Bee: 過去実績に基づく編成最適化 (M3-8)
+- [ ] Queen Bee タスク分解: LLMタスク分解実装 (M4-1)
 - [ ] LLM Orchestrator: 自律的なタスク分解・実行 (M4-2)
 - [ ] Artifact管理: 成果物の保存と参照
 - [ ] 因果リンクの自動設定（[Issue #001](issues/001-lineage-auto-parents.md)）
@@ -926,6 +928,7 @@ logging:
 ## 参照
 
 - [DEVELOPMENT_PLAN_v2.md](DEVELOPMENT_PLAN_v2.md) - 開発計画（進捗の正）
+- [v5-hive-design.md](design/v5-hive-design.md) - 詳細設計（Single Source of Truth）
 - [QUICKSTART.md](QUICKSTART.md) - 動作確認手順
 - [AGENTS.md](../AGENTS.md) - AI開発ガイドライン
 - [コンセプト_v6.md](コンセプト_v6.md) - 設計思想（最新版）

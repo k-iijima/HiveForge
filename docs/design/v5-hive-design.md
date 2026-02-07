@@ -148,7 +148,7 @@ class EscalationType(Enum):
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         Queen Bee (女王蜂)                           │
-│                       Colonyの調停エージェント                        │
+│                     Colonyの統括・調停エージェント                    │
 │  - colony_id: string (所属Colony)                                   │
 │  - system_prompt: string (調停用プロンプト)                          │
 │  - context_summary: string (Colony全体の状況要約)                    │
