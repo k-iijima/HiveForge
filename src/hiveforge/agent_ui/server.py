@@ -90,9 +90,7 @@ class AgentUIMCPServer:
     ) -> list[TextContent | ImageContent]:
         return await self.handlers.handle_capture_screen(args)
 
-    async def _handle_describe_page(
-        self, args: dict[str, Any]
-    ) -> list[TextContent | ImageContent]:
+    async def _handle_describe_page(self, args: dict[str, Any]) -> list[TextContent | ImageContent]:
         return await self.handlers.handle_describe_page(args)
 
     async def _handle_find_element(self, args: dict[str, Any]) -> list[TextContent]:
