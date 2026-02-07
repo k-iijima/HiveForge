@@ -387,3 +387,26 @@ class TestBeekeeperAgentRunnerPromptContext:
         # Assert
         assert runner.vault_path == str(beekeeper.ar.vault_path)
         assert runner.agent_type == "beekeeper"
+
+    @pytest.mark.asyncio
+    async def test_agent_runner_receives_agent_info(self, beekeeper):
+        """BeekeeperのAgentRunnerにAgentInfoが設定される
+
+        ActivityBusにイベントを発行するために、
+        AgentRunnerにagent_infoを渡す。
+        """
+        # Arrange
+        from unittest.mock import MagicMock, AsyncMock
+        from hiveforge.llm.client import LLMClient
+        from hiveforge.core.activity_bus import AgentRole
+
+        mock_client = MagicMock(spec=LLMClient)
+        mock_client.chat = AsyncMock()
+        beekeeper._llm_client = mock_client
+
+        # Act
+        runner = await beekeeper._get_agent_runner()
+
+        # Assert
+        assert runner.agent_info is not None
+        assert runner.agent_info.role == AgentRole.BEEKEEPER

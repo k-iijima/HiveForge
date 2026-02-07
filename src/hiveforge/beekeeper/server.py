@@ -359,12 +359,19 @@ class BeekeeperMCPServer:
         if self._agent_runner is None:
             from ..llm.runner import AgentRunner
             from ..llm.tools import ToolDefinition
+            from ..core.activity_bus import AgentInfo, AgentRole
 
             client = await self._get_llm_client()
+            agent_info = AgentInfo(
+                agent_id="beekeeper",
+                role=AgentRole.BEEKEEPER,
+                hive_id="0",
+            )
             self._agent_runner = AgentRunner(
                 client,
                 agent_type="beekeeper",
                 vault_path=str(self.ar.vault_path),
+                agent_info=agent_info,
             )
 
             # Beekeeperが使える内部ツールを登録

@@ -1631,3 +1631,23 @@ class TestWorkerBeeAgentRunnerPromptContext:
         assert runner.vault_path == str(worker_bee.ar.vault_path)
         assert runner.worker_name == worker_bee.worker_id
         assert runner.agent_type == "worker_bee"
+
+    @pytest.mark.asyncio
+    async def test_agent_runner_receives_agent_info(self, worker_bee):
+        """Worker BeeのAgentRunnerにAgentInfoが設定される"""
+        # Arrange
+        from unittest.mock import MagicMock, AsyncMock
+        from hiveforge.llm.client import LLMClient
+        from hiveforge.core.activity_bus import AgentRole
+
+        mock_client = MagicMock(spec=LLMClient)
+        mock_client.chat = AsyncMock()
+        worker_bee._llm_client = mock_client
+
+        # Act
+        runner = await worker_bee._get_agent_runner()
+
+        # Assert
+        assert runner.agent_info is not None
+        assert runner.agent_info.role == AgentRole.WORKER_BEE
+        assert runner.agent_info.agent_id == worker_bee.worker_id

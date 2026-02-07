@@ -324,13 +324,21 @@ class WorkerBeeMCPServer:
         if self._agent_runner is None:
             from ..llm.runner import AgentRunner
             from ..llm.tools import get_basic_tools
+            from ..core.activity_bus import AgentInfo, AgentRole
 
             client = await self._get_llm_client()
+            agent_info = AgentInfo(
+                agent_id=self.worker_id,
+                role=AgentRole.WORKER_BEE,
+                hive_id="0",
+                colony_id=self.context.colony_id if hasattr(self.context, "colony_id") else "0",
+            )
             self._agent_runner = AgentRunner(
                 client,
                 agent_type="worker_bee",
                 vault_path=str(self.ar.vault_path),
                 worker_name=self.worker_id,
+                agent_info=agent_info,
             )
 
             # 基本ツールを登録
