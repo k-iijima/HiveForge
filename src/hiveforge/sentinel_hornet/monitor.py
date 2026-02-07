@@ -140,9 +140,7 @@ class SentinelHornet:
         # 2. イベント型パターンの周期性検出（A→B→A→B...）
         if len(events) >= self.max_loop_count * 2:
             type_sequence = [e.type for e in events]
-            alerts.extend(
-                self._detect_type_cycle(type_sequence, colony_id)
-            )
+            alerts.extend(self._detect_type_cycle(type_sequence, colony_id))
 
         return alerts
 
@@ -199,9 +197,7 @@ class SentinelHornet:
         window_start = now - timedelta(seconds=self.rate_window_seconds)
 
         # ウィンドウ内のイベントをカウント
-        recent_count = sum(
-            1 for e in events if e.timestamp >= window_start
-        )
+        recent_count = sum(1 for e in events if e.timestamp >= window_start)
 
         if recent_count > self.max_event_rate:
             alerts.append(

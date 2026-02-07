@@ -99,9 +99,7 @@ class TestColonyStateSuspended:
         sm = ColonyStateMachine()
         sm.current_state = ColonyState.SUSPENDED
 
-        event = ColonyFailedEvent(
-            payload={"colony_id": "colony-001", "error": "User cancelled"}
-        )
+        event = ColonyFailedEvent(payload={"colony_id": "colony-001", "error": "User cancelled"})
 
         # Act
         new_state = sm.transition(event)
@@ -321,12 +319,8 @@ class TestLoopDetection:
         # タスクが3回以上 created→failed を繰り返す
         events = []
         for _ in range(4):
-            events.append(
-                BaseEvent(type=EventType.TASK_CREATED, payload={"task_id": "t1"})
-            )
-            events.append(
-                BaseEvent(type=EventType.TASK_FAILED, payload={"task_id": "t1"})
-            )
+            events.append(BaseEvent(type=EventType.TASK_CREATED, payload={"task_id": "t1"}))
+            events.append(BaseEvent(type=EventType.TASK_FAILED, payload={"task_id": "t1"}))
 
         # Act
         alerts = sentinel.check_events(events, colony_id="c1")
@@ -346,12 +340,8 @@ class TestLoopDetection:
         # A→B→A→B→A→B... パターン
         events = []
         for _ in range(4):
-            events.append(
-                BaseEvent(type=EventType.TASK_BLOCKED, payload={"task_id": "t1"})
-            )
-            events.append(
-                BaseEvent(type=EventType.TASK_UNBLOCKED, payload={"task_id": "t1"})
-            )
+            events.append(BaseEvent(type=EventType.TASK_BLOCKED, payload={"task_id": "t1"}))
+            events.append(BaseEvent(type=EventType.TASK_UNBLOCKED, payload={"task_id": "t1"}))
 
         # Act
         alerts = sentinel.check_events(events, colony_id="c1")
