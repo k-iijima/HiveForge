@@ -28,7 +28,7 @@ class SwarmingFeatures(BaseModel):
     - Urgency（緊急度）: 期限までの時間的余裕
     """
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(strict=True, frozen=True)
 
     complexity: int = Field(
         default=3,

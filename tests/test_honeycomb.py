@@ -9,10 +9,13 @@ M3-1 完了条件:
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
 
 from hiveforge.core import AkashicRecord, generate_event_id
 from hiveforge.core.events import (
+    EventType,
     RunCompletedEvent,
     RunFailedEvent,
     RunStartedEvent,
@@ -29,6 +32,7 @@ from hiveforge.core.honeycomb.models import (
 )
 from hiveforge.core.honeycomb.recorder import EpisodeRecorder
 from hiveforge.core.honeycomb.store import HoneycombStore
+
 
 # =========================================================================
 # Episode モデルのテスト
@@ -145,7 +149,9 @@ class TestEpisodeModel:
 
     def test_episode_deserialization(self):
         """JSONからEpisodeが復元できる"""
-        # Arrange
+        # Arrange: JSON文字列（実際のJSONLストアと同じ形式）
+        import json
+
         data = {
             "episode_id": "ep-007",
             "run_id": "run-007",
@@ -155,9 +161,10 @@ class TestEpisodeModel:
             "duration_seconds": 60.0,
             "token_count": 500,
         }
+        json_str = json.dumps(data)
 
-        # Act
-        episode = Episode(**data)
+        # Act: model_validate_jsonで復元（strictモードでもJSONデシリアライズは正常動作）
+        episode = Episode.model_validate_json(json_str)
 
         # Assert
         assert episode.outcome == Outcome.SUCCESS

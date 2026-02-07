@@ -6,7 +6,7 @@ Evidence-first原則: 意見ではなく証拠で判定する。
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
@@ -56,13 +56,13 @@ class Evidence(BaseModel):
     Guard Beeが検証に使用する具体的な証拠。
     """
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(strict=True, frozen=True)
 
     evidence_type: EvidenceType = Field(..., description="証拠の種類")
     source: str = Field(..., description="証拠の出所（ファイルパス、ツール名等）")
     content: dict[str, Any] = Field(default_factory=dict, description="証拠データ")
     collected_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
+        default_factory=lambda: datetime.now(timezone.utc),
         description="証拠収集日時",
     )
 
@@ -70,7 +70,7 @@ class Evidence(BaseModel):
 class RuleResult(BaseModel):
     """個別検証ルールの結果"""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(strict=True, frozen=True)
 
     rule_name: str = Field(..., description="ルール名")
     level: VerificationLevel = Field(..., description="検証レベル")
@@ -87,7 +87,7 @@ class GuardBeeReport(BaseModel):
     Honeycombに記録され、KPI算出に使用される。
     """
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(strict=True, frozen=True)
 
     colony_id: str = Field(..., description="検証対象Colony ID")
     task_id: str = Field(..., description="検証対象Task ID")
@@ -102,7 +102,7 @@ class GuardBeeReport(BaseModel):
         default_factory=list, description="改善指示（FAIL/CONDITIONAL_PASSの場合）"
     )
     verified_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
+        default_factory=lambda: datetime.now(timezone.utc),
         description="検証日時",
     )
 

@@ -7,6 +7,7 @@ Pydanticで厳格な型検証を行う。
 from __future__ import annotations
 
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -47,7 +48,7 @@ class KPIScores(BaseModel):
     各スコアは0.0〜1.0または計測値（秒数、トークン数）。
     """
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(strict=True, frozen=True)
 
     correctness: float | None = Field(
         default=None,
@@ -86,7 +87,7 @@ class Episode(BaseModel):
     学習・KPI計測の基本単位。
     """
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(strict=True, frozen=True)
 
     episode_id: str = Field(..., description="エピソードID (ULID)", examples=["01JKXYZ..."])
     run_id: str = Field(..., description="対応するRun ID")

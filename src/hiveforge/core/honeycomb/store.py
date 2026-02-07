@@ -104,8 +104,7 @@ class HoneycombStore:
                 if not line:
                     continue
                 try:
-                    data = json.loads(line)
-                    episodes.append(Episode(**data))
-                except (json.JSONDecodeError, ValueError) as e:
+                    episodes.append(Episode.model_validate_json(line))
+                except (ValueError, Exception) as e:
                     logger.warning(f"Episode読み込みエラー: {path}:{line_num}: {e}")
         return episodes

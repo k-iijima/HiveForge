@@ -19,7 +19,7 @@ from .models import TemplateName
 class ColonyTemplate(BaseModel):
     """Colonyテンプレート設定"""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(strict=True, frozen=True)
 
     name: TemplateName = Field(..., description="テンプレート名")
     description: str = Field(..., description="テンプレートの説明")
@@ -127,9 +127,7 @@ def apply_config_overrides(
                 update_kwargs[field_name] = overrides[config_key]
 
         if update_kwargs:
-            # frozenモデルなので新インスタンスを生成
-            data = base.model_dump()
-            data.update(update_kwargs)
-            result[template_name] = ColonyTemplate(**data)
+            # frozenモデルなのでmodel_copyで新インスタンスを生成
+            result[template_name] = base.model_copy(update=update_kwargs)
 
     return result
