@@ -22,6 +22,11 @@
         "icon": "$(dashboard)"
       },
       {
+        "command": "hiveforge.showHiveMonitor",
+        "title": "HiveForge: Hive Monitorを表示",
+        "icon": "$(type-hierarchy)"
+      },
+      {
         "command": "hiveforge.showAgentMonitor",
         "title": "HiveForge: Agent Monitorを表示",
         "icon": "$(pulse)"
@@ -157,6 +162,11 @@
     ],
     "menus": {
       "view/title": [
+        {
+          "command": "hiveforge.showHiveMonitor",
+          "when": "view == hiveforge.hives",
+          "group": "navigation@0"
+        },
         {
           "command": "hiveforge.createHive",
           "when": "view == hiveforge.hives",

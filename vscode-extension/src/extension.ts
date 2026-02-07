@@ -14,6 +14,7 @@ import { HiveForgeClient } from './client';
 import { registerRunCommands, registerRequirementCommands, registerFilterCommands, registerTaskCommands, registerDecisionCommands, Providers } from './commands';
 import { HiveTreeDataProvider } from './views/hiveTreeView';
 import { AgentMonitorPanel } from './views/agentMonitorPanel';
+import { HiveMonitorPanel } from './views/hiveMonitorPanel';
 import { registerHiveCommands, setHiveTreeProvider } from './commands/hiveCommands';
 import { registerColonyCommands, setHiveTreeProviderForColony } from './commands/colonyCommands';
 
@@ -44,8 +45,9 @@ export function activate(context: vscode.ExtensionContext) {
     // TreeViewを登録
     registerTreeViews(context);
 
-    // Hive TreeViewを登録
+    // Hive TreeViewを登録（APIクライアントを接続）
     hiveTreeProvider = new HiveTreeDataProvider();
+    hiveTreeProvider.setClient(client);
     setHiveTreeProvider(hiveTreeProvider);
     setHiveTreeProviderForColony(hiveTreeProvider);
     context.subscriptions.push(
@@ -60,6 +62,13 @@ export function activate(context: vscode.ExtensionContext) {
     registerDecisionCommands(context);
     registerHiveCommands(context);
     registerColonyCommands(context);
+
+    // Hive Monitor コマンド
+    context.subscriptions.push(
+        vscode.commands.registerCommand('hiveforge.showHiveMonitor', () => {
+            HiveMonitorPanel.createOrShow(context.extensionUri, client);
+        })
+    );
 
     // Agent Monitor コマンド
     context.subscriptions.push(
