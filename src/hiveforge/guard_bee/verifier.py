@@ -10,7 +10,12 @@ import logging
 from typing import Any
 
 from ..core import AkashicRecord
-from ..core.events import BaseEvent, EventType
+from ..core.events import (
+    GuardConditionalPassedEvent,
+    GuardFailedEvent,
+    GuardPassedEvent,
+    GuardVerificationRequestedEvent,
+)
 from .models import (
     Evidence,
     GuardBeeReport,
@@ -70,8 +75,7 @@ class GuardBeeVerifier:
 
         # 検証要求イベント
         self._ar.append(
-            BaseEvent(
-                type=EventType.GUARD_VERIFICATION_REQUESTED,
+            GuardVerificationRequestedEvent(
                 run_id=run_id,
                 colony_id=colony_id,
                 task_id=task_id,
@@ -120,16 +124,18 @@ class GuardBeeVerifier:
         )
 
         # 判定イベント
-        event_type = self._verdict_to_event_type(verdict)
+        event_class = self._verdict_to_event_class(verdict)
+        event_kwargs: dict[str, Any] = {
+            "run_id": run_id,
+            "colony_id": colony_id,
+            "task_id": task_id,
+            "payload": report.to_event_payload(),
+            "actor": actor,
+        }
+        if verdict == Verdict.FAIL and report.remand_reason:
+            event_kwargs["remand_reason"] = report.remand_reason
         self._ar.append(
-            BaseEvent(
-                type=event_type,
-                run_id=run_id,
-                colony_id=colony_id,
-                task_id=task_id,
-                payload=report.to_event_payload(),
-                actor=actor,
-            ),
+            event_class(**event_kwargs),
             run_id=run_id,
         )
 
@@ -171,11 +177,16 @@ class GuardBeeVerifier:
         return Verdict.CONDITIONAL_PASS, remand, reasons
 
     @staticmethod
-    def _verdict_to_event_type(verdict: Verdict) -> EventType:
-        """VerdictからEventTypeへの変換"""
-        mapping = {
-            Verdict.PASS: EventType.GUARD_PASSED,
-            Verdict.CONDITIONAL_PASS: EventType.GUARD_CONDITIONAL_PASSED,
-            Verdict.FAIL: EventType.GUARD_FAILED,
+    def _verdict_to_event_class(
+        verdict: Verdict,
+    ) -> type[GuardPassedEvent | GuardConditionalPassedEvent | GuardFailedEvent]:
+        """Verdictからイベントクラスへの変換"""
+        mapping: dict[
+            Verdict,
+            type[GuardPassedEvent | GuardConditionalPassedEvent | GuardFailedEvent],
+        ] = {
+            Verdict.PASS: GuardPassedEvent,
+            Verdict.CONDITIONAL_PASS: GuardConditionalPassedEvent,
+            Verdict.FAIL: GuardFailedEvent,
         }
         return mapping[verdict]

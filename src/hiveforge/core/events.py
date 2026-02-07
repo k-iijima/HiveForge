@@ -727,9 +727,7 @@ class GuardVerificationRequestedEvent(BaseEvent):
     ColonyがGuard Beeに品質検証を要求した際に発行。
     """
 
-    type: Literal[EventType.GUARD_VERIFICATION_REQUESTED] = (
-        EventType.GUARD_VERIFICATION_REQUESTED
-    )
+    type: Literal[EventType.GUARD_VERIFICATION_REQUESTED] = EventType.GUARD_VERIFICATION_REQUESTED
 
 
 class GuardPassedEvent(BaseEvent):
@@ -747,9 +745,7 @@ class GuardConditionalPassedEvent(BaseEvent):
     L1合格・L2に軽微な指摘がある際に発行。
     """
 
-    type: Literal[EventType.GUARD_CONDITIONAL_PASSED] = (
-        EventType.GUARD_CONDITIONAL_PASSED
-    )
+    type: Literal[EventType.GUARD_CONDITIONAL_PASSED] = EventType.GUARD_CONDITIONAL_PASSED
 
 
 class GuardFailedEvent(BaseEvent):
