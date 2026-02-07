@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Awaitable
 
 from .client import LLMClient, LLMResponse, Message, ToolCall
-from .prompts import get_system_prompt
+from .prompts import get_prompt_from_config, get_system_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +66,10 @@ class AgentRunner:
         client: LLMClient,
         agent_type: str = "worker_bee",
         max_iterations: int = 10,
+        vault_path: str | None = None,
+        hive_id: str = "0",
+        colony_id: str = "0",
+        worker_name: str = "default",
     ):
         """初期化
 
@@ -73,16 +77,43 @@ class AgentRunner:
             client: LLMクライアント
             agent_type: エージェントタイプ（worker_bee, queen_bee, beekeeper）
             max_iterations: 最大反復回数（無限ループ防止）
+            vault_path: Vaultディレクトリパス（YAML読込に使用）
+            hive_id: Hive ID
+            colony_id: Colony ID
+            worker_name: Worker Beeの名前
         """
         self.client = client
         self.agent_type = agent_type
         self.max_iterations = max_iterations
+        self.vault_path = vault_path
+        self.hive_id = hive_id
+        self.colony_id = colony_id
+        self.worker_name = worker_name
         self.tools: dict[str, ToolDefinition] = {}
 
     def register_tool(self, tool: ToolDefinition) -> None:
         """ツールを登録"""
         self.tools[tool.name] = tool
         logger.debug(f"ツール登録: {tool.name}")
+
+    def _resolve_system_prompt(self) -> str:
+        """システムプロンプトを解決する
+
+        vault_pathが設定されている場合はYAML設定から読み込み、
+        なければハードコードデフォルトを使用する。
+
+        Returns:
+            システムプロンプト
+        """
+        if self.vault_path is not None:
+            return get_prompt_from_config(
+                agent_type=self.agent_type,
+                vault_path=self.vault_path,
+                hive_id=self.hive_id,
+                colony_id=self.colony_id,
+                worker_name=self.worker_name,
+            )
+        return get_system_prompt(self.agent_type)
 
     def get_tool_definitions(self) -> list[dict[str, Any]]:
         """OpenAI形式のツール定義リストを取得"""
@@ -105,8 +136,9 @@ class AgentRunner:
         context = context or AgentContext(run_id="default")
 
         # メッセージ履歴を初期化
+        system_prompt = self._resolve_system_prompt()
         messages: list[Message] = [
-            Message(role="system", content=get_system_prompt(self.agent_type)),
+            Message(role="system", content=system_prompt),
             Message(role="user", content=user_message),
         ]
 

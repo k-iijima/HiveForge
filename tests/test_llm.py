@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from hiveforge.llm.client import LLMClient, LLMResponse, Message, ToolCall
 from hiveforge.llm.runner import AgentRunner, AgentContext, RunResult, ToolDefinition
-from hiveforge.llm.prompts import get_system_prompt, WORKER_BEE_SYSTEM
+from hiveforge.llm.prompts import get_system_prompt, get_prompt_from_config, WORKER_BEE_SYSTEM
 from hiveforge.llm.tools import (
     READ_FILE_TOOL,
     WRITE_FILE_TOOL,
@@ -370,3 +370,224 @@ class TestRunResult:
 
         assert result.success is False
         assert result.error == "Something went wrong"
+
+
+# =============================================================================
+# AgentRunnerプロンプトYAML統合テスト
+# =============================================================================
+
+
+class TestAgentRunnerPromptIntegration:
+    """AgentRunnerがYAMLプロンプト設定を使用するテスト"""
+
+    @pytest.fixture
+    def mock_client(self):
+        """モックLLMクライアント"""
+        client = MagicMock(spec=LLMClient)
+        client.chat = AsyncMock()
+        client.close = AsyncMock()
+        return client
+
+    @pytest.fixture
+    def temp_vault(self, tmp_path):
+        """テスト用の一時Vaultディレクトリ"""
+        vault = tmp_path / "Vault"
+        vault.mkdir()
+        return vault
+
+    def test_init_with_prompt_context(self, mock_client, temp_vault):
+        """vault_path等のプロンプトコンテキストを受け取れる
+
+        AgentRunnerにvault_path, hive_id, colony_id, worker_nameを渡せること。
+        """
+        # Arrange & Act
+        runner = AgentRunner(
+            mock_client,
+            agent_type="worker_bee",
+            vault_path=str(temp_vault),
+            hive_id="hive-1",
+            colony_id="colony-1",
+            worker_name="coder",
+        )
+
+        # Assert
+        assert runner.vault_path == str(temp_vault)
+        assert runner.hive_id == "hive-1"
+        assert runner.colony_id == "colony-1"
+        assert runner.worker_name == "coder"
+
+    def test_init_without_prompt_context(self, mock_client):
+        """プロンプトコンテキストなしでも初期化できる（後方互換）
+
+        vault_path等のパラメータは全てオプション。
+        """
+        # Arrange & Act
+        runner = AgentRunner(mock_client, agent_type="worker_bee")
+
+        # Assert
+        assert runner.vault_path is None
+        assert runner.hive_id == "0"
+        assert runner.colony_id == "0"
+        assert runner.worker_name == "default"
+
+    @pytest.mark.asyncio
+    async def test_run_uses_yaml_prompt_when_config_exists(self, mock_client, temp_vault):
+        """YAML設定ファイルが存在する場合、そのプロンプトを使用する
+
+        Vault内にカスタムプロンプトYAMLがあれば、それがLLMに渡される。
+        """
+        # Arrange: カスタムプロンプトYAMLを配置
+        custom_prompt = "あなたはカスタムWorker Beeです。テスト用。"
+        colony_dir = temp_vault / "hives" / "hive-1" / "colonies" / "colony-1"
+        colony_dir.mkdir(parents=True)
+        (colony_dir / "default_worker_bee.yml").write_text(
+            f"name: default\nprompt:\n  system: {custom_prompt}\n",
+            encoding="utf-8",
+        )
+
+        mock_client.chat.return_value = LLMResponse(
+            content="Done!", tool_calls=[], finish_reason="stop"
+        )
+
+        runner = AgentRunner(
+            mock_client,
+            agent_type="worker_bee",
+            vault_path=str(temp_vault),
+            hive_id="hive-1",
+            colony_id="colony-1",
+        )
+
+        # Act
+        await runner.run("テストタスク")
+
+        # Assert: LLMに渡されたシステムプロンプトがカスタムのもの
+        call_args = mock_client.chat.call_args
+        messages = (
+            call_args.kwargs.get("messages") or call_args[1].get("messages") or call_args[0][0]
+        )
+        system_msg = [m for m in messages if m.role == "system"][0]
+        assert system_msg.content == custom_prompt
+
+    @pytest.mark.asyncio
+    async def test_run_falls_back_to_default_when_no_config(self, mock_client, temp_vault):
+        """YAML設定がない場合、デフォルトプロンプトにフォールバックする
+
+        Vaultにファイルがなくても、パッケージ内デフォルトまたはハードコードデフォルトを使用。
+        """
+        # Arrange
+        mock_client.chat.return_value = LLMResponse(
+            content="Done!", tool_calls=[], finish_reason="stop"
+        )
+
+        runner = AgentRunner(
+            mock_client,
+            agent_type="worker_bee",
+            vault_path=str(temp_vault),  # Vaultは空
+            hive_id="nonexistent-hive",
+            colony_id="nonexistent-colony",
+        )
+
+        # Act
+        await runner.run("テストタスク")
+
+        # Assert: システムプロンプトが何かしら設定されている（空でない）
+        call_args = mock_client.chat.call_args
+        messages = (
+            call_args.kwargs.get("messages") or call_args[1].get("messages") or call_args[0][0]
+        )
+        system_msg = [m for m in messages if m.role == "system"][0]
+        assert len(system_msg.content) > 0
+        # デフォルトプロンプト（パッケージ内YAMLまたはハードコード）が使われる
+        assert "Worker Bee" in system_msg.content
+
+    @pytest.mark.asyncio
+    async def test_run_without_vault_uses_default(self, mock_client):
+        """vault_pathが未指定の場合もデフォルトプロンプトを使用する
+
+        後方互換: vault_pathなしでもAgentRunnerは動作する。
+        """
+        # Arrange
+        mock_client.chat.return_value = LLMResponse(
+            content="Done!", tool_calls=[], finish_reason="stop"
+        )
+        runner = AgentRunner(mock_client, agent_type="beekeeper")
+
+        # Act
+        await runner.run("テストメッセージ")
+
+        # Assert: beekeeperのデフォルトプロンプトが使用される
+        call_args = mock_client.chat.call_args
+        messages = (
+            call_args.kwargs.get("messages") or call_args[1].get("messages") or call_args[0][0]
+        )
+        system_msg = [m for m in messages if m.role == "system"][0]
+        assert "Beekeeper" in system_msg.content
+
+    @pytest.mark.asyncio
+    async def test_queen_bee_loads_custom_prompt(self, mock_client, temp_vault):
+        """Queen Beeのカスタムプロンプトが読み込まれる"""
+        # Arrange
+        custom_prompt = "あなたはカスタムQueen Beeです。"
+        colony_dir = temp_vault / "hives" / "h1" / "colonies" / "c1"
+        colony_dir.mkdir(parents=True)
+        (colony_dir / "queen_bee.yml").write_text(
+            f"name: default\nprompt:\n  system: {custom_prompt}\nmax_workers: 5\ntask_assignment_strategy: round_robin\n",
+            encoding="utf-8",
+        )
+
+        mock_client.chat.return_value = LLMResponse(
+            content="Done!", tool_calls=[], finish_reason="stop"
+        )
+
+        runner = AgentRunner(
+            mock_client,
+            agent_type="queen_bee",
+            vault_path=str(temp_vault),
+            hive_id="h1",
+            colony_id="c1",
+        )
+
+        # Act
+        await runner.run("タスクを分解して")
+
+        # Assert
+        call_args = mock_client.chat.call_args
+        messages = (
+            call_args.kwargs.get("messages") or call_args[1].get("messages") or call_args[0][0]
+        )
+        system_msg = [m for m in messages if m.role == "system"][0]
+        assert system_msg.content == custom_prompt
+
+    @pytest.mark.asyncio
+    async def test_beekeeper_loads_custom_prompt(self, mock_client, temp_vault):
+        """Beekeeperのカスタムプロンプトが読み込まれる"""
+        # Arrange
+        custom_prompt = "あなたはカスタムBeekeeperです。"
+        hive_dir = temp_vault / "hives" / "h1"
+        hive_dir.mkdir(parents=True)
+        (hive_dir / "beekeeper.yml").write_text(
+            f"name: default\nprompt:\n  system: {custom_prompt}\n",
+            encoding="utf-8",
+        )
+
+        mock_client.chat.return_value = LLMResponse(
+            content="Done!", tool_calls=[], finish_reason="stop"
+        )
+
+        runner = AgentRunner(
+            mock_client,
+            agent_type="beekeeper",
+            vault_path=str(temp_vault),
+            hive_id="h1",
+        )
+
+        # Act
+        await runner.run("ユーザーメッセージ")
+
+        # Assert
+        call_args = mock_client.chat.call_args
+        messages = (
+            call_args.kwargs.get("messages") or call_args[1].get("messages") or call_args[0][0]
+        )
+        system_msg = [m for m in messages if m.role == "system"][0]
+        assert system_msg.content == custom_prompt
