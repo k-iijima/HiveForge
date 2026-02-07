@@ -3,6 +3,7 @@
 FastAPIルーターを機能別に分割。
 """
 
+from .activity import router as activity_router
 from .colonies import hive_colonies_router
 from .colonies import router as colonies_router
 from .conferences import router as conferences_router
@@ -15,6 +16,7 @@ from .system import router as system_router
 from .tasks import router as tasks_router
 
 __all__ = [
+    "activity_router",
     "hives_router",
     "colonies_router",
     "hive_colonies_router",

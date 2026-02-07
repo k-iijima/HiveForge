@@ -13,6 +13,7 @@ from ..core import AkashicRecord, build_run_projection, get_settings
 from ..core.ar.projections import RunState
 from .helpers import clear_active_runs, get_active_runs, set_ar
 from .routes import (
+    activity_router,
     colonies_router,
     conferences_router,
     events_router,
@@ -75,6 +76,7 @@ if cors_config.enabled:
 
 # ルーターを登録
 app.include_router(system_router)
+app.include_router(activity_router)
 app.include_router(hives_router)
 app.include_router(hive_colonies_router)
 app.include_router(colonies_router)
