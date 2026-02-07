@@ -82,6 +82,11 @@ class EventType(StrEnum):
     SENTINEL_ALERT_RAISED = "sentinel.alert_raised"
     SENTINEL_REPORT = "sentinel.report"
 
+    # Sentinel Hornet 拡張イベント（M3-6追加）
+    SENTINEL_ROLLBACK = "sentinel.rollback"
+    SENTINEL_QUARANTINE = "sentinel.quarantine"
+    SENTINEL_KPI_DEGRADATION = "sentinel.kpi_degradation"
+
     # Guard Bee イベント（M3-3追加）
     GUARD_VERIFICATION_REQUESTED = "guard.verification_requested"
     GUARD_PASSED = "guard.passed"

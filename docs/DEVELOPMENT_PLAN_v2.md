@@ -188,7 +188,7 @@ M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)  
 | M3-3-c | 検証実行エンジン | `guard_bee/verifier.py` | ✅ |
 | M3-3-d | 合格/差戻しフロー | `guard_bee/verifier.py` | ✅ |
 | M3-3-e | Honeycomb との連携（検証結果記録） | `guard_bee/verifier.py` | ✅ |
-| M3-3-f | MCP / API エンドポイント | `api/routes/guard_bee.py` | ⬜ 未着手 |
+| M3-3-f | MCP / API エンドポイント | `api/routes/guard_bee.py` | ✅ |
 
 **完了条件**:
 - Colonyの成果物がGuard Beeによって検証される

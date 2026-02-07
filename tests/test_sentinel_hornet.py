@@ -733,3 +733,264 @@ class TestSentinelConfig:
         assert sentinel.max_event_rate == 200
         assert sentinel.max_loop_count == 5  # デフォルト維持
         assert sentinel.max_cost == 100.0  # デフォルト維持
+
+
+# ===========================================================================
+# M3-6: Sentinel Hornet拡張
+# ===========================================================================
+
+
+class TestSentinelExtendedEventTypes:
+    """M3-6で追加されたイベントタイプのテスト"""
+
+    def test_rollback_event_type(self):
+        """SENTINEL_ROLLBACK イベントタイプが存在する"""
+        assert hasattr(EventType, "SENTINEL_ROLLBACK")
+        assert EventType.SENTINEL_ROLLBACK.value == "sentinel.rollback"
+
+    def test_quarantine_event_type(self):
+        """SENTINEL_QUARANTINE イベントタイプが存在する"""
+        assert hasattr(EventType, "SENTINEL_QUARANTINE")
+        assert EventType.SENTINEL_QUARANTINE.value == "sentinel.quarantine"
+
+    def test_kpi_degradation_event_type(self):
+        """SENTINEL_KPI_DEGRADATION イベントタイプが存在する"""
+        assert hasattr(EventType, "SENTINEL_KPI_DEGRADATION")
+        assert EventType.SENTINEL_KPI_DEGRADATION.value == "sentinel.kpi_degradation"
+
+
+class TestKPIDegradationDetection:
+    """M3-6-a: KPI劣化検出（Honeycomb連携）"""
+
+    def test_detect_correctness_drop(self):
+        """Correctness KPIの急低下をアラートとして検出"""
+        from hiveforge.sentinel_hornet.monitor import SentinelHornet
+
+        sentinel = SentinelHornet()
+
+        # Arrange: 前回KPI=0.9, 現在KPI=0.3 → 60%以上低下
+        prev_kpi = {"correctness": 0.9, "incident_rate": 0.1}
+        curr_kpi = {"correctness": 0.3, "incident_rate": 0.1}
+
+        # Act
+        alerts = sentinel.check_kpi_degradation(
+            colony_id="colony-001",
+            previous_kpi=prev_kpi,
+            current_kpi=curr_kpi,
+        )
+
+        # Assert
+        assert len(alerts) >= 1
+        assert any(a.alert_type == "kpi_degradation" for a in alerts)
+
+    def test_no_alert_stable_kpi(self):
+        """KPIが安定している場合はアラートなし"""
+        from hiveforge.sentinel_hornet.monitor import SentinelHornet
+
+        sentinel = SentinelHornet()
+
+        prev_kpi = {"correctness": 0.9, "incident_rate": 0.1}
+        curr_kpi = {"correctness": 0.88, "incident_rate": 0.12}
+
+        alerts = sentinel.check_kpi_degradation(
+            colony_id="colony-001",
+            previous_kpi=prev_kpi,
+            current_kpi=curr_kpi,
+        )
+
+        assert len(alerts) == 0
+
+    def test_detect_incident_rate_spike(self):
+        """Incident Rateの急上昇を検出"""
+        from hiveforge.sentinel_hornet.monitor import SentinelHornet
+
+        sentinel = SentinelHornet()
+
+        prev_kpi = {"correctness": 0.9, "incident_rate": 0.1}
+        curr_kpi = {"correctness": 0.9, "incident_rate": 0.8}
+
+        alerts = sentinel.check_kpi_degradation(
+            colony_id="colony-001",
+            previous_kpi=prev_kpi,
+            current_kpi=curr_kpi,
+        )
+
+        assert len(alerts) >= 1
+
+    def test_kpi_degradation_empty_kpi(self):
+        """KPIが空の場合はアラートなし"""
+        from hiveforge.sentinel_hornet.monitor import SentinelHornet
+
+        sentinel = SentinelHornet()
+
+        alerts = sentinel.check_kpi_degradation(
+            colony_id="colony-001",
+            previous_kpi={},
+            current_kpi={},
+        )
+
+        assert len(alerts) == 0
+
+    def test_kpi_degradation_threshold_configurable(self):
+        """KPI劣化閾値を設定可能"""
+        from hiveforge.sentinel_hornet.monitor import SentinelHornet
+
+        sentinel = SentinelHornet(kpi_drop_threshold=0.5)
+
+        # 40%低下 → 閾値50%未満なのでアラートなし
+        prev_kpi = {"correctness": 1.0}
+        curr_kpi = {"correctness": 0.6}
+
+        alerts = sentinel.check_kpi_degradation(
+            colony_id="colony-001",
+            previous_kpi=prev_kpi,
+            current_kpi=curr_kpi,
+        )
+
+        assert len(alerts) == 0
+
+
+class TestRollbackAction:
+    """M3-6-b: ロールバックアクション"""
+
+    def test_create_rollback_event(self):
+        """ロールバックイベントを生成できる"""
+        from hiveforge.sentinel_hornet.monitor import SentinelAlert, SentinelHornet
+
+        sentinel = SentinelHornet()
+        alert = SentinelAlert(
+            alert_type="kpi_degradation",
+            colony_id="colony-001",
+            severity="critical",
+            message="Correctness dropped from 0.9 to 0.3",
+        )
+
+        # Act
+        event = sentinel.create_rollback_event(
+            alert=alert,
+            rollback_to="run-previous",
+        )
+
+        # Assert
+        assert event.type == EventType.SENTINEL_ROLLBACK
+        assert event.payload["colony_id"] == "colony-001"
+        assert event.payload["rollback_to"] == "run-previous"
+        assert event.payload["reason"] == alert.message
+
+    def test_rollback_event_payload(self):
+        """ロールバックイベントのペイロードに必要情報が含まれる"""
+        from hiveforge.sentinel_hornet.monitor import SentinelAlert, SentinelHornet
+
+        sentinel = SentinelHornet()
+        alert = SentinelAlert(
+            alert_type="cost_exceeded",
+            colony_id="colony-002",
+            severity="critical",
+            message="Cost exceeded",
+            details={"total_cost": 200.0},
+        )
+
+        event = sentinel.create_rollback_event(
+            alert=alert,
+            rollback_to="run-001",
+        )
+
+        assert "alert_type" in event.payload
+        assert event.payload["alert_type"] == "cost_exceeded"
+
+
+class TestQuarantineAction:
+    """M3-6-c: 隔離アクション"""
+
+    def test_create_quarantine_event(self):
+        """隔離イベントを生成できる"""
+        from hiveforge.sentinel_hornet.monitor import SentinelAlert, SentinelHornet
+
+        sentinel = SentinelHornet()
+        alert = SentinelAlert(
+            alert_type="security_violation",
+            colony_id="colony-001",
+            severity="critical",
+            message="Unconfirmed irreversible action",
+        )
+
+        # Act
+        event = sentinel.create_quarantine_event(
+            alert=alert,
+            quarantine_scope="colony",
+        )
+
+        # Assert
+        assert event.type == EventType.SENTINEL_QUARANTINE
+        assert event.payload["colony_id"] == "colony-001"
+        assert event.payload["scope"] == "colony"
+        assert event.payload["reason"] == alert.message
+
+    def test_quarantine_task_scope(self):
+        """タスクスコープの隔離"""
+        from hiveforge.sentinel_hornet.monitor import SentinelAlert, SentinelHornet
+
+        sentinel = SentinelHornet()
+        alert = SentinelAlert(
+            alert_type="loop_detected",
+            colony_id="colony-001",
+            severity="critical",
+            message="Task task-001 looping",
+            details={"task_id": "task-001"},
+        )
+
+        event = sentinel.create_quarantine_event(
+            alert=alert,
+            quarantine_scope="task",
+            target_id="task-001",
+        )
+
+        assert event.payload["scope"] == "task"
+        assert event.payload["target_id"] == "task-001"
+
+    def test_kpi_degradation_event(self):
+        """KPI劣化イベントを生成できる"""
+        from hiveforge.sentinel_hornet.monitor import SentinelAlert, SentinelHornet
+
+        sentinel = SentinelHornet()
+        alert = SentinelAlert(
+            alert_type="kpi_degradation",
+            colony_id="colony-001",
+            severity="warning",
+            message="Correctness dropped",
+            details={"metric": "correctness", "previous": 0.9, "current": 0.3},
+        )
+
+        event = sentinel.create_kpi_degradation_event(alert)
+
+        assert event.type == EventType.SENTINEL_KPI_DEGRADATION
+        assert event.payload["colony_id"] == "colony-001"
+        assert event.payload["details"]["metric"] == "correctness"
+
+
+class TestExecutionActions:
+    """3つの執行アクション（停止/ロールバック/隔離）の統合テスト"""
+
+    def test_all_three_actions_available(self):
+        """3つの執行アクションが全て利用可能"""
+        from hiveforge.sentinel_hornet.monitor import SentinelAlert, SentinelHornet
+
+        sentinel = SentinelHornet()
+        alert = SentinelAlert(
+            alert_type="test",
+            colony_id="colony-001",
+            severity="critical",
+            message="test alert",
+        )
+
+        # 停止（既存）
+        suspension = sentinel.create_suspension_event(alert)
+        assert suspension.type == EventType.COLONY_SUSPENDED
+
+        # ロールバック（M3-6-b新規）
+        rollback = sentinel.create_rollback_event(alert, rollback_to="run-001")
+        assert rollback.type == EventType.SENTINEL_ROLLBACK
+
+        # 隔離（M3-6-c新規）
+        quarantine = sentinel.create_quarantine_event(alert, quarantine_scope="colony")
+        assert quarantine.type == EventType.SENTINEL_QUARANTINE
