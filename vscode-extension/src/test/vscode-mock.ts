@@ -63,6 +63,14 @@ export class ThemeIcon {
     static readonly Folder = new ThemeIcon("folder");
     id: string;
 
+    constructor(id: string, _color?: ThemeColor) {
+        this.id = id;
+    }
+}
+
+export class ThemeColor {
+    id: string;
+
     constructor(id: string) {
         this.id = id;
     }
@@ -145,11 +153,32 @@ export const window = {
         return Promise.resolve(undefined);
     },
 
+    showQuickPick(
+        _items: unknown[],
+        _options?: unknown
+    ): Promise<unknown | undefined> {
+        return Promise.resolve(undefined);
+    },
+
     registerWebviewViewProvider(
         _viewId: string,
         _provider: unknown
     ): { dispose(): void } {
         return { dispose: () => { } };
+    },
+
+    registerTreeDataProvider(
+        _viewId: string,
+        _provider: unknown
+    ): { dispose(): void } {
+        return { dispose: () => { } };
+    },
+
+    createTreeView(
+        _viewId: string,
+        _options: unknown
+    ): { badge: unknown; dispose(): void } {
+        return { badge: undefined, dispose: () => { } };
     }
 };
 
@@ -159,5 +188,17 @@ export const commands = {
         _callback: (...args: unknown[]) => unknown
     ): { dispose(): void } {
         return { dispose: () => { } };
+    },
+    executeCommand(
+        _command: string,
+        ..._args: unknown[]
+    ): Promise<unknown> {
+        return Promise.resolve(undefined);
     }
+};
+
+export const ConfigurationTarget = {
+    Global: 1,
+    Workspace: 2,
+    WorkspaceFolder: 3,
 };

@@ -11,12 +11,10 @@ import { RequirementsProvider } from './providers/requirementsProvider';
 import { EventsProvider } from './providers/eventsProvider';
 import { DecisionsProvider } from './providers/decisionsProvider';
 import { HiveForgeClient } from './client';
-import { registerRunCommands, registerRequirementCommands, registerFilterCommands, registerTaskCommands, registerDecisionCommands, Providers } from './commands';
+import { registerRunCommands, registerRequirementCommands, registerFilterCommands, registerTaskCommands, registerDecisionCommands, Providers, registerHiveCommands, setHiveTreeProvider, registerColonyCommands, setHiveTreeProviderForColony } from './commands';
 import { HiveTreeDataProvider } from './views/hiveTreeView';
 import { AgentMonitorPanel } from './views/agentMonitorPanel';
 import { HiveMonitorPanel } from './views/hiveMonitorPanel';
-import { registerHiveCommands, setHiveTreeProvider } from './commands/hiveCommands';
-import { registerColonyCommands, setHiveTreeProviderForColony } from './commands/colonyCommands';
 
 let client: HiveForgeClient;
 let providers: Providers;
