@@ -43,6 +43,7 @@
 | **Beekeeper handler** | ✅ 完了 | ✅ 実装済 | — |
 | **Queen Bee** | ✅ 完了 | ⚠️ タスク分解スタブ | `_plan_tasks()` が固定1タスク返却、LLM分解未実装 |
 | **Worker Bee** | ✅ 完了 | ✅ 実装済 | ツール実行, リトライ, Trust は動作 |
+| **Sentinel Hornet** | — | ❗ 未実装 | M2で新規実装予定。モジュール自体が存在しない |
 | **VS Code拡張** (コマンド) | ✅ 完了 | ❌ 未接続 | Hive/Colony操作がAPI/MCP未接続、UIフレームワークのみ |
 | **VS Code拡張** (TreeView) | ✅ 完了 | ✅ API接続済 | Activity Hierarchy API連動に改修済 |
 | **VS Code拡張** (Hive Monitor) | — | ✅ 実装済 | リアルタイムWebview |
@@ -166,6 +167,26 @@ M0 (現在)  → M1 (基盤固め) → M2 (接続) → M3 (自律) → M4 (運�
 ### M2: 接続（信頼できる組み合わせにする）
 
 **目標**: コンポーネント間を実際に接続し、エンドツーエンドで動作することを検証する。
+
+#### M2-0: Sentinel Hornet（Hive内監視エージェント）
+
+**優先度: 高** — 自律エージェント接続前に安全弁が必須
+
+| タスク | 内容 |
+|--------|------|
+| M2-0-a | Sentinel Hornetコアモジュール（`sentinel_hornet/monitor.py`） |
+| M2-0-b | 無限ループ検出（タスク完了/失敗パターンの周期性検出） |
+| M2-0-c | 暴走検出（イベント発行レート閾値） |
+| M2-0-d | コスト超過検出（トークン/APIコール累積監視） |
+| M2-0-e | セキュリティ違反検出（ActionClass×TrustLevelポリシーチェック） |
+| M2-0-f | Colony強制停止フロー（`sentinel.alert_raised` → `colony.suspended` → Beekeeper報告） |
+| M2-0-g | Sentinelイベント型（`sentinel.alert_raised`, `sentinel.report`） |
+| M2-0-h | 設定ベースの閾値調整（`hiveforge.config.yaml`） |
+
+**完了条件**:
+- ループするモックエージェントがSentinel Hornetにより自動停止される
+- 停止根拠がARに記録され、Beekeeperに報告が届く
+- 全検出パターンにAAAパターンのテストが存在する
 
 #### M2-1: VS Code拡張のAPI接続
 
@@ -303,6 +324,7 @@ M0 (現在)  → M1 (基盤固め) → M2 (接続) → M3 (自律) → M4 (運�
      高
       │  M1-1 (AR移行)      ← イベントソーシング哲学の根幹
       │  M1-2 (Beekeeperスタブ) ← ガバナンス設計の実効性
+      │  M2-0 (Sentinel Hornet) ← エージェント接続前の安全弁
       │  M2-1 (VS Code API接続)  ← ユーザー体験
       │  M2-2 (エージェント統合) ← E2E動作
       │  M1-3 (型安全)       ← 長期信頼性
