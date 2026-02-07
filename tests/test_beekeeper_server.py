@@ -361,3 +361,29 @@ class TestDelegateToQueen:
 
         # Assert
         assert "colony-1" in beekeeper.current_session.active_colonies
+
+
+class TestBeekeeperAgentRunnerPromptContext:
+    """BeekeeperのAgentRunnerがvault_pathを渡すテスト"""
+
+    @pytest.mark.asyncio
+    async def test_agent_runner_receives_vault_path(self, beekeeper):
+        """BeekeeperのAgentRunnerがvault_pathを受け取る
+
+        AgentRunnerがYAMLプロンプトを読み込めるよう、
+        ARのvault_pathを渡す。
+        """
+        # Arrange: LLMクライアントをモックで事前設定
+        from unittest.mock import MagicMock, AsyncMock
+        from hiveforge.llm.client import LLMClient
+
+        mock_client = MagicMock(spec=LLMClient)
+        mock_client.chat = AsyncMock()
+        beekeeper._llm_client = mock_client
+
+        # Act
+        runner = await beekeeper._get_agent_runner()
+
+        # Assert
+        assert runner.vault_path == str(beekeeper.ar.vault_path)
+        assert runner.agent_type == "beekeeper"

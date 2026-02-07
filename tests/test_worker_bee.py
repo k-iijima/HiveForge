@@ -1604,3 +1604,30 @@ class TestExecuteTaskWithLLM:
 
         assert worker_bee._llm_client is None
         assert worker_bee._agent_runner is None
+
+
+class TestWorkerBeeAgentRunnerPromptContext:
+    """Worker BeeのAgentRunnerがvault_pathとworker_idを渡すテスト"""
+
+    @pytest.mark.asyncio
+    async def test_agent_runner_receives_vault_path_and_worker_id(self, worker_bee):
+        """Worker BeeのAgentRunnerがvault_pathとworker_nameを受け取る
+
+        AgentRunnerがYAMLプロンプトを読み込めるよう、
+        ARのvault_pathとworker_idを渡す。
+        """
+        # Arrange: LLMクライアントをモックで事前設定
+        from unittest.mock import MagicMock, AsyncMock
+        from hiveforge.llm.client import LLMClient
+
+        mock_client = MagicMock(spec=LLMClient)
+        mock_client.chat = AsyncMock()
+        worker_bee._llm_client = mock_client
+
+        # Act
+        runner = await worker_bee._get_agent_runner()
+
+        # Assert
+        assert runner.vault_path == str(worker_bee.ar.vault_path)
+        assert runner.worker_name == worker_bee.worker_id
+        assert runner.agent_type == "worker_bee"

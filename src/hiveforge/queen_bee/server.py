@@ -417,7 +417,12 @@ class QueenBeeMCPServer:
             from ..llm.runner import AgentRunner
 
             client = await self._get_llm_client()
-            self._agent_runner = AgentRunner(client, agent_type="queen_bee")
+            self._agent_runner = AgentRunner(
+                client,
+                agent_type="queen_bee",
+                vault_path=str(self.ar.vault_path),
+                colony_id=self.colony_id,
+            )
 
         return self._agent_runner
 

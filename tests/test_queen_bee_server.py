@@ -278,3 +278,30 @@ class TestClose:
         # Assert
         assert queen_bee._llm_client is None
         assert queen_bee._agent_runner is None
+
+
+class TestQueenBeeAgentRunnerPromptContext:
+    """Queen BeeのAgentRunnerがvault_pathとcolony_idを渡すテスト"""
+
+    @pytest.mark.asyncio
+    async def test_agent_runner_receives_vault_path_and_colony_id(self, queen_bee):
+        """Queen BeeのAgentRunnerがvault_pathとcolony_idを受け取る
+
+        AgentRunnerがYAMLプロンプトを読み込めるよう、
+        ARのvault_pathとColony IDを渡す。
+        """
+        # Arrange: LLMクライアントをモックで事前設定
+        from unittest.mock import MagicMock, AsyncMock
+        from hiveforge.llm.client import LLMClient
+
+        mock_client = MagicMock(spec=LLMClient)
+        mock_client.chat = AsyncMock()
+        queen_bee._llm_client = mock_client
+
+        # Act
+        runner = await queen_bee._get_agent_runner()
+
+        # Assert
+        assert runner.vault_path == str(queen_bee.ar.vault_path)
+        assert runner.colony_id == queen_bee.colony_id
+        assert runner.agent_type == "queen_bee"

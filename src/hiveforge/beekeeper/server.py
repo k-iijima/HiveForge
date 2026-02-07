@@ -361,7 +361,11 @@ class BeekeeperMCPServer:
             from ..llm.tools import ToolDefinition
 
             client = await self._get_llm_client()
-            self._agent_runner = AgentRunner(client, agent_type="beekeeper")
+            self._agent_runner = AgentRunner(
+                client,
+                agent_type="beekeeper",
+                vault_path=str(self.ar.vault_path),
+            )
 
             # Beekeeperが使える内部ツールを登録
             self._register_internal_tools()

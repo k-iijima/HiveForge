@@ -326,7 +326,12 @@ class WorkerBeeMCPServer:
             from ..llm.tools import get_basic_tools
 
             client = await self._get_llm_client()
-            self._agent_runner = AgentRunner(client, agent_type="worker_bee")
+            self._agent_runner = AgentRunner(
+                client,
+                agent_type="worker_bee",
+                vault_path=str(self.ar.vault_path),
+                worker_name=self.worker_id,
+            )
 
             # 基本ツールを登録
             for tool in get_basic_tools():
