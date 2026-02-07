@@ -143,13 +143,17 @@ Vault/                 # イベントログ (gitignore)
 
 ## ドキュメント
 
-| ドキュメント | 説明 |
-|--------------|------|
-| [AGENTS.md](AGENTS.md) | AI開発ガイドライン |
-| [docs/DEVELOPMENT_PLAN_v1.md](docs/DEVELOPMENT_PLAN_v1.md) | 開発計画・進捗の正 |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | アーキテクチャ設計書 |
-| [docs/QUICKSTART.md](docs/QUICKSTART.md) | 動作確認手順書 |
-| [docs/コンセプト_v5.md](docs/コンセプト_v5.md) | 設計思想・概念モデル |
+| ドキュメント | 役割 | 説明 |
+|--------------|------|------|
+| [AGENTS.md](AGENTS.md) | 規約 | AI開発ガイドライン |
+| [docs/コンセプト_v5.md](docs/コンセプト_v5.md) | **なぜ** | 設計思想・ビジョン・ユースケース |
+| [docs/design/v5-hive-design.md](docs/design/v5-hive-design.md) | **何を** | 詳細設計・スキーマ・プロトコル（Single Source of Truth） |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | **今どうなっている** | 実装の現況・コンポーネント構成 |
+| [docs/DEVELOPMENT_PLAN_v1.md](docs/DEVELOPMENT_PLAN_v1.md) | **次に何をする** | 開発計画・マイルストーン |
+| [docs/QUICKSTART.md](docs/QUICKSTART.md) | 手順 | 動作確認手順書 |
+
+> ドキュメント間の不整合を防ぐため、各情報に**正規の記載場所**を定めています。
+> 状態機械・イベント型・プロトコルの定義は v5-hive-design.md を正とし、他のドキュメントは参照リンクで接続します。
 
 ## テスト実行
 

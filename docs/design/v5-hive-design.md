@@ -1,6 +1,7 @@
 # v5 Hive設計ドキュメント
 
 > Phase 0: 設計検証の成果物
+> **本書は状態機械・イベント型・通信プロトコルの正式定義（Single Source of Truth）です。**
 
 作成日: 2026-02-01
 ステータス: **Reviewed**（レビュー完了）
@@ -268,8 +269,12 @@ class ColonyState(Enum):
     ACTIVE = "active"       # 1つ以上のRunが実行中
     COMPLETED = "completed" # 全Runが完了
     FAILED = "failed"       # 異常終了
-    SUSPENDED = "suspended" # 一時停止中
+    SUSPENDED = "suspended" # 一時停止中（Sentinel Hornet強制停止用）
 ```
+
+> **実装状況**: 現在の実装は `PENDING`/`IN_PROGRESS`/`COMPLETED`/`FAILED` の4状態。
+> `IDLE`/`ACTIVE` は名称差として `PENDING`/`IN_PROGRESS` に対応。
+> `SUSPENDED` は M2-0（Sentinel Hornet）実装時に追加予定。
 
 ### 2.2 状態遷移図
 
@@ -337,24 +342,26 @@ class EventType(Enum):
     
     # Colony関連（v5追加）
     COLONY_CREATED = "colony.created"
-    COLONY_ACTIVATED = "colony.activated"
+    COLONY_ACTIVATED = "colony.activated"    # 実装では COLONY_STARTED = "colony.started"
     COLONY_COMPLETED = "colony.completed"
     COLONY_FAILED = "colony.failed"
-    COLONY_SUSPENDED = "colony.suspended"
-    COLONY_RESUMED = "colony.resumed"
+    COLONY_SUSPENDED = "colony.suspended"    # M2-0で実装予定
+    COLONY_RESUMED = "colony.resumed"        # M2-0で実装予定
     
-    # エージェント間通信（v5追加）
+    # エージェント間通信（v5追加、M2で実装予定）
     OPINION_REQUESTED = "agent.opinion_requested"
     OPINION_RESPONDED = "agent.opinion_responded"
     
     # Worker Bee関連（v5追加）
     WORKER_ASSIGNED = "worker.assigned"
-    WORKER_RELEASED = "worker.released"
+    WORKER_RELEASED = "worker.released"      # 実装ではworker.started/progress/completed/failedに細分化
     
     # 直接介入・エスカレーション（v5追加）
-    USER_DIRECT_INTERVENTION = "user.direct_intervention"  # ユーザーの直接介入
-    QUEEN_ESCALATION = "queen.escalation"                  # Queen Beeからの直訴
-    BEEKEEPER_FEEDBACK = "beekeeper.feedback"              # Beekeeper改善フィードバック
+    # 実装では intervention.* 名前空間に統一:
+    #   intervention.user_direct / intervention.queen_escalation / intervention.beekeeper_feedback
+    USER_DIRECT_INTERVENTION = "user.direct_intervention"
+    QUEEN_ESCALATION = "queen.escalation"
+    BEEKEEPER_FEEDBACK = "beekeeper.feedback"
     
     # Decision Protocol（意思決定ライフサイクル、v5.1追加）
     PROPOSAL_CREATED = "decision.proposal.created"         # 提案作成
@@ -373,32 +380,28 @@ class EventType(Enum):
     # Standard Failure/Timeout（標準失敗、v5.1追加）
     OPERATION_TIMEOUT = "operation.timeout"                # タイムアウト
     OPERATION_FAILED = "operation.failed"                  # 操作失敗
+    
+    # Sentinel Hornet（Hive内監視、v5.3追加）
+    SENTINEL_ALERT_RAISED = "sentinel.alert_raised"        # 異常検出アラート
+    SENTINEL_REPORT = "sentinel.report"                    # Beekeeperへの報告
 ```
 
 ### 3.2 イベントスキーマ
 
-重要: v4実装（`BaseEvent`）との整合
+実装状況: `BaseEvent` との整合
 
-- 現行の `BaseEvent` は `run_id` / `task_id` / `actor` / `payload` を持つ。
-- Phase 1では **後方互換性と実装コスト最小化** のため、Hive/Colony/Agent関連の追加情報は原則 `payload` に格納する。
-    - 例: `payload.hive_id`, `payload.colony_id`, `payload.request_id` など
-    - `run_id` / `task_id` は「既存のRun/Taskに紐づく場合のみ」設定し、それ以外は `None` とする
-- 将来（Phase 2以降）に、`hive_id` / `colony_id` を `BaseEvent` のトップレベルフィールドへ昇格する案は検討対象（ただし破壊的変更になりやすいので慎重に）。
+- `BaseEvent` は `run_id` / `task_id` / `colony_id` / `actor` / `payload` をトップレベルフィールドとして持つ。
+- `colony_id` は当初 `payload` 格納を検討していたが、実装ではトップレベルに昇格済み。
+- Hive/Colony固有の追加情報（`hive_id`, `conference_id` 等）は `payload` に格納。
 
 課題: `run_id=None` のイベントの格納先
 
-- v4の `AkashicRecord.append()` は `run_id` 必須（ディレクトリ決定に使用）。
-- `HiveCreatedEvent` 等の `run_id=None` イベントは、以下いずれかで対応:
-    - (A) 専用ストア: `Vault/hives/{hive_id}/events.jsonl` に別途格納（推奨）
-    - (B) システムRun: 特別な `run_id` (例: `"__system__"`) に格納し、Hive/Colony横断イベントを集約
-- Phase 1では (A) を採用し、Hive/Colonyは専用ディレクトリで管理する。
+- `HiveCreatedEvent` 等の `run_id=None` イベントは、Hive専用ディレクトリで管理。
+- 現在: `Vault/hive-{hive_id}/events.jsonl` に格納。
 
-注意: `parse_event` の前方互換性
+`parse_event` の前方互換性
 
-- v4実装の `parse_event` は `EventType(data["type"])` を先に評価するため、**未知のtype文字列を読むと例外になる**。
-- 運用で「古いバイナリが新しいイベントログを読む」可能性があるなら、以下いずれかが必要:
-    - (A) バージョンを揃える運用（Phase 1はまずこれで十分）
-    - (B) `parse_event` を拡張し、未知typeは `BaseEvent` として読み込める設計に変更（将来の改善項目）
+- `UnknownEvent` クラスを導入済み。未知のイベントタイプは例外にせず `UnknownEvent` として読み込む。
 
 ```python
 class HiveCreatedEvent(BaseEvent):

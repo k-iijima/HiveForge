@@ -1,6 +1,18 @@
 # HiveForge アーキテクチャ設計書
 
-このドキュメントでは、HiveForgeの現在の設計と実装状況を説明します。
+このドキュメントでは、HiveForgeの**現在の実装状況**を説明します。
+
+> **ドキュメントの役割分担**
+>
+> | ドキュメント | 役割 | 記述レベル |
+> |---|---|---|
+> | [コンセプト_v5.md](コンセプト_v5.md) | **なぜ**: 設計思想・ビジョン・ユースケース | 概念・メタファー |
+> | [v5-hive-design.md](design/v5-hive-design.md) | **何を**: 詳細設計・スキーマ・プロトコル定義 | 正式な仕様（Single Source of Truth） |
+> | **本書 (ARCHITECTURE.md)** | **今どうなっている**: 実装の現況・ディレクトリ構造 | 実装の事実 |
+> | [DEVELOPMENT_PLAN_v1.md](DEVELOPMENT_PLAN_v1.md) | **次に何をする**: 開発計画・マイルストーン | タスク・優先度 |  
+>
+> 状態機械・イベント型・通信プロトコルの正式定義は [v5-hive-design.md](design/v5-hive-design.md) を参照。
+> 本書は実装の現況を反映し、設計との乖離がある場合は明示します。
 
 ---
 
@@ -246,11 +258,23 @@ Hive（組織単位・プロジェクト）
 | `hive_id` | string | 一意識別子（ULID） |
 | `name` | string | Hive名 |
 | `description` | string? | 説明 |
-| `status` | string | `active` \| `closed` |
+| `status` | HiveState | `active` \| `idle` \| `closed` |
 
-**状態遷移**:
+**状態遷移**（実装済み: `core/ar/projections.py`, `core/state/machines.py`）:
 ```
-created → active → closed
+       ┌──────────┐
+       │  ACTIVE   │◄──── COLONY_CREATED
+       └────┬──┬───┘
+  COLONY_   │  │ HIVE_CLOSED
+  COMPLETED │  │
+       ┌────▼──┼───┐
+       │  IDLE  │   │
+       └────┬──┘   │
+  HIVE_     │      │
+  CLOSED    │      │
+       ┌────▼──────▼┐
+       │  CLOSED     │
+       └─────────────┘
 ```
 
 **APIエンドポイント**:
@@ -275,13 +299,27 @@ created → active → closed
 | `hive_id` | string | 所属Hive ID |
 | `name` | string | Colony名 |
 | `goal` | string? | 目標説明 |
-| `status` | string | `created` \| `running` \| `completed` \| `failed` |
+| `status` | ColonyState | `pending` \| `in_progress` \| `completed` \| `failed` |
 
-**状態遷移**:
+**状態遷移**（実装済み: `core/ar/projections.py`, `core/state/machines.py`）:
 ```
-created → running → completed
-                 └→ failed
+┌─────────┐
+│ PENDING  │
+└────┬─────┘
+     │ COLONY_STARTED
+     ▼
+┌────────────┐
+│IN_PROGRESS │
+└──┬──────┬──┘
+   │      │
+   ▼      ▼
+┌────────┐ ┌────────┐
+│COMPLETED│ │ FAILED │
+└────────┘ └────────┘
 ```
+
+> **設計との差異**: [v5-hive-design.md](design/v5-hive-design.md) §2.1 では `SUSPENDED` 状態（Sentinel Hornet強制停止用）を含む5状態を定義。
+> 現在の実装は4状態。M2-0（Sentinel Hornet実装）時に `SUSPENDED` 状態を追加予定。
 
 **APIエンドポイント**:
 - `POST /hives/{hive_id}/colonies` - Colony作成
@@ -323,6 +361,7 @@ class BaseEvent(BaseModel):
     timestamp: datetime        # 発生時刻（UTC）
     run_id: str | None         # 関連するRunのID
     task_id: str | None        # 関連するTaskのID
+    colony_id: str | None      # 関連するColonyのID（v5追加）
     actor: str                 # イベント発生者
     payload: dict[str, Any]    # イベントペイロード
     prev_hash: str | None      # 前イベントのハッシュ（チェーン用）
@@ -335,28 +374,28 @@ class BaseEvent(BaseModel):
 
 ### 4.2 イベント型一覧
 
+主要なイベント型を以下に示します（全量は `core/events.py` の `EventType` enum を参照）:
+
 | カテゴリ | イベント型 | 説明 |
 |----------|------------|------|
 | **Run** | `run.started` | Run開始 |
-| | `run.completed` | Run完了 |
-| | `run.failed` | Run失敗 |
-| | `run.aborted` | Run中断 |
-| **Task** | `task.created` | Task作成 |
-| | `task.assigned` | Task割り当て |
-| | `task.progressed` | 進捗更新 |
-| | `task.completed` | Task完了 |
-| | `task.failed` | Task失敗 |
-| | `task.blocked` | Taskブロック |
-| | `task.unblocked` | ブロック解除 |
-| **Requirement** | `requirement.created` | 要件作成 |
-| | `requirement.approved` | 承認 |
-| | `requirement.rejected` | 却下 |
-| **LLM** | `llm.request` | LLMリクエスト |
-| | `llm.response` | LLMレスポンス |
-| **System** | `system.heartbeat` | ハートビート |
-| | `system.error` | エラー |
-| | `system.silence_detected` | 沈黙検出 |
-| | `system.emergency_stop` | 緊急停止 |
+| | `run.completed` / `run.failed` / `run.aborted` | Run終了系 |
+| **Task** | `task.created` / `task.assigned` / `task.progressed` | Task進行系 |
+| | `task.completed` / `task.failed` / `task.blocked` / `task.unblocked` | Task終了系 |
+| **Requirement** | `requirement.created` / `requirement.approved` / `requirement.rejected` | 確認要請 |
+| **Hive/Colony** | `hive.created` / `hive.closed` | Hiveライフサイクル |
+| | `colony.created` / `colony.started` / `colony.completed` / `colony.failed` | Colonyライフサイクル |
+| **Conference** | `conference.started` / `conference.ended` | 会議ライフサイクル |
+| **Decision** | `decision.proposal.created` / `decision.recorded` / `decision.applied` / `decision.superseded` | 意思決定 |
+| **Conflict** | `conflict.detected` / `conflict.resolved` | Colony間衝突 |
+| **Intervention** | `intervention.user_direct` / `intervention.queen_escalation` / `intervention.beekeeper_feedback` | 直接介入・エスカレーション |
+| **Worker** | `worker.assigned` / `worker.started` / `worker.progress` / `worker.completed` / `worker.failed` | Worker Bee実行 |
+| **Operation** | `operation.timeout` / `operation.failed` | 標準失敗・タイムアウト |
+| **LLM** | `llm.request` / `llm.response` | LLM連携 |
+| **System** | `system.heartbeat` / `system.error` / `system.silence_detected` / `system.emergency_stop` | システム |
+| **Unknown** | （任意の文字列） | 前方互換用（`UnknownEvent`として読み込み） |
+
+> イベント型の正式なスキーマ定義・payload仕様は [v5-hive-design.md §3](design/v5-hive-design.md) を参照。
 
 ### 4.3 RunProjection（状態投影）
 
@@ -480,70 +519,27 @@ class TaskProjection:
 
 ## 6. 状態機械
 
+Hive/ColonyStateMachine は §3.2, §3.3 を参照。Run/Task/Requirement の詳細な遷移ルールは [v5-hive-design.md §2](design/v5-hive-design.md) に正式定義があります。
+
+以下は実装済みの状態機械の概要です（`core/state/machines.py`）:
+
 ### 6.1 RunStateMachine
 
 ```
-              ┌───────────────────┐
-              │      RUNNING      │
-              └─────────┬─────────┘
-                        │
-        ┌───────────────┼───────────────┐
-        │               │               │
-        ▼               ▼               ▼
-┌───────────┐   ┌───────────┐   ┌───────────┐
-│ COMPLETED │   │  FAILED   │   │  ABORTED  │
-└───────────┘   └───────────┘   └───────────┘
+RUNNING → COMPLETED | FAILED | ABORTED
 ```
-
-| 遷移元 | 遷移先 | トリガーイベント |
-|--------|--------|------------------|
-| RUNNING | COMPLETED | `run.completed` |
-| RUNNING | FAILED | `run.failed` |
-| RUNNING | ABORTED | `run.aborted`, `system.emergency_stop` |
 
 ### 6.2 TaskStateMachine
 
 ```
-┌─────────┐                          
-│ PENDING │──────────────────────────┐
-└────┬────┘                          │
-     │ task.assigned                 │
-     ▼                               │
-┌──────────┐                         │
-│ ASSIGNED │                         │
-└────┬─────┘                         │
-     │ task.progressed               │
-     ▼                               │
-┌─────────────┐    task.blocked      │
-│ IN_PROGRESS │◄───────────────┐     │
-└──────┬──────┘                │     │
-       │                       │     │
-       ├───────────────────────┤     │
-       │                       │     │
-       ▼                       ▼     │
-┌───────────┐           ┌─────────┐  │
-│ COMPLETED │           │ BLOCKED │──┘
-└───────────┘           └─────────┘
-       ▲                       │
-       │                       │
-       │    ┌──────────┐       │
-       └────│  FAILED  │◄──────┘
-            └──────────┘
+PENDING → ASSIGNED → IN_PROGRESS → COMPLETED | FAILED
+                                  → BLOCKED → IN_PROGRESS (復帰)
 ```
 
 ### 6.3 RequirementStateMachine
 
 ```
-┌─────────┐
-│ PENDING │
-└────┬────┘
-     │
-     ├──────────────────┐
-     │                  │
-     ▼                  ▼
-┌──────────┐      ┌──────────┐
-│ APPROVED │      │ REJECTED │
-└──────────┘      └──────────┘
+PENDING → APPROVED | REJECTED
 ```
 
 ---
@@ -771,11 +767,17 @@ HiveForge/
 
 ```
 Vault/
-├── hive-{hive_id}/
-│   └── events.jsonl         # イベントログ（1行1イベント）
+├── {run_id}/                # Run単位のイベントログ（v4互換）
+│   └── events.jsonl         # 1行1イベント（JSONL形式）
+├── hive-{hive_id}/          # Hive関連イベント
+│   └── events.jsonl
 ├── meta-decisions/          # 意思決定メタデータ
-└── ...
+│   └── events.jsonl
+└── ...                      # 今後拡張予定（→ M1-1 AR移行）
 ```
+
+> **設計との差異**: [v5-hive-design.md §4](design/v5-hive-design.md) では `Vault/hives/{hive_id}/colonies/{colony_id}/` 階層を定義しているが、
+> 現在の実装は上記のフラット構造。M1-1（AR移行）で階層化を検討予定。
 
 ---
 

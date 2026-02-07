@@ -172,6 +172,11 @@ M0 (現在)  → M1 (基盤固め) → M2 (接続) → M3 (自律) → M4 (運�
 
 **優先度: 高** — 自律エージェント接続前に安全弁が必須
 
+**前提条件（M1完了後に対応）**:
+- `ColonyStateMachine` に `SUSPENDED` 状態と遷移（`IN_PROGRESS → SUSPENDED`、`SUSPENDED → IN_PROGRESS|FAILED`）を追加すること（現状は4状態: pending/in_progress/completed/failed）
+- `ColonyState` enum に `SUSPENDED = "suspended"` を追加すること
+- 対応する `colony.suspended` イベント型を `EventType` に追加すること
+
 | タスク | 内容 |
 |--------|------|
 | M2-0-a | Sentinel Hornetコアモジュール（`sentinel_hornet/monitor.py`） |
@@ -303,7 +308,7 @@ M0 (現在)  → M1 (基盤固め) → M2 (接続) → M3 (自律) → M4 (運�
 | `README.md` | フェーズ表を削除し、本計画へのリンクに置換。テスト件数の固定記載を除去 |
 | `ARCHITECTURE.md` | フェーズゲート条件のセクションをマイルストーン対応に更新 |
 | `AGENTS.md` | 変更なし（開発原則は不変） |
-| `コンセプト_v5.md` | 変更なし（設計思想は不変） |
+| `コンセプト_v5.md` | Sentinel Hornet概念追加（v5.3）、詳細定義をv5-hive-design.mdへの参照に置換。設計思想は不変 |
 
 ---
 
