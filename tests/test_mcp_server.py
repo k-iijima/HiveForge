@@ -2023,3 +2023,163 @@ class TestGuardBeeToolDefinitions:
             "task_id",
             "evidence",
         }
+
+
+# =============================================================================
+# M2-3: MCP Server ↔ Beekeeper連携テスト
+# =============================================================================
+
+
+class TestBeekeeperIntegration:
+    """MCP ServerのHive/Colony操作がBeekeeper経由でHiveStoreに永続化されることを検証"""
+
+    @pytest.mark.asyncio
+    async def test_create_hive_persists_to_hive_store(self, mcp_server):
+        """create_hiveがHiveStoreにイベントを永続化する
+
+        MCP Serverがcreate_hiveを呼ぶと、Beekeeper経由で
+        HiveCreatedEventがHiveStoreに保存される。
+        """
+        # Arrange / Act
+        result = await mcp_server._dispatch_tool(
+            "create_hive", {"name": "Persistent Hive", "goal": "永続化テスト"}
+        )
+
+        # Assert: レスポンスにhive_idがある
+        assert "hive_id" in result
+        hive_id = result["hive_id"]
+
+        # Assert: HiveStoreに永続化されている
+        store = mcp_server._get_hive_store()
+        events = list(store.replay(hive_id))
+        assert len(events) >= 1
+        assert events[0].type.value == "hive.created"
+
+    @pytest.mark.asyncio
+    async def test_create_colony_persists_to_hive_store(self, mcp_server):
+        """create_colonyがHiveStoreにイベントを永続化する"""
+        # Arrange: Hive作成
+        hive_result = await mcp_server._dispatch_tool(
+            "create_hive", {"name": "Test Hive", "goal": "Test"}
+        )
+        hive_id = hive_result["hive_id"]
+
+        # Act: Colony作成
+        colony_result = await mcp_server._dispatch_tool(
+            "create_colony",
+            {"hive_id": hive_id, "name": "UI Colony", "domain": "UI開発"},
+        )
+
+        # Assert
+        assert "colony_id" in colony_result
+
+        # Assert: HiveStoreにColonyCreatedイベントがある
+        store = mcp_server._get_hive_store()
+        events = list(store.replay(hive_id))
+        event_types = [e.type.value for e in events]
+        assert "colony.created" in event_types
+
+    @pytest.mark.asyncio
+    async def test_list_hives_reads_from_hive_store(self, mcp_server):
+        """list_hivesがHiveStore投影から読み取る
+
+        create_hive後にlist_hivesを呼ぶと、HiveStore投影から
+        永続化されたHive情報が返される。
+        """
+        # Arrange: 2つのHiveを作成
+        await mcp_server._dispatch_tool("create_hive", {"name": "Hive Alpha", "goal": "テスト1"})
+        await mcp_server._dispatch_tool("create_hive", {"name": "Hive Beta", "goal": "テスト2"})
+
+        # Act
+        result = await mcp_server._dispatch_tool("list_hives", {})
+
+        # Assert
+        assert "hives" in result
+        assert len(result["hives"]) >= 2
+
+    @pytest.mark.asyncio
+    async def test_close_hive_persists_event(self, mcp_server):
+        """close_hiveがHiveClosedイベントをHiveStoreに永続化する"""
+        # Arrange
+        hive_result = await mcp_server._dispatch_tool(
+            "create_hive", {"name": "To Close", "goal": "クローズテスト"}
+        )
+        hive_id = hive_result["hive_id"]
+
+        # Act
+        close_result = await mcp_server._dispatch_tool("close_hive", {"hive_id": hive_id})
+
+        # Assert
+        assert close_result.get("status") == "closed"
+        store = mcp_server._get_hive_store()
+        events = list(store.replay(hive_id))
+        event_types = [e.type.value for e in events]
+        assert "hive.closed" in event_types
+
+    @pytest.mark.asyncio
+    async def test_start_colony_persists_event(self, mcp_server):
+        """start_colonyがColonyStartedイベントを永続化する"""
+        # Arrange
+        hive_result = await mcp_server._dispatch_tool(
+            "create_hive", {"name": "Test", "goal": "Test"}
+        )
+        colony_result = await mcp_server._dispatch_tool(
+            "create_colony",
+            {"hive_id": hive_result["hive_id"], "name": "Worker", "domain": "Backend"},
+        )
+
+        # Act
+        start_result = await mcp_server._dispatch_tool(
+            "start_colony", {"colony_id": colony_result["colony_id"]}
+        )
+
+        # Assert
+        assert start_result.get("status") == "running"
+        store = mcp_server._get_hive_store()
+        events = list(store.replay(hive_result["hive_id"]))
+        event_types = [e.type.value for e in events]
+        assert "colony.started" in event_types
+
+    @pytest.mark.asyncio
+    async def test_complete_colony_persists_event(self, mcp_server):
+        """complete_colonyがColonyCompletedイベントを永続化する"""
+        # Arrange
+        hive_result = await mcp_server._dispatch_tool(
+            "create_hive", {"name": "Test", "goal": "Test"}
+        )
+        colony_result = await mcp_server._dispatch_tool(
+            "create_colony",
+            {"hive_id": hive_result["hive_id"], "name": "Worker", "domain": "Backend"},
+        )
+
+        # Act
+        complete_result = await mcp_server._dispatch_tool(
+            "complete_colony", {"colony_id": colony_result["colony_id"]}
+        )
+
+        # Assert
+        assert complete_result.get("status") == "completed"
+        store = mcp_server._get_hive_store()
+        events = list(store.replay(hive_result["hive_id"]))
+        event_types = [e.type.value for e in events]
+        assert "colony.completed" in event_types
+
+    @pytest.mark.asyncio
+    async def test_beekeeper_and_mcp_share_hive_store(self, mcp_server):
+        """MCP ServerとBeekeeperが同じHiveStoreを共有する
+
+        MCP Serverで作成したHiveがBeekeeperのlist_hivesで見えることを確認。
+        """
+        # Arrange: MCP ServerでHive作成
+        hive_result = await mcp_server._dispatch_tool(
+            "create_hive", {"name": "Shared Hive", "goal": "共有テスト"}
+        )
+        hive_id = hive_result["hive_id"]
+
+        # Act: Beekeeperでlist_hives
+        beekeeper = mcp_server._get_beekeeper()
+        bk_result = await beekeeper.handle_list_hives({})
+
+        # Assert: Beekeeperからも同じHiveが見える
+        hive_ids = [h["hive_id"] for h in bk_result["hives"]]
+        assert hive_id in hive_ids

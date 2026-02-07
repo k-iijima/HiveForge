@@ -21,6 +21,8 @@ from mcp.types import (
 )
 
 from ..core import AkashicRecord, get_settings
+from ..core.ar.hive_storage import HiveStore
+from ..beekeeper.server import BeekeeperMCPServer
 from .handlers import (
     ColonyHandlers,
     ConferenceHandlers,
@@ -55,6 +57,8 @@ class HiveForgeMCPServer:
     def __init__(self):
         self.server = Server("hiveforge")
         self._ar: AkashicRecord | None = None
+        self._hive_store: HiveStore | None = None
+        self._beekeeper: BeekeeperMCPServer | None = None
         self._current_run_id: str | None = None
 
         # ハンドラーを初期化
@@ -77,6 +81,21 @@ class HiveForgeMCPServer:
             settings = get_settings()
             self._ar = AkashicRecord(settings.get_vault_path())
         return self._ar
+
+    def _get_hive_store(self) -> HiveStore:
+        """HiveStoreを取得"""
+        if self._hive_store is None:
+            ar = self._get_ar()
+            self._hive_store = HiveStore(ar.vault_path)
+        return self._hive_store
+
+    def _get_beekeeper(self) -> BeekeeperMCPServer:
+        """BeekeeperMCPServerを取得"""
+        if self._beekeeper is None:
+            ar = self._get_ar()
+            hive_store = self._get_hive_store()
+            self._beekeeper = BeekeeperMCPServer(ar=ar, hive_store=hive_store)
+        return self._beekeeper
 
     def _setup_handlers(self) -> None:  # pragma: no cover
         """MCPハンドラーを設定"""

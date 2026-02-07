@@ -3,6 +3,8 @@
 GitHub Issue #9: P1-08: Hive MCP ツール実装
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 
@@ -14,13 +16,18 @@ class TestHiveMCPToolDefinitions:
         """テスト用MCPサーバー"""
         from hiveforge.mcp_server.server import HiveForgeMCPServer
 
-        server = HiveForgeMCPServer()
-        # ハンドラを直接アクセス可能にする
-        server._handle_create_hive = server._hive_handlers.handle_create_hive
-        server._handle_list_hives = server._hive_handlers.handle_list_hives
-        server._handle_get_hive = server._hive_handlers.handle_get_hive
-        server._handle_close_hive = server._hive_handlers.handle_close_hive
-        return server
+        with patch("hiveforge.mcp_server.server.get_settings") as mock_settings:
+            mock_s = MagicMock()
+            mock_s.get_vault_path.return_value = tmp_path / "Vault"
+            mock_settings.return_value = mock_s
+
+            server = HiveForgeMCPServer()
+            # ハンドラを直接アクセス可能にする
+            server._handle_create_hive = server._hive_handlers.handle_create_hive
+            server._handle_list_hives = server._hive_handlers.handle_list_hives
+            server._handle_get_hive = server._hive_handlers.handle_get_hive
+            server._handle_close_hive = server._hive_handlers.handle_close_hive
+            yield server
 
     def test_create_hive_tool_exists(self, mcp_server):
         """create_hiveツールが存在する"""
@@ -75,12 +82,17 @@ class TestHiveMCPHandlers:
         """テスト用MCPサーバー"""
         from hiveforge.mcp_server.server import HiveForgeMCPServer
 
-        server = HiveForgeMCPServer()
-        server._handle_create_hive = server._hive_handlers.handle_create_hive
-        server._handle_list_hives = server._hive_handlers.handle_list_hives
-        server._handle_get_hive = server._hive_handlers.handle_get_hive
-        server._handle_close_hive = server._hive_handlers.handle_close_hive
-        return server
+        with patch("hiveforge.mcp_server.server.get_settings") as mock_settings:
+            mock_s = MagicMock()
+            mock_s.get_vault_path.return_value = tmp_path / "Vault"
+            mock_settings.return_value = mock_s
+
+            server = HiveForgeMCPServer()
+            server._handle_create_hive = server._hive_handlers.handle_create_hive
+            server._handle_list_hives = server._hive_handlers.handle_list_hives
+            server._handle_get_hive = server._hive_handlers.handle_get_hive
+            server._handle_close_hive = server._hive_handlers.handle_close_hive
+            yield server
 
     @pytest.mark.asyncio
     async def test_create_hive(self, mcp_server):
@@ -96,7 +108,7 @@ class TestHiveMCPHandlers:
         # Assert
         assert "hive_id" in result
         assert result["name"] == "TestHive"
-        assert result["status"] == "active"
+        assert result["status"] == "created"
 
     @pytest.mark.asyncio
     async def test_list_hives_empty(self, mcp_server):
