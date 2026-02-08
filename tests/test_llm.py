@@ -1201,6 +1201,197 @@ class TestLLMClient:
         text_blocks = [b for b in assistant_msgs[0]["content"] if b["type"] == "text"]
         assert len(text_blocks) == 0
 
+    def test_check_api_key_returns_true_when_set(self, client, monkeypatch):
+        """APIキーが設定されている場合check_api_keyがTrueを返す"""
+        # Arrange
+        monkeypatch.setenv("TEST_API_KEY", "sk-test-12345")
+
+        # Act
+        result = client.check_api_key()
+
+        # Assert
+        assert result is True
+
+    def test_check_api_key_returns_false_when_unset(self, client, monkeypatch):
+        """APIキーが未設定の場合check_api_keyがFalseを返す"""
+        # Arrange
+        monkeypatch.delenv("TEST_API_KEY", raising=False)
+
+        # Act
+        result = client.check_api_key()
+
+        # Assert
+        assert result is False
+
+    def test_check_api_key_returns_false_when_empty(self, client, monkeypatch):
+        """APIキーが空文字の場合check_api_keyがFalseを返す"""
+        # Arrange
+        monkeypatch.setenv("TEST_API_KEY", "")
+
+        # Act
+        result = client.check_api_key()
+
+        # Assert
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_request_with_retry_5xx_retry_then_success(
+        self, client, mock_rate_limiter, monkeypatch
+    ):
+        """5xxエラー時に指数バックオフでリトライし成功する"""
+        # Arrange
+        monkeypatch.setenv("TEST_API_KEY", "sk-test")
+
+        mock_500 = MagicMock()
+        mock_500.status_code = 500
+        mock_500.headers = {}
+
+        mock_200 = MagicMock()
+        mock_200.status_code = 200
+        mock_200.raise_for_status = MagicMock()
+        mock_200.json.return_value = {
+            "choices": [
+                {
+                    "message": {"content": "Recovered", "role": "assistant"},
+                    "finish_reason": "stop",
+                }
+            ],
+        }
+
+        mock_http = AsyncMock()
+        mock_http.post = AsyncMock(side_effect=[mock_500, mock_200])
+        client._http_client = mock_http
+
+        # Act
+        messages = [Message(role="user", content="Hi")]
+        response = await client.chat(messages)
+
+        # Assert: 5xx後にリトライして成功
+        assert response.content == "Recovered"
+        assert mock_http.post.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_request_with_retry_5xx_exhaust_retries(
+        self, client, mock_rate_limiter, monkeypatch
+    ):
+        """5xxエラーがリトライ上限を超えるとHTTPStatusErrorが発生する"""
+        import httpx
+        from hiveforge.llm.client import MAX_SERVER_ERROR_RETRIES
+
+        # Arrange
+        monkeypatch.setenv("TEST_API_KEY", "sk-test")
+
+        mock_request = MagicMock()
+
+        def make_5xx():
+            resp = MagicMock()
+            resp.status_code = 503
+            resp.headers = {}
+            resp.request = mock_request
+            resp.raise_for_status.side_effect = httpx.HTTPStatusError(
+                "503 Service Unavailable", request=mock_request, response=resp
+            )
+            return resp
+
+        # MAX_SERVER_ERROR_RETRIES + 1回すべて503
+        mock_http = AsyncMock()
+        mock_http.post = AsyncMock(
+            side_effect=[make_5xx() for _ in range(MAX_SERVER_ERROR_RETRIES + 1)]
+        )
+        client._http_client = mock_http
+
+        # Act & Assert
+        with pytest.raises(httpx.HTTPStatusError):
+            messages = [Message(role="user", content="Hi")]
+            await client.chat(messages)
+
+        # リトライ回数 = MAX_SERVER_ERROR_RETRIES + 1（初回 + リトライ回数）
+        assert mock_http.post.call_count == MAX_SERVER_ERROR_RETRIES + 1
+
+    @pytest.mark.asyncio
+    async def test_request_with_retry_429_exhaust_retries(
+        self, client, mock_rate_limiter, monkeypatch
+    ):
+        """429エラーがリトライ上限を超えるとHTTPStatusErrorが発生する"""
+        import httpx
+        from hiveforge.llm.client import MAX_429_RETRIES
+
+        # Arrange
+        monkeypatch.setenv("TEST_API_KEY", "sk-test")
+
+        mock_request = MagicMock()
+
+        def make_429():
+            resp = MagicMock()
+            resp.status_code = 429
+            resp.headers = {"Retry-After": "1"}
+            resp.request = mock_request
+            return resp
+
+        # MAX_429_RETRIES + 1回すべて429
+        mock_http = AsyncMock()
+        mock_http.post = AsyncMock(side_effect=[make_429() for _ in range(MAX_429_RETRIES + 1)])
+        client._http_client = mock_http
+
+        # Act & Assert
+        with pytest.raises(httpx.HTTPStatusError, match="429リトライ上限超過"):
+            messages = [Message(role="user", content="Hi")]
+            await client.chat(messages)
+
+        assert mock_http.post.call_count == MAX_429_RETRIES + 1
+
+    @pytest.mark.asyncio
+    async def test_request_with_retry_mixed_429_and_5xx(
+        self, client, mock_rate_limiter, monkeypatch
+    ):
+        """429と5xxが混在してもそれぞれ独立したカウンターでリトライする"""
+        # Arrange
+        monkeypatch.setenv("TEST_API_KEY", "sk-test")
+
+        mock_429 = MagicMock()
+        mock_429.status_code = 429
+        mock_429.headers = {"Retry-After": "1"}
+
+        mock_502 = MagicMock()
+        mock_502.status_code = 502
+        mock_502.headers = {}
+
+        mock_200 = MagicMock()
+        mock_200.status_code = 200
+        mock_200.raise_for_status = MagicMock()
+        mock_200.json.return_value = {
+            "choices": [
+                {
+                    "message": {"content": "Finally OK", "role": "assistant"},
+                    "finish_reason": "stop",
+                }
+            ],
+        }
+
+        # 429 → 502 → 200
+        mock_http = AsyncMock()
+        mock_http.post = AsyncMock(side_effect=[mock_429, mock_502, mock_200])
+        client._http_client = mock_http
+
+        # Act
+        messages = [Message(role="user", content="Hi")]
+        response = await client.chat(messages)
+
+        # Assert: 429とサーバーエラーを経ても最終的に成功
+        assert response.content == "Finally OK"
+        assert mock_http.post.call_count == 3
+        mock_rate_limiter.handle_429.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_request_with_retry_retryable_status_codes(
+        self, client, mock_rate_limiter, monkeypatch
+    ):
+        """500, 502, 503, 529がリトライ対象のステータスコードである"""
+        from hiveforge.llm.client import _RETRYABLE_STATUS_CODES
+
+        # Assert: リトライ対象のステータスコードが正しく定義されている
+        assert _RETRYABLE_STATUS_CODES == {500, 502, 503, 529}
+
 
 # ==================== run_command_handler テスト ====================
 

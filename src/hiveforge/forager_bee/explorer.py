@@ -43,6 +43,11 @@ class ForagerExplorer:
 
         現時点ではシナリオの存在を記録して合格として返す。
         LLM統合後は実際のAPIコール・テスト実行を行う。
+
+        TODO(M5+): LLM統合後に実際の探索実行を実装する。
+        現在のスタブ実装では常に passed=True を返すため、
+        探索テスト結果を根拠とした品質判断には使用できない。
+        See: DEVELOPMENT_PLAN_v2.md §8 技術的負債 P-04
         """
         return ScenarioResult(
             scenario_id=scenario.scenario_id,

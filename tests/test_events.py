@@ -731,6 +731,5 @@ class TestEventTypeMapCompleteness:
         # Assert: 差分がゼロ
         missing = all_types - registered_types
         assert missing == set(), (
-            f"EVENT_TYPE_MAP に未登録の EventType があります: "
-            f"{sorted(m.value for m in missing)}"
+            f"EVENT_TYPE_MAP に未登録の EventType があります: {sorted(m.value for m in missing)}"
         )

@@ -20,6 +20,12 @@ logger = logging.getLogger(__name__)
 # 429リトライ上限
 MAX_429_RETRIES = 3
 
+# 5xx サーバーエラーリトライ上限
+MAX_SERVER_ERROR_RETRIES = 2
+
+# リトライ対象のHTTPステータスコード
+_RETRYABLE_STATUS_CODES = {500, 502, 503, 529}
+
 
 @dataclass
 class Message:
@@ -59,6 +65,13 @@ class LLMClient:
     """LLMクライアント
 
     OpenAI/Anthropic APIを統一インターフェースで呼び出す。
+
+    運用上の注意:
+        - APIキーは環境変数で管理（config.api_key_env で指定）
+        - キー未設定時は初回API呼び出しで ValueError が発生
+        - 429 (Rate Limit) は最大3回リトライ（Retry-Afterヘッダーに従う）
+        - 5xx (Server Error) は最大2回リトライ（指数バックオフ）
+        - プロバイダー間のフォールバックは未実装（将来対応予定）
     """
 
     def __init__(
@@ -75,6 +88,21 @@ class LLMClient:
         self.config = config or get_settings().llm
         self._rate_limiter = rate_limiter
         self._http_client: httpx.AsyncClient | None = None
+
+    def check_api_key(self) -> bool:
+        """APIキーが設定されているかチェック（起動時バリデーション用）
+
+        Returns:
+            True: APIキーが設定されている
+            False: APIキーが未設定
+
+        Example:
+            client = LLMClient()
+            if not client.check_api_key():
+                logger.warning("LLM APIキーが未設定です")
+        """
+        api_key = os.environ.get(self.config.api_key_env, "")
+        return bool(api_key)
 
     async def _get_rate_limiter(self) -> RateLimiter:
         """レートリミッターを取得（非同期）"""
@@ -105,6 +133,86 @@ class LLMClient:
         if self._http_client:
             await self._http_client.aclose()
             self._http_client = None
+
+    async def _request_with_retry(
+        self,
+        url: str,
+        headers: dict[str, str],
+        body: dict[str, Any],
+        provider_name: str,
+    ) -> httpx.Response:
+        """429/5xxリトライ付きHTTPリクエスト
+
+        Args:
+            url: APIエンドポイントURL
+            headers: リクエストヘッダー
+            body: リクエストボディ
+            provider_name: ログ用プロバイダー名
+
+        Returns:
+            成功したHTTPレスポンス
+
+        Raises:
+            httpx.HTTPStatusError: リトライ上限超過または非リトライ対象エラー
+        """
+        import asyncio
+
+        client = await self._get_client()
+        server_error_count = 0
+
+        for attempt in range(MAX_429_RETRIES + 1):
+            response = await client.post(url, headers=headers, json=body)
+
+            if response.status_code == 429:
+                retry_after = float(response.headers.get("Retry-After", 60))
+                logger.warning(
+                    "%s 429 レートリミット: retry_after=%.1fs, attempt=%d/%d, model=%s",
+                    provider_name,
+                    retry_after,
+                    attempt + 1,
+                    MAX_429_RETRIES,
+                    self.config.model,
+                )
+                if attempt >= MAX_429_RETRIES:
+                    raise httpx.HTTPStatusError(
+                        f"429リトライ上限超過 ({MAX_429_RETRIES}回)",
+                        request=response.request,
+                        response=response,
+                    )
+                rate_limiter = await self._get_rate_limiter()
+                await rate_limiter.handle_429(retry_after)
+                continue
+
+            if response.status_code in _RETRYABLE_STATUS_CODES:
+                server_error_count += 1
+                if server_error_count > MAX_SERVER_ERROR_RETRIES:
+                    logger.error(
+                        "%s %dエラー: リトライ上限超過 (%d回), model=%s",
+                        provider_name,
+                        response.status_code,
+                        MAX_SERVER_ERROR_RETRIES,
+                        self.config.model,
+                    )
+                    response.raise_for_status()
+
+                # 指数バックオフ: 1s, 2s
+                backoff = 2 ** (server_error_count - 1)
+                logger.warning(
+                    "%s %dサーバーエラー: %ds後にリトライ, attempt=%d/%d, model=%s",
+                    provider_name,
+                    response.status_code,
+                    backoff,
+                    server_error_count,
+                    MAX_SERVER_ERROR_RETRIES,
+                    self.config.model,
+                )
+                await asyncio.sleep(backoff)
+                continue
+
+            break
+
+        response.raise_for_status()
+        return response
 
     def _get_api_key(self) -> str:
         """APIキーを取得"""
@@ -150,7 +258,6 @@ class LLMClient:
         tool_choice: str | dict[str, Any] | None,
     ) -> LLMResponse:
         """OpenAI API呼び出し"""
-        client = await self._get_client()
         api_key = self._get_api_key()
 
         # メッセージを変換
@@ -185,39 +292,17 @@ class LLMClient:
         if tool_choice:
             body["tool_choice"] = tool_choice
 
-        # API呼び出し（429リトライ上限付き）
-        for attempt in range(MAX_429_RETRIES + 1):
-            response = await client.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                },
-                json=body,
-            )
+        # API呼び出し（429 + 5xxリトライ付き）
+        response = await self._request_with_retry(
+            url="https://api.openai.com/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            body=body,
+            provider_name="OpenAI",
+        )
 
-            if response.status_code == 429:
-                retry_after = float(response.headers.get("Retry-After", 60))
-                logger.warning(
-                    "OpenAI 429 レートリミット: retry_after=%.1fs, attempt=%d/%d, model=%s",
-                    retry_after,
-                    attempt + 1,
-                    MAX_429_RETRIES,
-                    self.config.model,
-                )
-                if attempt >= MAX_429_RETRIES:
-                    raise httpx.HTTPStatusError(
-                        f"429リトライ上限超過 ({MAX_429_RETRIES}回)",
-                        request=response.request,
-                        response=response,
-                    )
-                rate_limiter = await self._get_rate_limiter()
-                await rate_limiter.handle_429(retry_after)
-                continue
-
-            break
-
-        response.raise_for_status()
         data = response.json()
 
         # レスポンスをパース
@@ -249,7 +334,6 @@ class LLMClient:
         tool_choice: str | dict[str, Any] | None,
     ) -> LLMResponse:
         """Anthropic API呼び出し"""
-        client = await self._get_client()
         api_key = self._get_api_key()
 
         # システムメッセージを抽出
@@ -317,40 +401,18 @@ class LLMClient:
         if anthropic_tools:
             body["tools"] = anthropic_tools
 
-        # API呼び出し（429リトライ上限付き）
-        for attempt in range(MAX_429_RETRIES + 1):
-            response = await client.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={
-                    "x-api-key": api_key,
-                    "anthropic-version": "2023-06-01",
-                    "Content-Type": "application/json",
-                },
-                json=body,
-            )
+        # API呼び出し（429 + 5xxリトライ付き）
+        response = await self._request_with_retry(
+            url="https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "Content-Type": "application/json",
+            },
+            body=body,
+            provider_name="Anthropic",
+        )
 
-            if response.status_code == 429:
-                retry_after = float(response.headers.get("Retry-After", 60))
-                logger.warning(
-                    "Anthropic 429 レートリミット: retry_after=%.1fs, attempt=%d/%d, model=%s",
-                    retry_after,
-                    attempt + 1,
-                    MAX_429_RETRIES,
-                    self.config.model,
-                )
-                if attempt >= MAX_429_RETRIES:
-                    raise httpx.HTTPStatusError(
-                        f"429リトライ上限超過 ({MAX_429_RETRIES}回)",
-                        request=response.request,
-                        response=response,
-                    )
-                rate_limiter = await self._get_rate_limiter()
-                await rate_limiter.handle_429(retry_after)
-                continue
-
-            break
-
-        response.raise_for_status()
         data = response.json()
 
         # レスポンスをパース
