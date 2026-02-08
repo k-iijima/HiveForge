@@ -62,6 +62,42 @@ def test_event_hash_excludes_hash_field():
 - **コミットメッセージは明確に**: `feat:`, `fix:`, `test:`, `chore:`, `docs:`, `refactor:` のプレフィックスを使用
 - **壊れた状態をコミットしない**: 各コミットでテストが通る状態を維持
 
+### Git ワークフロー
+
+開発系プロジェクトでは、Colony ベースの並列開発を安全に回すための Git 運用規約に従う。
+詳細は **[docs/GIT_WORKFLOW.md](docs/GIT_WORKFLOW.md)** を参照。
+
+#### ブランチモデル
+
+| ブランチ | 用途 | 寿命 |
+|---------|------|------|
+| `main` | リリース専用（保護） | 永続 |
+| `develop` | 統合トランク | 永続 |
+| `feat/<hive>/<colony>/<ticket>-<slug>` | Colony 作業 | **短命**（1〜3日） |
+| `fix/…`, `hotfix/…` | 障害対応 | 短命 |
+| `exp/…` | 実験（使い捨て） | 任意 |
+
+#### Worktree 運用
+
+Colony 単位で `git worktree add` を使用し並列開発する。上限は 3 Worktree。
+
+```bash
+git worktree add ../wt-api -b feat/ec-site/api/123-login develop
+```
+
+#### Rebase / Merge 判定
+
+- **個人ブランチ** → `develop`: rebase（線形履歴）
+- **共有ブランチ** → `develop`: merge（履歴保護）
+- `develop` → `main`: merge --no-ff（リリース境界明示）
+
+#### PR ゲート（必須チェック）
+
+- `guard-l1`: Lint / Unit / Schema
+- `guard-l2`: 設計整合性
+- `forager-regression`: 回帰テスト
+- `sentinel-safety`: 安全性チェック
+
 ### 3. イミュータブル設計
 
 - **イベントは不変**: 一度作成されたイベントは変更されない

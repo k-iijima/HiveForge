@@ -1080,7 +1080,7 @@ logging:
 - [ ] Step 1: docker compose 最小構成（Plane概念の導入）
 - [ ] Step 2: Worker エフェメラルコンテナ化（Execution Plane分離）
 - [ ] Step 3: Guard Bee / Sentinel Hornet 独立コンテナ化（Safety Plane分離）
-- [ ] Step 4: git worktree 運用基盤（Colony × worktree）
+- [ ] Step 4: git worktree 運用基盤（Colony × worktree） — 規約策定済み: [GIT_WORKFLOW.md](GIT_WORKFLOW.md)
 - [ ] Step 5: 本番オーケストレーション（K8s / ECS）
 
 **Action Class × コンテナ分離**:
@@ -1099,4 +1099,5 @@ logging:
 - [v5-hive-design.md](design/v5-hive-design.md) - 詳細設計（Single Source of Truth）
 - [QUICKSTART.md](QUICKSTART.md) - 動作確認手順
 - [AGENTS.md](../AGENTS.md) - AI開発ガイドライン
+- [GIT_WORKFLOW.md](GIT_WORKFLOW.md) - Gitワークフロー規約（ブランチ・Worktree・PRゲート）
 - [コンセプト_v6.md](コンセプト_v6.md) - 設計思想（最新版）

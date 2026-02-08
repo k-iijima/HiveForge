@@ -499,6 +499,7 @@ M5（運用品質）の残項目に着手可能な状態。
 | [ARCHITECTURE.md](ARCHITECTURE.md) | **今どう**: 実装の現況 | 実装の事実 |
 | **本書** | **次に何**: 開発計画 | タスク・優先度 |
 | [QUICKSTART.md](QUICKSTART.md) | **使い方**: セットアップ手順 | 手順書 |
+| [GIT_WORKFLOW.md](GIT_WORKFLOW.md) | **Git運用**: ブランチ・Worktree・PRゲート | 運用規約 |
 | [AGENTS.md](../AGENTS.md) | **開発原則**: TDD, コミット規約 | ガイドライン |
 
 ### 5.3 アーカイブ済み
@@ -629,3 +630,28 @@ M5（運用品質）の残項目に着手可能な状態。
 | **🟢 低** | H-01〜H-08 ハードコード | 現時点で意図的な仮定。必要時にconfig化 |
 | ~~✅ 解消~~ | ~~P-01, P-03, P-04~~ | KPIコメント修正・correctness/incident_rate算出・DFSデッドロック検出 |
 | ~~✅ 解消~~ | ~~M-01〜M-03 インメモリ~~ | InterventionStore JSONL + ConferenceStore base_path |
+
+---
+
+## 9. Git ワークフロー
+
+Colony ベースの並列開発を安全かつ効率的に回すための Git 運用規約を策定済み。
+
+**詳細**: [GIT_WORKFLOW.md](GIT_WORKFLOW.md)
+
+### 概要
+
+| 項目 | 内容 |
+|------|------|
+| ブランチモデル | `main` / `develop` / `feat/<hive>/<colony>/<ticket>-<slug>` / `fix/…` / `hotfix/…` / `exp/…` |
+| Worktree | Colony 単位で `git worktree add`、上限 3 |
+| Rebase/Merge | 個人→rebase、共有→merge、develop→main は `merge --no-ff` |
+| PR ゲート | `guard-l1`（Lint/Unit）、`guard-l2`（設計整合）、`forager-regression`、`sentinel-safety` |
+| GitHub Projection | AR イベント → GitHub Issue 同期（コード変更は PR、タスク進捗は Issue） |
+
+### 関連コンポーネント
+
+- **Guard Bee**: PR ゲート L1/L2 の CI ジョブとして動作
+- **Forager Bee**: 変更影響グラフに基づく回帰テスト
+- **Sentinel Hornet**: トークン上限・セキュリティパターン検出
+- **GitHub Projection** (`core/github/`): AR→GitHub Issue 同期
