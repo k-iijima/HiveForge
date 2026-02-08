@@ -224,6 +224,13 @@ class RunProjector:
             task.progress = 100
             task.completed_at = event.timestamp
             task.updated_at = event.timestamp
+            # Worker結果をmetadataに保存
+            result = event.payload.get("result")
+            if result:
+                task.metadata["result"] = result
+            worker_id = event.payload.get("worker_id")
+            if worker_id:
+                task.metadata["worker_id"] = worker_id
 
     def _handle_task_failed(self, event: BaseEvent) -> None:
         task_id = event.task_id
@@ -232,6 +239,10 @@ class RunProjector:
             task.state = TaskState.FAILED
             task.error_message = event.payload.get("error")
             task.updated_at = event.timestamp
+            # Worker情報をmetadataに保存
+            worker_id = event.payload.get("worker_id")
+            if worker_id:
+                task.metadata["worker_id"] = worker_id
 
     def _handle_task_blocked(self, event: BaseEvent) -> None:
         task_id = event.task_id

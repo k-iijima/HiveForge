@@ -161,6 +161,12 @@ HiveForgeは「**信頼できる部品を、信頼できる組み合わせ方を
 > 各コンポーネントの詳細な実態とギャップは [DEVELOPMENT_PLAN_v2.md](DEVELOPMENT_PLAN_v2.md) §1.2 を参照。
 > マイルストーン（M1〜M5）の記号は同計画の §3 に対応。
 > 既知の制約の詳細は [DEVELOPMENT_PLAN_v2.md](DEVELOPMENT_PLAN_v2.md) §8 技術的負債一覧を参照。
+>
+> **重要な制約（2026-02-08 レビュー指摘）**:
+> - 「✅ 完了」はユニットテスト＋API単体レベルの完成度を示す。**E2E統合パスは未検証**（M2-2/M2-3未着手）。
+> - Beekeeper `_ask_user()`, Forager `_run_single()` のスタブにより、人間参加・探索実行の経路は未接続。
+> - KPI算出ロジック（`_calc_incident_rate()`）が暫定版のため、運用監視の精度は限定的。
+> - VS Code拡張はAPI接続コード完成だが E2E動作テスト未実施（M2-1-f）。
 
 ### 2.2 モジュール依存関係
 
@@ -176,12 +182,18 @@ hiveforge/
 │   │   ├── decision.py       # Decisionイベント
 │   │   ├── operation.py      # Operation Failure/Timeout
 │   │   ├── guard.py          # Guard Beeイベント
+│   │   ├── pipeline.py       # Pipelineイベント
+│   │   ├── sentinel.py       # Sentinel Hornetイベント
+│   │   ├── waggle.py         # Waggle Danceイベント
 │   │   └── registry.py       # イベントレジストリ
 │   ├── config.py         # 設定管理
 │   ├── activity_bus.py   # Activity Bus
 │   ├── lineage.py        # 因果リンク
 │   ├── policy_gate.py    # ポリシーゲート
 │   ├── rate_limiter.py   # レートリミッター
+│   ├── intervention/     # 介入・エスカレーション永続化
+│   │   ├── models.py         # 介入モデル
+│   │   └── store.py          # InterventionStore (JSONL永続化)
 │   ├── models/           # ドメインモデル
 │   │   ├── action_class.py
 │   │   └── project_contract.py
@@ -232,7 +244,8 @@ hiveforge/
 │   ├── conference.py     # Conference機能
 │   ├── conflict.py       # 衝突検出
 │   ├── escalation.py     # エスカレーション
-│   └── resolver.py       # 衝突解決
+│   ├── resolver.py       # 衝突解決
+│   └── tool_definitions.py # ツール定義
 ├── queen_bee/             # Queen Bee層（core, llmに依存、M4実装済）
 │   ├── server.py         # MCPサーバー
 │   ├── planner.py        # TaskPlanner（LLMタスク分解・依存分析）(M4-1)
@@ -259,6 +272,7 @@ hiveforge/
 │   ├── __init__.py
 │   ├── models.py         # VerificationRequest, VerificationResult等
 │   ├── rules.py          # 5組込ルール
+│   ├── plan_rules.py     # プラン検証ルール
 │   └── verifier.py       # 2層検証 (L1 structural / L2 semantic)
 ├── forager_bee/           # Forager Bee (M3-4)
 │   ├── __init__.py
@@ -482,7 +496,7 @@ class BaseEvent(BaseModel):
 | **System** | `system.heartbeat` / `system.error` / `system.silence_detected` / `system.emergency_stop` | システム |
 | **Unknown** | （任意の文字列） | 前方互換用（`UnknownEvent`として読み込み） |
 
-> 全56 EventType。イベント型の正式なスキーマ定義・payload仕様は [v5-hive-design.md §3](design/v5-hive-design.md) を参照。
+> 全61 EventType。イベント型の正式なスキーマ定義・payload仕様は [v5-hive-design.md §3](design/v5-hive-design.md) を参照。
 
 ### 4.3 RunProjection（状態投影）
 
@@ -727,11 +741,17 @@ HiveForge/
 │   │   │   ├── decision.py      # Decisionイベント
 │   │   │   ├── operation.py     # Failure/Timeout
 │   │   │   ├── guard.py         # Guard Beeイベント
+│   │   │   ├── pipeline.py      # Pipelineイベント
+│   │   │   ├── sentinel.py      # Sentinel Hornetイベント
+│   │   │   ├── waggle.py        # Waggle Danceイベント
 │   │   │   └── registry.py      # イベントレジストリ
 │   │   ├── activity_bus.py  # Activity Bus
 │   │   ├── lineage.py       # 因果リンク
 │   │   ├── policy_gate.py   # ポリシーゲート
 │   │   ├── rate_limiter.py  # レートリミッター
+│   │   ├── intervention/    # 介入・エスカレーション永続化
+│   │   │   ├── models.py        # 介入モデル
+│   │   │   └── store.py         # InterventionStore (JSONL)
 │   │   ├── models/          # ドメインモデル
 │   │   │   ├── action_class.py
 │   │   │   └── project_contract.py
@@ -782,7 +802,8 @@ HiveForge/
 │   │   ├── conference.py    # Conference機能
 │   │   ├── conflict.py      # 衝突検出
 │   │   ├── escalation.py    # エスカレーション
-│   │   └── resolver.py      # 衝突解決
+│   │   ├── resolver.py      # 衝突解決
+│   │   └── tool_definitions.py # ツール定義
 │   ├── queen_bee/           # Queen Bee層 (M4実装済)
 │   │   ├── server.py        # MCPサーバー
 │   │   ├── planner.py       # TaskPlanner（LLMタスク分解）(M4-1)
@@ -807,6 +828,7 @@ HiveForge/
 │   ├── guard_bee/           # Guard Bee (M3-3)
 │   │   ├── models.py        # VerificationRequest/Result
 │   │   ├── rules.py         # 5組込ルール
+│   │   ├── plan_rules.py    # プラン検証ルール
 │   │   └── verifier.py      # 2層検証 (L1/L2)
 │   ├── forager_bee/         # Forager Bee (M3-4)
 │   │   ├── models.py        # ImpactNode, Scenario等
@@ -868,6 +890,7 @@ HiveForge/
 │       ├── extension.ts
 │       ├── client.ts        # APIクライアント
 │       ├── commands/        # コマンド実装
+│       │   ├── index.ts
 │       │   ├── hiveCommands.ts
 │       │   ├── colonyCommands.ts
 │       │   ├── runCommands.ts
@@ -885,8 +908,11 @@ HiveForge/
 │       ├── utils/           # ユーティリティ
 │       └── test/            # テスト
 │           ├── client.test.ts
+│           ├── colonyCommands.test.ts
+│           ├── hiveCommands.test.ts
 │           ├── html.test.ts
-│           └── vscode-mock.ts
+│           ├── vscode-mock.ts
+│           └── vscode-shim.ts
 ├── docs/                    # ドキュメント
 │   ├── ARCHITECTURE.md
 │   ├── DEVELOPMENT_PLAN_v2.md
@@ -985,7 +1011,7 @@ logging:
 | M2: 接続 | Sentinel Hornet、VS Code↔API、エージェント間E2E | 🔄 M2-0/M2-1完了、M2-2/M2-3未着手 |
 | M3: 適応的協調 | Honeycomb, Swarming, Guard Bee, Forager Bee, Referee Bee, Sentinel拡張, Waggle Dance, Scout Bee | ✅ 完了（M3-1〜M3-8全完了） |
 | M4: 自律 | LLMタスク分解、Orchestrator | ✅ 完了（M4-1, M4-2） |
-| M5: 運用品質 | セキュリティ、KPIダッシュボード、CI/CD | 計画中 |
+| M5: 運用品質 | セキュリティ、KPIダッシュボード、CI/CD | 🔄 M5-1/M5-3完了、M5-2/M5-4〜M5-6未着手 |
 
 ### 11.3 ゲート条件
 

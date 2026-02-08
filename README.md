@@ -75,15 +75,17 @@ Worker × N案生成 → Forager探索拡張 → Referee多面的採点 → Guar
 
 ## 開発ステータス
 
-**M4（自律的タスク分解）完了** — LLMタスク分解（TaskPlanner）、並列実行（ColonyOrchestrator）、ゲート統合（ExecutionPipeline）が実装済。次はM5（運用品質）およびM2-2/M2-3（エージェント間E2E統合）。
+**M4（自律的タスク分解）完了** — LLMタスク分解（TaskPlanner）、並列実行（ColonyOrchestrator）、ゲート統合（ExecutionPipeline）が実装済。次はM2-2/M2-3（統合パス確立）を最優先で進め、その後M5残項目（運用品質）へ。
 
 | マイルストーン | 状態 |
-|--|–|
+|--|--|
 | M1: 基盤固め | ✅ 完了 |
-| M2: 接続 | M2-0/M2-1 完了、M2-2/M2-3 未着手 |
+| M2: 接続 | M2-0/M2-1 完了、**M2-2/M2-3 未着手（🔴 最優先）** |
 | M3: 適応的協調 | ✅ 全完了 (M3-1〜M3-8) |
 | M4: 自律 | ✅ 完了 (M4-1, M4-2) |
-| M5: 運用品質 | ★次に着手 |
+| M5: 運用品質 | 🔄 M5-1/M5-3 完了、M5-2/M5-4〜M5-6 未着手 |
+
+> **既知の制約**: 各コンポーネントはユニットテストレベルで完成しているが、エージェント間のE2E統合パス（Beekeeper→Queen Bee→Worker Bee）は未接続。詳細は [docs/DEVELOPMENT_PLAN_v2.md §4](docs/DEVELOPMENT_PLAN_v2.md) を参照。
 
 詳細: [docs/DEVELOPMENT_PLAN_v2.md](docs/DEVELOPMENT_PLAN_v2.md)
 
@@ -154,7 +156,7 @@ hiveforge serve
 ```
 src/hiveforge/
 ├── core/              # コア基盤（イベント、AR、状態機械）
-│   ├── events/        #   84 EventType (パッケージ化済)
+│   ├── events/        #   61 EventType (パッケージ化済)
 │   ├── ar/            #   Akashic Record (JSONL永続化)
 │   ├── state/         #   5状態機械
 │   ├── honeycomb/     #   実行履歴・学習基盤 (M3-1)

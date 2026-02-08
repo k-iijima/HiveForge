@@ -458,6 +458,140 @@ class TestRunProjector:
         # Assert: 要件は作成されない
         assert len(projector.projection.requirements) == 0
 
+    def test_task_completed_result_saved_to_metadata(self):
+        """タスク完了時のresultがmetadataに保存される
+
+        Worker Beeの実行結果（output）がTaskProjectionに反映されることで、
+        投影だけで完了タスクの成果物を確認できる。
+        """
+        # Arrange: タスクを作成
+        projector = RunProjector("run-001")
+        projector.apply(
+            TaskCreatedEvent(
+                run_id="run-001",
+                task_id="task-001",
+                payload={"title": "Build login page"},
+            )
+        )
+
+        # Act: resultとworker_idを含む完了イベントを適用
+        projector.apply(
+            TaskCompletedEvent(
+                run_id="run-001",
+                task_id="task-001",
+                payload={
+                    "result": "Created login.html with form validation",
+                    "worker_id": "worker-bee-1",
+                },
+            )
+        )
+
+        # Assert: resultとworker_idがmetadataに保存される
+        task = projector.projection.tasks["task-001"]
+        assert task.state == TaskState.COMPLETED
+        assert task.metadata["result"] == "Created login.html with form validation"
+        assert task.metadata["worker_id"] == "worker-bee-1"
+
+    def test_task_completed_without_result_no_metadata_pollution(self):
+        """resultがないタスク完了イベントではmetadataが汚染されない
+
+        MCP経由やシンプルな完了イベントではresultが空文字の場合がある。
+        その場合はmetadataに空文字を入れない。
+        """
+        # Arrange: タスクを作成
+        projector = RunProjector("run-001")
+        projector.apply(
+            TaskCreatedEvent(
+                run_id="run-001",
+                task_id="task-001",
+                payload={"title": "Simple task"},
+            )
+        )
+
+        # Act: resultなしの完了イベント
+        projector.apply(
+            TaskCompletedEvent(
+                run_id="run-001",
+                task_id="task-001",
+                payload={},
+            )
+        )
+
+        # Assert: metadataにresultキーが追加されていない
+        task = projector.projection.tasks["task-001"]
+        assert task.state == TaskState.COMPLETED
+        assert "result" not in task.metadata
+        assert "worker_id" not in task.metadata
+
+    def test_task_completed_preserves_existing_metadata(self):
+        """タスク完了時に既存のmetadataが保持される
+
+        タスク作成時に設定されたmetadata（priority等）が
+        完了イベントで上書きされないことを確認。
+        """
+        # Arrange: metadataつきでタスクを作成
+        projector = RunProjector("run-001")
+        projector.apply(
+            TaskCreatedEvent(
+                run_id="run-001",
+                task_id="task-001",
+                payload={
+                    "title": "Important task",
+                    "metadata": {"priority": "high", "category": "frontend"},
+                },
+            )
+        )
+
+        # Act: resultつきの完了イベント
+        projector.apply(
+            TaskCompletedEvent(
+                run_id="run-001",
+                task_id="task-001",
+                payload={"result": "Done", "worker_id": "worker-1"},
+            )
+        )
+
+        # Assert: 既存のmetadataが保持され、resultが追加される
+        task = projector.projection.tasks["task-001"]
+        assert task.metadata["priority"] == "high"
+        assert task.metadata["category"] == "frontend"
+        assert task.metadata["result"] == "Done"
+        assert task.metadata["worker_id"] == "worker-1"
+
+    def test_task_failed_error_details_in_metadata(self):
+        """タスク失敗時のworker_idがmetadataに保存される
+
+        失敗タスクのworker_idを記録することで、
+        どのWorkerが失敗したかをtask投影から追跡できる。
+        """
+        # Arrange: タスクを作成
+        projector = RunProjector("run-001")
+        projector.apply(
+            TaskCreatedEvent(
+                run_id="run-001",
+                task_id="task-001",
+                payload={"title": "Risky task"},
+            )
+        )
+
+        # Act: worker_idつきの失敗イベント
+        projector.apply(
+            TaskFailedEvent(
+                run_id="run-001",
+                task_id="task-001",
+                payload={
+                    "error": "Compilation failed",
+                    "worker_id": "worker-bee-2",
+                },
+            )
+        )
+
+        # Assert: error_messageとmetadata.worker_idが保存される
+        task = projector.projection.tasks["task-001"]
+        assert task.state == TaskState.FAILED
+        assert task.error_message == "Compilation failed"
+        assert task.metadata["worker_id"] == "worker-bee-2"
+
 
 class TestBuildRunProjection:
     """build_run_projection関数のテスト"""
