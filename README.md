@@ -73,15 +73,15 @@ Worker × N案生成 → Forager探索拡張 → Referee多面的採点 → Guar
 
 ## 開発ステータス
 
-**M3（適応的協調）完了** — Honeycomb, Swarming Protocol, Guard Bee, Forager Bee, Referee Bee, Sentinel Hornet拡張, Waggle Dance, Scout Bee がすべて実装・テスト済み。次はM4（自律的タスク分解 — LLM統合）。
+**M4（自律的タスク分解）完了** — LLMタスク分解（TaskPlanner）、並列実行（ColonyOrchestrator）、ゲート統合（ExecutionPipeline）が実装済。次はM5（運用品質）およびM2-2/M2-3（エージェント間E2E統合）。
 
 | マイルストーン | 状態 |
-|--|--|
+|--|–|
 | M1: 基盤固め | ✅ 完了 |
 | M2: 接続 | M2-0/M2-1 完了、M2-2/M2-3 未着手 |
 | M3: 適応的協調 | ✅ 全完了 (M3-1〜M3-8) |
-| M4: 自律 | 次の優先 |
-| M5: 運用品質 | 計画中 |
+| M4: 自律 | ✅ 完了 (M4-1, M4-2) |
+| M5: 運用品質 | ★次に着手 |
 
 詳細: [docs/DEVELOPMENT_PLAN_v2.md](docs/DEVELOPMENT_PLAN_v2.md)
 

@@ -24,14 +24,14 @@
 
 | コンポーネント | ステータス | 詳細 | 既知の制約 |
 |---------------|-----------|------|------------|
-| **Hive Core** (イベント, AR, 状態機械) | ✅ 完了 | 56 EventType, 5状態機械, ハッシュ連鎖 | — |
+| **Hive Core** (イベント, AR, 状態機械) | ✅ 完了 | 61 EventType, 5状態機械, ハッシュ連鎖 | — |
 | **Hive/Colony AR永続化** | ✅ M1-1完了 | HiveStore + HiveAggregate, JSONL永続化 | — |
 | **API Server** (FastAPI REST) | ✅ 完了 | Hive/Colony CRUD が AR永続化と接続済み | 認証は未有効化 (`auth.enabled: false`) |
 | **MCP Server** (Copilot連携) | ✅ 完了 | 全ツール実装・テスト済 | — |
 | **CLI** | ✅ 完了 | `hiveforge chat` 等 | mypy strict未対応 (M1-3) |
 | **Beekeeper server** | ✅ M1-2完了 | 全ハンドラ実装済 | **`_ask_user()` はスタブ** — ユーザー入力を実際に待たず即応答を返す (→ M2-2で解消) |
 | **Beekeeper handler** | ✅ 完了 | — | — |
-| **Queen Bee** | ✅ M4-1進行中 | LLMタスク分解実装済 | `_plan_tasks()` → `TaskPlanner` でLLM分解＋依存分析＋フォールバック実装済（M4-1-a/b完了） |
+| **Queen Bee** | ✅ M4-1/M4-2完了 | LLMタスク分解・並列実行・ゲート統合実装済 | TaskPlanner + ColonyOrchestrator + ExecutionPipeline |
 | **Worker Bee** | ✅ 完了 | ツール実行, リトライ, Trust | — |
 | **Sentinel Hornet** | ✅ M3-6完了 | 7検出パターン + KPI劣化検出 + ロールバック/隔離 | `_calc_incident_rate()` は失敗エピソード比率で算出（§8 P-02参照） |
 | **VS Code拡張** (コマンド) | ✅ M2-1完了 | API接続コード作成済、TSコンパイル+Lint確認済 | **実際のE2E動作テスト未実施** (M2-1-f) |
@@ -46,7 +46,7 @@
 | **Referee Bee** | ✅ M3-5完了 | 5次元スコアリング、Differential Testing、トーナメント選抜 | — |
 | **Waggle Dance** | ✅ M3-7完了 | Pydanticスキーマ検証、バリデーションミドルウェア、ARイベント記録 | — |
 | **KPI Calculator** | ✅ M3-1完了 | HoneycombのKPICalculatorとして実装済 | P-02 `_calc_incident_rate()` のみ残存 (§8参照) |
-| **LLM Orchestrator** | ❌ 未実装 | M4で実装予定 | — |
+| **LLM Orchestrator** | ✅ M4-2完了 | ColonyOrchestrator（層別並列実行）+ ColonyResult（結果集約）+ ExecutionPipeline（ゲート統合） | — |
 | **介入・エスカレーション** | ✅ 完了 | API/MCPハンドラ実装済、InterventionStore JSONL永続化 | — |
 
 ---
@@ -57,8 +57,8 @@
 
 ```
 M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)    → M5 (運用)
- ■■■■■■■■■■     ■■■■■■■■■■     ■■■■■■■■■■         ░░░░░░░░░░     ░░░░░░░░░░
- 完了              完了             完了                タスク分解      プロダクション
+ ■■■■■■■■■■     ■■■■■■■■■■     ■■■■■■■■■■         ■■■■■■■■■■     ░░░░░░░░░░
+ 完了              完了             完了                完了              プロダクション
 ```
 
 ### 2.2 完了マイルストーン
@@ -475,7 +475,7 @@ M1〜M4完了。次は M5（運用品質）。
 
 > コードベース全体を精査し、スタブ・暫定実装・仮決め・ハードコード等をすべて列挙。
 > 再開時にどこから手をつけるかが一目でわかることを目的とする。
-> **2026-02-08 更新**: P-01, P-03, P-04, M-01〜M-03 を解消済みに更新。
+> **2026-02-08 更新**: S-01, P-01, P-03, P-04, M-01〜M-03 を解消済みに更新。M4-1/M4-2完了を反映。
 
 ### 8.1 クリティカルスタブ（機能が実質的に動作しない）
 
@@ -483,7 +483,7 @@ M1〜M4完了。次は M5（運用品質）。
 |---|---------|------|------|-------------------|
 | S-01 | ~~`queen_bee/server.py`~~ → `queen_bee/planner.py` | `_plan_tasks()` | ~~固定1タスク返却~~ → `TaskPlanner` でLLMタスク分解＋依存分析（`execution_order`）＋フォールバック実装済 | ✅ M4-1-a/b 解消 |
 | S-02 | `beekeeper/server.py:728-734` | `_ask_user()` | ユーザー入力を実際に待たず即応答を返却 (`# TODO: VS Code拡張に通知してユーザー入力を待つ`) | M2-2 |
-| S-03 | `forager_bee/explorer.py:43-52` | `_run_single()` | 全シナリオを無条件 `passed=True` で返却。LLM統合後に実装 | M4-2 |
+| S-03 | `forager_bee/explorer.py:43-52` | `_run_single()` | 全シナリオを無条件 `passed=True` で返却。実際のテスト実行にはLLM統合が必要 | M5以降 |
 
 ### 8.2 暫定ロジック（動作するが精度が不十分）
 
@@ -529,7 +529,7 @@ M1〜M4完了。次は M5（運用品質）。
 |--------|------|------|
 | ~~✅ 解消~~ | ~~S-01 `_plan_tasks()`~~ | TaskPlanner でLLMタスク分解＋依存分析実装済 (M4-1-a/b) |
 | **🔴 最優先** | S-02 `_ask_user()` | M2-2の主目標。ユーザーインタラクション未接続 |
-| **🟡 次点** | S-03 `_run_single()` | M4-2でLLM統合後に自然解消 |
+| **🟡 次点** | S-03 `_run_single()` | Foragerの探索実行はスタブのまま。実際のテスト実行にはLLM統合が必要 |
 | **🟡 次点** | P-02 `_calc_incident_rate()` | Sentinel Hornet介入の直接計測は今後の課題 |
 | **🟢 低** | H-01〜H-08 ハードコード | 現時点で意図的な仮定。必要時にconfig化 |
 | ~~✅ 解消~~ | ~~P-01, P-03, P-04~~ | KPIコメント修正・correctness/incident_rate算出・DFSデッドロック検出 |

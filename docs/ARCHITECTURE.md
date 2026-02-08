@@ -138,7 +138,7 @@ HiveForgeは「**信頼できる部品を、信頼できる組み合わせ方を
 | **MCP Server** | Copilot Chat連携 | ✅ 完了 | — |
 | **CLI** | コマンドラインインターフェース | ✅ 完了 | mypy strict未対応 (M1-3) |
 | **Beekeeper** | ユーザー窓口・Hive統括 | ✅ M1-2完了 | `_ask_user()` はスタブ (→ M2-2) |
-| **Queen Bee** | Colony統括・タスク分解 | ⚠️ 基盤完了 | `_plan_tasks()` 固定1タスク返却 (→ M4-1) |
+| **Queen Bee** | Colony統括・タスク分解 | ✅ M4-1完了 | TaskPlannerによるLLMタスク分解＋依存分析実装済 |
 | **Worker Bee** | タスク実行（MCPサブプロセス） | ✅ 完了 | — |
 | **Sentinel Hornet** | Hive内監視・異常検出・強制停止 | ✅ M3-6完了 | 7検出パターン + KPI劣化検出 + ロールバック/隔離。`_calc_incident_rate()` は暫定ロジック |
 | **Honeycomb** | 実行履歴・学習基盤 | ✅ M3-1完了 | `_calc_correctness()` / `_calc_incident_rate()` が暫定ロジック |
@@ -148,11 +148,11 @@ HiveForgeは「**信頼できる部品を、信頼できる組み合わせ方を
 | **Referee Bee** | N案候補の多面的採点・生存選抜 | ✅ M3-5完了 | 5次元スコアリング、Differential Testing、トーナメント |
 | **Scout Bee** | 過去実績に基づく編成最適化 | ✅ M3-8完了 | 特徴量レンジ1〜5固定仮定、コールドスタート時は`balanced`固定 |
 | **Waggle Dance** | I/O構造化検証 | ✅ M3-7完了 | Pydanticスキーマ検証、バリデーションミドルウェア、ARイベント記録 |
-| **LLM Orchestrator** | 自律的タスク分解・実行 | ❌ 未実装 | → M4-2 |
+| **LLM Orchestrator** | 自律的タスク分解・実行 | ✅ M4-2完了 | ColonyOrchestrator（並列実行）+ ExecutionPipeline（ゲート統合） |
 | **VS Code拡張** (TreeView) | Activity階層表示 | ✅ 完了 | — |
 | **VS Code拡張** (Hive Monitor) | リアルタイム活動可視化 | ✅ 完了 | — |
 | **VS Code拡張** (コマンド) | Hive/Colony操作 | ✅ M2-1完了 | API接続コード作成済。E2E動作テスト未実施 (M2-1-f) |
-| **介入・エスカレーション** | API/MCPハンドラ | ⚠️ 暫定 | **インメモリストア** — プロセス再起動で消失 |
+| **介入・エスカレーション** | API/MCPハンドラ | ✅ 完了 | InterventionStore JSONL永続化、ConferenceStore JSONL永続化 |
 | **Agent UI** | ブラウザ自動操作MCPサーバー | ✅ 完了 | — |
 | **VLM** | 画像解析・画面認識 | ✅ 完了 | String画像入力のbase64判定は仮定ベース |
 | **VLM Tester** | Playwright + VLMによるE2Eテスト | ✅ 完了 | — |
@@ -169,7 +169,7 @@ hiveforge/
 ├── core/                  # コアモジュール（他から参照される）
 │   ├── events/           # イベントモデル（M3-6でパッケージ化）
 │   │   ├── base.py           # BaseEvent
-│   │   ├── types.py          # EventType enum (56種)
+│   │   ├── types.py          # EventType enum (61種)
 │   │   ├── run.py            # Run関連イベント
 │   │   ├── hive.py           # Hive/Colony関連イベント
 │   │   ├── worker.py         # Worker Beeイベント
@@ -233,8 +233,14 @@ hiveforge/
 │   ├── conflict.py       # 衝突検出
 │   ├── escalation.py     # エスカレーション
 │   └── resolver.py       # 衝突解決
-├── queen_bee/             # Queen Bee層（core, llmに依存）
+├── queen_bee/             # Queen Bee層（core, llmに依存、M4実装済）
 │   ├── server.py         # MCPサーバー
+│   ├── planner.py        # TaskPlanner（LLMタスク分解・依存分析）(M4-1)
+│   ├── orchestrator.py   # ColonyOrchestrator（層別並列実行）(M4-2)
+│   ├── pipeline.py       # ExecutionPipeline（Guard Bee/承認ゲート統合）
+│   ├── context.py        # TaskResult / TaskContext（コンテキスト共有）(M4-2)
+│   ├── result.py         # ColonyResult / ColonyResultBuilder（結果集約）(M4-2)
+│   ├── approval.py       # PlanApprovalGate（承認制御）(M4-1)
 │   ├── communication.py  # エージェント間通信
 │   ├── progress.py       # 進捗管理
 │   ├── retry.py          # リトライ制御
@@ -470,6 +476,8 @@ class BaseEvent(BaseModel):
 | | `sentinel.rollback` / `sentinel.quarantine` / `sentinel.kpi_degradation` | 執行アクション (M3-6) |
 | **Guard Bee** | `guard.verification_requested` / `guard.passed` / `guard.conditional_passed` / `guard.failed` | Evidence-first検証 (M3-3) |
 | **Waggle Dance** | `waggle_dance.validated` / `waggle_dance.violation` | I/O構造化検証 (M3-7) |
+| **Pipeline** | `pipeline.started` / `pipeline.completed` | 実行パイプライン |
+| | `plan.validation_failed` / `plan.approval_required` / `plan.fallback_activated` | プラン検証・承認・フォールバック |
 | **LLM** | `llm.request` / `llm.response` | LLM連携 |
 | **System** | `system.heartbeat` / `system.error` / `system.silence_detected` / `system.emergency_stop` | システム |
 | **Unknown** | （任意の文字列） | 前方互換用（`UnknownEvent`として読み込み） |
@@ -710,7 +718,7 @@ HiveForge/
 │   ├── silence.py           # 沈黙検出
 │   ├── core/                # コアモジュール
 │   │   ├── config.py        # 設定管理
-│   │   ├── events/          # イベントモデル (56 EventType)
+│   │   ├── events/          # イベントモデル (61 EventType)
 │   │   │   ├── base.py          # BaseEvent
 │   │   │   ├── types.py         # EventType enum
 │   │   │   ├── run.py           # Run/Task/Requirement
@@ -775,8 +783,14 @@ HiveForge/
 │   │   ├── conflict.py      # 衝突検出
 │   │   ├── escalation.py    # エスカレーション
 │   │   └── resolver.py      # 衝突解決
-│   ├── queen_bee/           # Queen Bee層
+│   ├── queen_bee/           # Queen Bee層 (M4実装済)
 │   │   ├── server.py        # MCPサーバー
+│   │   ├── planner.py       # TaskPlanner（LLMタスク分解）(M4-1)
+│   │   ├── orchestrator.py  # ColonyOrchestrator（並列実行）(M4-2)
+│   │   ├── pipeline.py      # ExecutionPipeline（ゲート統合）
+│   │   ├── context.py       # TaskResult / TaskContext (M4-2)
+│   │   ├── result.py        # ColonyResult / ColonyResultBuilder (M4-2)
+│   │   ├── approval.py      # PlanApprovalGate（承認制御）(M4-1)
 │   │   ├── communication.py # エージェント間通信
 │   │   ├── progress.py      # 進捗管理
 │   │   ├── retry.py         # リトライ制御
@@ -970,7 +984,7 @@ logging:
 | M1: 基盤固め | AR移行、スタブ解消 | ✅ 完了（M1-1, M1-2） |
 | M2: 接続 | Sentinel Hornet、VS Code↔API、エージェント間E2E | 🔄 M2-0/M2-1完了、M2-2/M2-3未着手 |
 | M3: 適応的協調 | Honeycomb, Swarming, Guard Bee, Forager Bee, Referee Bee, Sentinel拡張, Waggle Dance, Scout Bee | ✅ 完了（M3-1〜M3-8全完了） |
-| M4: 自律 | LLMタスク分解、Orchestrator | 未着手（次の優先） |
+| M4: 自律 | LLMタスク分解、Orchestrator | ✅ 完了（M4-1, M4-2） |
 | M5: 運用品質 | セキュリティ、KPIダッシュボード、CI/CD | 計画中 |
 
 ### 11.3 ゲート条件
@@ -989,7 +1003,7 @@ logging:
 | G-08 | Hive/ColonyがAR永続化 | サーバー再起動後もデータ維持 | ✅ (M1-1) |
 | G-09 | Beekeeperの全ハンドラが実装 | TODOスタブがゼロ | ✅ (M1-2) |
 | G-10 | E2Eエージェントチェーンが動作 | Beekeeper→Queen→Worker完走 | M2 |
-| G-11 | LLMタスク分解が動作 | 抽象目標→複数タスク自動分解 | M4 |
+| G-11 | LLMタスク分解が動作 | 抽象目標→複数タスク自動分解 | ✅ (M4-1) |
 
 ---
 
@@ -1008,8 +1022,8 @@ logging:
 - [x] Sentinel Hornet拡張: KPI劣化検出 + ロールバック/隔離 (M3-6) ✅
 - [x] Waggle Dance: I/O構造化検証 (M3-7) ✅
 - [x] Scout Bee: 過去実績に基づく編成最適化 (M3-8) ✅
-- [ ] Queen Bee タスク分解: LLMタスク分解実装 (M4-1) — 次の優先
-- [ ] LLM Orchestrator: 自律的なタスク分解・実行 (M4-2)
+- [x] Queen Bee タスク分解: LLMタスク分解実装 (M4-1) ✅
+- [x] LLM Orchestrator: 自律的なタスク分解・実行 (M4-2) ✅
 - [ ] Artifact管理: 成果物の保存と参照
 - [ ] 因果リンクの自動設定（[Issue #001](issues/001-lineage-auto-parents.md)）
 - [ ] イベント署名: 改ざん者の特定
