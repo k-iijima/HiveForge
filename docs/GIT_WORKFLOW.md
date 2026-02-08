@@ -181,6 +181,35 @@ git worktree prune                           # 参照整理
 | `develop` → `main` | `merge --no-ff` | リリース境界をマージコミットで明示 |
 | `hotfix/…` → `main` | `merge --no-ff` | 修正点を明確にする |
 
+### PR マージの実行主体
+
+PR ゲート全通過後のマージは **Queen Bee が自動実行** する。
+
+```
+PR 作成 → CI Gate 全通過 → Queen Bee が auto-merge 実行 → ブランチ削除 + Worktree 掃除
+```
+
+| マージ先 | 実行主体 | 条件 |
+|---------|-----------|------|
+| `feat/…` → `develop` | Queen Bee | guard-l1 通過 |
+| `fix/…` → `develop` | Queen Bee | guard-l1 通過 |
+| `develop` → `main` | Queen Bee | guard-l1/l2 + forager + sentinel 全通過 |
+| `hotfix/…` → `main` | Queen Bee | guard-l1/l2 + sentinel 通過 |
+
+> **根拠**: Colony 完了時に Queen Bee が `RunCompleted` を発行する流れと整合する。
+> Guard Bee が不合格を出した場合はマージされず、Queen Bee が Worker Bee に修正を再委譲する。
+
+#### GitHub Auto-Merge 設定
+
+GitHub の Auto-Merge 機能と連携し、Queen Bee が PR 作成時に auto-merge を有効化する：
+
+```bash
+# Queen Bee が実行するコマンド（概念）
+gh pr create --base develop --head feat/... --title "..."
+gh pr merge --auto --rebase   # 個人ブランチの場合
+gh pr merge --auto --merge     # 共有ブランチ / main へのマージの場合
+```
+
 ### 個人ブランチの rebase 運用
 
 ```bash
@@ -426,16 +455,14 @@ Git ワークフローと GitHub Projection（AR→GitHub 同期）は相補的�
     │  └── sentinel  ✅
     │
     ▼
- ⑥ レビュー → Approve
+ ⑥ Queen Bee が auto-merge 実行（全ゲート通過後）
+    │  ※ rebase or merge、判定基準に従う
     │
     ▼
- ⑦ マージ（rebase or merge、判定基準に従う）
+ ⑦ ブランチ削除 + Worktree 掃除
     │
     ▼
- ⑧ ブランチ削除 + Worktree 掃除
-    │
-    ▼
- ⑨ AR: RunCompleted → GitHub Projection → Issue クローズ
+ ⑧ AR: RunCompleted → GitHub Projection → Issue クローズ
 ```
 
 ### リリースサイクル
@@ -447,10 +474,10 @@ Git ワークフローと GitHub Projection（AR→GitHub 同期）は相補的�
  ② develop → main への PR 作成
     │
     ▼
- ③ 全 PR ゲート通過 + レビュー
+ ③ 全 PR ゲート通過
     │
     ▼
- ④ merge --no-ff でマージ
+ ④ Queen Bee が merge --no-ff で自動マージ
     │
     ▼
  ⑤ タグ付け（v1.x.x）
