@@ -250,35 +250,45 @@ class ResourceConflict:
         return self._waiting.get(resource_id, []).copy()
 
     def is_deadlock(self, colony_ids: list[str]) -> bool:
-        """デッドロック検出（簡易版）
+        """デッドロック検出（DFSベース完全サイクル検出）
 
-        指定されたColonyが互いのリソースを待っている場合True。
+        指定されたColony群の中で、wait-forグラフに
+        任意長のサイクルが存在する場合Trueを返す。
+
+        wait-forグラフ:
+        - ノード: colony_id
+        - エッジ A→B: Aが待っているリソースをBが保持している
         """
-        # 各Colonyが保持しているリソースを取得
-        held_by: dict[str, set[str]] = {}
-        for resource_id, holder in self._locks.items():
-            if holder not in held_by:
-                held_by[holder] = set()
-            held_by[holder].add(resource_id)
+        target_set = set(colony_ids)
 
-        # 各Colonyが待っているリソースを取得
-        waiting_for: dict[str, set[str]] = {}
+        # wait-forグラフを構築: colony → {colonies it waits for}
+        waits_for: dict[str, set[str]] = {}
         for resource_id, waiters in self._waiting.items():
-            for waiter in waiters:
-                if waiter not in waiting_for:
-                    waiting_for[waiter] = set()
-                waiting_for[waiter].add(resource_id)
+            holder = self._locks.get(resource_id)
+            if holder and holder in target_set:
+                for waiter in waiters:
+                    if waiter in target_set and waiter != holder:
+                        if waiter not in waits_for:
+                            waits_for[waiter] = set()
+                        waits_for[waiter].add(holder)
 
-        # 循環チェック
-        for colony_id in colony_ids:
-            waiting = waiting_for.get(colony_id, set())
-            for resource_id in waiting:
-                holder = self._locks.get(resource_id)
-                if holder and holder in colony_ids and holder != colony_id:
-                    # holderもcolony_idのリソースを待っているか
-                    holder_waiting = waiting_for.get(holder, set())
-                    for hw_resource in holder_waiting:
-                        if self._locks.get(hw_resource) == colony_id:
-                            return True
+        # DFSでサイクル検出
+        visited: set[str] = set()
+        rec_stack: set[str] = set()
 
-        return False
+        def _has_cycle(node: str) -> bool:
+            visited.add(node)
+            rec_stack.add(node)
+            for neighbor in waits_for.get(node, ()):
+                if neighbor not in visited:
+                    if _has_cycle(neighbor):
+                        return True
+                elif neighbor in rec_stack:
+                    return True
+            rec_stack.discard(node)
+            return False
+
+        return any(
+            colony_id not in visited and _has_cycle(colony_id)
+            for colony_id in colony_ids
+        )

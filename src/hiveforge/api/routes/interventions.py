@@ -4,6 +4,7 @@ Direct Intervention REST API
 ユーザー直接介入、Queen直訴、Beekeeperフィードバックのエンドポイント。
 """
 
+import tempfile
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -14,6 +15,12 @@ from ...core.events import (
     EscalationType,
     QueenEscalationEvent,
     UserDirectInterventionEvent,
+)
+from ...core.intervention import (
+    EscalationRecord,
+    FeedbackRecord,
+    InterventionRecord,
+    InterventionStore,
 )
 
 router = APIRouter(prefix="/interventions", tags=["Interventions"])
@@ -66,12 +73,26 @@ class InterventionResponse(BaseModel):
 
 
 # ============================================================================
-# インメモリストア（Phase 1用簡易実装）
+# InterventionStore（MCP/APIで同一モデルを使用）
 # ============================================================================
 
-_interventions: dict[str, dict[str, Any]] = {}
-_escalations: dict[str, dict[str, Any]] = {}
-_feedbacks: dict[str, dict[str, Any]] = {}
+_intervention_store: InterventionStore | None = None
+
+
+def get_intervention_store() -> InterventionStore:
+    """InterventionStoreを取得（遅延初期化）"""
+    global _intervention_store
+    if _intervention_store is None:
+        _intervention_store = InterventionStore(
+            base_path=tempfile.mkdtemp(prefix="hiveforge-interventions-")
+        )
+    return _intervention_store
+
+
+def set_intervention_store(store: InterventionStore) -> None:
+    """InterventionStoreを設定（テスト・初期化用）"""
+    global _intervention_store
+    _intervention_store = store
 
 
 # ============================================================================
@@ -96,16 +117,15 @@ async def create_user_intervention(request: UserInterventionRequest) -> Interven
         },
     )
 
-    _interventions[event.id] = {
-        "event_id": event.id,
-        "type": "user_intervention",
-        "colony_id": request.colony_id,
-        "instruction": request.instruction,
-        "reason": request.reason,
-        "bypass_beekeeper": request.bypass_beekeeper,
-        "share_with_beekeeper": request.share_with_beekeeper,
-        "timestamp": event.timestamp.isoformat(),
-    }
+    record = InterventionRecord(
+        event_id=event.id,
+        colony_id=request.colony_id,
+        instruction=request.instruction,
+        reason=request.reason,
+        share_with_beekeeper=request.share_with_beekeeper,
+        timestamp=event.timestamp.isoformat(),
+    )
+    get_intervention_store().add_intervention(record)
 
     return InterventionResponse(
         event_id=event.id,
@@ -143,18 +163,17 @@ async def create_queen_escalation(request: QueenEscalationRequest) -> Interventi
         },
     )
 
-    _escalations[event.id] = {
-        "event_id": event.id,
-        "type": "queen_escalation",
-        "colony_id": request.colony_id,
-        "escalation_type": esc_type.value,
-        "summary": request.summary,
-        "details": request.details,
-        "suggested_actions": request.suggested_actions,
-        "beekeeper_context": request.beekeeper_context,
-        "status": "pending",
-        "timestamp": event.timestamp.isoformat(),
-    }
+    record = EscalationRecord(
+        event_id=event.id,
+        colony_id=request.colony_id,
+        escalation_type=esc_type.value,
+        summary=request.summary,
+        details=request.details,
+        suggested_actions=request.suggested_actions,
+        beekeeper_context=request.beekeeper_context,
+        timestamp=event.timestamp.isoformat(),
+    )
+    get_intervention_store().add_escalation(record)
 
     return InterventionResponse(
         event_id=event.id,
@@ -171,7 +190,8 @@ async def create_beekeeper_feedback(request: BeekeeperFeedbackRequest) -> Interv
     直接介入やエスカレーション解決後のフィードバックを記録。
     """
     # 対象のエスカレーション/介入を確認
-    target = _escalations.get(request.escalation_id) or _interventions.get(request.escalation_id)
+    store = get_intervention_store()
+    target = store.get_target(request.escalation_id)
     if not target:
         raise HTTPException(
             status_code=404,
@@ -188,24 +208,23 @@ async def create_beekeeper_feedback(request: BeekeeperFeedbackRequest) -> Interv
         },
     )
 
-    _feedbacks[event.id] = {
-        "event_id": event.id,
-        "type": "beekeeper_feedback",
-        "escalation_id": request.escalation_id,
-        "resolution": request.resolution,
-        "beekeeper_adjustment": request.beekeeper_adjustment,
-        "lesson_learned": request.lesson_learned,
-        "timestamp": event.timestamp.isoformat(),
-    }
+    record = FeedbackRecord(
+        event_id=event.id,
+        escalation_id=request.escalation_id,
+        resolution=request.resolution,
+        beekeeper_adjustment=request.beekeeper_adjustment,
+        lesson_learned=request.lesson_learned,
+        timestamp=event.timestamp.isoformat(),
+    )
+    store.add_feedback(record)
 
     # エスカレーションのステータスを更新
-    if request.escalation_id in _escalations:
-        _escalations[request.escalation_id]["status"] = "resolved"
+    store.resolve_escalation(request.escalation_id)
 
     return InterventionResponse(
         event_id=event.id,
         type="beekeeper_feedback",
-        colony_id=target.get("colony_id"),
+        colony_id=target.colony_id if hasattr(target, "colony_id") else None,
         message=f"Feedback recorded for {request.escalation_id}",
     )
 
@@ -216,13 +235,7 @@ async def list_escalations(
     status: str | None = None,
 ) -> dict[str, Any]:
     """エスカレーション一覧を取得"""
-    escalations = list(_escalations.values())
-
-    if colony_id:
-        escalations = [e for e in escalations if e.get("colony_id") == colony_id]
-
-    if status:
-        escalations = [e for e in escalations if e.get("status") == status]
+    escalations = get_intervention_store().list_escalations(colony_id=colony_id, status=status)
 
     return {
         "escalations": escalations,
@@ -233,19 +246,16 @@ async def list_escalations(
 @router.get("/escalations/{escalation_id}")
 async def get_escalation(escalation_id: str) -> dict[str, Any]:
     """エスカレーション詳細を取得"""
-    escalation = _escalations.get(escalation_id)
+    escalation = get_intervention_store().get_escalation(escalation_id)
     if not escalation:
         raise HTTPException(status_code=404, detail=f"Escalation not found: {escalation_id}")
-    return escalation
+    return escalation.model_dump(mode="json")
 
 
 @router.get("/interventions")
 async def list_interventions(colony_id: str | None = None) -> dict[str, Any]:
     """直接介入一覧を取得"""
-    interventions = list(_interventions.values())
-
-    if colony_id:
-        interventions = [i for i in interventions if i.get("colony_id") == colony_id]
+    interventions = get_intervention_store().list_interventions(colony_id=colony_id)
 
     return {
         "interventions": interventions,

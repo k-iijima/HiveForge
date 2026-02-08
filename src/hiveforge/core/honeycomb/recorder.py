@@ -171,8 +171,31 @@ class EpisodeRecorder:
         return total
 
     def _calculate_kpi_scores(self, events: list, duration: float) -> KPIScores:
-        """イベントからKPIスコアを算出"""
-        # 現時点ではlead_timeのみ算出
+        """イベントからKPIスコアを算出
+
+        単一Episodeレベルで算出可能なKPIを計算:
+        - correctness: outcome に基づく (SUCCESS=1.0, PARTIAL=0.5, FAILURE=0.0)
+        - lead_time_seconds: 所要時間
+        - incident_rate: 失敗系outcome なら 1.0, 成功なら 0.0
+
+        repeatability / recurrence_rate は複数Episode集約が必要なため
+        KPICalculator に委ねる。
+        """
+        outcome = self._determine_outcome(events)
+
+        # correctness: outcome に基づく一次判定
+        correctness_map = {
+            Outcome.SUCCESS: 1.0,
+            Outcome.PARTIAL: 0.5,
+            Outcome.FAILURE: 0.0,
+        }
+        correctness = correctness_map.get(outcome, 0.0)
+
+        # incident_rate: 失敗/部分失敗を 1.0, 成功を 0.0
+        incident_rate = 0.0 if outcome == Outcome.SUCCESS else 1.0
+
         return KPIScores(
+            correctness=correctness,
             lead_time_seconds=duration if duration > 0 else None,
+            incident_rate=incident_rate,
         )

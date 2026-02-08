@@ -4,18 +4,21 @@ Direct Intervention MCP テスト
 ユーザー直接介入、Queen直訴、BeekeeperフィードバックのMCPテスト。
 """
 
+import tempfile
 from unittest.mock import MagicMock
 
 import pytest
 
+from hiveforge.core.intervention import InterventionStore
 from hiveforge.mcp_server.handlers.intervention import InterventionHandlers
 
 
 @pytest.fixture
 def handlers():
-    """テスト用InterventionHandlers"""
+    """テスト用InterventionHandlers（独立したストア付き）"""
     mock_server = MagicMock()
-    return InterventionHandlers(mock_server)
+    store = InterventionStore(base_path=tempfile.mkdtemp())
+    return InterventionHandlers(mock_server, store=store)
 
 
 class TestUserInterveneMCP:

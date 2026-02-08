@@ -1068,6 +1068,69 @@ class TestDeadlockDetection:
 
         assert result is True
 
+    def test_deadlock_three_node_cycle(self):
+        """3ノードの循環デッドロックを検出できる (A→B→C→A)
+
+        2ノードだけでなく、任意長のサイクルを検出する。
+        """
+        # Arrange: A→B→C→A の循環
+        conflict = ResourceConflict()
+        conflict.try_acquire("res-a", "colony-a")
+        conflict.try_acquire("res-b", "colony-b")
+        conflict.try_acquire("res-c", "colony-c")
+        # colony-a は res-b を待つ (Bが保持)
+        conflict.wait_for("res-b", "colony-a")
+        # colony-b は res-c を待つ (Cが保持)
+        conflict.wait_for("res-c", "colony-b")
+        # colony-c は res-a を待つ (Aが保持)
+        conflict.wait_for("res-a", "colony-c")
+
+        # Act
+        result = conflict.is_deadlock(["colony-a", "colony-b", "colony-c"])
+
+        # Assert
+        assert result is True
+
+    def test_deadlock_four_node_cycle(self):
+        """4ノードの循環デッドロックを検出できる
+
+        A→B→C→D→A の長いサイクル。
+        """
+        # Arrange
+        conflict = ResourceConflict()
+        for name in ("a", "b", "c", "d"):
+            conflict.try_acquire(f"res-{name}", f"colony-{name}")
+        conflict.wait_for("res-b", "colony-a")
+        conflict.wait_for("res-c", "colony-b")
+        conflict.wait_for("res-d", "colony-c")
+        conflict.wait_for("res-a", "colony-d")
+
+        # Act
+        result = conflict.is_deadlock(["colony-a", "colony-b", "colony-c", "colony-d"])
+
+        # Assert
+        assert result is True
+
+    def test_no_deadlock_chain_without_cycle(self):
+        """サイクルなしのチェーンはデッドロックではない
+
+        A→B→C （Cは何も待たない）はデッドロックではない。
+        """
+        # Arrange
+        conflict = ResourceConflict()
+        conflict.try_acquire("res-a", "colony-a")
+        conflict.try_acquire("res-b", "colony-b")
+        conflict.try_acquire("res-c", "colony-c")
+        conflict.wait_for("res-b", "colony-a")
+        conflict.wait_for("res-c", "colony-b")
+        # colony-c は何も待たない
+
+        # Act
+        result = conflict.is_deadlock(["colony-a", "colony-b", "colony-c"])
+
+        # Assert
+        assert result is False
+
 
 # 追加テスト: カバレッジ改善
 class TestMessengerEdgeCases:

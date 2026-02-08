@@ -85,7 +85,8 @@ class KPICalculator:
     def _calc_correctness(self, episodes: list[Episode]) -> float | None:
         """正確性: 成功率（一次合格率）
 
-        Guard Beeが未実装のため、現時点では成功/全体の比率を使用。
+        成功/全体の比率を使用。Guard Bee検証結果との連携は
+        将来的に一次合格率（first-pass yield）に拡張予定。
         """
         if not episodes:
             return None

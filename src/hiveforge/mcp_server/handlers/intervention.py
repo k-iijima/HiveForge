@@ -15,20 +15,31 @@ from ...core.events import (
     QueenEscalationEvent,
     UserDirectInterventionEvent,
 )
+from ...core.intervention import (
+    EscalationRecord,
+    FeedbackRecord,
+    InterventionRecord,
+    InterventionStore,
+)
 from .base import BaseHandler
 
 if TYPE_CHECKING:
     pass
 
 
-# インメモリストア（Phase 1用簡易実装）
-_interventions: dict[str, dict[str, Any]] = {}
-_escalations: dict[str, dict[str, Any]] = {}
-_feedbacks: dict[str, dict[str, Any]] = {}
-
-
 class InterventionHandlers(BaseHandler):
     """Direct Intervention関連のMCPハンドラー"""
+
+    def __init__(self, server: Any, store: InterventionStore | None = None) -> None:
+        super().__init__(server)
+        self._store = store
+
+    def _get_store(self) -> InterventionStore:
+        """InterventionStoreを取得（遅延初期化）"""
+        if self._store is None:
+            ar = self._get_ar()
+            self._store = InterventionStore(base_path=ar.vault_path)
+        return self._store
 
     async def handle_user_intervene(self, args: dict[str, Any]) -> dict[str, Any]:
         """ユーザー直接介入を作成
@@ -65,16 +76,15 @@ class InterventionHandlers(BaseHandler):
             },
         )
 
-        data = {
-            "event_id": event.id,
-            "type": "user_intervention",
-            "colony_id": colony_id,
-            "instruction": instruction,
-            "reason": reason,
-            "share_with_beekeeper": share_with_beekeeper,
-            "timestamp": event.timestamp.isoformat(),
-        }
-        _interventions[event.id] = data
+        record = InterventionRecord(
+            event_id=event.id,
+            colony_id=colony_id,
+            instruction=instruction,
+            reason=reason,
+            share_with_beekeeper=share_with_beekeeper,
+            timestamp=event.timestamp.isoformat(),
+        )
+        self._get_store().add_intervention(record)
 
         return {
             "event_id": event.id,
@@ -133,19 +143,17 @@ class InterventionHandlers(BaseHandler):
             },
         )
 
-        data = {
-            "event_id": event.id,
-            "type": "queen_escalation",
-            "colony_id": colony_id,
-            "escalation_type": esc_type.value,
-            "summary": summary,
-            "details": details,
-            "suggested_actions": suggested_actions,
-            "beekeeper_context": beekeeper_context,
-            "status": "pending",
-            "timestamp": event.timestamp.isoformat(),
-        }
-        _escalations[event.id] = data
+        record = EscalationRecord(
+            event_id=event.id,
+            colony_id=colony_id,
+            escalation_type=esc_type.value,
+            summary=summary,
+            details=details,
+            suggested_actions=suggested_actions,
+            beekeeper_context=beekeeper_context,
+            timestamp=event.timestamp.isoformat(),
+        )
+        self._get_store().add_escalation(record)
 
         return {
             "event_id": event.id,
@@ -178,7 +186,8 @@ class InterventionHandlers(BaseHandler):
             return {"error": "resolution is required"}
 
         # 対象の確認
-        target = _escalations.get(escalation_id) or _interventions.get(escalation_id)
+        store = self._get_store()
+        target = store.get_target(escalation_id)
         if not target:
             return {"error": f"Escalation or intervention not found: {escalation_id}"}
 
@@ -195,20 +204,18 @@ class InterventionHandlers(BaseHandler):
             },
         )
 
-        data = {
-            "event_id": event.id,
-            "type": "beekeeper_feedback",
-            "escalation_id": escalation_id,
-            "resolution": resolution,
-            "beekeeper_adjustment": beekeeper_adjustment,
-            "lesson_learned": lesson_learned,
-            "timestamp": event.timestamp.isoformat(),
-        }
-        _feedbacks[event.id] = data
+        record = FeedbackRecord(
+            event_id=event.id,
+            escalation_id=escalation_id,
+            resolution=resolution,
+            beekeeper_adjustment=beekeeper_adjustment,
+            lesson_learned=lesson_learned,
+            timestamp=event.timestamp.isoformat(),
+        )
+        store.add_feedback(record)
 
         # エスカレーションのステータス更新
-        if escalation_id in _escalations:
-            _escalations[escalation_id]["status"] = "resolved"
+        store.resolve_escalation(escalation_id)
 
         return {
             "event_id": event.id,
@@ -227,15 +234,10 @@ class InterventionHandlers(BaseHandler):
         Returns:
             エスカレーション一覧
         """
-        escalations = list(_escalations.values())
-
         colony_id = args.get("colony_id")
         status = args.get("status")
 
-        if colony_id:
-            escalations = [e for e in escalations if e.get("colony_id") == colony_id]
-        if status:
-            escalations = [e for e in escalations if e.get("status") == status]
+        escalations = self._get_store().list_escalations(colony_id=colony_id, status=status)
 
         return {
             "escalations": escalations,
@@ -256,8 +258,8 @@ class InterventionHandlers(BaseHandler):
         if not escalation_id:
             return {"error": "escalation_id is required"}
 
-        escalation = _escalations.get(escalation_id)
+        escalation = self._get_store().get_escalation(escalation_id)
         if not escalation:
             return {"error": f"Escalation not found: {escalation_id}"}
 
-        return escalation
+        return escalation.model_dump(mode="json")

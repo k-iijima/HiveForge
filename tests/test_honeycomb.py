@@ -633,6 +633,114 @@ class TestEpisodeRecorder:
         # Assert
         assert "ep-prev-001" in episode.parent_episode_ids
 
+    def test_kpi_scores_correctness_on_success(self, recorder, ar, store):
+        """成功RunのKPIScoresでcorrectnessが1.0
+
+        _calculate_kpi_scoresが成功時にcorrectness=1.0を算出することを確認。
+        """
+        # Arrange
+        run_id = "run-kpi-success"
+        self._seed_success_run(ar, run_id)
+
+        # Act
+        episode = recorder.record_run_episode(
+            run_id=run_id, colony_id="colony-1",
+        )
+
+        # Assert
+        assert episode.kpi_scores.correctness == 1.0
+        assert episode.kpi_scores.incident_rate == 0.0
+
+    def test_kpi_scores_correctness_on_failure(self, recorder, ar, store):
+        """失敗RunのKPIScoresでcorrectnessが0.0
+
+        _calculate_kpi_scoresが失敗時にcorrectness=0.0, incident_rate=1.0を算出。
+        """
+        # Arrange
+        run_id = "run-kpi-fail"
+        self._seed_failed_run(ar, run_id, reason="error")
+
+        # Act
+        episode = recorder.record_run_episode(
+            run_id=run_id, colony_id="colony-1",
+        )
+
+        # Assert
+        assert episode.kpi_scores.correctness == 0.0
+        assert episode.kpi_scores.incident_rate == 1.0
+
+    def test_kpi_scores_partial_outcome(self, recorder, ar, store):
+        """Partial outcomeのKPIScoresでcorrectnessが0.5
+
+        成功タスクと失敗タスクが混在するRunでは0.5になる。
+        """
+        # Arrange: 成功タスクと失敗タスクが混在
+        run_id = "run-kpi-partial"
+        ar.append(
+            RunStartedEvent(
+                id=generate_event_id(),
+                run_id=run_id,
+                actor="queen-test",
+                payload={"goal": "テスト"},
+            ),
+            run_id,
+        )
+        ar.append(
+            TaskCreatedEvent(
+                id=generate_event_id(),
+                run_id=run_id,
+                actor="queen-test",
+                payload={"task_id": "task-1"},
+            ),
+            run_id,
+        )
+        ar.append(
+            TaskCompletedEvent(
+                id=generate_event_id(),
+                run_id=run_id,
+                actor="queen-test",
+                payload={"task_id": "task-1"},
+            ),
+            run_id,
+        )
+        ar.append(
+            TaskCreatedEvent(
+                id=generate_event_id(),
+                run_id=run_id,
+                actor="queen-test",
+                payload={"task_id": "task-2"},
+            ),
+            run_id,
+        )
+        ar.append(
+            TaskFailedEvent(
+                id=generate_event_id(),
+                run_id=run_id,
+                actor="queen-test",
+                payload={"task_id": "task-2", "reason": "error"},
+            ),
+            run_id,
+        )
+        ar.append(
+            RunFailedEvent(
+                id=generate_event_id(),
+                run_id=run_id,
+                actor="queen-test",
+                payload={"reason": "partial", "tasks_completed": 1, "tasks_total": 2},
+            ),
+            run_id,
+        )
+
+        # Act
+        episode = recorder.record_run_episode(
+            run_id=run_id, colony_id="colony-1",
+        )
+
+        # Assert
+        assert episode.outcome == Outcome.PARTIAL
+        assert episode.kpi_scores.correctness == 0.5
+        assert episode.kpi_scores.incident_rate == 1.0
+
 
 # =========================================================================
 # KPICalculator のテスト

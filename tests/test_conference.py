@@ -479,3 +479,112 @@ class TestConferenceStore:
 
         # Assert
         assert len(result) == 0
+
+
+class TestConferenceStorePersistence:
+    """ConferenceStore JSONL永続化のテスト"""
+
+    def test_replay_restores_conferences(self, tmp_path):
+        """プロセス再起動後に会議データが復元される"""
+        # Arrange: 1つ目のストアでデータ書き込み
+        store1 = ConferenceStore(base_path=tmp_path)
+        store1.add(
+            ConferenceProjection(
+                conference_id="conf-001",
+                hive_id="hive-a",
+                topic="永続化テスト",
+                participants=["colony-a"],
+                state=ConferenceState.ACTIVE,
+            )
+        )
+
+        # Act: 2つ目のストアを同じパスで作成（再起動シミュレーション）
+        store2 = ConferenceStore(base_path=tmp_path)
+
+        # Assert: データが復元されている
+        result = store2.get("conf-001")
+        assert result is not None
+        assert result.topic == "永続化テスト"
+        assert result.state == ConferenceState.ACTIVE
+
+    def test_replay_restores_ended_conference(self, tmp_path):
+        """終了した会議の状態が永続化・復元される"""
+        # Arrange
+        store1 = ConferenceStore(base_path=tmp_path)
+        proj = ConferenceProjection(
+            conference_id="conf-002",
+            hive_id="hive-a",
+            topic="終了テスト",
+            participants=[],
+            state=ConferenceState.ACTIVE,
+        )
+        store1.add(proj)
+        proj.state = ConferenceState.ENDED
+        proj.summary = "完了しました"
+        store1.update(proj)
+
+        # Act
+        store2 = ConferenceStore(base_path=tmp_path)
+
+        # Assert
+        result = store2.get("conf-002")
+        assert result is not None
+        assert result.state == ConferenceState.ENDED
+        assert result.summary == "完了しました"
+
+    def test_replay_handles_remove(self, tmp_path):
+        """削除後の再起動で会議が残らない"""
+        # Arrange
+        store1 = ConferenceStore(base_path=tmp_path)
+        store1.add(
+            ConferenceProjection(
+                conference_id="conf-del",
+                hive_id="hive-a",
+                topic="削除テスト",
+                participants=[],
+            )
+        )
+        store1.remove("conf-del")
+
+        # Act
+        store2 = ConferenceStore(base_path=tmp_path)
+
+        # Assert
+        assert store2.get("conf-del") is None
+        assert len(store2.list_all()) == 0
+
+    def test_replay_handles_clear(self, tmp_path):
+        """clear後の再起動でデータがない"""
+        # Arrange
+        store1 = ConferenceStore(base_path=tmp_path)
+        store1.add(
+            ConferenceProjection(
+                conference_id="conf-clr",
+                hive_id="hive-a",
+                topic="クリアテスト",
+                participants=[],
+            )
+        )
+        store1.clear()
+
+        # Act
+        store2 = ConferenceStore(base_path=tmp_path)
+
+        # Assert
+        assert len(store2.list_all()) == 0
+
+    def test_no_base_path_is_memory_only(self):
+        """base_pathなしは従来通りメモリのみで動作する"""
+        # Arrange / Act
+        store = ConferenceStore()
+        store.add(
+            ConferenceProjection(
+                conference_id="conf-mem",
+                hive_id="hive-a",
+                topic="メモリのみ",
+                participants=[],
+            )
+        )
+
+        # Assert
+        assert store.get("conf-mem") is not None
