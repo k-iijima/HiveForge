@@ -78,9 +78,7 @@ class TaskPlanner:
     def __init__(self, llm_client: LLMClient) -> None:
         self._client = llm_client
 
-    async def plan(
-        self, goal: str, context: dict[str, Any] | None = None
-    ) -> TaskPlan:
+    async def plan(self, goal: str, context: dict[str, Any] | None = None) -> TaskPlan:
         """ゴールをタスクに分解する
 
         LLMでタスク分解を試み、失敗した場合は目標をそのまま
@@ -91,17 +89,13 @@ class TaskPlanner:
             response = await self._client.chat(messages)
             return self._parse_response(response.content)
         except Exception:
-            logger.warning(
-                "LLMタスク分解に失敗、単一タスクにフォールバック", exc_info=True
-            )
+            logger.warning("LLMタスク分解に失敗、単一タスクにフォールバック", exc_info=True)
             return TaskPlan(
                 tasks=[PlannedTask(goal=goal)],
                 reasoning="LLMタスク分解に失敗したため、目標をそのまま1タスクとして実行",
             )
 
-    def _build_messages(
-        self, goal: str, context: dict[str, Any]
-    ) -> list[Message]:
+    def _build_messages(self, goal: str, context: dict[str, Any]) -> list[Message]:
         """LLM用メッセージを構築"""
         user_content = f"## 目標\n{goal}"
         if context:
@@ -118,9 +112,7 @@ class TaskPlanner:
         JSONコードブロック (```json ... ```) または
         生JSONの両方に対応する。
         """
-        json_match = re.search(
-            r"```(?:json)?\s*\n?(.*?)\n?\s*```", content, re.DOTALL
-        )
+        json_match = re.search(r"```(?:json)?\s*\n?(.*?)\n?\s*```", content, re.DOTALL)
         json_str = json_match.group(1).strip() if json_match else content.strip()
 
         data = json.loads(json_str)

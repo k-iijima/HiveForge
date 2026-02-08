@@ -203,9 +203,7 @@ class TestTaskPlannerParseResponse:
     def test_parse_json_in_code_block(self, planner):
         """コードブロック内のJSONも正しくパースされる"""
         # Arrange
-        content = (
-            '```json\n{"tasks": [{"goal": "テスト"}], "reasoning": "ok"}\n```'
-        )
+        content = '```json\n{"tasks": [{"goal": "テスト"}], "reasoning": "ok"}\n```'
 
         # Act
         plan = planner._parse_response(content)
@@ -247,9 +245,7 @@ class TestTaskPlannerParseResponse:
         """JSON前後にテキストがある場合もコードブロックなら抽出"""
         # Arrange
         content = (
-            "タスクを分解しました。\n"
-            '```json\n{"tasks": [{"goal": "テスト"}]}\n```\n'
-            "以上です。"
+            'タスクを分解しました。\n```json\n{"tasks": [{"goal": "テスト"}]}\n```\n以上です。'
         )
 
         # Act
@@ -261,9 +257,7 @@ class TestTaskPlannerParseResponse:
     def test_preserves_provided_task_id(self, planner):
         """LLMがtask_idを提供した場合はそれを使用する"""
         # Arrange
-        content = json.dumps(
-            {"tasks": [{"task_id": "custom-123", "goal": "テスト"}]}
-        )
+        content = json.dumps({"tasks": [{"task_id": "custom-123", "goal": "テスト"}]})
 
         # Act
         plan = planner._parse_response(content)
