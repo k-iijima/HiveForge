@@ -15,6 +15,7 @@ import { registerRunCommands, registerRequirementCommands, registerFilterCommand
 import { HiveTreeDataProvider } from './views/hiveTreeView';
 import { AgentMonitorPanel } from './views/agentMonitorPanel';
 import { HiveMonitorPanel } from './views/hiveMonitorPanel';
+import { registerChatParticipant } from './chatHandler';
 
 let client: HiveForgeClient;
 let providers: Providers;
@@ -74,6 +75,9 @@ export function activate(context: vscode.ExtensionContext) {
             AgentMonitorPanel.createOrShow(context.extensionUri, client);
         })
     );
+
+    // Chat Participant (@hiveforge) を登録
+    registerChatParticipant(context, client);
 
     // 自動更新を設定
     setupAutoRefresh(config);

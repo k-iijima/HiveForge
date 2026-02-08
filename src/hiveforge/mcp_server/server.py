@@ -196,6 +196,19 @@ class HiveForgeMCPServer:
             return await self._guard_bee_handlers.handle_verify_colony(arguments)
         elif name == "get_guard_report":
             return await self._guard_bee_handlers.handle_get_guard_report(arguments)
+        # Beekeeper関連（@hiveforge Chat Participant 経由）
+        elif name == "send_message":
+            beekeeper = self._get_beekeeper()
+            return await beekeeper.handle_send_message(arguments)
+        elif name == "get_beekeeper_status":
+            beekeeper = self._get_beekeeper()
+            return await beekeeper.handle_get_status(arguments)
+        elif name == "approve":
+            beekeeper = self._get_beekeeper()
+            return await beekeeper.handle_approve(arguments)
+        elif name == "reject":
+            beekeeper = self._get_beekeeper()
+            return await beekeeper.handle_reject(arguments)
         else:
             return {"error": f"Unknown tool: {name}"}
 

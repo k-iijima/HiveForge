@@ -357,4 +357,24 @@ export class HiveForgeClient {
         );
         return response.data;
     }
+
+    // Beekeeper API
+    async sendMessageToBeekeeper(
+        message: string,
+        context?: { working_directory?: string; selected_files?: string[] }
+    ): Promise<BeekeeperResponse> {
+        const response = await this.client.post<BeekeeperResponse>(
+            '/beekeeper/send_message',
+            { message, context: context || {} }
+        );
+        return response.data;
+    }
+}
+
+export interface BeekeeperResponse {
+    status: string;
+    session_id?: string;
+    response?: string;
+    error?: string;
+    actions_taken?: number;
 }

@@ -2183,3 +2183,92 @@ class TestBeekeeperIntegration:
         # Assert: Beekeeperからも同じHiveが見える
         hive_ids = [h["hive_id"] for h in bk_result["hives"]]
         assert hive_id in hive_ids
+
+
+class TestDispatchBeekeeperTools:
+    """Beekeeper関連ツールのディスパッチテスト
+
+    M2-3-a: MCP Server → Beekeeper 直結。
+    send_message, get_beekeeper_status, approve, reject の
+    ディスパッチが正しくBeekeeperに委譲されることを確認。
+    """
+
+    @pytest.mark.asyncio
+    async def test_dispatch_send_message(self, mcp_server):
+        """send_messageがBeekeeperに委譲される
+
+        LLMなしでもsend_messageが呼び出し可能で、
+        セッションが作成されることを確認。
+        """
+        # Act
+        result = await mcp_server._dispatch_tool("send_message", {"message": "テストメッセージ"})
+
+        # Assert: レスポンスの基本構造
+        assert "status" in result
+        assert "session_id" in result
+
+    @pytest.mark.asyncio
+    async def test_dispatch_get_beekeeper_status(self, mcp_server):
+        """get_beekeeper_statusがBeekeeperに委譲される"""
+        # Act
+        result = await mcp_server._dispatch_tool("get_beekeeper_status", {})
+
+        # Assert: ステータス情報が返される
+        assert isinstance(result, dict)
+        assert "hives" in result
+
+    @pytest.mark.asyncio
+    async def test_dispatch_get_beekeeper_status_with_hive(self, mcp_server):
+        """特定HiveのステータスをBeekeeper経由で取得"""
+        # Arrange: Hiveを作成
+        hive_result = await mcp_server._dispatch_tool(
+            "create_hive", {"name": "Status Test", "goal": "テスト"}
+        )
+        hive_id = hive_result["hive_id"]
+
+        # Act
+        result = await mcp_server._dispatch_tool("get_beekeeper_status", {"hive_id": hive_id})
+
+        # Assert: 指定のHive情報が含まれる
+        assert isinstance(result, dict)
+        assert "hives" in result
+        hive_ids = [h["hive_id"] for h in result["hives"]]
+        assert hive_id in hive_ids
+
+    @pytest.mark.asyncio
+    async def test_dispatch_approve(self, mcp_server):
+        """approveがBeekeeperに委譲される
+
+        存在しないrequirement_idの場合はAR永続化でValueErrorが発生する。
+        ディスパッチ自体がBeekeeper.handle_approveに到達することを確認。
+        """
+        # Act / Assert: AR永続化エラーで例外が上がるが、
+        # Beekeeperに委譲されていることは確認できる
+        with pytest.raises(ValueError, match="run_id"):
+            await mcp_server._dispatch_tool("approve", {"requirement_id": "req-nonexistent"})
+
+    @pytest.mark.asyncio
+    async def test_dispatch_reject(self, mcp_server):
+        """rejectがBeekeeperに委譲される
+
+        存在しないrequirement_idの場合はAR永続化でValueErrorが発生する。
+        ディスパッチ自体がBeekeeper.handle_rejectに到達することを確認。
+        """
+        # Act / Assert
+        with pytest.raises(ValueError, match="run_id"):
+            await mcp_server._dispatch_tool("reject", {"requirement_id": "req-nonexistent"})
+
+    @pytest.mark.asyncio
+    async def test_beekeeper_tools_in_definitions(self, mcp_server):
+        """Beekeeper関連ツールがツール定義に含まれる"""
+        from hiveforge.mcp_server.tools import get_tool_definitions
+
+        # Act
+        tools = get_tool_definitions()
+
+        # Assert
+        tool_names = [t.name for t in tools]
+        assert "send_message" in tool_names
+        assert "get_beekeeper_status" in tool_names
+        assert "approve" in tool_names
+        assert "reject" in tool_names

@@ -15,6 +15,25 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "chatParticipants": [
+      {
+        "id": "hiveforge-dashboard.hiveforge",
+        "fullName": "HiveForge",
+        "name": "hiveforge",
+        "description": "HiveForge自律型ソフトウェア組立システムとの対話",
+        "isSticky": true,
+        "commands": [
+          {
+            "name": "status",
+            "description": "HiveForgeのステータスを確認"
+          },
+          {
+            "name": "hives",
+            "description": "Hive一覧を表示"
+          }
+        ]
+      }
+    ],
     "commands": [
       {
         "command": "hiveforge.showDashboard",

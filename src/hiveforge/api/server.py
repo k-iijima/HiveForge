@@ -15,6 +15,7 @@ from .auth import verify_api_key
 from .helpers import clear_active_runs, get_active_runs, set_ar
 from .routes import (
     activity_router,
+    beekeeper_router,
     colonies_router,
     conferences_router,
     events_router,
@@ -90,3 +91,4 @@ app.include_router(tasks_router)
 app.include_router(requirements_router)
 app.include_router(events_router)
 app.include_router(guard_bee_router)
+app.include_router(beekeeper_router)

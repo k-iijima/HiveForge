@@ -26,5 +26,35 @@
     "docker.context": "wsl-docker",
     // Docker CLI のパスを明示的に指定（WSLラッパーではなくネイティブCLI）
     "docker.dockerPath": "C:\\Users\\kiiji\\bin\\docker.exe",
-    "containers.containerCommand": "C:\\Users\\kiiji\\bin\\docker.exe"
+    "containers.containerCommand": "C:\\Users\\kiiji\\bin\\docker.exe",
+    "chat.tools.terminal.autoApprove": {
+        "/^cd /workspace/HiveForge/vscode-extension && npm run lint 2>&1 \\| tail -10$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^cd /workspace/HiveForge/vscode-extension && npm run compile 2>&1 && npm run lint 2>&1$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^cd /workspace/HiveForge/vscode-extension && npm run lint 2>&1 \\| tail -5$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^cd /workspace/HiveForge/vscode-extension && npx tsc -p \\./ --noEmit 2>&1; echo \"EXIT:\\$\\?\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^cd /workspace/HiveForge/vscode-extension && npx eslint src --ext ts 2>&1; echo \"EXIT:\\$\\?\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^cd /workspace/HiveForge/vscode-extension && npx eslint src/chatHandler\\.ts 2>&1; echo \"LINT_EXIT:\\$\\?\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^cd /workspace/HiveForge/vscode-extension && npx eslint src/chatHandler\\.ts 2>&1 \\| wc -l && npx eslint src/chatHandler\\.ts 2>&1 \\| grep -c \"error\\\\\\|warning\" \\|\\| true$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
 }
