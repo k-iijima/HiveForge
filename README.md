@@ -1,5 +1,7 @@
 # HiveForge
 
+[![CI](https://github.com/k-iijima/HiveForge/actions/workflows/ci.yml/badge.svg)](https://github.com/k-iijima/HiveForge/actions/workflows/ci.yml)
+
 > マルチエージェント協調開発システム
 
 HiveForgeは、LLMを活用した自律型ソフトウェア開発支援システムです。複数の専門エージェント（Beekeeper, Queen Bee, Worker Bee, Sentinel Hornet, Guard Bee, Forager Bee, Referee Bee）が協調し、VS Code + GitHub Copilot Chat と連携してソフトウェア開発を支援します。
