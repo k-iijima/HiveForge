@@ -720,10 +720,10 @@ class TestEventTypeMapCompleteness:
         全 EventType の専用クラス登録を強制する。
         """
         from hiveforge.core.events.registry import EVENT_TYPE_MAP
-        from hiveforge.core.events.types import EventType as ET
+        from hiveforge.core.events.types import EventType
 
         # Arrange: 全EventType値を取得
-        all_types = set(ET)
+        all_types = set(EventType)
 
         # Act: MAP に登録されたキーを取得
         registered_types = set(EVENT_TYPE_MAP.keys())

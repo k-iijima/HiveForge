@@ -4,7 +4,6 @@
 """
 
 from datetime import datetime
-from enum import Enum
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query

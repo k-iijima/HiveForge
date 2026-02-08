@@ -7,7 +7,7 @@
  */
 
 import * as vscode from 'vscode';
-import { HiveForgeClient, ActivityEvent, ActivityHierarchy, AgentInfo } from '../client';
+import { HiveForgeClient, ActivityEvent, ActivityHierarchy } from '../client';
 
 export class AgentMonitorPanel {
     public static currentPanel: AgentMonitorPanel | undefined;

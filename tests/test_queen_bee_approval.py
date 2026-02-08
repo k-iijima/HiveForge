@@ -16,7 +16,6 @@ from hiveforge.queen_bee.approval import (
 )
 from hiveforge.queen_bee.planner import PlannedTask, TaskPlan
 
-
 # =========================================================================
 # PlanApprovalGate.classify_plan のテスト
 # =========================================================================

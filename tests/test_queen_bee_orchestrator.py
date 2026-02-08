@@ -7,15 +7,13 @@ ColonyOrchestrator がタスク依存関係を解析し、
 
 from __future__ import annotations
 
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 
-from hiveforge.queen_bee.context import TaskContext, TaskResult
+from hiveforge.queen_bee.context import TaskContext
 from hiveforge.queen_bee.orchestrator import ColonyOrchestrator
 from hiveforge.queen_bee.planner import PlannedTask, TaskPlan
-
 
 # =========================================================================
 # ColonyOrchestrator の並列実行テスト

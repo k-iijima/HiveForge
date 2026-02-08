@@ -7,14 +7,11 @@ TaskPlanner.validate() の統合テスト。
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
-
 import pytest
 
 from hiveforge.guard_bee.models import (
     Evidence,
     EvidenceType,
-    RuleResult,
     Verdict,
     VerificationLevel,
 )
@@ -26,7 +23,6 @@ from hiveforge.guard_bee.plan_rules import (
 from hiveforge.guard_bee.rules import RuleRegistry
 from hiveforge.guard_bee.verifier import GuardBeeVerifier
 from hiveforge.queen_bee.planner import PlannedTask, TaskPlan, TaskPlanner
-
 
 # =========================================================================
 # create_plan_evidence ヘルパーのテスト
@@ -414,7 +410,7 @@ class TestTaskPlannerValidate:
         plan = TaskPlan(tasks=[PlannedTask(task_id="t1", goal="テスト実装")])
 
         # Act
-        report = TaskPlanner.validate(
+        TaskPlanner.validate(
             plan=plan,
             original_goal="テスト",
             verifier=plan_verifier,

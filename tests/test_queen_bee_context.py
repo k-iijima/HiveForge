@@ -11,7 +11,6 @@ from pydantic import ValidationError
 
 from hiveforge.queen_bee.context import TaskContext, TaskResult
 
-
 # =========================================================================
 # TaskResult モデルのテスト
 # =========================================================================

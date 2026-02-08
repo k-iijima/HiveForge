@@ -95,7 +95,7 @@ class TaskPlan(BaseModel):
         all_ids = set(task_map.keys())
 
         # 入次数を計算（不明な依存先は無視）
-        in_degree: dict[str, int] = {tid: 0 for tid in all_ids}
+        in_degree: dict[str, int] = dict.fromkeys(all_ids, 0)
         for task in self.tasks:
             for dep in task.depends_on:
                 if dep in all_ids:
@@ -117,7 +117,7 @@ class TaskPlan(BaseModel):
             for tid in remaining:
                 task = task_map[tid]
                 for dep in task.depends_on:
-                    if dep in [r for r in ready]:
+                    if dep in ready:
                         remaining[tid] -= 1
 
         return layers

@@ -12,7 +12,6 @@ import pytest
 from hiveforge.queen_bee.context import TaskContext, TaskResult
 from hiveforge.queen_bee.result import ColonyResult, ColonyResultBuilder, ColonyStatus
 
-
 # =========================================================================
 # ColonyResult モデルのテスト
 # =========================================================================

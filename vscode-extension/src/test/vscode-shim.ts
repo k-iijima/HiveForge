@@ -6,7 +6,6 @@
  * mocha --require out/test/vscode-shim.js で使用する。
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import * as vscodeMock from "./vscode-mock";
 
 // 'vscode' というモジュール名でキャッシュに直接登録

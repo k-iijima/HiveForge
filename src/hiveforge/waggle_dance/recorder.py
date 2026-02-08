@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 from hiveforge.core.events import (
-    EventType,
     WaggleDanceValidatedEvent,
     WaggleDanceViolationEvent,
 )

@@ -14,10 +14,8 @@ from __future__ import annotations
 
 import os
 import secrets
-from typing import Optional
 
-from fastapi import Depends, HTTPException, Request, status
-from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import HTTPException, Request, status
 
 from ..core import get_settings
 

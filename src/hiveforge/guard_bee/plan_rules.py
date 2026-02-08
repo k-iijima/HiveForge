@@ -18,7 +18,6 @@ from .models import (
 )
 from .rules import VerificationRule
 
-
 # ─── ヘルパー ────────────────────────────────────────────
 
 

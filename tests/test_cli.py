@@ -436,7 +436,7 @@ class TestRunChat:
 
         with (
             patch("hiveforge.core.get_settings") as mock_get_settings,
-            patch("hiveforge.core.AkashicRecord") as mock_ar_class,
+            patch("hiveforge.core.AkashicRecord"),
             patch("hiveforge.beekeeper.BeekeeperMCPServer", return_value=mock_beekeeper),
         ):
             mock_settings = MagicMock()
@@ -467,7 +467,7 @@ class TestRunChat:
 
         with (
             patch("hiveforge.core.get_settings") as mock_get_settings,
-            patch("hiveforge.core.AkashicRecord") as mock_ar_class,
+            patch("hiveforge.core.AkashicRecord"),
             patch("hiveforge.beekeeper.BeekeeperMCPServer", return_value=mock_beekeeper),
         ):
             mock_settings = MagicMock()
@@ -492,7 +492,7 @@ class TestRunChat:
 
         with (
             patch("hiveforge.core.get_settings") as mock_get_settings,
-            patch("hiveforge.core.AkashicRecord") as mock_ar_class,
+            patch("hiveforge.core.AkashicRecord"),
             patch("hiveforge.beekeeper.BeekeeperMCPServer", return_value=mock_beekeeper),
         ):
             mock_settings = MagicMock()

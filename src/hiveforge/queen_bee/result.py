@@ -17,7 +17,7 @@ from hiveforge.queen_bee.context import TaskContext, TaskResult
 logger = logging.getLogger(__name__)
 
 
-class ColonyStatus(str, enum.Enum):
+class ColonyStatus(enum.StrEnum):
     """Colony全体の実行ステータス"""
 
     COMPLETED = "completed"

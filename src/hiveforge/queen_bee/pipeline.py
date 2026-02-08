@@ -23,7 +23,6 @@ from hiveforge.queen_bee.approval import (
     PlanApprovalGate,
     PlanApprovalRequest,
 )
-from hiveforge.queen_bee.context import TaskContext
 from hiveforge.queen_bee.orchestrator import ColonyOrchestrator
 from hiveforge.queen_bee.planner import TaskPlan
 from hiveforge.queen_bee.result import ColonyResult, ColonyResultBuilder
@@ -167,16 +166,17 @@ class ExecutionPipeline:
         approval_request = self._approval_gate.check_approval(
             plan, self._trust_level, original_goal
         )
-        if approval_request.requires_approval:
-            if approval_decision is None or not approval_decision.approved:
-                self._record_event(
-                    EventType.PLAN_APPROVAL_REQUIRED,
-                    run_id=run_id,
-                    colony_id=colony_id,
-                    actor=actor,
-                    payload=approval_request.to_event_payload(),
-                )
-                raise ApprovalRequiredError(approval_request)
+        if approval_request.requires_approval and (
+            approval_decision is None or not approval_decision.approved
+        ):
+            self._record_event(
+                EventType.PLAN_APPROVAL_REQUIRED,
+                run_id=run_id,
+                colony_id=colony_id,
+                actor=actor,
+                payload=approval_request.to_event_payload(),
+            )
+            raise ApprovalRequiredError(approval_request)
 
         # 5. 実行
         ctx = await self._orchestrator.execute_plan(

@@ -7,27 +7,23 @@ ARイベントが記録され、問題が隠蔽されないことを検証する
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from hiveforge.core.ar.storage import AkashicRecord
+from hiveforge.core.models.action_class import TrustLevel
 from hiveforge.guard_bee.models import (
     GuardBeeReport,
-    RuleResult,
     Verdict,
-    VerificationLevel,
 )
-from hiveforge.core.models.action_class import TrustLevel
-from hiveforge.queen_bee.approval import ApprovalDecision, PlanApprovalGate
+from hiveforge.queen_bee.approval import ApprovalDecision
 from hiveforge.queen_bee.pipeline import (
-    ExecutionPipeline,
-    PipelineError,
-    PlanValidationFailedError,
     ApprovalRequiredError,
+    ExecutionPipeline,
+    PlanValidationFailedError,
 )
 from hiveforge.queen_bee.planner import PlannedTask, TaskPlan
-
 
 # =========================================================================
 # ヘルパー
@@ -264,7 +260,7 @@ class TestExecutionPipeline:
 
         # Act
         with patch.object(pipeline, "_validate_plan", return_value=_make_passing_report()):
-            result = await pipeline.run(
+            await pipeline.run(
                 plan=plan,
                 execute_fn=mock_execute,
                 colony_id="col-1",

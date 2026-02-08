@@ -1276,6 +1276,7 @@ class TestLLMClient:
     ):
         """5xxエラーがリトライ上限を超えるとHTTPStatusErrorが発生する"""
         import httpx
+
         from hiveforge.llm.client import MAX_SERVER_ERROR_RETRIES
 
         # Arrange
@@ -1314,6 +1315,7 @@ class TestLLMClient:
     ):
         """429エラーがリトライ上限を超えるとHTTPStatusErrorが発生する"""
         import httpx
+
         from hiveforge.llm.client import MAX_429_RETRIES
 
         # Arrange
@@ -1390,7 +1392,7 @@ class TestLLMClient:
         from hiveforge.llm.client import _RETRYABLE_STATUS_CODES
 
         # Assert: リトライ対象のステータスコードが正しく定義されている
-        assert _RETRYABLE_STATUS_CODES == {500, 502, 503, 529}
+        assert {500, 502, 503, 529} == _RETRYABLE_STATUS_CODES
 
 
 # ==================== run_command_handler テスト ====================

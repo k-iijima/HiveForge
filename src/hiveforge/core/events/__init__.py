@@ -63,6 +63,15 @@ from .operation import (
     UserDirectInterventionEvent,
 )
 
+# --- Pipeline ---
+from .pipeline import (
+    PipelineCompletedEvent,
+    PipelineStartedEvent,
+    PlanApprovalRequiredEvent,
+    PlanFallbackActivatedEvent,
+    PlanValidationFailedEvent,
+)
+
 # --- レジストリ ---
 from .registry import (
     EVENT_TYPE_MAP,
@@ -86,6 +95,15 @@ from .run import (
     TaskProgressedEvent,
     TaskUnblockedEvent,
 )
+
+# --- Sentinel Hornet ---
+from .sentinel import (
+    SentinelAlertRaisedEvent,
+    SentinelKpiDegradationEvent,
+    SentinelQuarantineEvent,
+    SentinelReportEvent,
+    SentinelRollbackEvent,
+)
 from .types import (
     ConflictCategory,
     ConflictSeverity,
@@ -96,6 +114,12 @@ from .types import (
     RiskLevel,
 )
 
+# --- Waggle Dance ---
+from .waggle import (
+    WaggleDanceValidatedEvent,
+    WaggleDanceViolationEvent,
+)
+
 # --- Worker Bee ---
 from .worker import (
     WorkerAssignedEvent,
@@ -103,30 +127,6 @@ from .worker import (
     WorkerFailedEvent,
     WorkerProgressEvent,
     WorkerStartedEvent,
-)
-
-# --- Sentinel Hornet ---
-from .sentinel import (
-    SentinelAlertRaisedEvent,
-    SentinelKpiDegradationEvent,
-    SentinelQuarantineEvent,
-    SentinelReportEvent,
-    SentinelRollbackEvent,
-)
-
-# --- Waggle Dance ---
-from .waggle import (
-    WaggleDanceValidatedEvent,
-    WaggleDanceViolationEvent,
-)
-
-# --- Pipeline ---
-from .pipeline import (
-    PipelineCompletedEvent,
-    PipelineStartedEvent,
-    PlanApprovalRequiredEvent,
-    PlanFallbackActivatedEvent,
-    PlanValidationFailedEvent,
 )
 
 __all__ = [
