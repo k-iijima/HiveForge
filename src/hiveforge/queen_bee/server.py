@@ -22,6 +22,7 @@ from ..core.events import (
     TaskCreatedEvent,
     TaskFailedEvent,
 )
+from ..core.models.action_class import TrustLevel
 from ..worker_bee.server import WorkerBeeMCPServer, WorkerState
 
 logger = logging.getLogger(__name__)
@@ -48,6 +49,8 @@ class QueenBeeMCPServer:
     colony_id: str
     ar: AkashicRecord
     llm_config: LLMConfig | None = None  # エージェント別LLM設定
+    use_pipeline: bool = False  # ExecutionPipeline を使用するか
+    trust_level: TrustLevel = TrustLevel.PROPOSE_CONFIRM  # 承認レベル
 
     def __post_init__(self) -> None:
         """初期化"""
@@ -56,6 +59,7 @@ class QueenBeeMCPServer:
         self._workers: dict[str, ManagedWorker] = {}
         self._pending_tasks: list[dict[str, Any]] = []
         self._current_run_id: str | None = None
+        self._pending_approvals: dict[str, dict[str, Any]] = {}  # request_id -> approval context
 
     def get_tool_definitions(self) -> list[dict[str, Any]]:
         """MCPツール定義を取得
@@ -185,6 +189,9 @@ class QueenBeeMCPServer:
 
         目標をタスクに分解し、Worker Beeで実行する。
         RunStarted/RunCompleted/RunFailedイベントを発行して追跡可能にする。
+
+        use_pipeline=True の場合、ExecutionPipeline を通じて
+        Guard Bee検証 + 承認ゲートを経由して実行する。
         """
         run_id = arguments.get("run_id", generate_event_id())
         goal = arguments.get("goal", "")
@@ -219,6 +226,207 @@ class QueenBeeMCPServer:
         )
         self.ar.append(colony_started, run_id)
 
+        if self.use_pipeline:
+            return await self._execute_with_pipeline(run_id, goal, context)
+        else:
+            return await self._execute_direct(run_id, goal, context)
+
+    async def _execute_with_pipeline(
+        self,
+        run_id: str,
+        goal: str,
+        context: dict[str, Any],
+        approval_decision: Any | None = None,
+    ) -> dict[str, Any]:
+        """ExecutionPipeline 経由でタスクを実行する
+
+        Guard Bee検証 → 承認ゲート → ColonyOrchestrator並列実行
+        """
+        from .approval import ApprovalDecision
+        from .pipeline import ApprovalRequiredError, ExecutionPipeline, PipelineError
+        from .planner import PlannedTask, TaskPlan
+
+        try:
+            # LLMでタスク分解
+            tasks_raw = await self._plan_tasks(goal, context)
+            if not tasks_raw:
+                tasks_raw = [{"task_id": str(generate_event_id()), "goal": goal}]
+
+            # TaskPlan を構築
+            planned_tasks = [
+                PlannedTask(task_id=t.get("task_id", str(generate_event_id())), goal=t["goal"])
+                for t in tasks_raw
+            ]
+            plan = TaskPlan(tasks=planned_tasks, reasoning=f"Goal: {goal}")
+
+            # ExecutionPipeline を実行
+            pipeline = ExecutionPipeline(ar=self.ar, trust_level=self.trust_level)
+
+            async def execute_fn(task_id: str, goal: str, context_data: Any) -> dict[str, Any]:
+                """Pipeline から呼ばれるタスク実行関数"""
+                return await self._execute_task(
+                    task_id=task_id,
+                    run_id=run_id,
+                    goal=goal,
+                    context=context_data or context,
+                )
+
+            colony_result = await pipeline.run(
+                plan=plan,
+                execute_fn=execute_fn,
+                colony_id=self.colony_id,
+                run_id=run_id,
+                original_goal=goal,
+                approval_decision=approval_decision,
+            )
+
+            # RunCompleted/RunFailed を記録
+            if colony_result.failed_count == 0:
+                run_completed = RunCompletedEvent(
+                    id=generate_event_id(),
+                    run_id=run_id,
+                    actor=f"queen-{self.colony_id}",
+                    payload={
+                        "colony_id": self.colony_id,
+                        "goal": goal,
+                        "tasks_completed": colony_result.completed_count,
+                        "tasks_total": colony_result.total_tasks,
+                    },
+                )
+                self.ar.append(run_completed, run_id)
+            else:
+                run_failed = RunFailedEvent(
+                    id=generate_event_id(),
+                    run_id=run_id,
+                    actor=f"queen-{self.colony_id}",
+                    payload={
+                        "colony_id": self.colony_id,
+                        "goal": goal,
+                        "tasks_completed": colony_result.completed_count,
+                        "tasks_total": colony_result.total_tasks,
+                        "reason": "Some tasks failed",
+                    },
+                )
+                self.ar.append(run_failed, run_id)
+
+            return {
+                "status": "completed" if colony_result.failed_count == 0 else "partial",
+                "run_id": run_id,
+                "goal": goal,
+                "tasks_total": colony_result.total_tasks,
+                "tasks_completed": colony_result.completed_count,
+                "results": colony_result.task_results,
+            }
+
+        except ApprovalRequiredError as e:
+            # 承認待ち — コンテキストを保存して approval_required を返す
+            request_id = str(generate_event_id())
+            self._pending_approvals[request_id] = {
+                "run_id": run_id,
+                "goal": goal,
+                "context": context,
+                "approval_request": e.approval_request,
+            }
+            logger.info(f"承認待ち: request_id={request_id}, goal={goal}")
+
+            return {
+                "status": "approval_required",
+                "run_id": run_id,
+                "goal": goal,
+                "request_id": request_id,
+                "action_class": e.approval_request.action_class.value,
+                "task_count": e.approval_request.task_count,
+            }
+
+        except PipelineError as e:
+            logger.exception(f"パイプラインエラー: {e}")
+
+            run_failed = RunFailedEvent(
+                id=generate_event_id(),
+                run_id=run_id,
+                actor=f"queen-{self.colony_id}",
+                payload={
+                    "colony_id": self.colony_id,
+                    "goal": goal,
+                    "reason": str(e),
+                },
+            )
+            self.ar.append(run_failed, run_id)
+
+            return {
+                "status": "error",
+                "run_id": run_id,
+                "goal": goal,
+                "error": str(e),
+            }
+
+        except Exception as e:
+            logger.exception(f"目標実行エラー: {e}")
+
+            run_failed = RunFailedEvent(
+                id=generate_event_id(),
+                run_id=run_id,
+                actor=f"queen-{self.colony_id}",
+                payload={
+                    "colony_id": self.colony_id,
+                    "goal": goal,
+                    "reason": str(e),
+                },
+            )
+            self.ar.append(run_failed, run_id)
+
+            return {
+                "status": "error",
+                "run_id": run_id,
+                "goal": goal,
+                "error": str(e),
+            }
+
+    async def resume_with_approval(
+        self,
+        request_id: str,
+        approved: bool,
+        reason: str = "",
+    ) -> dict[str, Any]:
+        """承認/拒否を受けて実行を再開する
+
+        Args:
+            request_id: 承認リクエストID
+            approved: 承認されたか
+            reason: 理由
+
+        Returns:
+            実行結果
+        """
+        from .approval import ApprovalDecision
+
+        pending = self._pending_approvals.pop(request_id, None)
+        if not pending:
+            return {
+                "status": "error",
+                "error": f"Unknown request_id: {request_id}",
+            }
+
+        if not approved:
+            return {
+                "status": "rejected",
+                "run_id": pending["run_id"],
+                "reason": reason,
+            }
+
+        # 承認付きで再実行
+        decision = ApprovalDecision(approved=True, reason=reason)
+        return await self._execute_with_pipeline(
+            run_id=pending["run_id"],
+            goal=pending["goal"],
+            context=pending["context"],
+            approval_decision=decision,
+        )
+
+    async def _execute_direct(
+        self, run_id: str, goal: str, context: dict[str, Any]
+    ) -> dict[str, Any]:
+        """従来の直接実行パス（Pipeline なし）"""
         try:
             # LLMでタスク分解（または単純なタスクとしてそのまま実行）
             tasks = await self._plan_tasks(goal, context)
