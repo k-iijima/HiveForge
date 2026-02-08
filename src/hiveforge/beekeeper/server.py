@@ -7,6 +7,7 @@ LLMを使用してユーザーの意図を解釈し、適切な対応を行う�
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from typing import Any
@@ -20,6 +21,7 @@ from ..core.events import (
     EmergencyStopEvent,
     HiveCreatedEvent,
     RequirementApprovedEvent,
+    RequirementCreatedEvent,
     RequirementRejectedEvent,
 )
 from ..core.swarming import SwarmingEngine, SwarmingFeatures
@@ -51,6 +53,7 @@ class BeekeeperMCPServer:
         self._agent_runner = None
         self._queens: dict[str, QueenBeeMCPServer] = {}  # colony_id -> Queen Bee
         self._swarming_engine = SwarmingEngine()
+        self._pending_requests: dict[str, asyncio.Future[str]] = {}
         # HiveStoreが未設定の場合、ARと同じVaultパスで作成
         if self.hive_store is None:
             self.hive_store = HiveStore(self.ar.vault_path)
@@ -328,7 +331,7 @@ class BeekeeperMCPServer:
         """承認ハンドラ
 
         RequirementApprovedイベントを発行してARに記録する。
-        Requirement（承認待ち操作）のrequest_idをrun_idとして使用する。
+        pending_requests に対応する Future があれば解決する。
         """
         request_id = arguments.get("request_id", "")
         comment = arguments.get("comment", "")
@@ -347,6 +350,11 @@ class BeekeeperMCPServer:
 
         logger.info(f"承認: request_id={request_id}, comment={comment}")
 
+        # pending_requests の Future を解決
+        future = self._pending_requests.get(request_id)
+        if future and not future.done():
+            future.set_result(f"approved: {comment}")
+
         return {
             "status": "approved",
             "request_id": request_id,
@@ -357,6 +365,7 @@ class BeekeeperMCPServer:
         """拒否ハンドラ
 
         RequirementRejectedイベントを発行してARに記録する。
+        pending_requests に対応する Future があれば拒否結果で解決する。
         """
         request_id = arguments.get("request_id", "")
         reason = arguments.get("reason", "")
@@ -374,6 +383,11 @@ class BeekeeperMCPServer:
         self.ar.append(event, request_id)
 
         logger.info(f"拒否: request_id={request_id}, reason={reason}")
+
+        # pending_requests の Future を拒否結果で解決
+        future = self._pending_requests.get(request_id)
+        if future and not future.done():
+            future.set_result(f"rejected: {reason}")
 
         return {
             "status": "rejected",
@@ -725,13 +739,67 @@ class BeekeeperMCPServer:
             error = result.get("error", "Unknown error")
             return f"タスク失敗: {error}"
 
-    async def _ask_user(self, question: str, options: list[str] | None = None) -> str:
-        """ユーザーに確認を求める"""
-        # TODO: VS Code拡張に通知してユーザー入力を待つ
-        logger.info(f"ユーザーに確認: {question}")
+    async def _ask_user(
+        self,
+        question: str,
+        options: list[str] | None = None,
+        timeout: float | None = None,
+    ) -> str:
+        """ユーザーに確認を求め、応答を非同期に待機する
+
+        RequirementCreatedEvent を AR に記録し、asyncio.Future で
+        ユーザーの approve/reject を待つ。
+
+        Args:
+            question: 質問内容
+            options: 選択肢（任意）
+            timeout: タイムアウト秒数（None の場合は無制限）
+
+        Returns:
+            ユーザーの応答結果文字列
+        """
+        request_id = generate_event_id()
+        logger.info(f"ユーザーに確認: {question} (request_id={request_id})")
+
+        # RequirementCreatedEvent を AR に記録
+        event = RequirementCreatedEvent(
+            run_id=str(request_id),
+            actor="beekeeper",
+            payload={
+                "request_id": str(request_id),
+                "description": question,
+                "options": options or [],
+            },
+        )
+        self.ar.append(event, str(request_id))
+
+        # セッション状態を WAITING_USER に設定
         if self.current_session:
             self.current_session.set_waiting_user()
-        return f"ユーザーに確認を求めています: {question}"
+
+        # Future を作成して pending_requests に登録
+        loop = asyncio.get_running_loop()
+        future: asyncio.Future[str] = loop.create_future()
+        self._pending_requests[str(request_id)] = future
+
+        try:
+            # タイムアウト付きで応答を待機
+            if timeout is not None:
+                result = await asyncio.wait_for(future, timeout=timeout)
+            else:
+                result = await future
+        except asyncio.TimeoutError:
+            result = f"タイムアウト: {question} (timeout={timeout}s)"
+            logger.warning(f"ユーザー応答タイムアウト: request_id={request_id}")
+        finally:
+            # pending_requests をクリーンアップ
+            self._pending_requests.pop(str(request_id), None)
+
+            # セッション状態を ACTIVE に復元
+            if self.current_session:
+                self.current_session.set_active()
+
+        return result
 
     async def _get_hive_status(self, hive_id: str | None = None) -> str:
         """Hive/Colonyの状態を取得"""
