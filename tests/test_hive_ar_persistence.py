@@ -687,3 +687,151 @@ class TestHiveStoreAppendAndHashChain:
 
         # Assert
         assert hives == []
+
+
+class TestFindLastHashEdgeCases:
+    """_find_last_hash のエッジケーステスト
+
+    corrupted JSONL ファイルに対する防御的な振る舞いを検証する。
+    """
+
+    def test_corrupted_last_line_falls_back_to_larger_chunk(self, tmp_path: Path) -> None:
+        """末尾行が壊れている場合、チャンクサイズを増やしてリトライする
+
+        最後の行が不正なJSONでparse_eventが失敗した場合、
+        chunk_size を倍にして再読み込みを試みる（breakパス）。
+        最終的にファイル全体を読み込むフォールバックに入る。
+        """
+        # Arrange: 正常イベント行 + 壊れた行を直接書き込む
+        store = HiveStore(tmp_path)
+        hive_id = generate_event_id()
+        valid_event = HiveCreatedEvent(
+            run_id=hive_id,
+            actor="user",
+            payload={"hive_id": hive_id, "name": "CorruptTest"},
+        )
+        # 正常にイベントを追記
+        store.append(valid_event, hive_id)
+
+        # events.jsonl に壊れた行を追加
+        events_file = store._get_events_file(hive_id)
+        with open(events_file, "ab") as f:
+            f.write(b'{"this is": "not a valid event"}\n')
+
+        # Act: 次のイベントを追記（_find_last_hash がフォールバック動作）
+        second_event = HiveCreatedEvent(
+            run_id=hive_id,
+            actor="user",
+            payload={"hive_id": hive_id, "name": "SecondEvent"},
+        )
+        result = store.append(second_event, hive_id)
+
+        # Assert: prev_hash は最初の正常イベントのハッシュを取得できたはず
+        # フォールバックで全体読み込みが走り、正常行のhashが返される
+        assert result.prev_hash is not None
+
+    def test_all_lines_corrupted_returns_none_prev_hash(self, tmp_path: Path) -> None:
+        """すべての行が壊れている場合、prev_hash は None になる
+
+        ファイルにまともなイベント行が一つもない場合、
+        _find_last_hash は最終的に None を返す。
+        """
+        import portalocker
+
+        # Arrange: 壊れた行だけの events.jsonl を作成（空行も混ぜて L82->80 をカバー）
+        store = HiveStore(tmp_path)
+        hive_id = generate_event_id()
+        events_file = store._get_events_file(hive_id)
+
+        with open(events_file, "wb") as f:
+            f.write(b"corrupted line 1\n")
+            f.write(b"\n")  # 空行 — L82->80 分岐カバー
+            f.write(b"corrupted line 2\n")
+            f.write(b"   \n")  # 空白のみ行
+            f.write(b"corrupted line 3\n")
+
+        # Act: _find_last_hash を直接呼び出す
+        with portalocker.Lock(events_file, mode="a+b", timeout=10) as f:
+            f.seek(0, 2)
+            file_size = f.tell()
+            last_hash = store._find_last_hash(f, file_size)
+
+        # Assert: 正常な行がないので None
+        assert last_hash is None
+
+    def test_large_file_with_corrupted_tail_triggers_chunk_doubling(
+        self, tmp_path: Path
+    ) -> None:
+        """8KB超のファイルで末尾が壊れていると、chunk_size倍増→breakが発生する
+
+        while ループ内で parse_event が失敗して break し、
+        chunk_size *= 2 で再試行するパス（L62→break→L74）をカバーする。
+        最終的にファイル全体の読み込みフォールバックで正常行を発見する。
+        """
+        import portalocker
+
+        # Arrange: 正常イベント1件 + 8KB以上のパディング + 壊れた行
+        store = HiveStore(tmp_path)
+        hive_id = generate_event_id()
+        valid_event = HiveCreatedEvent(
+            run_id=hive_id,
+            actor="user",
+            payload={"hive_id": hive_id, "name": "LargeFileTest"},
+        )
+        store.append(valid_event, hive_id)
+
+        events_file = store._get_events_file(hive_id)
+        with open(events_file, "ab") as f:
+            # 8KB以上のパディング行を追加（空行で L68->66 もカバー）
+            padding_line = b"x" * 200 + b"\n"
+            for _ in range(50):  # 50 * 201 = ~10KB
+                f.write(padding_line)
+            f.write(b"\n")  # 空行挿入
+            # 末尾に壊れた行を追加
+            f.write(b'{"broken": "not a valid event"}\n')
+
+        # Act: _find_last_hash を呼び出す
+        with portalocker.Lock(events_file, mode="a+b", timeout=10) as f:
+            f.seek(0, 2)
+            file_size = f.tell()
+            last_hash = store._find_last_hash(f, file_size)
+
+        # Assert: フォールバックで正常行のハッシュが取得される
+        assert last_hash is not None
+
+    def test_utf8_continuation_bytes_at_chunk_boundary(
+        self, tmp_path: Path
+    ) -> None:
+        """チャンク境界にUTF-8継続バイトがある場合、先頭バイトをスキップする
+
+        chunk読み込み時にマルチバイト文字の途中から始まった場合、
+        先頭の継続バイト (0x80-0xBF) をスキップするパス (L62) をカバー。
+        """
+        import portalocker
+
+        # Arrange: 正常イベント + マルチバイト文字を含む大きなファイル
+        store = HiveStore(tmp_path)
+        hive_id = generate_event_id()
+        valid_event = HiveCreatedEvent(
+            run_id=hive_id,
+            actor="user",
+            payload={"hive_id": hive_id, "name": "UTF8境界テスト"},
+        )
+        store.append(valid_event, hive_id)
+
+        events_file = store._get_events_file(hive_id)
+        with open(events_file, "ab") as f:
+            # 日本語（3バイトUTF-8 = e3 83 xx 等）を大量に追加
+            # チャンク境界でマルチバイト文字が分断される可能性を作る
+            multibyte_line = ("あ" * 100 + "\n").encode("utf-8")  # 300 bytes/line
+            for _ in range(30):  # ~9KB
+                f.write(multibyte_line)
+
+        # Act: _find_last_hash を呼び出す
+        with portalocker.Lock(events_file, mode="a+b", timeout=10) as f:
+            f.seek(0, 2)
+            file_size = f.tell()
+            last_hash = store._find_last_hash(f, file_size)
+
+        # Assert: 先頭の正常イベントのハッシュが取得される
+        assert last_hash is not None

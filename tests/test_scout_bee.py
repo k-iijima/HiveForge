@@ -495,3 +495,50 @@ class TestScoutBee:
 
         # Assert: 類似エピソードのテンプレートが推薦される
         assert report.recommended_template == "quality"
+
+    def test_insufficient_data_when_no_similar(self):
+        """エピソードは十分だが類似度閾値を満たすものがない場合
+
+        min_episodes以上のエピソードがあるが、ターゲット特徴量と
+        大きく乖離しており min_similarity 閾値を超えるものが0件の場合、
+        INSUFFICIENT_DATA verdict を返す。
+        """
+        # Arrange: 非常に高い類似度閾値 + 全く異なる特徴量
+        scout = ScoutBee(min_episodes=1, min_similarity=0.999)
+        episodes = [
+            _make_episode(
+                episode_id="ep-far",
+                template_used="speed",
+                outcome=Outcome.SUCCESS,
+                task_features={"complexity": 1.0, "risk": 1.0, "urgency": 1.0},
+            ),
+        ]
+
+        # Act
+        report = scout.recommend(
+            target_features={"complexity": 5.0, "risk": 5.0, "urgency": 5.0},
+            episodes=episodes,
+        )
+
+        # Assert
+        assert report.verdict == ScoutVerdict.INSUFFICIENT_DATA
+        assert report.recommended_template == "balanced"
+        assert report.similar_count == 0
+
+    def test_build_reason_stats_none(self):
+        """stats=None の場合のフォールバック理由文"""
+        # Act
+        reason = ScoutBee._build_reason("speed", 5, None)
+
+        # Assert
+        assert "類似エピソード5件" in reason
+        assert "推薦" in reason
+
+    def test_build_reason_stats_not_template_stats(self):
+        """stats が TemplateStats 以外のオブジェクトの場合のフォールバック"""
+        # Act: dict は TemplateStats ではない
+        reason = ScoutBee._build_reason("balanced", 3, {"some": "dict"})
+
+        # Assert
+        assert "類似エピソード3件" in reason
+        assert "推薦" in reason

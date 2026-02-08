@@ -308,3 +308,29 @@ class TestWaggleDanceRecorder:
         assert event.payload["valid"] is False
         assert len(event.payload["errors"]) == 1
         assert event.payload["colony_id"] == "colony-001"
+
+
+class TestWaggleDanceValidatorEdgeCases:
+    """バリデータのエッジケーステスト"""
+
+    def test_unsupported_direction_returns_invalid(self):
+        """未対応の MessageDirection（スキーママップに未登録）は invalid を返す
+
+        GUARD_RESULT は _DIRECTION_SCHEMA_MAP に登録されていないため、
+        防御的にバリデーション失敗を返す。
+        """
+        # Arrange
+        validator = WaggleDanceValidator()
+
+        # Act
+        result = validator.validate(
+            direction=MessageDirection.GUARD_RESULT,
+            data={"some": "data"},
+        )
+
+        # Assert
+        assert result.valid is False
+        assert len(result.errors) == 1
+        assert result.errors[0].field == "direction"
+        assert "未対応" in result.errors[0].message
+        assert result.direction == MessageDirection.GUARD_RESULT
