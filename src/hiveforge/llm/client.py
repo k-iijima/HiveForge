@@ -5,6 +5,7 @@ OpenAI/Anthropic APIを統一インターフェースで呼び出す。
 """
 
 import json
+import logging
 import os
 from dataclasses import dataclass, field
 from typing import Any, Literal
@@ -13,6 +14,11 @@ import httpx
 
 from ..core.config import LLMConfig, get_settings
 from ..core.rate_limiter import RateLimitConfig, RateLimiter, get_rate_limiter_registry
+
+logger = logging.getLogger(__name__)
+
+# 429リトライ上限
+MAX_429_RETRIES = 3
 
 
 @dataclass
@@ -179,22 +185,37 @@ class LLMClient:
         if tool_choice:
             body["tool_choice"] = tool_choice
 
-        # API呼び出し
-        response = await client.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            json=body,
-        )
+        # API呼び出し（429リトライ上限付き）
+        for attempt in range(MAX_429_RETRIES + 1):
+            response = await client.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=body,
+            )
 
-        if response.status_code == 429:
-            retry_after = float(response.headers.get("Retry-After", 60))
-            rate_limiter = await self._get_rate_limiter()
-            await rate_limiter.handle_429(retry_after)
-            # リトライ
-            return await self._chat_openai(messages, tools, tool_choice)
+            if response.status_code == 429:
+                retry_after = float(response.headers.get("Retry-After", 60))
+                logger.warning(
+                    "OpenAI 429 レートリミット: retry_after=%.1fs, attempt=%d/%d, model=%s",
+                    retry_after,
+                    attempt + 1,
+                    MAX_429_RETRIES,
+                    self.config.model,
+                )
+                if attempt >= MAX_429_RETRIES:
+                    raise httpx.HTTPStatusError(
+                        f"429リトライ上限超過 ({MAX_429_RETRIES}回)",
+                        request=response.request,
+                        response=response,
+                    )
+                rate_limiter = await self._get_rate_limiter()
+                await rate_limiter.handle_429(retry_after)
+                continue
+
+            break
 
         response.raise_for_status()
         data = response.json()
@@ -296,22 +317,38 @@ class LLMClient:
         if anthropic_tools:
             body["tools"] = anthropic_tools
 
-        # API呼び出し
-        response = await client.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": api_key,
-                "anthropic-version": "2023-06-01",
-                "Content-Type": "application/json",
-            },
-            json=body,
-        )
+        # API呼び出し（429リトライ上限付き）
+        for attempt in range(MAX_429_RETRIES + 1):
+            response = await client.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                    "Content-Type": "application/json",
+                },
+                json=body,
+            )
 
-        if response.status_code == 429:
-            retry_after = float(response.headers.get("Retry-After", 60))
-            rate_limiter = await self._get_rate_limiter()
-            await rate_limiter.handle_429(retry_after)
-            return await self._chat_anthropic(messages, tools, tool_choice)
+            if response.status_code == 429:
+                retry_after = float(response.headers.get("Retry-After", 60))
+                logger.warning(
+                    "Anthropic 429 レートリミット: retry_after=%.1fs, attempt=%d/%d, model=%s",
+                    retry_after,
+                    attempt + 1,
+                    MAX_429_RETRIES,
+                    self.config.model,
+                )
+                if attempt >= MAX_429_RETRIES:
+                    raise httpx.HTTPStatusError(
+                        f"429リトライ上限超過 ({MAX_429_RETRIES}回)",
+                        request=response.request,
+                        response=response,
+                    )
+                rate_limiter = await self._get_rate_limiter()
+                await rate_limiter.handle_429(retry_after)
+                continue
+
+            break
 
         response.raise_for_status()
         data = response.json()

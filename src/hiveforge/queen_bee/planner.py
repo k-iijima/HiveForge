@@ -150,7 +150,11 @@ class TaskPlanner:
             response = await self._client.chat(messages)
             return self._parse_response(response.content)
         except Exception:
-            logger.warning("LLMタスク分解に失敗、単一タスクにフォールバック", exc_info=True)
+            logger.error(
+                "LLMタスク分解に失敗、単一タスクにフォールバック: goal=%s",
+                goal,
+                exc_info=True,
+            )
             return TaskPlan(
                 tasks=[PlannedTask(goal=goal)],
                 reasoning="LLMタスク分解に失敗したため、目標をそのまま1タスクとして実行",
