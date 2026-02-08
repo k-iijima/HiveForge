@@ -26,7 +26,7 @@
 |---------------|-----------|------|------------|
 | **Hive Core** (イベント, AR, 状態機械) | ✅ 完了 | 61 EventType, 5状態機械, ハッシュ連鎖 | — |
 | **Hive/Colony AR永続化** | ✅ M1-1完了 | HiveStore + HiveAggregate, JSONL永続化 | — |
-| **API Server** (FastAPI REST) | ✅ 完了 | Hive/Colony CRUD が AR永続化と接続済み | 認証は未有効化 (`auth.enabled: false`) |
+| **API Server** (FastAPI REST) | ✅ 完了 | Hive/Colony CRUD が AR永続化と接続済み | 認証ミドルウェア実装済 (`auth.enabled: false` がデフォルト) |
 | **MCP Server** (Copilot連携) | ✅ 完了 | 全ツール実装・テスト済 | — |
 | **CLI** | ✅ 完了 | `hiveforge chat` 等 | mypy strict未対応 (M1-3) |
 | **Beekeeper server** | ✅ M1-2完了 | 全ハンドラ実装済 | **`_ask_user()` はスタブ** — ユーザー入力を実際に待たず即応答を返す (→ M2-2で解消) |
@@ -334,14 +334,33 @@ M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)  
 
 ### M5: 運用品質（プロダクション準備）
 
-| タスク | 内容 |
-|--------|------|
-| M5-1 | セキュリティ監査（API認証、入力検証） |
-| M5-2 | パフォーマンス計測・最適化 |
-| M5-3 | CI/CD強化（テスト・型チェック・カバレッジの自動化） |
-| M5-4 | KPIダッシュボード（Hive Monitor Webview統合） |
-| M5-5 | サンプルプロジェクト作成 |
-| M5-6 | ユーザードキュメント完成 |
+| タスク | 内容 | ステータス |
+|--------|------|-----------|
+| M5-1a | API認証ミドルウェア（X-API-Key / Bearer Token） | ✅ 完了 |
+| M5-1b | 入力バリデーション強化（MCP + APIルート） | ✅ 完了 |
+| M5-2 | パフォーマンス計測・最適化 | 未着手 |
+| M5-3 | CI/CD強化（3ジョブ分割、カバレッジゲート96%） | ✅ 完了 |
+| M5-4 | KPIダッシュボード（Hive Monitor Webview統合） | 未着手 |
+| M5-5 | サンプルプロジェクト作成 | 未着手 |
+| M5-6 | ユーザードキュメント完成 | 未着手 |
+
+#### M5-1a 実装詳細
+- `src/hiveforge/api/auth.py`: `verify_api_key` FastAPI依存
+- X-API-Key ヘッダー + Authorization: Bearer トークン
+- `secrets.compare_digest` でタイミング攻撃防止
+- 除外パス: `/health`, `/docs`, `/redoc`, `/openapi.json`
+- `auth.enabled: false`（デフォルト）で既存挙動に影響なし
+
+#### M5-1b 実装詳細
+- MCP全ハンドラに空文字・範囲バリデーション追加
+- API `events.py` に Query 制約（limit, direction, max_depth）
+- 23テストで全バリデーション網羅
+
+#### M5-3 実装詳細
+- GitHub Actions を3並列ジョブに分割: lint / test / vscode-extension
+- テスト二重実行を解消
+- `--cov-fail-under=96` でカバレッジゲート強制
+- README.md に CIバッジ追加
 
 ---
 
@@ -369,21 +388,25 @@ M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)  
 
 ## 4. 優先順位（2025-07 更新）
 
-M1〜M4完了。次は M5（運用品質）。
+M1〜M4完了。M5（運用品質）着手中 — M5-1(セキュリティ)・M5-3(CI/CD)完了。
 
 ```
      高
       │  M4-1 (タスク分解)           ✅ 完了
       │  M4-2 (LLM Orchestrator)    ✅ 完了
-      │  M5   (運用品質)            ← プロダクション準備 ★次に着手
+      │  M5-1 (セキュリティ)         ✅ 完了（認証+バリデーション）
+      │  M5-3 (CI/CD)               ✅ 完了（3ジョブ+カバレッジゲート）
+      │  M5-2 (パフォーマンス)       ← ★次に着手
+      │  M5-4 (KPIダッシュボード)    ← Webview統合
+      │  M5-5 (サンプルプロジェクト)  ← ドキュメント整備
+      │  M5-6 (ユーザードキュメント)  ← GA準備
       │  M2-2 (エージェント統合)     ← E2E動作
-      │  M2-3 (MCP→Beekeeper連携)  ← Copilot統合
       │  M1-3 (型安全)              ← 長期信頼性（並行）
      低
 ```
 
-> M4-1/M4-2完了により、Queen BeeのLLMタスク分解・並列実行・結果集約が実装済み。
-> 次はM5（運用品質）でプロダクション準備へ進む。
+> M5-1/M5-3完了。API認証・入力バリデーション・CI/CDゲートが整備済み。
+> 次はM5-2（パフォーマンス）またはM5-4（KPIダッシュボード）へ進む。
 
 ---
 
