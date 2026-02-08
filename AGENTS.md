@@ -195,6 +195,7 @@ src/hiveforge/
 │   ├── honeycomb/  # 実行履歴・学習基盤（Episode, KPI）
 │   ├── swarming/   # Swarming Protocol（適応的Colony編成）
 │   ├── intervention/ # 介入・エスカレーション永続化
+│   ├── github/     # GitHub Projection（PR/Issue同期）
 │   ├── activity_bus.py  # Activity Bus
 │   ├── config.py   # 設定管理
 │   ├── lineage.py  # 因果リンク

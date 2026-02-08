@@ -75,17 +75,15 @@ Worker × N案生成 → Forager探索拡張 → Referee多面的採点 → Guar
 
 ## 開発ステータス
 
-**M4（自律的タスク分解）完了** — LLMタスク分解（TaskPlanner）、並列実行（ColonyOrchestrator）、ゲート統合（ExecutionPipeline）が実装済。次はM2-2/M2-3（統合パス確立）を最優先で進め、その後M5残項目（運用品質）へ。
+**M4（自律的タスク分解）完了、M2（接続）完了** — LLMタスク分解（TaskPlanner）、並列実行（ColonyOrchestrator）、ゲート統合（ExecutionPipeline）、統合パス（Beekeeper→Queen Bee→Worker Bee）が全て実装済。現在はM5残項目（運用品質）を推進中。
 
 | マイルストーン | 状態 |
 |--|--|
 | M1: 基盤固め | ✅ 完了 |
-| M2: 接続 | M2-0/M2-1 完了、**M2-2/M2-3 未着手（🔴 最優先）** |
+| M2: 接続 | ✅ 完了（M2-0〜M2-4 全完了） |
 | M3: 適応的協調 | ✅ 全完了 (M3-1〜M3-8) |
 | M4: 自律 | ✅ 完了 (M4-1, M4-2) |
-| M5: 運用品質 | 🔄 M5-1/M5-3 完了、M5-2/M5-4〜M5-6 未着手 |
-
-> **既知の制約**: 各コンポーネントはユニットテストレベルで完成しているが、エージェント間のE2E統合パス（Beekeeper→Queen Bee→Worker Bee）は未接続。詳細は [docs/DEVELOPMENT_PLAN_v2.md §4](docs/DEVELOPMENT_PLAN_v2.md) を参照。
+| M5: 運用品質 | 🔄 M5-1/M5-2基盤/M5-3 完了、M5-4〜M5-6 未着手 |
 
 詳細: [docs/DEVELOPMENT_PLAN_v2.md](docs/DEVELOPMENT_PLAN_v2.md)
 
@@ -156,7 +154,7 @@ hiveforge serve
 ```
 src/hiveforge/
 ├── core/              # コア基盤（イベント、AR、状態機械）
-│   ├── events/        #   61 EventType (パッケージ化済)
+│   ├── events/        #   95 EventType (パッケージ化済)
 │   ├── ar/            #   Akashic Record (JSONL永続化)
 │   ├── state/         #   5状態機械
 │   ├── honeycomb/     #   実行履歴・学習基盤 (M3-1)
@@ -194,6 +192,8 @@ Vault/                 # イベントログ (gitignore)
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | **今どうなっている** | 実装の現況・コンポーネント構成 |
 | [docs/DEVELOPMENT_PLAN_v2.md](docs/DEVELOPMENT_PLAN_v2.md) | **次に何をする** | 開発計画・マイルストーン |
 | [docs/QUICKSTART.md](docs/QUICKSTART.md) | 手順 | 動作確認手順書 |
+| [docs/GIT_WORKFLOW.md](docs/GIT_WORKFLOW.md) | 規約 | Gitブランチ戦略・Worktree運用 |
+| [docs/VLM_TESTER.md](docs/VLM_TESTER.md) | 手順 | VLM Testerの使い方・E2Eテスト |
 
 > ドキュメント間の不整合を防ぐため、各情報に**正規の記載場所**を定めています。
 > 状態機械・イベント型・プロトコルの定義は v5-hive-design.md を正とし、他のドキュメントは参照リンクで接続します。
