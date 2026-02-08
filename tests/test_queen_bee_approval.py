@@ -122,9 +122,7 @@ class TestCheckApproval:
     def test_read_only_no_approval(self, gate):
         """READ_ONLYプランはどのTrustLevelでも承認不要"""
         # Arrange
-        plan = TaskPlan(
-            tasks=[PlannedTask(task_id="t1", goal="コードの分析と調査")]
-        )
+        plan = TaskPlan(tasks=[PlannedTask(task_id="t1", goal="コードの分析と調査")])
 
         # Act
         request = gate.check_approval(plan, TrustLevel.REPORT_ONLY, "テスト")
@@ -167,9 +165,7 @@ class TestCheckApproval:
     def test_irreversible_requires_approval(self, gate):
         """IRREVERSIBLEプランはLevel 3でも承認必要"""
         # Arrange
-        plan = TaskPlan(
-            tasks=[PlannedTask(task_id="t1", goal="本番DBのデプロイ実行")]
-        )
+        plan = TaskPlan(tasks=[PlannedTask(task_id="t1", goal="本番DBのデプロイ実行")])
 
         # Act
         request = gate.check_approval(plan, TrustLevel.FULL_DELEGATION, "テスト")

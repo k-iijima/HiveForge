@@ -58,9 +58,7 @@ class TaskContext:
         else:
             self.failed_tasks[result.task_id] = result
 
-    def get_predecessor_results(
-        self, depends_on: list[str]
-    ) -> dict[str, TaskResult]:
+    def get_predecessor_results(self, depends_on: list[str]) -> dict[str, TaskResult]:
         """先行タスクの完了結果を取得する
 
         Args:
@@ -69,11 +67,7 @@ class TaskContext:
         Returns:
             完了済み先行タスクの結果（未完了は含まない）
         """
-        return {
-            tid: self.completed_tasks[tid]
-            for tid in depends_on
-            if tid in self.completed_tasks
-        }
+        return {tid: self.completed_tasks[tid] for tid in depends_on if tid in self.completed_tasks}
 
     def build_context_for_task(
         self,

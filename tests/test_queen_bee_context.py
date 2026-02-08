@@ -111,9 +111,7 @@ class TestTaskContext:
         """失敗タスク結果を追加"""
         # Arrange
         ctx = TaskContext(original_goal="テスト", run_id="run-1")
-        result = TaskResult(
-            task_id="t2", goal="API実装", status="failed", error="エラー"
-        )
+        result = TaskResult(task_id="t2", goal="API実装", status="failed", error="エラー")
 
         # Act
         ctx.add_result(result)
@@ -156,9 +154,7 @@ class TestTaskContext:
         """一部のみ完了している場合は完了分のみ返す"""
         # Arrange
         ctx = TaskContext(original_goal="テスト", run_id="run-1")
-        ctx.add_result(
-            TaskResult(task_id="t1", goal="DB設計", status="completed", output="完了")
-        )
+        ctx.add_result(TaskResult(task_id="t1", goal="DB設計", status="completed", output="完了"))
 
         # Act: t1は完了、t2は未完了
         predecessors = ctx.get_predecessor_results(["t1", "t2"])
@@ -201,9 +197,7 @@ class TestTaskContext:
         ctx = TaskContext(original_goal="テスト", run_id="run-1")
 
         # Act
-        task_ctx = ctx.build_context_for_task(
-            task_id="t1", goal="独立タスク", depends_on=[]
-        )
+        task_ctx = ctx.build_context_for_task(task_id="t1", goal="独立タスク", depends_on=[])
 
         # Assert
         assert task_ctx["predecessor_results"] == {}
@@ -212,12 +206,8 @@ class TestTaskContext:
         """コンテキストのサマリーを取得"""
         # Arrange
         ctx = TaskContext(original_goal="テスト", run_id="run-1")
-        ctx.add_result(
-            TaskResult(task_id="t1", goal="タスク1", status="completed", output="OK")
-        )
-        ctx.add_result(
-            TaskResult(task_id="t2", goal="タスク2", status="failed", error="NG")
-        )
+        ctx.add_result(TaskResult(task_id="t1", goal="タスク1", status="completed", output="OK"))
+        ctx.add_result(TaskResult(task_id="t2", goal="タスク2", status="failed", error="NG"))
 
         # Act
         summary = ctx.summary()
