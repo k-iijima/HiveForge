@@ -27,6 +27,7 @@ from .handlers import (
     ColonyHandlers,
     ConferenceHandlers,
     DecisionHandlers,
+    GitHubHandlers,
     GuardBeeHandlers,
     HiveHandlers,
     InterventionHandlers,
@@ -72,6 +73,7 @@ class HiveForgeMCPServer:
         self._conference_handlers = ConferenceHandlers(self)
         self._intervention_handlers = InterventionHandlers(self)
         self._guard_bee_handlers = GuardBeeHandlers(self)
+        self._github_handlers = GitHubHandlers(self)
 
         self._setup_handlers()
 
@@ -196,6 +198,11 @@ class HiveForgeMCPServer:
             return await self._guard_bee_handlers.handle_verify_colony(arguments)
         elif name == "get_guard_report":
             return await self._guard_bee_handlers.handle_get_guard_report(arguments)
+        # GitHub Projection関連
+        elif name == "sync_run_to_github":
+            return await self._github_handlers.handle_sync_run_to_github(arguments)
+        elif name == "get_github_sync_status":
+            return await self._github_handlers.handle_get_github_sync_status(arguments)
         # Beekeeper関連（@hiveforge Chat Participant 経由）
         elif name == "send_message":
             beekeeper = self._get_beekeeper()

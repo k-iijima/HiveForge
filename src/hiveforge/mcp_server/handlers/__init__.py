@@ -6,6 +6,7 @@ MCPツールのハンドラー実装を機能別に分割。
 from .colony import ColonyHandlers
 from .conference import ConferenceHandlers
 from .decision import DecisionHandlers
+from .github import GitHubHandlers
 from .guard_bee import GuardBeeHandlers
 from .hive import HiveHandlers
 from .intervention import InterventionHandlers
@@ -18,6 +19,7 @@ __all__ = [
     "HiveHandlers",
     "ColonyHandlers",
     "ConferenceHandlers",
+    "GitHubHandlers",
     "GuardBeeHandlers",
     "InterventionHandlers",
     "RunHandlers",
