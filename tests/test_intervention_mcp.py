@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from hiveforge.core import AkashicRecord
 from hiveforge.core.intervention import InterventionStore
 from hiveforge.mcp_server.handlers.intervention import InterventionHandlers
 
@@ -19,6 +20,16 @@ def handlers():
     mock_server = MagicMock()
     store = InterventionStore(base_path=tempfile.mkdtemp())
     return InterventionHandlers(mock_server, store=store)
+
+
+@pytest.fixture
+def handlers_with_ar(tmp_path):
+    """AR永続化検証用のInterventionHandlers"""
+    ar = AkashicRecord(vault_path=tmp_path)
+    mock_server = MagicMock()
+    mock_server._get_ar.return_value = ar
+    store = InterventionStore(base_path=tmp_path)
+    return InterventionHandlers(mock_server, store=store), ar
 
 
 class TestUserInterveneMCP:
@@ -391,3 +402,108 @@ class TestGetEscalationMCP:
 
         # Assert
         assert "error" in result
+
+
+class TestInterventionARPersistence:
+    """Intervention系イベントのAR永続化テスト
+
+    全てのInterventionイベントがAkashic Recordに永続化され、
+    replay() で復元可能であることを検証する。
+    """
+
+    @pytest.mark.asyncio
+    async def test_user_intervene_persists_to_ar(self, handlers_with_ar):
+        """ユーザー直接介入イベントがARに永続化される
+
+        InterventionStoreだけでなく、ARのイベントチェーンにも
+        記録されることで因果リンクの構築が可能になる。
+        """
+        # Arrange
+        handlers, ar = handlers_with_ar
+
+        # Act: 介入を作成
+        result = await handlers.handle_user_intervene(
+            {
+                "colony_id": "col-001",
+                "instruction": "このアプローチで進めて",
+                "reason": "緊急対応",
+            }
+        )
+
+        # Assert: ARにイベントが永続化されている
+        event_id = result["event_id"]
+        stream_key = f"intervention-col-001"
+        events = list(ar.replay(stream_key))
+        assert len(events) == 1
+        assert events[0].id == event_id
+        assert events[0].type.value == "intervention.user_direct"
+        assert events[0].payload["colony_id"] == "col-001"
+        assert events[0].payload["instruction"] == "このアプローチで進めて"
+
+    @pytest.mark.asyncio
+    async def test_queen_escalate_persists_to_ar(self, handlers_with_ar):
+        """Queen直訴イベントがARに永続化される
+
+        エスカレーションイベントがARに記録されることで、
+        後から問題の因果関係を追跡できる。
+        """
+        # Arrange
+        handlers, ar = handlers_with_ar
+
+        # Act: エスカレーションを作成
+        result = await handlers.handle_queen_escalate(
+            {
+                "colony_id": "col-002",
+                "escalation_type": "resource_shortage",
+                "summary": "リソース不足",
+                "details": "Worker数が足りない",
+            }
+        )
+
+        # Assert: ARにイベントが永続化されている
+        event_id = result["event_id"]
+        stream_key = "intervention-col-002"
+        events = list(ar.replay(stream_key))
+        assert len(events) == 1
+        assert events[0].id == event_id
+        assert events[0].type.value == "intervention.queen_escalation"
+        assert events[0].payload["escalation_type"] == "resource_shortage"
+        assert events[0].payload["summary"] == "リソース不足"
+
+    @pytest.mark.asyncio
+    async def test_beekeeper_feedback_persists_to_ar(self, handlers_with_ar):
+        """BeekeeperフィードバックイベントがARに永続化される
+
+        フィードバックがARに記録されることで、
+        介入→フィードバックの因果チェーンが構築される。
+        """
+        # Arrange: 先に介入を作成（フィードバックの対象として必要）
+        handlers, ar = handlers_with_ar
+
+        intervene_result = await handlers.handle_user_intervene(
+            {
+                "colony_id": "col-003",
+                "instruction": "テスト介入",
+            }
+        )
+        escalation_id = intervene_result["event_id"]
+
+        # Act: フィードバックを作成
+        result = await handlers.handle_beekeeper_feedback(
+            {
+                "escalation_id": escalation_id,
+                "resolution": "対応完了",
+                "lesson_learned": "早期介入が効果的",
+            }
+        )
+
+        # Assert: ARにフィードバックイベントが永続化されている
+        feedback_event_id = result["event_id"]
+        stream_key = f"intervention-col-003"
+        events = list(ar.replay(stream_key))
+        # 介入 + フィードバック の2イベント
+        assert len(events) >= 2
+        feedback_events = [e for e in events if e.id == feedback_event_id]
+        assert len(feedback_events) == 1
+        assert feedback_events[0].type.value == "intervention.beekeeper_feedback"
+        assert feedback_events[0].payload["resolution"] == "対応完了"

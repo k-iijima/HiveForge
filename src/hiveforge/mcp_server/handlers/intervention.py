@@ -76,6 +76,11 @@ class InterventionHandlers(BaseHandler):
             },
         )
 
+        # ARに永続化（因果リンク構築のため）
+        ar = self._get_ar()
+        stream_key = f"intervention-{colony_id}"
+        ar.append(event, stream_key)
+
         record = InterventionRecord(
             event_id=event.id,
             colony_id=colony_id,
@@ -143,6 +148,11 @@ class InterventionHandlers(BaseHandler):
             },
         )
 
+        # ARに永続化（因果リンク構築のため）
+        ar = self._get_ar()
+        stream_key = f"intervention-{colony_id}"
+        ar.append(event, stream_key)
+
         record = EscalationRecord(
             event_id=event.id,
             colony_id=colony_id,
@@ -203,6 +213,13 @@ class InterventionHandlers(BaseHandler):
                 "lesson_learned": lesson_learned,
             },
         )
+
+        # ARに永続化（因果リンク構築のため）
+        # フィードバック対象のcolony_idを取得
+        feedback_colony_id = getattr(target, "colony_id", "unknown")
+        ar = self._get_ar()
+        stream_key = f"intervention-{feedback_colony_id}"
+        ar.append(event, stream_key)
 
         record = FeedbackRecord(
             event_id=event.id,
