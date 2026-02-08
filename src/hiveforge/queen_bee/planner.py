@@ -8,12 +8,16 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from hiveforge.core import generate_event_id
 from hiveforge.llm.client import LLMClient, Message
+
+if TYPE_CHECKING:
+    from hiveforge.guard_bee.models import GuardBeeReport
+    from hiveforge.guard_bee.verifier import GuardBeeVerifier
 
 logger = logging.getLogger(__name__)
 
@@ -185,3 +189,38 @@ class TaskPlanner:
                     task_data["task_id"] = task_data.pop("id")
 
         return TaskPlan.model_validate(data)
+
+    @staticmethod
+    def validate(
+        plan: TaskPlan,
+        original_goal: str,
+        verifier: GuardBeeVerifier,
+        colony_id: str,
+        task_id: str,
+        run_id: str,
+    ) -> GuardBeeReport:
+        """Guard Beeでプラン妥当性を検証する
+
+        PlanStructureRule (L1) と PlanGoalCoverageRule (L2) を適用し、
+        構造的妥当性とゴール品質をチェックする。
+
+        Args:
+            plan: 検証対象のタスク分解計画
+            original_goal: 分解前の元のゴール
+            verifier: GuardBeeVerifier（プラン用ルール構成済み）
+            colony_id: Colony ID
+            task_id: Task ID（親タスク）
+            run_id: Run ID
+
+        Returns:
+            GuardBeeReport（verdict, rule_results 等）
+        """
+        from hiveforge.guard_bee.plan_rules import create_plan_evidence
+
+        evidence = [create_plan_evidence(plan, original_goal)]
+        return verifier.verify(
+            colony_id=colony_id,
+            task_id=task_id,
+            run_id=run_id,
+            evidence=evidence,
+        )

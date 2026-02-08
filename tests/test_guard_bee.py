@@ -52,7 +52,7 @@ class TestEnums:
 
     def test_evidence_type_values(self):
         """EvidenceTypeの全種別"""
-        assert len(EvidenceType) == 7
+        assert len(EvidenceType) == 8
 
 
 # =========================================================================

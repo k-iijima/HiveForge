@@ -11,6 +11,11 @@ from .models import (
     Verdict,
     VerificationLevel,
 )
+from .plan_rules import (
+    PlanGoalCoverageRule,
+    PlanStructureRule,
+    create_plan_evidence,
+)
 from .rules import (
     AllTestsPassRule,
     CoverageThresholdRule,
@@ -30,6 +35,8 @@ __all__ = [
     "GuardBeeReport",
     "GuardBeeVerifier",
     "LintCleanRule",
+    "PlanGoalCoverageRule",
+    "PlanStructureRule",
     "RuleRegistry",
     "RuleResult",
     "AllTestsPassRule",
@@ -37,4 +44,5 @@ __all__ = [
     "Verdict",
     "VerificationLevel",
     "VerificationRule",
+    "create_plan_evidence",
 ]

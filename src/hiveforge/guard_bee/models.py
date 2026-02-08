@@ -47,6 +47,7 @@ class EvidenceType(StrEnum):
     TEST_COVERAGE = "test_coverage"
     TYPE_CHECK = "type_check"
     SECURITY_SCAN = "security_scan"
+    PLAN_DECOMPOSITION = "plan_decomposition"
     CUSTOM = "custom"
 
 
