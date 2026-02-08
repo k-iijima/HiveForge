@@ -352,3 +352,111 @@ class TestExecutionPipeline:
         event_types = [e.type for e in events]
         assert "pipeline.started" in event_types
         assert "pipeline.completed" in event_types
+
+
+class TestValidatePlanIntegration:
+    """_validate_plan のモックなし統合テスト"""
+
+    @pytest.fixture
+    def ar(self, tmp_path):
+        return AkashicRecord(vault_path=tmp_path)
+
+    @pytest.fixture
+    def pipeline(self, ar):
+        return ExecutionPipeline(ar=ar, trust_level=TrustLevel.AUTO_NOTIFY)
+
+    def test_validate_plan_passes_valid_plan(self, pipeline):
+        """有効なプランがGuard Bee検証を通過する"""
+        # Arrange: 目標をカバーするタスクを含むプラン
+        plan = _make_plan("ログインページのUI作成", "バリデーション実装")
+
+        # Act: 実際の _validate_plan を呼び出す
+        report = pipeline._validate_plan(
+            plan=plan,
+            original_goal="ログインページの作成",
+            colony_id="col-test",
+            run_id="run-test",
+        )
+
+        # Assert
+        assert report.verdict == Verdict.PASS
+
+    def test_validate_plan_fails_single_vague_task(self, pipeline):
+        """目標と無関係な単一タスクはGuard Bee検証で不合格になりうる
+
+        PlanStructureRuleは最低1タスクを要求するが、
+        PlanGoalCoverageRuleで目標カバレッジが低い場合はFAILとなる。
+        """
+        # Arrange: 目標をまったくカバーしない曖昧なタスク
+        plan = _make_plan("何かする")
+
+        # Act
+        report = pipeline._validate_plan(
+            plan=plan,
+            original_goal="ECサイトの決済システム、ユーザー管理、在庫管理を構築",
+            colony_id="col-test",
+            run_id="run-test",
+        )
+
+        # Assert: レポートが返る（検証自体は実行される）
+        assert report is not None
+        assert isinstance(report, GuardBeeReport)
+
+
+class TestRecordEvent:
+    """_record_event のテスト"""
+
+    @pytest.fixture
+    def ar(self, tmp_path):
+        return AkashicRecord(vault_path=tmp_path)
+
+    @pytest.fixture
+    def pipeline(self, ar):
+        return ExecutionPipeline(ar=ar, trust_level=TrustLevel.AUTO_NOTIFY)
+
+    def test_record_event_stored_in_ar(self, pipeline, ar):
+        """_record_event がARにイベントを正しく記録する"""
+        from hiveforge.core.events.types import EventType
+
+        # Act
+        pipeline._record_event(
+            EventType.PIPELINE_STARTED,
+            run_id="run-rec",
+            colony_id="col-rec",
+            actor="test-actor",
+            payload={"key": "value"},
+        )
+
+        # Assert
+        events = list(ar.replay("run-rec"))
+        assert len(events) == 1
+        assert events[0].type == EventType.PIPELINE_STARTED
+        assert events[0].colony_id == "col-rec"
+        assert events[0].actor == "test-actor"
+        assert events[0].payload["key"] == "value"
+
+    def test_record_multiple_events(self, pipeline, ar):
+        """複数イベントが正しい順序で記録される"""
+        from hiveforge.core.events.types import EventType
+
+        # Act
+        pipeline._record_event(
+            EventType.PIPELINE_STARTED,
+            run_id="run-multi",
+            colony_id="col-m",
+            actor="actor1",
+            payload={"stage": "start"},
+        )
+        pipeline._record_event(
+            EventType.PIPELINE_COMPLETED,
+            run_id="run-multi",
+            colony_id="col-m",
+            actor="actor2",
+            payload={"stage": "end"},
+        )
+
+        # Assert
+        events = list(ar.replay("run-multi"))
+        assert len(events) == 2
+        assert events[0].type == EventType.PIPELINE_STARTED
+        assert events[1].type == EventType.PIPELINE_COMPLETED

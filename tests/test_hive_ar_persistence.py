@@ -759,9 +759,7 @@ class TestFindLastHashEdgeCases:
         # Assert: 正常な行がないので None
         assert last_hash is None
 
-    def test_large_file_with_corrupted_tail_triggers_chunk_doubling(
-        self, tmp_path: Path
-    ) -> None:
+    def test_large_file_with_corrupted_tail_triggers_chunk_doubling(self, tmp_path: Path) -> None:
         """8KB超のファイルで末尾が壊れていると、chunk_size倍増→breakが発生する
 
         while ループ内で parse_event が失敗して break し、
@@ -799,9 +797,7 @@ class TestFindLastHashEdgeCases:
         # Assert: フォールバックで正常行のハッシュが取得される
         assert last_hash is not None
 
-    def test_utf8_continuation_bytes_at_chunk_boundary(
-        self, tmp_path: Path
-    ) -> None:
+    def test_utf8_continuation_bytes_at_chunk_boundary(self, tmp_path: Path) -> None:
         """チャンク境界にUTF-8継続バイトがある場合、先頭バイトをスキップする
 
         chunk読み込み時にマルチバイト文字の途中から始まった場合、
