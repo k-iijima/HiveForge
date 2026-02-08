@@ -747,6 +747,204 @@ class TestForagerExplorer:
         assert results == []
 
 
+# ==================== S-03: ForagerExplorer LLM統合テスト ====================
+
+
+class TestForagerExplorerLLMIntegration:
+    """ForagerExplorer._run_single のLLM統合テスト
+
+    S-03: _run_single()がAgentRunnerを使って実際のシナリオ実行を行えることを検証。
+    """
+
+    def _make_scenario(
+        self,
+        scenario_id: str = "sc-001",
+        title: str = "テストシナリオ",
+        steps: list[str] | None = None,
+    ) -> Scenario:
+        """テスト用シナリオを作成"""
+        return Scenario(
+            scenario_id=scenario_id,
+            category=ScenarioCategory.NORMAL_CROSS,
+            title=title,
+            description="テスト用",
+            target_nodes=["a.py"],
+            steps=steps or ["ステップ1: aを実行", "ステップ2: bを確認"],
+        )
+
+    def test_create_explorer_with_runner(self):
+        """AgentRunner付きでExplorerを作成できる"""
+        from unittest.mock import AsyncMock
+
+        # Arrange
+        mock_runner = AsyncMock()
+
+        # Act
+        explorer = ForagerExplorer(agent_runner=mock_runner)
+
+        # Assert
+        assert explorer.agent_runner is mock_runner
+
+    def test_create_explorer_without_runner(self):
+        """AgentRunnerなしで作成した場合はNone"""
+        # Act
+        explorer = ForagerExplorer()
+
+        # Assert
+        assert explorer.agent_runner is None
+
+    @pytest.mark.asyncio
+    async def test_run_single_with_llm_success(self):
+        """LLM実行成功時: passed=True, detailsにLLM出力を含む"""
+        from unittest.mock import AsyncMock, MagicMock
+
+        # Arrange
+        mock_runner = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.success = True
+        mock_result.output = "全ステップ正常に完了しました"
+        mock_result.tool_calls_made = 3
+        mock_result.error = None
+        mock_runner.run.return_value = mock_result
+
+        explorer = ForagerExplorer(agent_runner=mock_runner)
+        scenario = self._make_scenario()
+
+        # Act
+        result = await explorer._run_single(scenario)
+
+        # Assert
+        assert result.passed is True
+        assert "全ステップ正常に完了しました" in result.details
+        assert result.scenario_id == "sc-001"
+        mock_runner.run.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_run_single_with_llm_failure(self):
+        """LLM実行失敗時: passed=False, detailsにエラーを含む"""
+        from unittest.mock import AsyncMock, MagicMock
+
+        # Arrange
+        mock_runner = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.success = False
+        mock_result.output = "ステップ2で失敗"
+        mock_result.tool_calls_made = 1
+        mock_result.error = "アサーション不一致"
+        mock_runner.run.return_value = mock_result
+
+        explorer = ForagerExplorer(agent_runner=mock_runner)
+        scenario = self._make_scenario()
+
+        # Act
+        result = await explorer._run_single(scenario)
+
+        # Assert
+        assert result.passed is False
+        assert "アサーション不一致" in result.details
+        assert result.scenario_id == "sc-001"
+
+    @pytest.mark.asyncio
+    async def test_run_single_llm_exception_returns_failure(self):
+        """LLM実行中に例外が発生した場合: passed=False, detailsにエラー情報"""
+        from unittest.mock import AsyncMock
+
+        # Arrange
+        mock_runner = AsyncMock()
+        mock_runner.run.side_effect = RuntimeError("LLM接続エラー")
+
+        explorer = ForagerExplorer(agent_runner=mock_runner)
+        scenario = self._make_scenario()
+
+        # Act
+        result = await explorer._run_single(scenario)
+
+        # Assert
+        assert result.passed is False
+        assert "LLM接続エラー" in result.details
+        assert result.scenario_id == "sc-001"
+
+    @pytest.mark.asyncio
+    async def test_run_single_without_runner_fallback(self):
+        """AgentRunnerなしの場合はスタブ動作（後方互換）"""
+        # Arrange
+        explorer = ForagerExplorer()  # runner なし
+        scenario = self._make_scenario(steps=["step1", "step2", "step3"])
+
+        # Act
+        result = await explorer._run_single(scenario)
+
+        # Assert: スタブの基本保証
+        assert result.passed is True
+        assert result.scenario_id == "sc-001"
+        assert "3 steps" in result.details
+
+    @pytest.mark.asyncio
+    async def test_run_single_builds_prompt_from_scenario(self):
+        """LLM呼び出し時にシナリオ情報がプロンプトに含まれる"""
+        from unittest.mock import AsyncMock, MagicMock
+
+        # Arrange
+        mock_runner = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.success = True
+        mock_result.output = "OK"
+        mock_result.tool_calls_made = 0
+        mock_result.error = None
+        mock_runner.run.return_value = mock_result
+
+        explorer = ForagerExplorer(agent_runner=mock_runner)
+        scenario = self._make_scenario(
+            title="境界値テスト",
+            steps=["空リストを渡す", "例外が発生しないことを確認"],
+        )
+
+        # Act
+        await explorer._run_single(scenario)
+
+        # Assert: runner.run に渡されたプロンプトにシナリオ情報が含まれる
+        call_args = mock_runner.run.call_args
+        prompt = call_args[0][0] if call_args[0] else call_args[1].get("user_message", "")
+        assert "境界値テスト" in prompt
+        assert "空リストを渡す" in prompt
+
+    @pytest.mark.asyncio
+    async def test_run_scenarios_with_runner(self):
+        """複数シナリオをLLMで実行"""
+        from unittest.mock import AsyncMock, MagicMock
+
+        # Arrange: 2件中1件成功、1件失敗
+        mock_runner = AsyncMock()
+        success_result = MagicMock()
+        success_result.success = True
+        success_result.output = "OK"
+        success_result.tool_calls_made = 0
+        success_result.error = None
+
+        failure_result = MagicMock()
+        failure_result.success = False
+        failure_result.output = "NG"
+        failure_result.tool_calls_made = 1
+        failure_result.error = "テスト失敗"
+
+        mock_runner.run.side_effect = [success_result, failure_result]
+
+        explorer = ForagerExplorer(agent_runner=mock_runner)
+        scenarios = [
+            self._make_scenario(scenario_id="sc-001"),
+            self._make_scenario(scenario_id="sc-002"),
+        ]
+
+        # Act
+        results = await explorer.run_scenarios(scenarios)
+
+        # Assert
+        assert len(results) == 2
+        assert results[0].passed is True
+        assert results[1].passed is False
+        assert mock_runner.run.call_count == 2
+
+
 # ==================== M3-4-d: 違和感検知 ====================
 
 
