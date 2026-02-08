@@ -368,7 +368,7 @@ M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)  
 |--------|------|-----------|
 | M5-1a | API認証ミドルウェア（X-API-Key / Bearer Token） | ✅ 完了 |
 | M5-1b | 入力バリデーション強化（MCP + APIルート） | ✅ 完了 |
-| M5-2 | パフォーマンス計測・最適化 | 未着手 |
+| M5-2 | パフォーマンス計測・最適化 | ✅ ベンチマーク基盤完了 |
 | M5-3 | CI/CD強化（3ジョブ分割、カバレッジゲート96%） | ✅ 完了 |
 | M5-4 | KPIダッシュボード（Hive Monitor Webview統合） | 未着手 |
 | M5-5 | サンプルプロジェクト作成 | 未着手 |
@@ -391,6 +391,17 @@ M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)  
 - テスト二重実行を解消
 - `--cov-fail-under=96` でカバレッジゲート強制
 - README.md に CIバッジ追加
+
+#### M5-2 実装詳細
+- `pytest-benchmark>=4.0.0` 導入（`pyproject.toml` dev依存に追加）
+- `tests/test_benchmark.py`: 15件のベンチマーク（compute_hash, parse_event, to_jsonl, AR append/replay, Projection構築, HoneycombStore）
+- ベンチマークは `@pytest.mark.benchmark` で通常テストから分離（`--benchmark-disable` デフォルト）
+- 実行: `pytest tests/test_benchmark.py -m benchmark --benchmark-enable`
+- ベースライン計測値:
+  - parse_event: 4.8μs (209K ops/s)
+  - compute_hash: 8.4μs (119K ops/s)
+  - AR append: 201μs (5K ops/s)
+  - AR replay 1000件: 6.4ms (155 ops/s)
 
 ---
 
