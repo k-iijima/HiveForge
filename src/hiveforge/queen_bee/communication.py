@@ -288,7 +288,4 @@ class ResourceConflict:
             rec_stack.discard(node)
             return False
 
-        return any(
-            colony_id not in visited and _has_cycle(colony_id)
-            for colony_id in colony_ids
-        )
+        return any(colony_id not in visited and _has_cycle(colony_id) for colony_id in colony_ids)

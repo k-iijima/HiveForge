@@ -644,7 +644,8 @@ class TestEpisodeRecorder:
 
         # Act
         episode = recorder.record_run_episode(
-            run_id=run_id, colony_id="colony-1",
+            run_id=run_id,
+            colony_id="colony-1",
         )
 
         # Assert
@@ -662,7 +663,8 @@ class TestEpisodeRecorder:
 
         # Act
         episode = recorder.record_run_episode(
-            run_id=run_id, colony_id="colony-1",
+            run_id=run_id,
+            colony_id="colony-1",
         )
 
         # Assert
@@ -733,7 +735,8 @@ class TestEpisodeRecorder:
 
         # Act
         episode = recorder.record_run_episode(
-            run_id=run_id, colony_id="colony-1",
+            run_id=run_id,
+            colony_id="colony-1",
         )
 
         # Assert
