@@ -1,6 +1,7 @@
 """LLMクライアント
 
-OpenAI/Anthropic APIを統一インターフェースで呼び出す。
+LiteLLM SDK経由で100+プロバイダーを統一インターフェースで呼び出す。
+OpenAI互換のI/Oフォーマットを使用し、プロバイダー間の差異をLiteLLMが吸収する。
 レートリミッター統合済み。
 """
 
@@ -10,21 +11,15 @@ import os
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-import httpx
+import litellm
 
 from ..core.config import LLMConfig, get_settings
 from ..core.rate_limiter import RateLimitConfig, RateLimiter, get_rate_limiter_registry
 
 logger = logging.getLogger(__name__)
 
-# 429リトライ上限
-MAX_429_RETRIES = 3
-
-# 5xx サーバーエラーリトライ上限
-MAX_SERVER_ERROR_RETRIES = 2
-
-# リトライ対象のHTTPステータスコード
-_RETRYABLE_STATUS_CODES = {500, 502, 503, 529}
+# LiteLLMのデバッグログを抑制（必要時に litellm.set_verbose = True へ変更）
+litellm.suppress_debug_info = True
 
 
 @dataclass
@@ -61,18 +56,54 @@ class LLMResponse:
         return len(self.tool_calls) > 0
 
 
+def _build_litellm_model_name(config: LLMConfig) -> str:
+    """LiteLLM用のモデル名を構築する
+
+    LiteLLMは「provider/model」形式でプロバイダーを判別する。
+    既に「/」を含む場合はそのまま使用し、
+    含まない場合はprovider設定から自動的にプレフィックスを付与する。
+
+    Args:
+        config: LLM設定
+
+    Returns:
+        LiteLLM用モデル名（例: "openai/gpt-4o", "ollama_chat/qwen3-coder"）
+    """
+    model = config.model
+
+    # 既にprefix/model形式の場合はそのまま
+    if "/" in model:
+        return model
+
+    # providerに基づいてプレフィックスを付与
+    provider = config.provider
+
+    # openaiはプレフィックスなしでもLiteLLMが認識するが
+    # 明示的にプレフィックスを付与して一貫性を保つ
+    if provider == "openai":
+        return f"openai/{model}"
+
+    # litellm_proxyは特殊: api_base経由でモデル指定するためプレフィックスなし
+    if provider == "litellm_proxy":
+        return model
+
+    return f"{provider}/{model}"
+
+
 class LLMClient:
     """LLMクライアント
 
-    OpenAI/Anthropic APIを統一インターフェースで呼び出す。
+    LiteLLM SDK経由で全プロバイダーを統一インターフェースで呼び出す。
 
     運用上の注意:
         - APIキーは環境変数で管理（config.api_key_env で指定）
-        - キー未設定時は初回API呼び出しで ValueError が発生
-        - 429 (Rate Limit) は最大3回リトライ（Retry-Afterヘッダーに従う）
-        - 5xx (Server Error) は最大2回リトライ（指数バックオフ）
-        - プロバイダー間のフォールバックは未実装（将来対応予定）
+        - Ollamaなどローカルモデルはapi_keyが不要（check_api_keyは常にTrue）
+        - リトライ/フォールバックはLiteLLMの組込み機能で処理
+        - HiveForge独自レートリミッターとの二重保護
     """
+
+    # APIキー不要なプロバイダー
+    _NO_API_KEY_PROVIDERS = {"ollama", "ollama_chat"}
 
     def __init__(
         self,
@@ -87,20 +118,18 @@ class LLMClient:
         """
         self.config = config or get_settings().llm
         self._rate_limiter = rate_limiter
-        self._http_client: httpx.AsyncClient | None = None
 
     def check_api_key(self) -> bool:
         """APIキーが設定されているかチェック（起動時バリデーション用）
 
-        Returns:
-            True: APIキーが設定されている
-            False: APIキーが未設定
+        Ollama等のローカルプロバイダーでは常にTrueを返す。
 
-        Example:
-            client = LLMClient()
-            if not client.check_api_key():
-                logger.warning("LLM APIキーが未設定です")
+        Returns:
+            True: APIキーが設定されている（またはキー不要プロバイダー）
+            False: APIキーが未設定
         """
+        if self.config.provider in self._NO_API_KEY_PROVIDERS:
+            return True
         api_key = os.environ.get(self.config.api_key_env, "")
         return bool(api_key)
 
@@ -122,146 +151,41 @@ class LLMClient:
             self._rate_limiter = await registry.get_limiter(limiter_key, rate_config)
         return self._rate_limiter
 
-    async def _get_client(self) -> httpx.AsyncClient:
-        """HTTPクライアントを取得"""
-        if self._http_client is None:
-            self._http_client = httpx.AsyncClient(timeout=120.0)
-        return self._http_client
-
     async def close(self) -> None:
-        """クライアントを閉じる"""
-        if self._http_client:
-            await self._http_client.aclose()
-            self._http_client = None
+        """クライアントを閉じる（互換性のため保持）"""
+        pass
 
-    async def _request_with_retry(
-        self,
-        url: str,
-        headers: dict[str, str],
-        body: dict[str, Any],
-        provider_name: str,
-    ) -> httpx.Response:
-        """429/5xxリトライ付きHTTPリクエスト
+    def _get_api_key(self) -> str | None:
+        """APIキーを取得
 
-        Args:
-            url: APIエンドポイントURL
-            headers: リクエストヘッダー
-            body: リクエストボディ
-            provider_name: ログ用プロバイダー名
+        Ollama等のローカルプロバイダーではNoneを返す。
 
         Returns:
-            成功したHTTPレスポンス
+            APIキー文字列、またはローカルプロバイダーの場合None
 
         Raises:
-            httpx.HTTPStatusError: リトライ上限超過または非リトライ対象エラー
+            ValueError: クラウドプロバイダーでAPIキーが未設定の場合
         """
-        import asyncio
-
-        client = await self._get_client()
-        server_error_count = 0
-
-        for attempt in range(MAX_429_RETRIES + 1):
-            response = await client.post(url, headers=headers, json=body)
-
-            if response.status_code == 429:
-                retry_after = float(response.headers.get("Retry-After", 60))
-                logger.warning(
-                    "%s 429 レートリミット: retry_after=%.1fs, attempt=%d/%d, model=%s",
-                    provider_name,
-                    retry_after,
-                    attempt + 1,
-                    MAX_429_RETRIES,
-                    self.config.model,
-                )
-                if attempt >= MAX_429_RETRIES:
-                    raise httpx.HTTPStatusError(
-                        f"429リトライ上限超過 ({MAX_429_RETRIES}回)",
-                        request=response.request,
-                        response=response,
-                    )
-                rate_limiter = await self._get_rate_limiter()
-                await rate_limiter.handle_429(retry_after)
-                continue
-
-            if response.status_code in _RETRYABLE_STATUS_CODES:
-                server_error_count += 1
-                if server_error_count > MAX_SERVER_ERROR_RETRIES:
-                    logger.error(
-                        "%s %dエラー: リトライ上限超過 (%d回), model=%s",
-                        provider_name,
-                        response.status_code,
-                        MAX_SERVER_ERROR_RETRIES,
-                        self.config.model,
-                    )
-                    response.raise_for_status()
-
-                # 指数バックオフ: 1s, 2s
-                backoff = 2 ** (server_error_count - 1)
-                logger.warning(
-                    "%s %dサーバーエラー: %ds後にリトライ, attempt=%d/%d, model=%s",
-                    provider_name,
-                    response.status_code,
-                    backoff,
-                    server_error_count,
-                    MAX_SERVER_ERROR_RETRIES,
-                    self.config.model,
-                )
-                await asyncio.sleep(backoff)
-                continue
-
-            break
-
-        response.raise_for_status()
-        return response
-
-    def _get_api_key(self) -> str:
-        """APIキーを取得"""
+        if self.config.provider in self._NO_API_KEY_PROVIDERS:
+            return None
         api_key = os.environ.get(self.config.api_key_env, "")
         if not api_key:
             raise ValueError(f"環境変数 {self.config.api_key_env} が設定されていません")
         return api_key
 
-    async def chat(
-        self,
-        messages: list[Message],
-        tools: list[dict[str, Any]] | None = None,
-        tool_choice: str | dict[str, Any] | None = None,
-    ) -> LLMResponse:
-        """チャット完了を呼び出す
+    def _build_messages(self, messages: list[Message]) -> list[dict[str, Any]]:
+        """MessageリストをOpenAI互換dict形式に変換
+
+        LiteLLMはOpenAI形式のメッセージを全プロバイダーに自動変換するため、
+        ここではOpenAI形式に統一する。
 
         Args:
-            messages: メッセージリスト
-            tools: ツール定義リスト（OpenAI形式）
-            tool_choice: ツール選択（"auto", "none", {"type": "function", "function": {"name": "..."}})
+            messages: HiveForge内部のMessageリスト
 
         Returns:
-            LLM応答
+            OpenAI互換のメッセージdictリスト
         """
-        # レートリミッターを取得
-        rate_limiter = await self._get_rate_limiter()
-
-        # レート制限を待機
-        await rate_limiter.wait()
-
-        async with await rate_limiter.acquire():
-            if self.config.provider == "openai":
-                return await self._chat_openai(messages, tools, tool_choice)
-            elif self.config.provider == "anthropic":
-                return await self._chat_anthropic(messages, tools, tool_choice)
-            else:
-                raise ValueError(f"未サポートのプロバイダー: {self.config.provider}")
-
-    async def _chat_openai(
-        self,
-        messages: list[Message],
-        tools: list[dict[str, Any]] | None,
-        tool_choice: str | dict[str, Any] | None,
-    ) -> LLMResponse:
-        """OpenAI API呼び出し"""
-        api_key = self._get_api_key()
-
-        # メッセージを変換
-        openai_messages = []
+        result = []
         for msg in messages:
             msg_dict: dict[str, Any] = {"role": msg.role, "content": msg.content}
             if msg.tool_call_id:
@@ -278,161 +202,127 @@ class LLMClient:
                     }
                     for tc in msg.tool_calls
                 ]
-            openai_messages.append(msg_dict)
+            result.append(msg_dict)
+        return result
 
-        # リクエストボディ
-        body: dict[str, Any] = {
-            "model": self.config.model,
-            "messages": openai_messages,
-            "max_tokens": self.config.max_tokens,
-            "temperature": self.config.temperature,
-        }
-        if tools:
-            body["tools"] = tools
-        if tool_choice:
-            body["tool_choice"] = tool_choice
+    def _parse_response(self, response: litellm.ModelResponse) -> LLMResponse:
+        """LiteLLMレスポンスをHiveForge内部形式に変換
 
-        # API呼び出し（429 + 5xxリトライ付き）
-        response = await self._request_with_retry(
-            url="https://api.openai.com/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            body=body,
-            provider_name="OpenAI",
-        )
+        LiteLLMは全プロバイダーの応答をOpenAI互換形式に統一するため、
+        パース処理は1種類で済む。
 
-        data = response.json()
+        Args:
+            response: LiteLLMのModelResponse
 
-        # レスポンスをパース
-        choice = data["choices"][0]
-        message = choice["message"]
+        Returns:
+            HiveForge内部のLLMResponse
+        """
+        choice = response.choices[0]
+        message = choice.message
 
         tool_calls = []
-        if "tool_calls" in message and message["tool_calls"]:
-            for tc in message["tool_calls"]:
+        if message.tool_calls:
+            for tc in message.tool_calls:
+                arguments = tc.function.arguments
+                if isinstance(arguments, str):
+                    arguments = json.loads(arguments)
                 tool_calls.append(
                     ToolCall(
-                        id=tc["id"],
-                        name=tc["function"]["name"],
-                        arguments=json.loads(tc["function"]["arguments"]),
+                        id=tc.id,
+                        name=tc.function.name,
+                        arguments=arguments,
                     )
                 )
 
+        # usageをdict化
+        usage = {}
+        if response.usage:
+            usage = {
+                "prompt_tokens": response.usage.prompt_tokens or 0,
+                "completion_tokens": response.usage.completion_tokens or 0,
+                "total_tokens": response.usage.total_tokens or 0,
+            }
+
         return LLMResponse(
-            content=message.get("content"),
+            content=message.content,
             tool_calls=tool_calls,
-            finish_reason=choice["finish_reason"],
-            usage=data.get("usage", {}),
+            finish_reason=choice.finish_reason or "stop",
+            usage=usage,
         )
 
-    async def _chat_anthropic(
+    async def chat(
         self,
         messages: list[Message],
-        tools: list[dict[str, Any]] | None,
-        tool_choice: str | dict[str, Any] | None,
+        tools: list[dict[str, Any]] | None = None,
+        tool_choice: str | dict[str, Any] | None = None,
     ) -> LLMResponse:
-        """Anthropic API呼び出し"""
-        api_key = self._get_api_key()
+        """チャット完了を呼び出す（LiteLLM SDK経由）
 
-        # システムメッセージを抽出
-        system_content = ""
-        anthropic_messages = []
-        for msg in messages:
-            if msg.role == "system":
-                system_content = msg.content
-            elif msg.role == "tool":
-                # ツール結果をuser roleで送る（Anthropic形式）
-                anthropic_messages.append(
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "tool_result",
-                                "tool_use_id": msg.tool_call_id,
-                                "content": msg.content,
-                            }
-                        ],
-                    }
-                )
-            elif msg.role == "assistant" and msg.tool_calls:
-                # ツール呼び出しを含むassistantメッセージ
-                content = []
-                if msg.content:
-                    content.append({"type": "text", "text": msg.content})
-                for tc in msg.tool_calls:
-                    content.append(
-                        {
-                            "type": "tool_use",
-                            "id": tc.id,
-                            "name": tc.name,
-                            "input": tc.arguments,
-                        }
-                    )
-                anthropic_messages.append({"role": "assistant", "content": content})
-            else:
-                anthropic_messages.append({"role": msg.role, "content": msg.content})
+        全プロバイダーを統一インターフェースで呼び出す。
+        LiteLLMが内部でプロバイダー固有のフォーマット変換を行う。
 
-        # ツールをAnthropic形式に変換
-        anthropic_tools = None
-        if tools:
-            anthropic_tools = []
-            for tool in tools:
-                func = tool.get("function", tool)
-                anthropic_tools.append(
-                    {
-                        "name": func["name"],
-                        "description": func.get("description", ""),
-                        "input_schema": func.get(
-                            "parameters", {"type": "object", "properties": {}}
-                        ),
-                    }
-                )
+        Args:
+            messages: メッセージリスト
+            tools: ツール定義リスト（OpenAI形式）
+            tool_choice: ツール選択（"auto", "none", etc.）
 
-        # リクエストボディ
-        body: dict[str, Any] = {
-            "model": self.config.model,
-            "messages": anthropic_messages,
-            "max_tokens": self.config.max_tokens,
-        }
-        if system_content:
-            body["system"] = system_content
-        if anthropic_tools:
-            body["tools"] = anthropic_tools
+        Returns:
+            LLM応答
+        """
+        # レートリミッターを取得
+        rate_limiter = await self._get_rate_limiter()
 
-        # API呼び出し（429 + 5xxリトライ付き）
-        response = await self._request_with_retry(
-            url="https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": api_key,
-                "anthropic-version": "2023-06-01",
-                "Content-Type": "application/json",
-            },
-            body=body,
-            provider_name="Anthropic",
-        )
+        # レート制限を待機
+        await rate_limiter.wait()
 
-        data = response.json()
+        async with await rate_limiter.acquire():
+            # LiteLLM用モデル名を構築
+            model_name = _build_litellm_model_name(self.config)
 
-        # レスポンスをパース
-        content = ""
-        tool_calls = []
-        for block in data.get("content", []):
-            if block["type"] == "text":
-                content += block["text"]
-            elif block["type"] == "tool_use":
-                tool_calls.append(
-                    ToolCall(
-                        id=block["id"],
-                        name=block["name"],
-                        arguments=block["input"],
-                    )
+            # メッセージをOpenAI互換形式に変換
+            openai_messages = self._build_messages(messages)
+
+            # LiteLLM呼び出しパラメータ
+            kwargs: dict[str, Any] = {
+                "model": model_name,
+                "messages": openai_messages,
+                "max_tokens": self.config.max_tokens,
+                "temperature": self.config.temperature,
+                "num_retries": self.config.num_retries,
+            }
+
+            # APIキー設定（ローカルプロバイダーはスキップ）
+            api_key = self._get_api_key()
+            if api_key:
+                kwargs["api_key"] = api_key
+
+            # カスタムAPIベースURL（Ollama, LiteLLM Proxy等）
+            if self.config.api_base:
+                kwargs["api_base"] = self.config.api_base
+
+            # ツール定義
+            if tools:
+                kwargs["tools"] = tools
+            if tool_choice:
+                kwargs["tool_choice"] = tool_choice
+
+            # フォールバック設定
+            if self.config.fallback_models:
+                kwargs["fallbacks"] = [{"model": m} for m in self.config.fallback_models]
+
+            logger.debug(
+                "LiteLLM呼び出し: model=%s, messages=%d, tools=%s",
+                model_name,
+                len(openai_messages),
+                bool(tools),
+            )
+
+            try:
+                # LiteLLM非同期呼び出し
+                response = await litellm.acompletion(**kwargs)
+            except litellm.exceptions.AuthenticationError:
+                raise ValueError(
+                    f"認証エラー: 環境変数 {self.config.api_key_env} を確認してください"
                 )
 
-        return LLMResponse(
-            content=content if content else None,
-            tool_calls=tool_calls,
-            finish_reason=data.get("stop_reason", "end_turn"),
-            usage=data.get("usage", {}),
-        )
+            return self._parse_response(response)

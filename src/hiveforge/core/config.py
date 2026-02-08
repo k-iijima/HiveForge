@@ -41,15 +41,52 @@ class RateLimitConfig(BaseModel):
     retry_after_429: int = Field(default=60, ge=1, description="429エラー時の待機秒数")
 
 
-class LLMConfig(BaseModel):
-    """LLM設定"""
+# LiteLLM対応プロバイダー一覧
+# 「litellm_proxy」は LiteLLM Proxy 経由でモデルを呼び出す際に使用
+LLM_PROVIDERS = Literal[
+    "openai",
+    "azure",
+    "anthropic",
+    "ollama",
+    "ollama_chat",
+    "bedrock",
+    "vertex_ai",
+    "openrouter",
+    "huggingface",
+    "together_ai",
+    "groq",
+    "deepseek",
+    "litellm_proxy",
+]
 
-    provider: Literal["openai", "azure", "anthropic"] = Field(default="openai")
+
+class LLMConfig(BaseModel):
+    """LLM設定
+
+    LiteLLM SDK経由で100+プロバイダーを統一インターフェースで呼び出す。
+    model名は LiteLLM 形式（例: "openai/gpt-4o", "ollama_chat/qwen3-coder"）を使用。
+    """
+
+    provider: LLM_PROVIDERS = Field(default="openai")
     model: str = Field(default="gpt-4o")
     api_key_env: str = Field(default="OPENAI_API_KEY", description="APIキーの環境変数名")
+    api_base: str | None = Field(
+        default=None,
+        description="カスタムAPIベースURL（Ollama, LiteLLM Proxy等）",
+    )
     max_tokens: int = Field(default=4096, ge=100)
     temperature: float = Field(default=0.2, ge=0.0, le=2.0)
     rate_limit: RateLimitConfig = Field(default_factory=RateLimitConfig)
+    num_retries: int = Field(
+        default=3,
+        ge=0,
+        le=10,
+        description="LiteLLM APIリトライ回数",
+    )
+    fallback_models: list[str] = Field(
+        default_factory=list,
+        description="フォールバックモデルリスト（例: ['anthropic/claude-3-haiku-20240307']）",
+    )
 
 
 class AgentLLMConfig(BaseModel):
@@ -59,7 +96,7 @@ class AgentLLMConfig(BaseModel):
     未設定の場合はグローバルのllm設定を使用する。
     """
 
-    provider: Literal["openai", "azure", "anthropic"] | None = Field(
+    provider: LLM_PROVIDERS | None = Field(
         default=None, description="LLMプロバイダー（未設定時はグローバル設定を使用）"
     )
     model: str | None = Field(
@@ -67,6 +104,9 @@ class AgentLLMConfig(BaseModel):
     )
     api_key_env: str | None = Field(
         default=None, description="APIキー環境変数名（未設定時はグローバル設定を使用）"
+    )
+    api_base: str | None = Field(
+        default=None, description="カスタムAPIベースURL（未設定時はグローバル設定を使用）"
     )
     max_tokens: int | None = Field(
         default=None, ge=100, description="最大トークン数（未設定時はグローバル設定を使用）"
@@ -76,6 +116,12 @@ class AgentLLMConfig(BaseModel):
     )
     rate_limit: RateLimitConfig | None = Field(
         default=None, description="レートリミット設定（未設定時はグローバル設定を使用）"
+    )
+    num_retries: int | None = Field(
+        default=None, ge=0, le=10, description="リトライ回数（未設定時はグローバル設定を使用）"
+    )
+    fallback_models: list[str] | None = Field(
+        default=None, description="フォールバックモデルリスト（未設定時はグローバル設定を使用）"
     )
 
     def merge_with_global(self, global_llm: LLMConfig) -> LLMConfig:
@@ -93,11 +139,18 @@ class AgentLLMConfig(BaseModel):
             api_key_env=self.api_key_env
             if self.api_key_env is not None
             else global_llm.api_key_env,
+            api_base=self.api_base if self.api_base is not None else global_llm.api_base,
             max_tokens=self.max_tokens if self.max_tokens is not None else global_llm.max_tokens,
             temperature=self.temperature
             if self.temperature is not None
             else global_llm.temperature,
             rate_limit=self.rate_limit if self.rate_limit is not None else global_llm.rate_limit,
+            num_retries=self.num_retries
+            if self.num_retries is not None
+            else global_llm.num_retries,
+            fallback_models=self.fallback_models
+            if self.fallback_models is not None
+            else global_llm.fallback_models,
         )
 
 

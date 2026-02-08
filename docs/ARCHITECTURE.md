@@ -300,8 +300,8 @@ hiveforge/
 │   ├── models.py         # WaggleDanceSchema等
 │   ├── validator.py      # Pydanticスキーマ検証
 │   └── recorder.py       # ARイベント記録
-├── llm/                   # LLM統合（coreに依存）
-│   ├── client.py         # LLMクライアント
+├── llm/                   # LLM統合（coreに依存、LiteLLM SDK経由）
+│   ├── client.py         # LLMクライアント（LiteLLM acompletion）
 │   ├── runner.py         # AgentRunner
 │   ├── tools.py          # LLMツール
 │   ├── prompts.py        # プロンプト取得
@@ -852,8 +852,8 @@ HiveForge/
 │   │   ├── models.py        # WaggleDanceSchema等
 │   │   ├── validator.py     # Pydanticスキーマ検証
 │   │   └── recorder.py      # ARイベント記録
-│   ├── llm/                 # LLM統合
-│   │   ├── client.py        # LLMクライアント
+│   ├── llm/                 # LLM統合（LiteLLM SDK経由）
+│   │   ├── client.py        # LLMクライアント（LiteLLM acompletion）
 │   │   ├── runner.py        # AgentRunner
 │   │   ├── tools.py         # LLMツール
 │   │   ├── prompts.py       # プロンプト取得
@@ -967,11 +967,14 @@ governance:
   archive_after_days: 7       # アーカイブ日数
 
 llm:
-  provider: "openai"
-  model: "gpt-4o"
-  api_key_env: "OPENAI_API_KEY"
+  provider: "openai"              # LiteLLM対応プロバイダー
+  model: "gpt-4o"                 #   openai, anthropic, ollama, ollama_chat,
+  api_key_env: "OPENAI_API_KEY"   #   groq, deepseek, litellm_proxy 等
   max_tokens: 4096
   temperature: 0.2
+  # api_base: ""                  # Ollama/Proxy用カスタムエンドポイント
+  # num_retries: 3                # LiteLLMリトライ回数
+  # fallback_models: []           # フォールバック先
 
 auth:
   enabled: false              # API認証（POCでは無効）
@@ -992,7 +995,9 @@ logging:
 |--------|------|------------|
 | `HIVEFORGE_VAULT_PATH` | Vaultディレクトリパス | `./Vault` |
 | `OPENAI_API_KEY` | OpenAI APIキー | - |
+| `ANTHROPIC_API_KEY` | Anthropic APIキー（Anthropic使用時） | - |
 | `HIVEFORGE_API_KEY` | HiveForge API認証キー | - |
+| `LITELLM_PROXY_KEY` | LiteLLM Proxy認証キー（Proxy使用時） | - |
 
 ---
 

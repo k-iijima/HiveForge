@@ -30,13 +30,19 @@ governance:
 # -----------------------------------------------------------------------------
 # LLM設定
 # 使用するLLMプロバイダーとモデル
+# LiteLLM SDK経由で100+プロバイダーを統一インターフェースで呼び出す
+# サポートプロバイダー: openai, azure, anthropic, ollama, ollama_chat,
+#   bedrock, vertex_ai, openrouter, huggingface, together_ai, groq, deepseek, litellm_proxy
 # -----------------------------------------------------------------------------
 llm:
-  provider: "openai"              # openai | azure | anthropic
+  provider: "openai"              # プロバイダー名（上記リストから選択）
   model: "gpt-4o"                 # 使用モデル名
   api_key_env: "OPENAI_API_KEY"   # APIキーを格納する環境変数名
   max_tokens: 4096                # 最大トークン数
   temperature: 0.2                # 生成温度（0.0-2.0、低いほど決定的）
+  # api_base: ""                  # カスタムAPIエンドポイント（Ollama, LiteLLM Proxy等）
+  # num_retries: 3                # LiteLLMリトライ回数（429/5xx時）
+  # fallback_models: []           # フォールバック先モデル（例: ["anthropic/claude-3-haiku-20240307"]）
   
   # レートリミット設定
   rate_limit:
@@ -46,6 +52,24 @@ llm:
     max_concurrent: 10            # 最大同時リクエスト数
     burst_limit: 10               # バースト許容数（瞬間的に許容するリクエスト数）
     retry_after_429: 60           # 429エラー時のデフォルト待機秒数
+
+# --- Ollama（ローカルLLM）設定例 ---
+# llm:
+#   provider: "ollama_chat"         # Ollama chat API（ツール呼び出し対応）
+#   model: "qwen3-coder"            # Ollamaにインストール済みのモデル名
+#   api_base: "http://localhost:11434"  # OllamaサーバーURL
+#   max_tokens: 4096
+#   temperature: 0.2
+#   # api_key_env は不要（ローカルモデルのため）
+#   # num_retries: 3
+
+# --- LiteLLM Proxy設定例 ---
+# llm:
+#   provider: "litellm_proxy"       # LiteLLM Proxyサーバー経由
+#   model: "my-custom-model"        # Proxyに登録済みのモデル名
+#   api_base: "http://litellm-proxy:4000"  # ProxyサーバーURL
+#   api_key_env: "LITELLM_PROXY_KEY"
+#   max_tokens: 4096
 
 # -----------------------------------------------------------------------------
 # 認証設定
@@ -115,6 +139,8 @@ agents:
     #   provider: "openai"            # グローバル設定を上書きする場合のみ指定
     #   model: "gpt-4o"               # 高性能モデルで複雑な調整を担当
     #   temperature: 0.3              # やや創造的な応答
+    #   api_base: ""                  # カスタムAPIエンドポイント
+    #   num_retries: 3                # リトライ回数
 
   # ---------------------------------------------------------------------------
   # Queen Bee（女王蜂）
@@ -132,6 +158,7 @@ agents:
     # llm:                            # Queen Bee専用LLM設定（オプション）
     #   provider: "openai"
     #   model: "gpt-4o-mini"          # 高速・低コストモデルでタスク分解
+    #   api_base: ""                  # カスタムAPIエンドポイント
 
   # ---------------------------------------------------------------------------
   # Worker Bee（働き蜂）
@@ -153,6 +180,9 @@ agents:
     #   provider: "anthropic"         # 異なるプロバイダーも使用可能
     #   model: "claude-3-5-sonnet"
     #   api_key_env: "ANTHROPIC_API_KEY"
+    #   api_base: ""                  # カスタムAPIエンドポイント
+    #   fallback_models:              # フォールバック先
+    #     - "openai/gpt-4o-mini"
 
 # =============================================================================
 # Sentinel Hornet設定（M2-0追加）

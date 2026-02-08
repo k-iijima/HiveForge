@@ -138,6 +138,26 @@ M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)  
 | M2-3-a | Copilot Chat の `@hiveforge` → Beekeeper直結 | ⬜ 未着手 |
 | M2-3-b | MCP経由のHive/Colony操作がAR永続化 | ✅ 完了 |
 
+#### M2-4: LiteLLM統合（LLM統一インターフェース） ✅ 完了
+
+| タスク | 内容 | 状態 |
+|--------|------|------|
+| M2-4-a | LLMClient→LiteLLM SDK移行（client.py書換え） | ✅ 完了 |
+| M2-4-b | config拡張（13プロバイダー対応、api_base/fallback/num_retries） | ✅ 完了 |
+| M2-4-c | テスト書換え（litellm.acompletion モック化） | ✅ 完了 |
+| M2-4-d | hiveforge.config.yaml/ドキュメント更新 | ✅ 完了 |
+
+**変更内容**:
+- LLMClientをhttpx直接呼出しからLiteLLM SDK (`litellm.acompletion`) に全面移行
+- OpenAI/Anthropic個別実装を削除し、LiteLLMの統一OpenAI互換I/Oに一本化
+- 依存: `openai` + `anthropic` → `litellm>=1.40.0`（openai/anthropicは推移的依存として残存）
+- 13プロバイダー対応: openai, azure, anthropic, ollama, ollama_chat, bedrock, vertex_ai, openrouter, huggingface, together_ai, groq, deepseek, litellm_proxy
+- ローカル開発: Ollama + Qwen3-Coder-Next でコスト削減可能
+
+**責務分界**:
+- **LiteLLMに委譲**: モデル抽象化、プロバイダー間フォーマット変換、リトライ/フォールバック、コスト追跡
+- **HiveForge保持**: Swarming Protocol、Honeycomb学習、Guard Bee L2、Sentinel Hornet、Waggle Dance、エージェント固有レートリミッター
+
 ---
 
 ### M3: 適応的協調（v1.5コア機能）
@@ -391,7 +411,7 @@ M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)  
 ## 4. 優先順位（2026-02-08 更新）
 
 M1〜M4完了。M5（運用品質）一部着手済み（M5-1/M5-3完了）。
-M2-2 サブタスク全完了、M2-3-b完了。
+M2-2 サブタスク全完了、M2-3-b完了、M2-4（LiteLLM統合）完了。
 
 **レビュー指摘**: M5の残項目（パフォーマンス・KPIダッシュボード等）を進める前に、M2-2/M2-3の統合パスを完成させる必要がある。エージェントチェーンが一気通貫で動作しない限り、M5の運用品質評価は基盤不足。
 
@@ -405,6 +425,7 @@ M2-2 サブタスク全完了、M2-3-b完了。
       │  M5-3 (CI/CD)               ✅ 完了（3ジョブ+カバレッジゲート）
       │  M2-2 (エージェント統合)     ✅ 完了（Beekeeper→Queen→Worker E2E）
       │  M2-3-b (MCP→AR永続化)      ✅ 完了（Intervention系含む全操作永続化）
+      │  M2-4 (LiteLLM統合)         ✅ 完了（100+プロバイダー統一I/O + Ollama対応）
       │
       │  ════════ 最優先: 統合パス確立 ════════
       │  M2-3-a (Copilot↔Beekeeper)  ← 🔴 最優先: @hiveforge → Beekeeper直結
@@ -429,6 +450,7 @@ M2-2 サブタスク全完了、M2-3-b完了。
 > **進捗**:
 > - ✅ M2-2完了: `_ask_user()` 非同期化、Pipeline統合、承認フローE2E、チャットチェーンE2E
 > - ✅ M2-3-b完了: 全MCP操作（Intervention系含む）がAR永続化
+> - ✅ M2-4完了: LiteLLM SDK統合（httpx直接→litellm.acompletion、13プロバイダー対応、Ollama対応）
 > - ⬜ M2-3-a残: Copilot Chat `@hiveforge` → Beekeeper直結
 > - 🔴 M2-1-f未実施 → UIの動作保証なし
 
@@ -526,6 +548,7 @@ M2-2 サブタスク全完了、M2-3-b完了。
 > コードベース全体を精査し、スタブ・暫定実装・仮決め・ハードコード等をすべて列挙。
 > 再開時にどこから手をつけるかが一目でわかることを目的とする。
 > **2026-02-08 更新**: S-01, P-01, P-03, P-04, M-01〜M-03 を解消済みに更新。M4-1/M4-2完了を反映。
+> **2026-02-09 更新**: LiteLLM統合（M2-4）完了。httpx直接呼出し→LiteLLM SDK移行。S-02更新。
 
 ### 8.1 クリティカルスタブ（機能が実質的に動作しない）
 

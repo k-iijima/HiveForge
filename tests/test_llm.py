@@ -1,11 +1,17 @@
 """LLMモジュールのテスト"""
 
 import json
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from hiveforge.llm.client import LLMClient, LLMResponse, Message, ToolCall
+from hiveforge.llm.client import (
+    LLMClient,
+    LLMResponse,
+    Message,
+    ToolCall,
+    _build_litellm_model_name,
+)
 from hiveforge.llm.prompts import WORKER_BEE_SYSTEM, get_system_prompt
 from hiveforge.llm.runner import AgentContext, AgentRunner, RunResult
 from hiveforge.llm.tools import (
@@ -652,8 +658,110 @@ class TestAgentRunnerPromptIntegration:
 # ==================== LLMClient テスト ====================
 
 
+def _make_mock_model_response(
+    content="Hello!",
+    tool_calls=None,
+    finish_reason="stop",
+    prompt_tokens=10,
+    completion_tokens=5,
+):
+    """litellm.ModelResponse互換のモックを生成するヘルパー"""
+    mock_response = MagicMock()
+
+    # choice.message
+    mock_message = MagicMock()
+    mock_message.content = content
+    mock_message.tool_calls = tool_calls
+
+    # choice
+    mock_choice = MagicMock()
+    mock_choice.message = mock_message
+    mock_choice.finish_reason = finish_reason
+
+    mock_response.choices = [mock_choice]
+
+    # usage
+    mock_usage = MagicMock()
+    mock_usage.prompt_tokens = prompt_tokens
+    mock_usage.completion_tokens = completion_tokens
+    mock_usage.total_tokens = prompt_tokens + completion_tokens
+    mock_response.usage = mock_usage
+
+    return mock_response
+
+
+def _make_mock_tool_call(tc_id="tc-1", name="read_file", arguments='{"path": "test.txt"}'):
+    """litellm互換のツール呼び出しモックを生成するヘルパー"""
+    mock_tc = MagicMock()
+    mock_tc.id = tc_id
+    mock_tc.function = MagicMock()
+    mock_tc.function.name = name
+    mock_tc.function.arguments = arguments
+    return mock_tc
+
+
+class TestBuildLiteLLMModelName:
+    """_build_litellm_model_name のテスト"""
+
+    def test_openai_adds_prefix(self):
+        """OpenAIプロバイダーはopenai/プレフィックスを付与"""
+        from hiveforge.core.config import LLMConfig
+
+        config = LLMConfig(provider="openai", model="gpt-4o")
+        assert _build_litellm_model_name(config) == "openai/gpt-4o"
+
+    def test_anthropic_adds_prefix(self):
+        """Anthropicプロバイダーはanthropic/プレフィックスを付与"""
+        from hiveforge.core.config import LLMConfig
+
+        config = LLMConfig(provider="anthropic", model="claude-3-5-sonnet-20241022")
+        assert _build_litellm_model_name(config) == "anthropic/claude-3-5-sonnet-20241022"
+
+    def test_ollama_chat_adds_prefix(self):
+        """Ollama chatプロバイダーはollama_chat/プレフィックスを付与"""
+        from hiveforge.core.config import LLMConfig
+
+        config = LLMConfig(provider="ollama_chat", model="qwen3-coder")
+        assert _build_litellm_model_name(config) == "ollama_chat/qwen3-coder"
+
+    def test_ollama_adds_prefix(self):
+        """Ollamaプロバイダーはollama/プレフィックスを付与"""
+        from hiveforge.core.config import LLMConfig
+
+        config = LLMConfig(provider="ollama", model="llama3.1")
+        assert _build_litellm_model_name(config) == "ollama/llama3.1"
+
+    def test_model_with_existing_prefix_kept(self):
+        """既にprefix/model形式の場合はそのまま"""
+        from hiveforge.core.config import LLMConfig
+
+        config = LLMConfig(provider="openai", model="openai/gpt-4o-mini")
+        assert _build_litellm_model_name(config) == "openai/gpt-4o-mini"
+
+    def test_litellm_proxy_no_prefix(self):
+        """litellm_proxyはプレフィックスを付与しない"""
+        from hiveforge.core.config import LLMConfig
+
+        config = LLMConfig(provider="litellm_proxy", model="my-model")
+        assert _build_litellm_model_name(config) == "my-model"
+
+    def test_groq_adds_prefix(self):
+        """Groqプロバイダーはgroq/プレフィックスを付与"""
+        from hiveforge.core.config import LLMConfig
+
+        config = LLMConfig(provider="groq", model="llama-3.1-70b-versatile")
+        assert _build_litellm_model_name(config) == "groq/llama-3.1-70b-versatile"
+
+    def test_deepseek_adds_prefix(self):
+        """DeepSeekプロバイダーはdeepseek/プレフィックスを付与"""
+        from hiveforge.core.config import LLMConfig
+
+        config = LLMConfig(provider="deepseek", model="deepseek-chat")
+        assert _build_litellm_model_name(config) == "deepseek/deepseek-chat"
+
+
 class TestLLMClient:
-    """LLMClient統合テスト（HTTPモック）"""
+    """LLMClient統合テスト（LiteLLMモック）"""
 
     @pytest.fixture
     def llm_config(self):
@@ -707,499 +815,323 @@ class TestLLMClient:
         with pytest.raises(ValueError, match="TEST_API_KEY"):
             client._get_api_key()
 
-    @pytest.mark.asyncio
-    async def test_close_with_client(self, client):
-        """HTTPクライアントを閉じる"""
-        # Arrange: httpクライアント作成
-        mock_http = AsyncMock()
-        client._http_client = mock_http
+    def test_get_api_key_ollama_returns_none(self, monkeypatch):
+        """Ollamaプロバイダーの場合APIキーはNone"""
+        from hiveforge.core.config import LLMConfig
 
-        # Act
-        await client.close()
-
-        # Assert
-        mock_http.aclose.assert_called_once()
-        assert client._http_client is None
-
-    @pytest.mark.asyncio
-    async def test_close_without_client(self, client):
-        """クライアント未作成時はcloseしても安全"""
         # Arrange
-        assert client._http_client is None
+        config = LLMConfig(provider="ollama", model="llama3.1")
+        client = LLMClient(config=config)
 
-        # Act - 例外が出ないこと
-        await client.close()
+        # Act
+        api_key = client._get_api_key()
 
         # Assert
-        assert client._http_client is None
+        assert api_key is None
 
     @pytest.mark.asyncio
-    async def test_get_client_creates_once(self, client):
-        """HTTPクライアントは1回だけ作成される"""
-        # Act
-        client1 = await client._get_client()
-        client2 = await client._get_client()
-
-        # Assert
-        assert client1 is client2
-
-        # Cleanup
+    async def test_close_is_noop(self, client):
+        """close()は互換性のため存在するが何もしない"""
+        # Act - 例外が出ないこと
         await client.close()
 
     @pytest.mark.asyncio
     async def test_chat_openai(self, client, monkeypatch):
-        """OpenAI APIを正しく呼び出す"""
+        """OpenAI APIをLiteLLM経由で正しく呼び出す"""
         # Arrange
         monkeypatch.setenv("TEST_API_KEY", "sk-test")
+        mock_response = _make_mock_model_response(content="Hello!")
 
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.raise_for_status = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [
-                {
-                    "message": {"content": "Hello!", "role": "assistant"},
-                    "finish_reason": "stop",
-                }
-            ],
-            "usage": {"prompt_tokens": 10, "completion_tokens": 5},
-        }
+        with patch(
+            "hiveforge.llm.client.litellm.acompletion", new_callable=AsyncMock
+        ) as mock_acomp:
+            mock_acomp.return_value = mock_response
 
-        mock_http = AsyncMock()
-        mock_http.post = AsyncMock(return_value=mock_response)
-        client._http_client = mock_http
+            # Act
+            messages = [Message(role="user", content="Hi")]
+            response = await client.chat(messages)
 
-        # Act
-        messages = [Message(role="user", content="Hi")]
-        response = await client.chat(messages)
-
-        # Assert
-        assert response.content == "Hello!"
-        assert response.finish_reason == "stop"
-        assert response.usage == {"prompt_tokens": 10, "completion_tokens": 5}
-        assert response.tool_calls == []
-        mock_http.post.assert_called_once()
-        call_url = mock_http.post.call_args[0][0]
-        assert "openai" in call_url
+            # Assert
+            assert response.content == "Hello!"
+            assert response.finish_reason == "stop"
+            assert response.usage["prompt_tokens"] == 10
+            assert response.usage["completion_tokens"] == 5
+            assert response.tool_calls == []
+            mock_acomp.assert_called_once()
+            call_kwargs = mock_acomp.call_args[1]
+            assert call_kwargs["model"] == "openai/gpt-4o"
+            assert call_kwargs["api_key"] == "sk-test"
 
     @pytest.mark.asyncio
     async def test_chat_openai_with_tool_calls(self, client, monkeypatch):
         """OpenAI APIのツール呼び出しレスポンスをパースできる"""
         # Arrange
         monkeypatch.setenv("TEST_API_KEY", "sk-test")
+        mock_tc = _make_mock_tool_call()
+        mock_response = _make_mock_model_response(
+            content=None, tool_calls=[mock_tc], finish_reason="tool_calls"
+        )
 
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.raise_for_status = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [
-                {
-                    "message": {
-                        "content": None,
-                        "role": "assistant",
-                        "tool_calls": [
-                            {
-                                "id": "tc-1",
-                                "type": "function",
-                                "function": {
-                                    "name": "read_file",
-                                    "arguments": '{"path": "test.txt"}',
-                                },
-                            }
-                        ],
-                    },
-                    "finish_reason": "tool_calls",
-                }
-            ],
-        }
+        with patch(
+            "hiveforge.llm.client.litellm.acompletion", new_callable=AsyncMock
+        ) as mock_acomp:
+            mock_acomp.return_value = mock_response
 
-        mock_http = AsyncMock()
-        mock_http.post = AsyncMock(return_value=mock_response)
-        client._http_client = mock_http
+            # Act
+            messages = [Message(role="user", content="Read test.txt")]
+            response = await client.chat(messages)
 
-        # Act
-        messages = [Message(role="user", content="Read test.txt")]
-        response = await client.chat(messages)
-
-        # Assert
-        assert response.content is None
-        assert len(response.tool_calls) == 1
-        assert response.tool_calls[0].name == "read_file"
-        assert response.tool_calls[0].arguments == {"path": "test.txt"}
-        assert response.has_tool_calls
+            # Assert
+            assert response.content is None
+            assert len(response.tool_calls) == 1
+            assert response.tool_calls[0].name == "read_file"
+            assert response.tool_calls[0].arguments == {"path": "test.txt"}
+            assert response.has_tool_calls
 
     @pytest.mark.asyncio
     async def test_chat_anthropic(self, client, monkeypatch):
-        """Anthropic APIを正しく呼び出す"""
+        """Anthropic APIをLiteLLM経由で正しく呼び出す"""
         # Arrange
         client.config = client.config.model_copy(
-            update={"provider": "anthropic", "api_key_env": "TEST_API_KEY"}
+            update={
+                "provider": "anthropic",
+                "api_key_env": "TEST_API_KEY",
+                "model": "claude-3-5-sonnet-20241022",
+            }
         )
         monkeypatch.setenv("TEST_API_KEY", "sk-ant-test")
+        mock_response = _make_mock_model_response(content="Bonjour!")
 
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.raise_for_status = MagicMock()
-        mock_response.json.return_value = {
-            "content": [{"type": "text", "text": "Bonjour!"}],
-            "stop_reason": "end_turn",
-            "usage": {"input_tokens": 10, "output_tokens": 5},
-        }
+        with patch(
+            "hiveforge.llm.client.litellm.acompletion", new_callable=AsyncMock
+        ) as mock_acomp:
+            mock_acomp.return_value = mock_response
 
-        mock_http = AsyncMock()
-        mock_http.post = AsyncMock(return_value=mock_response)
-        client._http_client = mock_http
+            # Act
+            messages = [
+                Message(role="system", content="You are helpful."),
+                Message(role="user", content="Hi"),
+            ]
+            response = await client.chat(messages)
 
-        # Act
-        messages = [
-            Message(role="system", content="You are helpful."),
-            Message(role="user", content="Hi"),
-        ]
-        response = await client.chat(messages)
-
-        # Assert
-        assert response.content == "Bonjour!"
-        assert response.finish_reason == "end_turn"
-        call_url = mock_http.post.call_args[0][0]
-        assert "anthropic" in call_url
+            # Assert
+            assert response.content == "Bonjour!"
+            call_kwargs = mock_acomp.call_args[1]
+            assert call_kwargs["model"] == "anthropic/claude-3-5-sonnet-20241022"
 
     @pytest.mark.asyncio
     async def test_chat_anthropic_with_tool_calls(self, client, monkeypatch):
         """Anthropic APIのツール呼び出しレスポンスをパースできる"""
         # Arrange
         client.config = client.config.model_copy(
-            update={"provider": "anthropic", "api_key_env": "TEST_API_KEY"}
-        )
-        monkeypatch.setenv("TEST_API_KEY", "sk-ant-test")
-
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.raise_for_status = MagicMock()
-        mock_response.json.return_value = {
-            "content": [
-                {"type": "text", "text": "Let me read that."},
-                {
-                    "type": "tool_use",
-                    "id": "tc-1",
-                    "name": "read_file",
-                    "input": {"path": "test.txt"},
-                },
-            ],
-            "stop_reason": "tool_use",
-        }
-
-        mock_http = AsyncMock()
-        mock_http.post = AsyncMock(return_value=mock_response)
-        client._http_client = mock_http
-
-        # Act
-        messages = [Message(role="user", content="Read test.txt")]
-        response = await client.chat(messages)
-
-        # Assert
-        assert response.content == "Let me read that."
-        assert len(response.tool_calls) == 1
-        assert response.tool_calls[0].name == "read_file"
-
-    @pytest.mark.asyncio
-    async def test_chat_anthropic_tool_result_message(self, client, monkeypatch):
-        """Anthropicでtoolロールメッセージが正しく変換される"""
-        # Arrange
-        client.config = client.config.model_copy(
-            update={"provider": "anthropic", "api_key_env": "TEST_API_KEY"}
-        )
-        monkeypatch.setenv("TEST_API_KEY", "sk-ant-test")
-
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.raise_for_status = MagicMock()
-        mock_response.json.return_value = {
-            "content": [{"type": "text", "text": "Got it."}],
-            "stop_reason": "end_turn",
-        }
-
-        mock_http = AsyncMock()
-        mock_http.post = AsyncMock(return_value=mock_response)
-        client._http_client = mock_http
-
-        # Act: tool結果メッセージを含めて呼び出す
-        messages = [
-            Message(role="user", content="Read file"),
-            Message(
-                role="assistant",
-                content="Reading...",
-                tool_calls=[ToolCall(id="tc-1", name="read_file", arguments={"path": "a.txt"})],
-            ),
-            Message(role="tool", content='{"content": "hello"}', tool_call_id="tc-1"),
-        ]
-        response = await client.chat(messages)
-
-        # Assert
-        assert response.content == "Got it."
-        # リクエストボディを検証
-        call_body = mock_http.post.call_args[1]["json"]
-        # toolメッセージはuserロールに変換される
-        tool_msg = [
-            m
-            for m in call_body["messages"]
-            if m.get("role") == "user" and isinstance(m.get("content"), list)
-        ]
-        assert len(tool_msg) == 1
-
-    @pytest.mark.asyncio
-    async def test_chat_anthropic_with_tools_definition(self, client, monkeypatch):
-        """Anthropicでツール定義が正しく変換される"""
-        # Arrange
-        client.config = client.config.model_copy(
-            update={"provider": "anthropic", "api_key_env": "TEST_API_KEY"}
-        )
-        monkeypatch.setenv("TEST_API_KEY", "sk-ant-test")
-
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.raise_for_status = MagicMock()
-        mock_response.json.return_value = {
-            "content": [{"type": "text", "text": "OK"}],
-            "stop_reason": "end_turn",
-        }
-
-        mock_http = AsyncMock()
-        mock_http.post = AsyncMock(return_value=mock_response)
-        client._http_client = mock_http
-
-        # Act
-        tools = [
-            {
-                "function": {
-                    "name": "test_tool",
-                    "description": "A test tool",
-                    "parameters": {"type": "object", "properties": {"x": {"type": "string"}}},
-                }
+            update={
+                "provider": "anthropic",
+                "api_key_env": "TEST_API_KEY",
+                "model": "claude-3-5-sonnet-20241022",
             }
-        ]
-        await client.chat([Message(role="user", content="Hi")], tools=tools)
-
-        # Assert
-        call_body = mock_http.post.call_args[1]["json"]
-        assert "tools" in call_body
-        assert call_body["tools"][0]["name"] == "test_tool"
-
-    @pytest.mark.asyncio
-    async def test_chat_unsupported_provider(self, client, monkeypatch):
-        """未サポートのプロバイダーでエラー"""
-        # Arrange
-        monkeypatch.setenv("TEST_API_KEY", "sk-test")
-        # providerを無理やり変更（Pydanticバリデーション回避）
-        object.__setattr__(client.config, "provider", "unknown")
-
-        # Act & Assert
-        with pytest.raises(ValueError, match="未サポート"):
-            await client.chat([Message(role="user", content="Hi")])
-
-    @pytest.mark.asyncio
-    async def test_chat_openai_with_tools_and_tool_choice(self, client, monkeypatch):
-        """OpenAI APIにtools/tool_choiceを渡せる"""
-        # Arrange
-        monkeypatch.setenv("TEST_API_KEY", "sk-test")
-
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.raise_for_status = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [
-                {
-                    "message": {"content": "OK", "role": "assistant"},
-                    "finish_reason": "stop",
-                }
-            ],
-        }
-
-        mock_http = AsyncMock()
-        mock_http.post = AsyncMock(return_value=mock_response)
-        client._http_client = mock_http
-
-        # Act
-        tools = [{"function": {"name": "test", "parameters": {}}}]
-        tool_choice = "auto"
-        await client.chat(
-            [Message(role="user", content="Hi")],
-            tools=tools,
-            tool_choice=tool_choice,
+        )
+        monkeypatch.setenv("TEST_API_KEY", "sk-ant-test")
+        mock_tc = _make_mock_tool_call()
+        mock_response = _make_mock_model_response(
+            content="Let me read that.", tool_calls=[mock_tc], finish_reason="tool_use"
         )
 
-        # Assert
-        call_body = mock_http.post.call_args[1]["json"]
-        assert "tools" in call_body
-        assert call_body["tool_choice"] == "auto"
+        with patch(
+            "hiveforge.llm.client.litellm.acompletion", new_callable=AsyncMock
+        ) as mock_acomp:
+            mock_acomp.return_value = mock_response
+
+            # Act
+            messages = [Message(role="user", content="Read test.txt")]
+            response = await client.chat(messages)
+
+            # Assert
+            assert response.content == "Let me read that."
+            assert len(response.tool_calls) == 1
+            assert response.tool_calls[0].name == "read_file"
 
     @pytest.mark.asyncio
-    async def test_chat_openai_message_with_tool_call_id(self, client, monkeypatch):
+    async def test_chat_with_tools_and_tool_choice(self, client, monkeypatch):
+        """tools/tool_choiceパラメータがLiteLLMに渡される"""
+        # Arrange
+        monkeypatch.setenv("TEST_API_KEY", "sk-test")
+        mock_response = _make_mock_model_response(content="OK")
+
+        with patch(
+            "hiveforge.llm.client.litellm.acompletion", new_callable=AsyncMock
+        ) as mock_acomp:
+            mock_acomp.return_value = mock_response
+
+            # Act
+            tools = [{"function": {"name": "test", "parameters": {}}}]
+            tool_choice = "auto"
+            await client.chat(
+                [Message(role="user", content="Hi")],
+                tools=tools,
+                tool_choice=tool_choice,
+            )
+
+            # Assert
+            call_kwargs = mock_acomp.call_args[1]
+            assert call_kwargs["tools"] == tools
+            assert call_kwargs["tool_choice"] == "auto"
+
+    @pytest.mark.asyncio
+    async def test_chat_message_with_tool_call_id(self, client, monkeypatch):
         """tool_call_idを含むメッセージが正しく変換される"""
         # Arrange
         monkeypatch.setenv("TEST_API_KEY", "sk-test")
+        mock_response = _make_mock_model_response(content="Done")
 
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.raise_for_status = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [
-                {
-                    "message": {"content": "Done", "role": "assistant"},
-                    "finish_reason": "stop",
-                }
-            ],
-        }
+        with patch(
+            "hiveforge.llm.client.litellm.acompletion", new_callable=AsyncMock
+        ) as mock_acomp:
+            mock_acomp.return_value = mock_response
 
-        mock_http = AsyncMock()
-        mock_http.post = AsyncMock(return_value=mock_response)
-        client._http_client = mock_http
+            # Act
+            messages = [
+                Message(role="user", content="Do something"),
+                Message(
+                    role="assistant",
+                    content=None,
+                    tool_calls=[ToolCall(id="tc-1", name="test", arguments={"a": 1})],
+                ),
+                Message(role="tool", content="result", tool_call_id="tc-1"),
+            ]
+            await client.chat(messages)
 
-        # Act
-        messages = [
-            Message(role="user", content="Do something"),
-            Message(
-                role="assistant",
-                content=None,
-                tool_calls=[ToolCall(id="tc-1", name="test", arguments={"a": 1})],
-            ),
-            Message(role="tool", content="result", tool_call_id="tc-1"),
-        ]
-        await client.chat(messages)
-
-        # Assert
-        call_body = mock_http.post.call_args[1]["json"]
-        tool_msg = [m for m in call_body["messages"] if m.get("tool_call_id") == "tc-1"]
-        assert len(tool_msg) == 1
+            # Assert
+            call_kwargs = mock_acomp.call_args[1]
+            openai_msgs = call_kwargs["messages"]
+            tool_msg = [m for m in openai_msgs if m.get("tool_call_id") == "tc-1"]
+            assert len(tool_msg) == 1
 
     @pytest.mark.asyncio
-    async def test_chat_openai_429_retry(self, client, mock_rate_limiter, monkeypatch):
-        """OpenAI API 429→レートリミットハンドル→リトライ（L193-197）"""
+    async def test_chat_ollama(self, monkeypatch, mock_rate_limiter):
+        """OllamaプロバイダーをLiteLLM経由で呼び出す（APIキー不要）"""
+        from hiveforge.core.config import LLMConfig
+
+        # Arrange
+        config = LLMConfig(
+            provider="ollama_chat",
+            model="qwen3-coder",
+            api_base="http://localhost:11434",
+            max_tokens=2048,
+        )
+        client = LLMClient(config=config, rate_limiter=mock_rate_limiter)
+        mock_response = _make_mock_model_response(content="Hello from Ollama!")
+
+        with patch(
+            "hiveforge.llm.client.litellm.acompletion", new_callable=AsyncMock
+        ) as mock_acomp:
+            mock_acomp.return_value = mock_response
+
+            # Act
+            messages = [Message(role="user", content="Hi")]
+            response = await client.chat(messages)
+
+            # Assert
+            assert response.content == "Hello from Ollama!"
+            call_kwargs = mock_acomp.call_args[1]
+            assert call_kwargs["model"] == "ollama_chat/qwen3-coder"
+            assert call_kwargs["api_base"] == "http://localhost:11434"
+            assert "api_key" not in call_kwargs
+
+    @pytest.mark.asyncio
+    async def test_chat_litellm_proxy(self, monkeypatch, mock_rate_limiter):
+        """LiteLLM Proxy経由でモデルを呼び出す"""
+        from hiveforge.core.config import LLMConfig
+
+        # Arrange
+        config = LLMConfig(
+            provider="litellm_proxy",
+            model="my-custom-model",
+            api_base="http://litellm-proxy:4000",
+            api_key_env="LITELLM_PROXY_KEY",
+        )
+        client = LLMClient(config=config, rate_limiter=mock_rate_limiter)
+        monkeypatch.setenv("LITELLM_PROXY_KEY", "sk-proxy")
+        mock_response = _make_mock_model_response(content="Proxy response")
+
+        with patch(
+            "hiveforge.llm.client.litellm.acompletion", new_callable=AsyncMock
+        ) as mock_acomp:
+            mock_acomp.return_value = mock_response
+
+            # Act
+            messages = [Message(role="user", content="Hi")]
+            response = await client.chat(messages)
+
+            # Assert
+            assert response.content == "Proxy response"
+            call_kwargs = mock_acomp.call_args[1]
+            assert call_kwargs["model"] == "my-custom-model"
+            assert call_kwargs["api_base"] == "http://litellm-proxy:4000"
+            assert call_kwargs["api_key"] == "sk-proxy"
+
+    @pytest.mark.asyncio
+    async def test_chat_with_fallback_models(self, client, monkeypatch):
+        """フォールバックモデルが設定されている場合にfallbacksパラメータが渡される"""
         # Arrange
         monkeypatch.setenv("TEST_API_KEY", "sk-test")
+        client.config = client.config.model_copy(
+            update={"fallback_models": ["anthropic/claude-3-haiku-20240307"]}
+        )
+        mock_response = _make_mock_model_response(content="OK")
 
-        # 1回目: 429, 2回目: 200
-        mock_429 = MagicMock()
-        mock_429.status_code = 429
-        mock_429.headers = {"Retry-After": "1"}
+        with patch(
+            "hiveforge.llm.client.litellm.acompletion", new_callable=AsyncMock
+        ) as mock_acomp:
+            mock_acomp.return_value = mock_response
 
-        mock_200 = MagicMock()
-        mock_200.status_code = 200
-        mock_200.raise_for_status = MagicMock()
-        mock_200.json.return_value = {
-            "choices": [
-                {
-                    "message": {"content": "OK", "role": "assistant"},
-                    "finish_reason": "stop",
-                }
-            ],
-            "usage": {"prompt_tokens": 5, "completion_tokens": 2},
-        }
+            # Act
+            await client.chat([Message(role="user", content="Hi")])
 
-        mock_http = AsyncMock()
-        mock_http.post = AsyncMock(side_effect=[mock_429, mock_200])
-        client._http_client = mock_http
-
-        # Act
-        messages = [Message(role="user", content="Hi")]
-        response = await client.chat(messages)
-
-        # Assert: 429処理後にリトライして成功
-        assert response.content == "OK"
-        mock_rate_limiter.handle_429.assert_awaited_once_with(1.0)
-        assert mock_http.post.call_count == 2
+            # Assert
+            call_kwargs = mock_acomp.call_args[1]
+            assert "fallbacks" in call_kwargs
+            assert call_kwargs["fallbacks"] == [{"model": "anthropic/claude-3-haiku-20240307"}]
 
     @pytest.mark.asyncio
-    async def test_chat_anthropic_429_retry(self, monkeypatch, mock_rate_limiter):
-        """Anthropic API 429→レートリミットハンドル→リトライ（L311-314）"""
-        from hiveforge.core.config import LLMConfig
+    async def test_chat_authentication_error(self, client, monkeypatch):
+        """LiteLLM認証エラーがValueErrorに変換される"""
+        import litellm
 
         # Arrange
-        config = LLMConfig(
-            provider="anthropic",
-            model="claude-3-5-sonnet-20241022",
-            api_key_env="TEST_API_KEY",
-            max_tokens=1024,
-        )
-        client = LLMClient(config=config, rate_limiter=mock_rate_limiter)
-        monkeypatch.setenv("TEST_API_KEY", "sk-ant-test")
+        monkeypatch.setenv("TEST_API_KEY", "invalid-key")
 
-        # 1回目: 429, 2回目: 200
-        mock_429 = MagicMock()
-        mock_429.status_code = 429
-        mock_429.headers = {"Retry-After": "2"}
+        with patch(
+            "hiveforge.llm.client.litellm.acompletion", new_callable=AsyncMock
+        ) as mock_acomp:
+            mock_acomp.side_effect = litellm.exceptions.AuthenticationError(
+                message="Invalid API key",
+                model="openai/gpt-4o",
+                llm_provider="openai",
+            )
 
-        mock_200 = MagicMock()
-        mock_200.status_code = 200
-        mock_200.raise_for_status = MagicMock()
-        mock_200.json.return_value = {
-            "content": [{"type": "text", "text": "Retried OK"}],
-            "stop_reason": "end_turn",
-            "usage": {"input_tokens": 5, "output_tokens": 2},
-        }
-
-        mock_http = AsyncMock()
-        mock_http.post = AsyncMock(side_effect=[mock_429, mock_200])
-        client._http_client = mock_http
-
-        # Act
-        messages = [Message(role="user", content="Hi")]
-        response = await client.chat(messages)
-
-        # Assert
-        assert response.content == "Retried OK"
-        mock_rate_limiter.handle_429.assert_awaited_once_with(2.0)
-        assert mock_http.post.call_count == 2
+            # Act & Assert
+            with pytest.raises(ValueError, match="認証エラー"):
+                await client.chat([Message(role="user", content="Hi")])
 
     @pytest.mark.asyncio
-    async def test_chat_anthropic_assistant_no_content_with_tool_calls(
-        self, monkeypatch, mock_rate_limiter
-    ):
-        """Anthropic: assistantメッセージのcontent=NoneでもTool呼び出しが送信される（L257->259）"""
-        from hiveforge.core.config import LLMConfig
-
+    async def test_chat_num_retries_passed(self, client, monkeypatch):
+        """num_retriesパラメータがLiteLLMに渡される"""
         # Arrange
-        config = LLMConfig(
-            provider="anthropic",
-            model="claude-3-5-sonnet-20241022",
-            api_key_env="TEST_API_KEY",
-            max_tokens=1024,
-        )
-        client = LLMClient(config=config, rate_limiter=mock_rate_limiter)
-        monkeypatch.setenv("TEST_API_KEY", "sk-ant-test")
+        monkeypatch.setenv("TEST_API_KEY", "sk-test")
+        client.config = client.config.model_copy(update={"num_retries": 5})
+        mock_response = _make_mock_model_response(content="OK")
 
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.raise_for_status = MagicMock()
-        mock_response.json.return_value = {
-            "content": [{"type": "text", "text": "Done"}],
-            "stop_reason": "end_turn",
-            "usage": {"input_tokens": 5, "output_tokens": 2},
-        }
+        with patch(
+            "hiveforge.llm.client.litellm.acompletion", new_callable=AsyncMock
+        ) as mock_acomp:
+            mock_acomp.return_value = mock_response
 
-        mock_http = AsyncMock()
-        mock_http.post = AsyncMock(return_value=mock_response)
-        client._http_client = mock_http
+            # Act
+            await client.chat([Message(role="user", content="Hi")])
 
-        # Act: content=None + tool_callsのassistantメッセージを含む
-        messages = [
-            Message(role="user", content="Call a tool"),
-            Message(
-                role="assistant",
-                content=None,
-                tool_calls=[ToolCall(id="tc-1", name="test_tool", arguments={"x": 1})],
-            ),
-            Message(role="tool", content="tool result", tool_call_id="tc-1"),
-            Message(role="user", content="Continue"),
-        ]
-        await client.chat(messages)
-
-        # Assert: textブロックなし、tool_useブロックのみのassistantメッセージ
-        call_body = mock_http.post.call_args[1]["json"]
-        assistant_msgs = [m for m in call_body["messages"] if m.get("role") == "assistant"]
-        assert len(assistant_msgs) == 1
-        # content=Noneなのでtextブロックは含まれない
-        text_blocks = [b for b in assistant_msgs[0]["content"] if b["type"] == "text"]
-        assert len(text_blocks) == 0
+            # Assert
+            call_kwargs = mock_acomp.call_args[1]
+            assert call_kwargs["num_retries"] == 5
 
     def test_check_api_key_returns_true_when_set(self, client, monkeypatch):
         """APIキーが設定されている場合check_api_keyがTrueを返す"""
@@ -1234,165 +1166,132 @@ class TestLLMClient:
         # Assert
         assert result is False
 
-    @pytest.mark.asyncio
-    async def test_request_with_retry_5xx_retry_then_success(
-        self, client, mock_rate_limiter, monkeypatch
-    ):
-        """5xxエラー時に指数バックオフでリトライし成功する"""
+    def test_check_api_key_ollama_always_true(self):
+        """Ollamaプロバイダーでは常にTrueを返す"""
+        from hiveforge.core.config import LLMConfig
+
         # Arrange
-        monkeypatch.setenv("TEST_API_KEY", "sk-test")
+        config = LLMConfig(provider="ollama", model="llama3")
+        client = LLMClient(config=config)
 
-        mock_500 = MagicMock()
-        mock_500.status_code = 500
-        mock_500.headers = {}
+        # Act & Assert
+        assert client.check_api_key() is True
 
-        mock_200 = MagicMock()
-        mock_200.status_code = 200
-        mock_200.raise_for_status = MagicMock()
-        mock_200.json.return_value = {
-            "choices": [
-                {
-                    "message": {"content": "Recovered", "role": "assistant"},
-                    "finish_reason": "stop",
-                }
-            ],
-        }
+    def test_check_api_key_ollama_chat_always_true(self):
+        """Ollama chatプロバイダーでは常にTrueを返す"""
+        from hiveforge.core.config import LLMConfig
 
-        mock_http = AsyncMock()
-        mock_http.post = AsyncMock(side_effect=[mock_500, mock_200])
-        client._http_client = mock_http
+        # Arrange
+        config = LLMConfig(provider="ollama_chat", model="qwen3-coder")
+        client = LLMClient(config=config)
+
+        # Act & Assert
+        assert client.check_api_key() is True
+
+    @pytest.mark.asyncio
+    async def test_build_messages_basic(self, client):
+        """基本的なメッセージがOpenAI互換形式に変換される"""
+        # Arrange
+        messages = [
+            Message(role="system", content="You are helpful"),
+            Message(role="user", content="Hi"),
+        ]
 
         # Act
-        messages = [Message(role="user", content="Hi")]
-        response = await client.chat(messages)
+        result = client._build_messages(messages)
 
-        # Assert: 5xx後にリトライして成功
-        assert response.content == "Recovered"
-        assert mock_http.post.call_count == 2
+        # Assert
+        assert len(result) == 2
+        assert result[0] == {"role": "system", "content": "You are helpful"}
+        assert result[1] == {"role": "user", "content": "Hi"}
 
     @pytest.mark.asyncio
-    async def test_request_with_retry_5xx_exhaust_retries(
-        self, client, mock_rate_limiter, monkeypatch
-    ):
-        """5xxエラーがリトライ上限を超えるとHTTPStatusErrorが発生する"""
-        import httpx
-
-        from hiveforge.llm.client import MAX_SERVER_ERROR_RETRIES
-
+    async def test_build_messages_with_tool_calls(self, client):
+        """ツール呼び出し付きメッセージが正しく変換される"""
         # Arrange
-        monkeypatch.setenv("TEST_API_KEY", "sk-test")
+        messages = [
+            Message(
+                role="assistant",
+                content=None,
+                tool_calls=[ToolCall(id="tc-1", name="test", arguments={"x": 1})],
+            ),
+        ]
 
-        mock_request = MagicMock()
+        # Act
+        result = client._build_messages(messages)
 
-        def make_5xx():
-            resp = MagicMock()
-            resp.status_code = 503
-            resp.headers = {}
-            resp.request = mock_request
-            resp.raise_for_status.side_effect = httpx.HTTPStatusError(
-                "503 Service Unavailable", request=mock_request, response=resp
-            )
-            return resp
+        # Assert
+        assert len(result) == 1
+        assert result[0]["role"] == "assistant"
+        assert len(result[0]["tool_calls"]) == 1
+        assert result[0]["tool_calls"][0]["function"]["name"] == "test"
 
-        # MAX_SERVER_ERROR_RETRIES + 1回すべて503
-        mock_http = AsyncMock()
-        mock_http.post = AsyncMock(
-            side_effect=[make_5xx() for _ in range(MAX_SERVER_ERROR_RETRIES + 1)]
+    @pytest.mark.asyncio
+    async def test_build_messages_with_tool_result(self, client):
+        """ツール結果メッセージが正しく変換される"""
+        # Arrange
+        messages = [
+            Message(role="tool", content='{"result": "ok"}', tool_call_id="tc-1"),
+        ]
+
+        # Act
+        result = client._build_messages(messages)
+
+        # Assert
+        assert len(result) == 1
+        assert result[0]["role"] == "tool"
+        assert result[0]["tool_call_id"] == "tc-1"
+
+    @pytest.mark.asyncio
+    async def test_parse_response_no_tool_calls(self, client):
+        """ツール呼び出しなしのレスポンスをパースできる"""
+        # Arrange
+        mock_response = _make_mock_model_response(content="OK", finish_reason="stop")
+
+        # Act
+        result = client._parse_response(mock_response)
+
+        # Assert
+        assert result.content == "OK"
+        assert result.tool_calls == []
+        assert result.finish_reason == "stop"
+        assert result.usage["prompt_tokens"] == 10
+
+    @pytest.mark.asyncio
+    async def test_parse_response_with_tool_calls(self, client):
+        """ツール呼び出しありのレスポンスをパースできる"""
+        # Arrange
+        mock_tc = _make_mock_tool_call(
+            tc_id="tc-1", name="read_file", arguments='{"path": "x.txt"}'
         )
-        client._http_client = mock_http
-
-        # Act & Assert
-        with pytest.raises(httpx.HTTPStatusError):
-            messages = [Message(role="user", content="Hi")]
-            await client.chat(messages)
-
-        # リトライ回数 = MAX_SERVER_ERROR_RETRIES + 1（初回 + リトライ回数）
-        assert mock_http.post.call_count == MAX_SERVER_ERROR_RETRIES + 1
-
-    @pytest.mark.asyncio
-    async def test_request_with_retry_429_exhaust_retries(
-        self, client, mock_rate_limiter, monkeypatch
-    ):
-        """429エラーがリトライ上限を超えるとHTTPStatusErrorが発生する"""
-        import httpx
-
-        from hiveforge.llm.client import MAX_429_RETRIES
-
-        # Arrange
-        monkeypatch.setenv("TEST_API_KEY", "sk-test")
-
-        mock_request = MagicMock()
-
-        def make_429():
-            resp = MagicMock()
-            resp.status_code = 429
-            resp.headers = {"Retry-After": "1"}
-            resp.request = mock_request
-            return resp
-
-        # MAX_429_RETRIES + 1回すべて429
-        mock_http = AsyncMock()
-        mock_http.post = AsyncMock(side_effect=[make_429() for _ in range(MAX_429_RETRIES + 1)])
-        client._http_client = mock_http
-
-        # Act & Assert
-        with pytest.raises(httpx.HTTPStatusError, match="429リトライ上限超過"):
-            messages = [Message(role="user", content="Hi")]
-            await client.chat(messages)
-
-        assert mock_http.post.call_count == MAX_429_RETRIES + 1
-
-    @pytest.mark.asyncio
-    async def test_request_with_retry_mixed_429_and_5xx(
-        self, client, mock_rate_limiter, monkeypatch
-    ):
-        """429と5xxが混在してもそれぞれ独立したカウンターでリトライする"""
-        # Arrange
-        monkeypatch.setenv("TEST_API_KEY", "sk-test")
-
-        mock_429 = MagicMock()
-        mock_429.status_code = 429
-        mock_429.headers = {"Retry-After": "1"}
-
-        mock_502 = MagicMock()
-        mock_502.status_code = 502
-        mock_502.headers = {}
-
-        mock_200 = MagicMock()
-        mock_200.status_code = 200
-        mock_200.raise_for_status = MagicMock()
-        mock_200.json.return_value = {
-            "choices": [
-                {
-                    "message": {"content": "Finally OK", "role": "assistant"},
-                    "finish_reason": "stop",
-                }
-            ],
-        }
-
-        # 429 → 502 → 200
-        mock_http = AsyncMock()
-        mock_http.post = AsyncMock(side_effect=[mock_429, mock_502, mock_200])
-        client._http_client = mock_http
+        mock_response = _make_mock_model_response(
+            content=None, tool_calls=[mock_tc], finish_reason="tool_calls"
+        )
 
         # Act
-        messages = [Message(role="user", content="Hi")]
-        response = await client.chat(messages)
+        result = client._parse_response(mock_response)
 
-        # Assert: 429とサーバーエラーを経ても最終的に成功
-        assert response.content == "Finally OK"
-        assert mock_http.post.call_count == 3
-        mock_rate_limiter.handle_429.assert_awaited_once()
+        # Assert
+        assert result.has_tool_calls
+        assert len(result.tool_calls) == 1
+        assert result.tool_calls[0].name == "read_file"
+        assert result.tool_calls[0].arguments == {"path": "x.txt"}
 
     @pytest.mark.asyncio
-    async def test_request_with_retry_retryable_status_codes(
-        self, client, mock_rate_limiter, monkeypatch
-    ):
-        """500, 502, 503, 529がリトライ対象のステータスコードである"""
-        from hiveforge.llm.client import _RETRYABLE_STATUS_CODES
+    async def test_parse_response_arguments_already_dict(self, client):
+        """引数が既にdictの場合もパースできる"""
+        # Arrange
+        mock_tc = _make_mock_tool_call()
+        mock_tc.function.arguments = {"path": "test.txt"}  # dictで渡される場合
+        mock_response = _make_mock_model_response(
+            content=None, tool_calls=[mock_tc], finish_reason="tool_calls"
+        )
 
-        # Assert: リトライ対象のステータスコードが正しく定義されている
-        assert {500, 502, 503, 529} == _RETRYABLE_STATUS_CODES
+        # Act
+        result = client._parse_response(mock_response)
+
+        # Assert
+        assert result.tool_calls[0].arguments == {"path": "test.txt"}
 
 
 # ==================== run_command_handler テスト ====================
