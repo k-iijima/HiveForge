@@ -32,13 +32,13 @@ Hive（プロジェクト）
  │
  ├── Colony: UI/UX
  │    ├── Queen Bee（Colony統括）
- │    ├── Worker Bee: Designer × N案並列
- │    └── Run → Task...
+ │    └── Worker Bee × N（実務エージェント）
+ │         └── Run → Task... （Worker Beeが担当・実行）
  │
  ├── Colony: API
  │    ├── Queen Bee
- │    ├── Worker Bee: Backend × N案並列
- │    └── Run → Task...
+ │    └── Worker Bee × N
+ │         └── Run → Task...
  │
  ├── Forager Bee（探索的テスト・影響分析）
  ├── Referee Bee（多面的採点・自動選抜）
@@ -61,7 +61,7 @@ Worker × N案生成 → Forager探索拡張 → Referee多面的採点 → Guar
 | **Beekeeper** | ユーザーとの対話窓口、複数Hive統括 |
 | **Colony** | 専門領域のエージェント群（UI/UX, API等） |
 | **Queen Bee** | Colonyの統括エージェント |
-| **Worker Bee** | 実務を行う専門エージェント（N案並列生成可） |
+| **Worker Bee** | 実務エージェント。Queen Beeから割り当てられたRunのTaskを実行し、成果物を報告 |
 | **Sentinel Hornet** | Hive内監視・異常検出・強制停止の一体型エージェント |
 | **Guard Bee** | 最終品質ゲート（PASS/CONDITIONAL_PASS/FAIL） |
 | **Forager Bee** | 探索的テスト・変更影響分析・違和感検知 |
@@ -70,8 +70,8 @@ Worker × N案生成 → Forager探索拡張 → Referee多面的採点 → Guar
 | **Swarming Protocol** | タスク適応的Colony編成プロトコル |
 | **Honeycomb** | 実行履歴からの学習基盤 |
 | **Waggle Dance** | エージェント間の構造化通信プロトコル |
-| **Run** | 実行単位（タスクの集合） |
-| **Task** | 個別の作業項目 |
+| **Run** | Colony内の実行単位。Worker Beeが担当し、複数のTaskを含む |
+| **Task** | Run内の個別作業項目。Worker Beeが実行し、成果物と証拠を生成 |
 
 ## 開発ステータス
 
