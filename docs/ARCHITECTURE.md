@@ -1041,6 +1041,25 @@ logging:
 - [ ] イベントアーカイブ
 - [ ] 分散ストレージ対応
 
+### 12.4 Plane分離アーキテクチャ（M5/M6構想）
+
+サンドボックス実行環境により、エージェントの自動化と安全性を両立する。
+詳細は [コンセプト_v6.md §9.4](コンセプト_v6.md) を参照。
+
+- [ ] Step 1: docker compose 最小構成（Plane概念の導入）
+- [ ] Step 2: Worker エフェメラルコンテナ化（Execution Plane分離）
+- [ ] Step 3: Guard Bee / Sentinel Hornet 独立コンテナ化（Safety Plane分離）
+- [ ] Step 4: git worktree 運用基盤（Colony × worktree）
+- [ ] Step 5: 本番オーケストレーション（K8s / ECS）
+
+**Action Class × コンテナ分離**:
+
+| Action Class | 分離レベル |
+|-------------|-----------|
+| Read-only | 共有Runner + git worktree (read-only) |
+| Reversible | スナップショット付きWorkspaceコンテナ |
+| Irreversible | 専用隔離コンテナ + 人間承認必須 |
+
 ---
 
 ## 参照
