@@ -25,7 +25,14 @@ class LineageHandlers(BaseHandler):
             return {"error": "event_id is required"}
 
         direction = args.get("direction", "both")
+        if direction not in ("ancestors", "descendants", "both"):
+            return {
+                "error": f"direction must be one of: ancestors, descendants, both (got '{direction}')"
+            }
+
         max_depth = args.get("max_depth", 10)
+        if not isinstance(max_depth, int) or max_depth < 1 or max_depth > 100:
+            return {"error": "max_depth must be an integer between 1 and 100"}
 
         # 全イベントを取得してインデックス化
         all_events: dict[str, Any] = {}

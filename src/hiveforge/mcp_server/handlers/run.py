@@ -37,9 +37,12 @@ class RunHandlers(BaseHandler):
 
     async def handle_start_run(self, args: dict[str, Any]) -> dict[str, Any]:
         """Run開始"""
+        goal = args.get("goal", "").strip()
+        if not goal:
+            return {"error": "goal is required and must not be empty"}
+
         ar = self._get_ar()
         run_id = generate_event_id()
-        goal = args.get("goal", "")
 
         event = RunStartedEvent(
             run_id=run_id,

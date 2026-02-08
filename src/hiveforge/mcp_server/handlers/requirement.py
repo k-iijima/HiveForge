@@ -30,6 +30,10 @@ class RequirementHandlers(BaseHandler):
         if not self._current_run_id:
             return {"error": "No active run. Use start_run first."}
 
+        description = args.get("description", "").strip()
+        if not description:
+            return {"error": "description is required and must not be empty"}
+
         ar = self._get_ar()
         req_id = generate_event_id()
 
@@ -44,7 +48,7 @@ class RequirementHandlers(BaseHandler):
             actor="copilot",
             payload={
                 "requirement_id": req_id,
-                "description": args.get("description", ""),
+                "description": description,
                 "options": args.get("options", []),
             },
             parents=parents,
@@ -54,6 +58,6 @@ class RequirementHandlers(BaseHandler):
         return {
             "status": "created",
             "requirement_id": req_id,
-            "description": args.get("description", ""),
+            "description": description,
             "message": "ユーザーの承認を待っています。",
         }

@@ -41,6 +41,10 @@ class TaskHandlers(BaseHandler):
         if not self._current_run_id:
             return {"error": "No active run. Use start_run first."}
 
+        title = args.get("title", "").strip()
+        if not title:
+            return {"error": "title is required and must not be empty"}
+
         ar = self._get_ar()
         task_id = generate_event_id()
 
@@ -56,7 +60,7 @@ class TaskHandlers(BaseHandler):
             actor="copilot",
             parents=parents,
             payload={
-                "title": args.get("title", ""),
+                "title": title,
                 "description": args.get("description", ""),
             },
         )
@@ -65,7 +69,7 @@ class TaskHandlers(BaseHandler):
         return {
             "status": "created",
             "task_id": task_id,
-            "title": args.get("title", ""),
+            "title": title,
         }
 
     async def handle_assign_task(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -109,6 +113,9 @@ class TaskHandlers(BaseHandler):
 
         if not task_id:
             return {"error": "task_id is required"}
+
+        if not isinstance(progress, (int, float)) or progress < 0 or progress > 100:
+            return {"error": "progress must be a number between 0 and 100"}
 
         parents = args.get("parents", [])
         if not parents:

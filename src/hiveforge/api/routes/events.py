@@ -4,9 +4,10 @@
 """
 
 from datetime import datetime
-from typing import Any
+from enum import Enum
+from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from ..helpers import get_ar
 from ..models import EventResponse, LineageResponse
@@ -15,7 +16,11 @@ router = APIRouter(prefix="/runs/{run_id}/events", tags=["Events"])
 
 
 @router.get("", response_model=list[EventResponse])
-async def get_events(run_id: str, since: datetime | None = None, limit: int = 100):
+async def get_events(
+    run_id: str,
+    since: datetime | None = None,
+    limit: Annotated[int, Query(ge=1, le=10000, description="取得件数上限")] = 100,
+):
     """イベント一覧を取得"""
     ar = get_ar()
     events = []
@@ -43,8 +48,11 @@ async def get_events(run_id: str, since: datetime | None = None, limit: int = 10
 async def get_event_lineage(
     run_id: str,
     event_id: str,
-    direction: str = "both",
-    max_depth: int = 10,
+    direction: Annotated[
+        Literal["ancestors", "descendants", "both"],
+        Query(description="探索方向"),
+    ] = "both",
+    max_depth: Annotated[int, Query(ge=1, le=100, description="最大探索深度")] = 10,
 ):
     """イベントの因果リンクを取得
 

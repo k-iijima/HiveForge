@@ -20,6 +20,12 @@ class DecisionHandlers(BaseHandler):
         if not self._current_run_id:
             return {"error": "No active run. Use start_run first."}
 
+        key = args.get("key", "").strip()
+        title = args.get("title", "").strip()
+        selected = args.get("selected", "").strip()
+        if not key or not title or not selected:
+            return {"error": "key, title, and selected are required and must not be empty"}
+
         decision_id = generate_event_id()
 
         event = DecisionRecordedEvent(
@@ -27,11 +33,11 @@ class DecisionHandlers(BaseHandler):
             actor="copilot",
             payload={
                 "decision_id": decision_id,
-                "key": args.get("key", ""),
-                "title": args.get("title", ""),
+                "key": key,
+                "title": title,
                 "rationale": args.get("rationale", ""),
                 "options": args.get("options", []),
-                "selected": args.get("selected", ""),
+                "selected": selected,
                 "impact": args.get("impact", ""),
                 "supersedes": args.get("supersedes", []),
             },
@@ -43,7 +49,7 @@ class DecisionHandlers(BaseHandler):
         return {
             "status": "recorded",
             "decision_id": decision_id,
-            "key": args.get("key", ""),
-            "title": args.get("title", ""),
-            "selected": args.get("selected", ""),
+            "key": key,
+            "title": title,
+            "selected": selected,
         }
