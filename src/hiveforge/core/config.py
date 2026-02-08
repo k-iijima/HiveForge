@@ -291,6 +291,30 @@ class SwarmingConfig(BaseModel):
     )
 
 
+class GitHubConfig(BaseModel):
+    """GitHub Projection設定（AR→GitHub同期）"""
+
+    enabled: bool = Field(default=False, description="GitHub Projection を有効にするか")
+    token_env: str = Field(
+        default="GITHUB_TOKEN",
+        description="GitHub トークンを格納する環境変数名",
+    )
+    owner: str = Field(default="", description="リポジトリオーナー（user or org）")
+    repo: str = Field(default="", description="リポジトリ名")
+    project_number: int | None = Field(
+        default=None, description="GitHub Projects V2 のプロジェクト番号"
+    )
+    base_url: str = Field(
+        default="https://api.github.com",
+        description="GitHub API ベースURL（GHES対応）",
+    )
+    sync_interval_seconds: int = Field(default=30, ge=5, description="同期ポーリング間隔（秒）")
+    label_prefix: str = Field(
+        default="hiveforge:",
+        description="HiveForge管理ラベルのプレフィックス",
+    )
+
+
 class HiveForgeSettings(BaseSettings):
     """HiveForge全体設定
 
@@ -316,6 +340,7 @@ class HiveForgeSettings(BaseSettings):
     conference: ConferenceConfig = Field(default_factory=ConferenceConfig)
     sentinel: SentinelConfig = Field(default_factory=SentinelConfig)
     swarming: SwarmingConfig = Field(default_factory=SwarmingConfig)
+    github: GitHubConfig = Field(default_factory=GitHubConfig)
 
     @classmethod
     def from_yaml(cls, config_path: Path | str | None = None) -> "HiveForgeSettings":

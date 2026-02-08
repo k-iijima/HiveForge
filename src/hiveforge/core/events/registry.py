@@ -90,6 +90,14 @@ from .worker import (
     WorkerProgressEvent,
     WorkerStartedEvent,
 )
+from .github import (
+    GitHubCommentAddedEvent,
+    GitHubIssueClosedEvent,
+    GitHubIssueCreatedEvent,
+    GitHubIssueUpdatedEvent,
+    GitHubLabelAppliedEvent,
+    GitHubProjectSyncedEvent,
+)
 
 # イベントタイプからクラスへのマッピング
 EVENT_TYPE_MAP: dict[EventType, type[BaseEvent]] = {
@@ -168,6 +176,13 @@ EVENT_TYPE_MAP: dict[EventType, type[BaseEvent]] = {
     # LLM
     EventType.LLM_REQUEST: LLMRequestEvent,
     EventType.LLM_RESPONSE: LLMResponseEvent,
+    # GitHub Projection
+    EventType.GITHUB_ISSUE_CREATED: GitHubIssueCreatedEvent,
+    EventType.GITHUB_ISSUE_UPDATED: GitHubIssueUpdatedEvent,
+    EventType.GITHUB_ISSUE_CLOSED: GitHubIssueClosedEvent,
+    EventType.GITHUB_COMMENT_ADDED: GitHubCommentAddedEvent,
+    EventType.GITHUB_LABEL_APPLIED: GitHubLabelAppliedEvent,
+    EventType.GITHUB_PROJECT_SYNCED: GitHubProjectSyncedEvent,
 }
 
 

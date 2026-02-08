@@ -110,6 +110,14 @@ class EventType(StrEnum):
     SILENCE_DETECTED = "system.silence_detected"
     EMERGENCY_STOP = "system.emergency_stop"
 
+    # GitHub Projection イベント（AR→GitHub片方向同期）
+    GITHUB_ISSUE_CREATED = "github.issue_created"
+    GITHUB_ISSUE_UPDATED = "github.issue_updated"
+    GITHUB_ISSUE_CLOSED = "github.issue_closed"
+    GITHUB_COMMENT_ADDED = "github.comment_added"
+    GITHUB_LABEL_APPLIED = "github.label_applied"
+    GITHUB_PROJECT_SYNCED = "github.project_synced"
+
 
 class ConflictCategory(StrEnum):
     """衝突カテゴリ（v5.2追加）"""

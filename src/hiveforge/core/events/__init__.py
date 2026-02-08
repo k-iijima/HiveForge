@@ -130,6 +130,16 @@ from .worker import (
     WorkerStartedEvent,
 )
 
+# --- GitHub Projection ---
+from .github import (
+    GitHubCommentAddedEvent,
+    GitHubIssueClosedEvent,
+    GitHubIssueCreatedEvent,
+    GitHubIssueUpdatedEvent,
+    GitHubLabelAppliedEvent,
+    GitHubProjectSyncedEvent,
+)
+
 __all__ = [
     # 列挙型
     "ConflictCategory",
@@ -216,6 +226,13 @@ __all__ = [
     "PlanApprovalRequiredEvent",
     "PlanFallbackActivatedEvent",
     "PlanValidationFailedEvent",
+    # GitHub Projection
+    "GitHubCommentAddedEvent",
+    "GitHubIssueClosedEvent",
+    "GitHubIssueCreatedEvent",
+    "GitHubIssueUpdatedEvent",
+    "GitHubLabelAppliedEvent",
+    "GitHubProjectSyncedEvent",
     # レジストリ
     "EVENT_TYPE_MAP",
     "parse_event",
