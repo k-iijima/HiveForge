@@ -6,11 +6,12 @@ Run管理、Task操作、イベント取得などを提供。
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from ..core import AkashicRecord, build_run_projection, get_settings
 from ..core.ar.projections import RunState
+from .auth import verify_api_key
 from .helpers import clear_active_runs, get_active_runs, set_ar
 from .routes import (
     activity_router,
@@ -61,6 +62,7 @@ app = FastAPI(
     description="自律型ソフトウェア組立システム HiveForge のコアAPI",
     version="0.1.0",
     lifespan=lifespan,
+    dependencies=[Depends(verify_api_key)],
 )
 
 # CORS設定（設定ファイルから読み込み）
