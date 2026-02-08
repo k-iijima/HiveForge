@@ -703,3 +703,34 @@ class TestWorkerBeeEvents:
         # Assert
         assert isinstance(parsed, WorkerAssignedEvent)
         assert parsed.worker_id == "worker-1"
+
+
+class TestEventTypeMapCompleteness:
+    """EVENT_TYPE_MAP が全 EventType を網羅していることを検証
+
+    EventType に新しい値が追加されたとき、
+    EVENT_TYPE_MAP への登録漏れを検出するガードレールテスト。
+    """
+
+    def test_all_event_types_registered_in_map(self):
+        """全 EventType が EVENT_TYPE_MAP に登録されている
+
+        未登録の EventType があると BaseEvent にフォールバックし、
+        ペイロードのスキーマ検証が効かなくなるため、
+        全 EventType の専用クラス登録を強制する。
+        """
+        from hiveforge.core.events.registry import EVENT_TYPE_MAP
+        from hiveforge.core.events.types import EventType as ET
+
+        # Arrange: 全EventType値を取得
+        all_types = set(ET)
+
+        # Act: MAP に登録されたキーを取得
+        registered_types = set(EVENT_TYPE_MAP.keys())
+
+        # Assert: 差分がゼロ
+        missing = all_types - registered_types
+        assert missing == set(), (
+            f"EVENT_TYPE_MAP に未登録の EventType があります: "
+            f"{sorted(m.value for m in missing)}"
+        )

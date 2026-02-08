@@ -6,7 +6,11 @@
 
 from __future__ import annotations
 
-from hiveforge.core.events import BaseEvent, EventType
+from hiveforge.core.events import (
+    EventType,
+    WaggleDanceValidatedEvent,
+    WaggleDanceViolationEvent,
+)
 
 from .models import WaggleDanceResult
 
@@ -18,7 +22,7 @@ class WaggleDanceRecorder:
         self,
         result: WaggleDanceResult,
         colony_id: str,
-    ) -> BaseEvent:
+    ) -> WaggleDanceValidatedEvent | WaggleDanceViolationEvent:
         """バリデーション結果からARイベントを生成する
 
         Args:
@@ -26,22 +30,26 @@ class WaggleDanceRecorder:
             colony_id: 対象ColonyのID
 
         Returns:
-            BaseEvent: 生成されたARイベント
+            生成されたARイベント（成功: WaggleDanceValidatedEvent, 違反: WaggleDanceViolationEvent）
         """
-        event_type = (
-            EventType.WAGGLE_DANCE_VALIDATED if result.valid else EventType.WAGGLE_DANCE_VIOLATION
-        )
-
         errors_payload = [{"field": err.field, "message": err.message} for err in result.errors]
 
-        return BaseEvent(
-            type=event_type,
-            colony_id=colony_id,
-            actor="waggle_dance",
-            payload={
-                "valid": result.valid,
-                "direction": result.direction.value,
-                "errors": errors_payload,
-                "colony_id": colony_id,
-            },
-        )
+        payload = {
+            "valid": result.valid,
+            "direction": result.direction.value,
+            "errors": errors_payload,
+            "colony_id": colony_id,
+        }
+
+        if result.valid:
+            return WaggleDanceValidatedEvent(
+                colony_id=colony_id,
+                actor="waggle_dance",
+                payload=payload,
+            )
+        else:
+            return WaggleDanceViolationEvent(
+                colony_id=colony_id,
+                actor="waggle_dance",
+                payload=payload,
+            )

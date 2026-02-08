@@ -37,6 +37,12 @@ class ColonyStartedEvent(BaseEvent):
     type: Literal[EventType.COLONY_STARTED] = EventType.COLONY_STARTED
 
 
+class ColonySuspendedEvent(BaseEvent):
+    """Colony一時停止イベント"""
+
+    type: Literal[EventType.COLONY_SUSPENDED] = EventType.COLONY_SUSPENDED
+
+
 class ColonyCompletedEvent(BaseEvent):
     """Colony完了イベント"""
 

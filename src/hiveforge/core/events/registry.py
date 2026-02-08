@@ -30,6 +30,7 @@ from .hive import (
     ColonyCreatedEvent,
     ColonyFailedEvent,
     ColonyStartedEvent,
+    ColonySuspendedEvent,
     HiveClosedEvent,
     HiveCreatedEvent,
 )
@@ -38,6 +39,8 @@ from .operation import (
     EmergencyStopEvent,
     ErrorEvent,
     HeartbeatEvent,
+    LLMRequestEvent,
+    LLMResponseEvent,
     OperationFailedEvent,
     OperationTimeoutEvent,
     QueenEscalationEvent,
@@ -68,6 +71,24 @@ from .worker import (
     WorkerProgressEvent,
     WorkerStartedEvent,
 )
+from .sentinel import (
+    SentinelAlertRaisedEvent,
+    SentinelKpiDegradationEvent,
+    SentinelQuarantineEvent,
+    SentinelReportEvent,
+    SentinelRollbackEvent,
+)
+from .waggle import (
+    WaggleDanceValidatedEvent,
+    WaggleDanceViolationEvent,
+)
+from .pipeline import (
+    PipelineCompletedEvent,
+    PipelineStartedEvent,
+    PlanApprovalRequiredEvent,
+    PlanFallbackActivatedEvent,
+    PlanValidationFailedEvent,
+)
 
 # イベントタイプからクラスへのマッピング
 EVENT_TYPE_MAP: dict[EventType, type[BaseEvent]] = {
@@ -77,6 +98,7 @@ EVENT_TYPE_MAP: dict[EventType, type[BaseEvent]] = {
     # Colony
     EventType.COLONY_CREATED: ColonyCreatedEvent,
     EventType.COLONY_STARTED: ColonyStartedEvent,
+    EventType.COLONY_SUSPENDED: ColonySuspendedEvent,
     EventType.COLONY_COMPLETED: ColonyCompletedEvent,
     EventType.COLONY_FAILED: ColonyFailedEvent,
     # Run
@@ -127,6 +149,24 @@ EVENT_TYPE_MAP: dict[EventType, type[BaseEvent]] = {
     EventType.GUARD_PASSED: GuardPassedEvent,
     EventType.GUARD_CONDITIONAL_PASSED: GuardConditionalPassedEvent,
     EventType.GUARD_FAILED: GuardFailedEvent,
+    # Sentinel Hornet (M2-0 / M3-6)
+    EventType.SENTINEL_ALERT_RAISED: SentinelAlertRaisedEvent,
+    EventType.SENTINEL_REPORT: SentinelReportEvent,
+    EventType.SENTINEL_ROLLBACK: SentinelRollbackEvent,
+    EventType.SENTINEL_QUARANTINE: SentinelQuarantineEvent,
+    EventType.SENTINEL_KPI_DEGRADATION: SentinelKpiDegradationEvent,
+    # Waggle Dance (M3-7)
+    EventType.WAGGLE_DANCE_VALIDATED: WaggleDanceValidatedEvent,
+    EventType.WAGGLE_DANCE_VIOLATION: WaggleDanceViolationEvent,
+    # Pipeline (監査性強化)
+    EventType.PIPELINE_STARTED: PipelineStartedEvent,
+    EventType.PIPELINE_COMPLETED: PipelineCompletedEvent,
+    EventType.PLAN_VALIDATION_FAILED: PlanValidationFailedEvent,
+    EventType.PLAN_APPROVAL_REQUIRED: PlanApprovalRequiredEvent,
+    EventType.PLAN_FALLBACK_ACTIVATED: PlanFallbackActivatedEvent,
+    # LLM
+    EventType.LLM_REQUEST: LLMRequestEvent,
+    EventType.LLM_RESPONSE: LLMResponseEvent,
 }
 
 

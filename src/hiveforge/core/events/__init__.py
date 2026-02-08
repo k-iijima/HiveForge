@@ -43,6 +43,7 @@ from .hive import (
     ColonyCreatedEvent,
     ColonyFailedEvent,
     ColonyStartedEvent,
+    ColonySuspendedEvent,
     HiveClosedEvent,
     HiveCreatedEvent,
 )
@@ -53,6 +54,8 @@ from .operation import (
     EmergencyStopEvent,
     ErrorEvent,
     HeartbeatEvent,
+    LLMRequestEvent,
+    LLMResponseEvent,
     OperationFailedEvent,
     OperationTimeoutEvent,
     QueenEscalationEvent,
@@ -102,6 +105,30 @@ from .worker import (
     WorkerStartedEvent,
 )
 
+# --- Sentinel Hornet ---
+from .sentinel import (
+    SentinelAlertRaisedEvent,
+    SentinelKpiDegradationEvent,
+    SentinelQuarantineEvent,
+    SentinelReportEvent,
+    SentinelRollbackEvent,
+)
+
+# --- Waggle Dance ---
+from .waggle import (
+    WaggleDanceValidatedEvent,
+    WaggleDanceViolationEvent,
+)
+
+# --- Pipeline ---
+from .pipeline import (
+    PipelineCompletedEvent,
+    PipelineStartedEvent,
+    PlanApprovalRequiredEvent,
+    PlanFallbackActivatedEvent,
+    PlanValidationFailedEvent,
+)
+
 __all__ = [
     # 列挙型
     "ConflictCategory",
@@ -122,6 +149,7 @@ __all__ = [
     "ColonyCreatedEvent",
     "ColonyFailedEvent",
     "ColonyStartedEvent",
+    "ColonySuspendedEvent",
     "HiveClosedEvent",
     "HiveCreatedEvent",
     # Run/Task/Requirement
@@ -158,6 +186,8 @@ __all__ = [
     "QueenEscalationEvent",
     "SilenceDetectedEvent",
     "UserDirectInterventionEvent",
+    "LLMRequestEvent",
+    "LLMResponseEvent",
     # Worker Bee
     "WorkerAssignedEvent",
     "WorkerCompletedEvent",
@@ -169,6 +199,21 @@ __all__ = [
     "GuardFailedEvent",
     "GuardPassedEvent",
     "GuardVerificationRequestedEvent",
+    # Sentinel Hornet
+    "SentinelAlertRaisedEvent",
+    "SentinelKpiDegradationEvent",
+    "SentinelQuarantineEvent",
+    "SentinelReportEvent",
+    "SentinelRollbackEvent",
+    # Waggle Dance
+    "WaggleDanceValidatedEvent",
+    "WaggleDanceViolationEvent",
+    # Pipeline
+    "PipelineCompletedEvent",
+    "PipelineStartedEvent",
+    "PlanApprovalRequiredEvent",
+    "PlanFallbackActivatedEvent",
+    "PlanValidationFailedEvent",
     # レジストリ
     "EVENT_TYPE_MAP",
     "parse_event",

@@ -63,3 +63,16 @@ class EmergencyStopEvent(BaseEvent):
     """緊急停止イベント"""
 
     type: Literal[EventType.EMERGENCY_STOP] = EventType.EMERGENCY_STOP
+
+
+# LLM イベント
+class LLMRequestEvent(BaseEvent):
+    """LLMリクエスト送信イベント"""
+
+    type: Literal[EventType.LLM_REQUEST] = EventType.LLM_REQUEST
+
+
+class LLMResponseEvent(BaseEvent):
+    """LLMレスポンス受信イベント"""
+
+    type: Literal[EventType.LLM_RESPONSE] = EventType.LLM_RESPONSE

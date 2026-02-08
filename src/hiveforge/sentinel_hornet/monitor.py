@@ -17,7 +17,16 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from ..core.events import BaseEvent, EventType
+from ..core.events import (
+    BaseEvent,
+    ColonySuspendedEvent,
+    EventType,
+    SentinelAlertRaisedEvent,
+    SentinelKpiDegradationEvent,
+    SentinelQuarantineEvent,
+    SentinelReportEvent,
+    SentinelRollbackEvent,
+)
 from ..core.models.action_class import ActionClass, TrustLevel, classify_action
 
 
@@ -327,17 +336,16 @@ class SentinelHornet:
     # イベント生成 (M2-0-f)
     # ------------------------------------------------------------------
 
-    def create_alert_event(self, alert: SentinelAlert) -> BaseEvent:
+    def create_alert_event(self, alert: SentinelAlert) -> SentinelAlertRaisedEvent:
         """SentinelAlertからsentinel.alert_raisedイベントを生成
 
         Args:
             alert: 発行するアラート
 
         Returns:
-            ARに永続化可能なBaseEvent
+            ARに永続化可能なイベント
         """
-        return BaseEvent(
-            type=EventType.SENTINEL_ALERT_RAISED,
+        return SentinelAlertRaisedEvent(
             payload={
                 "alert_type": alert.alert_type,
                 "colony_id": alert.colony_id,
@@ -347,7 +355,7 @@ class SentinelHornet:
             },
         )
 
-    def create_suspension_event(self, alert: SentinelAlert) -> BaseEvent:
+    def create_suspension_event(self, alert: SentinelAlert) -> ColonySuspendedEvent:
         """SentinelAlertからcolony.suspendedイベントを生成
 
         Args:
@@ -356,8 +364,7 @@ class SentinelHornet:
         Returns:
             Colony一時停止イベント
         """
-        return BaseEvent(
-            type=EventType.COLONY_SUSPENDED,
+        return ColonySuspendedEvent(
             payload={
                 "colony_id": alert.colony_id,
                 "reason": alert.message,
@@ -371,7 +378,7 @@ class SentinelHornet:
         colony_id: str,
         summary: str,
         alerts_count: int,
-    ) -> BaseEvent:
+    ) -> SentinelReportEvent:
         """監視レポートイベントを生成
 
         Args:
@@ -382,8 +389,7 @@ class SentinelHornet:
         Returns:
             Sentinelレポートイベント
         """
-        return BaseEvent(
-            type=EventType.SENTINEL_REPORT,
+        return SentinelReportEvent(
             payload={
                 "colony_id": colony_id,
                 "summary": summary,
@@ -491,7 +497,7 @@ class SentinelHornet:
         self,
         alert: SentinelAlert,
         rollback_to: str,
-    ) -> BaseEvent:
+    ) -> SentinelRollbackEvent:
         """ロールバックイベントを生成
 
         Args:
@@ -501,8 +507,7 @@ class SentinelHornet:
         Returns:
             ロールバックイベント
         """
-        return BaseEvent(
-            type=EventType.SENTINEL_ROLLBACK,
+        return SentinelRollbackEvent(
             payload={
                 "colony_id": alert.colony_id,
                 "rollback_to": rollback_to,
@@ -521,7 +526,7 @@ class SentinelHornet:
         alert: SentinelAlert,
         quarantine_scope: str,
         target_id: str | None = None,
-    ) -> BaseEvent:
+    ) -> SentinelQuarantineEvent:
         """隔離イベントを生成
 
         Args:
@@ -542,8 +547,7 @@ class SentinelHornet:
         if target_id:
             payload["target_id"] = target_id
 
-        return BaseEvent(
-            type=EventType.SENTINEL_QUARANTINE,
+        return SentinelQuarantineEvent(
             payload=payload,
         )
 
@@ -551,7 +555,7 @@ class SentinelHornet:
     # KPI劣化イベント生成 (M3-6-a)
     # ------------------------------------------------------------------
 
-    def create_kpi_degradation_event(self, alert: SentinelAlert) -> BaseEvent:
+    def create_kpi_degradation_event(self, alert: SentinelAlert) -> SentinelKpiDegradationEvent:
         """KPI劣化イベントを生成
 
         Args:
@@ -560,8 +564,7 @@ class SentinelHornet:
         Returns:
             KPI劣化イベント
         """
-        return BaseEvent(
-            type=EventType.SENTINEL_KPI_DEGRADATION,
+        return SentinelKpiDegradationEvent(
             payload={
                 "colony_id": alert.colony_id,
                 "severity": alert.severity,
