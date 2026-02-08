@@ -153,6 +153,29 @@ class TestReadFileHandler:
 
         assert "error" in data
 
+    @pytest.mark.asyncio
+    async def test_read_file_general_exception(self, tmp_path):
+        """read_text中の例外がerrorとして返される
+
+        ファイルは存在するがread_textで失敗する場合（パーミッションエラー等）、
+        一般例外ハンドラがエラーメッセージを返す。
+        """
+        from pathlib import Path
+        from unittest.mock import patch
+
+        # Arrange
+        test_file = tmp_path / "test.txt"
+        test_file.write_text("content")
+
+        # Act: read_textで例外を発生させる
+        with patch.object(Path, "read_text", side_effect=PermissionError("Access denied")):
+            result = await read_file_handler(str(test_file))
+            data = json.loads(result)
+
+        # Assert
+        assert "error" in data
+        assert "Access denied" in data["error"]
+
 
 class TestWriteFileHandler:
     """write_file ハンドラのテスト"""
@@ -178,6 +201,24 @@ class TestWriteFileHandler:
 
         assert data["success"] is True
         assert test_file.exists()
+
+    @pytest.mark.asyncio
+    async def test_write_file_general_exception(self, tmp_path):
+        """write_text中の例外がerrorとして返される"""
+        from pathlib import Path
+        from unittest.mock import patch
+
+        # Arrange
+        test_file = tmp_path / "output.txt"
+
+        # Act: write_textで例外を発生させる
+        with patch.object(Path, "write_text", side_effect=OSError("Disk full")):
+            result = await write_file_handler(str(test_file), "content")
+            data = json.loads(result)
+
+        # Assert
+        assert "error" in data
+        assert "Disk full" in data["error"]
 
 
 class TestListDirectoryHandler:
@@ -205,6 +246,21 @@ class TestListDirectoryHandler:
         data = json.loads(result)
 
         assert "error" in data
+
+    @pytest.mark.asyncio
+    async def test_list_directory_general_exception(self, tmp_path):
+        """iterdir中の例外がerrorとして返される"""
+        from pathlib import Path
+        from unittest.mock import patch
+
+        # Act: iterdir()で例外を発生させる
+        with patch.object(Path, "iterdir", side_effect=PermissionError("No access")):
+            result = await list_directory_handler(str(tmp_path))
+            data = json.loads(result)
+
+        # Assert
+        assert "error" in data
+        assert "No access" in data["error"]
 
 
 class TestAgentRunner:
@@ -1014,6 +1070,136 @@ class TestLLMClient:
         call_body = mock_http.post.call_args[1]["json"]
         tool_msg = [m for m in call_body["messages"] if m.get("tool_call_id") == "tc-1"]
         assert len(tool_msg) == 1
+
+    @pytest.mark.asyncio
+    async def test_chat_openai_429_retry(self, client, mock_rate_limiter, monkeypatch):
+        """OpenAI API 429→レートリミットハンドル→リトライ（L193-197）"""
+        # Arrange
+        monkeypatch.setenv("TEST_API_KEY", "sk-test")
+
+        # 1回目: 429, 2回目: 200
+        mock_429 = MagicMock()
+        mock_429.status_code = 429
+        mock_429.headers = {"Retry-After": "1"}
+
+        mock_200 = MagicMock()
+        mock_200.status_code = 200
+        mock_200.raise_for_status = MagicMock()
+        mock_200.json.return_value = {
+            "choices": [
+                {
+                    "message": {"content": "OK", "role": "assistant"},
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {"prompt_tokens": 5, "completion_tokens": 2},
+        }
+
+        mock_http = AsyncMock()
+        mock_http.post = AsyncMock(side_effect=[mock_429, mock_200])
+        client._http_client = mock_http
+
+        # Act
+        messages = [Message(role="user", content="Hi")]
+        response = await client.chat(messages)
+
+        # Assert: 429処理後にリトライして成功
+        assert response.content == "OK"
+        mock_rate_limiter.handle_429.assert_awaited_once_with(1.0)
+        assert mock_http.post.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_chat_anthropic_429_retry(self, monkeypatch, mock_rate_limiter):
+        """Anthropic API 429→レートリミットハンドル→リトライ（L311-314）"""
+        from hiveforge.core.config import LLMConfig
+
+        # Arrange
+        config = LLMConfig(
+            provider="anthropic",
+            model="claude-3-5-sonnet-20241022",
+            api_key_env="TEST_API_KEY",
+            max_tokens=1024,
+        )
+        client = LLMClient(config=config, rate_limiter=mock_rate_limiter)
+        monkeypatch.setenv("TEST_API_KEY", "sk-ant-test")
+
+        # 1回目: 429, 2回目: 200
+        mock_429 = MagicMock()
+        mock_429.status_code = 429
+        mock_429.headers = {"Retry-After": "2"}
+
+        mock_200 = MagicMock()
+        mock_200.status_code = 200
+        mock_200.raise_for_status = MagicMock()
+        mock_200.json.return_value = {
+            "content": [{"type": "text", "text": "Retried OK"}],
+            "stop_reason": "end_turn",
+            "usage": {"input_tokens": 5, "output_tokens": 2},
+        }
+
+        mock_http = AsyncMock()
+        mock_http.post = AsyncMock(side_effect=[mock_429, mock_200])
+        client._http_client = mock_http
+
+        # Act
+        messages = [Message(role="user", content="Hi")]
+        response = await client.chat(messages)
+
+        # Assert
+        assert response.content == "Retried OK"
+        mock_rate_limiter.handle_429.assert_awaited_once_with(2.0)
+        assert mock_http.post.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_chat_anthropic_assistant_no_content_with_tool_calls(
+        self, monkeypatch, mock_rate_limiter
+    ):
+        """Anthropic: assistantメッセージのcontent=NoneでもTool呼び出しが送信される（L257->259）"""
+        from hiveforge.core.config import LLMConfig
+
+        # Arrange
+        config = LLMConfig(
+            provider="anthropic",
+            model="claude-3-5-sonnet-20241022",
+            api_key_env="TEST_API_KEY",
+            max_tokens=1024,
+        )
+        client = LLMClient(config=config, rate_limiter=mock_rate_limiter)
+        monkeypatch.setenv("TEST_API_KEY", "sk-ant-test")
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json.return_value = {
+            "content": [{"type": "text", "text": "Done"}],
+            "stop_reason": "end_turn",
+            "usage": {"input_tokens": 5, "output_tokens": 2},
+        }
+
+        mock_http = AsyncMock()
+        mock_http.post = AsyncMock(return_value=mock_response)
+        client._http_client = mock_http
+
+        # Act: content=None + tool_callsのassistantメッセージを含む
+        messages = [
+            Message(role="user", content="Call a tool"),
+            Message(
+                role="assistant",
+                content=None,
+                tool_calls=[ToolCall(id="tc-1", name="test_tool", arguments={"x": 1})],
+            ),
+            Message(role="tool", content="tool result", tool_call_id="tc-1"),
+            Message(role="user", content="Continue"),
+        ]
+        await client.chat(messages)
+
+        # Assert: textブロックなし、tool_useブロックのみのassistantメッセージ
+        call_body = mock_http.post.call_args[1]["json"]
+        assistant_msgs = [m for m in call_body["messages"] if m.get("role") == "assistant"]
+        assert len(assistant_msgs) == 1
+        # content=Noneなのでtextブロックは含まれない
+        text_blocks = [b for b in assistant_msgs[0]["content"] if b["type"] == "text"]
+        assert len(text_blocks) == 0
 
 
 # ==================== run_command_handler テスト ====================

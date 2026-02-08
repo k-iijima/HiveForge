@@ -909,3 +909,108 @@ class TestRunColonyProjectionNullHandling:
 
         # Assert
         assert proj.colony_runs["col-001"].count("run-001") == 1
+
+
+class TestHiveAggregateEdgeCases:
+    """HiveAggregate の境界ケーステスト"""
+
+    def test_unknown_event_type_ignored(self):
+        """未知のイベントタイプは無視される
+
+        _handlersに登録されていないイベントタイプを適用しても
+        例外が発生せず、状態も変化しない。
+        """
+        from hiveforge.core.ar.hive_projections import HiveAggregate
+        from hiveforge.core.events import RunStartedEvent
+
+        # Arrange
+        aggregate = HiveAggregate("hive-001")
+
+        # Act: HiveAggregateが処理しないRUN_STARTEDイベントを適用
+        event = RunStartedEvent(
+            run_id="run-001",
+            actor="test",
+            payload={"goal": "test"},
+        )
+        aggregate.apply(event)
+
+        # Assert: エラーなし、デフォルト状態のまま（HiveCreatedを適用していないので）
+        from hiveforge.core.ar.projections import HiveState
+
+        assert aggregate.state == HiveState.ACTIVE
+
+    def test_colony_created_empty_id_ignored(self):
+        """colony_idが空のColonyCreatedは無視される"""
+        from hiveforge.core.ar.hive_projections import HiveAggregate
+        from hiveforge.core.events import ColonyCreatedEvent
+
+        # Arrange
+        aggregate = HiveAggregate("hive-001")
+
+        # Act: colony_idが空
+        event = ColonyCreatedEvent(
+            actor="queen",
+            payload={"colony_id": "", "name": "Empty"},
+        )
+        aggregate.apply(event)
+
+        # Assert: コロニーは登録されない
+        assert len(aggregate.projection.colonies) == 0
+
+    def test_colony_started_nonexistent_ignored(self):
+        """存在しないColonyのStartedイベントは無視される"""
+        from hiveforge.core.ar.hive_projections import HiveAggregate
+        from hiveforge.core.events import ColonyStartedEvent
+
+        # Arrange
+        aggregate = HiveAggregate("hive-001")
+
+        # Act: 存在しないcolonyのstarted
+        event = ColonyStartedEvent(
+            actor="queen",
+            payload={"colony_id": "nonexistent"},
+        )
+        aggregate.apply(event)
+
+        # Assert: エラーなし
+        assert len(aggregate.projection.colonies) == 0
+
+    def test_colony_completed_nonexistent_ignored(self):
+        """存在しないColonyのCompletedイベントは無視される"""
+        from hiveforge.core.ar.hive_projections import HiveAggregate
+        from hiveforge.core.events import ColonyCompletedEvent
+
+        aggregate = HiveAggregate("hive-001")
+        event = ColonyCompletedEvent(
+            actor="queen",
+            payload={"colony_id": "nonexistent"},
+        )
+        aggregate.apply(event)
+        assert len(aggregate.projection.colonies) == 0
+
+    def test_colony_failed_nonexistent_ignored(self):
+        """存在しないColonyのFailedイベントは無視される"""
+        from hiveforge.core.ar.hive_projections import HiveAggregate
+        from hiveforge.core.events import ColonyFailedEvent
+
+        aggregate = HiveAggregate("hive-001")
+        event = ColonyFailedEvent(
+            actor="queen",
+            payload={"colony_id": "nonexistent", "error": "err"},
+        )
+        aggregate.apply(event)
+        assert len(aggregate.projection.colonies) == 0
+
+    def test_colony_suspended_nonexistent_ignored(self):
+        """存在しないColonyのSuspendedイベントは無視される"""
+        from hiveforge.core.ar.hive_projections import HiveAggregate
+        from hiveforge.core.events import BaseEvent, EventType
+
+        aggregate = HiveAggregate("hive-001")
+        event = BaseEvent(
+            type=EventType.COLONY_SUSPENDED,
+            actor="sentinel",
+            payload={"colony_id": "nonexistent"},
+        )
+        aggregate.apply(event)
+        assert len(aggregate.projection.colonies) == 0

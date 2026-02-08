@@ -1320,6 +1320,192 @@ class TestToolExecutor:
         assert "echo" in names
         assert "sleep" in names
 
+    def test_get_tool_by_name_not_found(self):
+        """存在しない名前でツール取得→None"""
+        # Arrange
+        executor = ToolExecutor()
+        executor.register_tool(ToolDefinition(name="existing"))
+
+        # Act
+        result = executor.get_tool_by_name("nonexistent")
+
+        # Assert
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_execute_by_name_not_found(self):
+        """存在しない名前で実行→FAILEDステータス"""
+        # Arrange
+        executor = ToolExecutor()
+
+        # Act
+        result = await executor.execute_by_name("nonexistent", {})
+
+        # Assert
+        assert result.status == ToolStatus.FAILED
+        assert "nonexistent" in result.error
+
+    def test_get_result_not_found(self):
+        """存在しない結果ID→None"""
+        # Arrange
+        executor = ToolExecutor()
+
+        # Act / Assert
+        assert executor.get_result("nonexistent") is None
+
+    def test_get_results_by_tool_empty(self):
+        """ツール別結果が空"""
+        # Arrange
+        executor = ToolExecutor()
+
+        # Act / Assert
+        assert executor.get_results_by_tool("nonexistent") == []
+
+    def test_get_stats_empty(self):
+        """空の統計情報→avg_duration_ms=0"""
+        # Arrange
+        executor = ToolExecutor()
+        executor.register_tool(ToolDefinition(name="dummy"))
+
+        # Act
+        stats = executor.get_stats()
+
+        # Assert
+        assert stats["total_executions"] == 0
+        assert stats["avg_duration_ms"] == 0
+
+    @pytest.mark.asyncio
+    async def test_add_listener_only_on_completed(self):
+        """on_completedのみリスナー登録"""
+        # Arrange
+        completed = []
+        executor = ToolExecutor()
+        executor.add_listener(on_completed=lambda r: completed.append(r))
+
+        tool = ToolDefinition(name="test")
+        executor.register_tool(tool, lambda: "done")
+
+        # Act
+        await executor.execute(tool.tool_id, {})
+
+        # Assert
+        assert len(completed) == 1
+
+    @pytest.mark.asyncio
+    async def test_listener_exception_suppressed(self):
+        """リスナーが例外を投げても抑制される"""
+        # Arrange
+        executor = ToolExecutor()
+        executor.add_listener(
+            on_started=lambda _: (_ for _ in ()).throw(RuntimeError("boom")),
+            on_completed=lambda _: (_ for _ in ()).throw(RuntimeError("boom")),
+        )
+        tool = ToolDefinition(name="test")
+        executor.register_tool(tool, lambda: "ok")
+
+        # Act: 例外が抑制されて正常結果が返る
+        result = await executor.execute(tool.tool_id, {})
+
+        # Assert
+        assert result.is_success()
+
+
+class TestWorkerProcessManagerCoverageGaps:
+    """WorkerProcessManager のカバレッジ補完テスト"""
+
+    @pytest.mark.asyncio
+    async def test_stop_worker_timeout_then_kill(self):
+        """stop_workerでwaitがタイムアウト→killされる（L153-155）"""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        # Arrange
+        manager = WorkerProcessManager()
+        mock_process = MagicMock()
+        mock_process.pid = 12345
+        mock_process.terminate = MagicMock()
+        mock_process.kill = MagicMock()
+        mock_process.wait = AsyncMock()
+
+        with patch(
+            "asyncio.create_subprocess_exec",
+            new_callable=AsyncMock,
+            return_value=mock_process,
+        ):
+            worker = await manager.start_worker(
+                worker_id="worker-1",
+                colony_id="colony-1",
+                command=["echo", "hi"],
+            )
+
+        # asyncio.wait_for がTimeoutErrorを起こす
+        with patch(
+            "asyncio.wait_for",
+            new_callable=AsyncMock,
+            side_effect=TimeoutError,
+        ):
+            # Act
+            result = await manager.stop_worker(worker.process_id, force=False)
+
+        # Assert: タイムアウト後にkillされる
+        assert result is True
+        mock_process.terminate.assert_called_once()
+        mock_process.kill.assert_called_once()
+        assert worker.state == WorkerProcessState.STOPPED
+
+    @pytest.mark.asyncio
+    async def test_start_worker_crash_without_callback(self):
+        """コマンド起動失敗時、on_crashed未設定でもCRASHED（L124->126）"""
+        from unittest.mock import AsyncMock, patch
+
+        # Arrange: コールバック未設定
+        manager = WorkerProcessManager()
+
+        with patch(
+            "asyncio.create_subprocess_exec",
+            new_callable=AsyncMock,
+            side_effect=OSError("permission denied"),
+        ):
+            # Act
+            worker = await manager.start_worker(
+                worker_id="worker-1",
+                colony_id="colony-1",
+                command=["restricted_command"],
+            )
+
+        # Assert
+        assert worker.state == WorkerProcessState.CRASHED
+        assert "permission denied" in worker.last_error
+
+    @pytest.mark.asyncio
+    async def test_check_health_crashed_without_callback(self):
+        """プロセス終了時、on_crashed未設定でもCRASHED（L225->227）"""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        # Arrange: コールバック未設定
+        manager = WorkerProcessManager()
+
+        mock_process = MagicMock()
+        mock_process.pid = 12345
+        mock_process.returncode = 1
+
+        with patch(
+            "asyncio.create_subprocess_exec",
+            new_callable=AsyncMock,
+            return_value=mock_process,
+        ):
+            worker = await manager.start_worker(
+                worker_id="worker-1",
+                colony_id="colony-1",
+                command=["echo", "hi"],
+            )
+
+        # Act
+        healthy = await manager.check_health(worker.process_id)
+
+        # Assert
+        assert healthy is False
+        assert worker.state == WorkerProcessState.CRASHED
+
 
 # Retry Executor テスト
 from hiveforge.worker_bee.retry import (  # noqa: E402

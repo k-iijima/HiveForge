@@ -2,11 +2,20 @@
 
 import sys
 from argparse import Namespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from hiveforge.cli import main, run_init, run_mcp, run_record_decision, run_server, run_status
+from hiveforge.cli import (
+    main,
+    run_chat,
+    run_init,
+    run_mcp,
+    run_record_decision,
+    run_server,
+    run_status,
+    run_task,
+)
 
 
 class TestMainFunction:
@@ -35,11 +44,14 @@ class TestMainFunction:
     def test_server_command_with_options(self):
         """serverコマンドのオプションが正しく渡される"""
         # Arrange
-        with patch.object(
-            sys,
-            "argv",
-            ["hiveforge", "server", "--host", "127.0.0.1", "--port", "9000", "--reload"],
-        ), patch("hiveforge.cli.run_server") as mock_run_server:
+        with (
+            patch.object(
+                sys,
+                "argv",
+                ["hiveforge", "server", "--host", "127.0.0.1", "--port", "9000", "--reload"],
+            ),
+            patch("hiveforge.cli.run_server") as mock_run_server,
+        ):
             # Act
             main()
 
@@ -85,20 +97,23 @@ class TestMainFunction:
     def test_record_decision_command(self):
         """record-decisionコマンドが正しく処理される"""
         # Arrange
-        with patch.object(
-            sys,
-            "argv",
-            [
-                "hiveforge",
-                "record-decision",
-                "--key",
-                "D5",
-                "--title",
-                "自動parents付与の責務境界",
-                "--selected",
-                "A",
-            ],
-        ), patch("hiveforge.cli.run_record_decision") as mock_run_decision:
+        with (
+            patch.object(
+                sys,
+                "argv",
+                [
+                    "hiveforge",
+                    "record-decision",
+                    "--key",
+                    "D5",
+                    "--title",
+                    "自動parents付与の責務境界",
+                    "--selected",
+                    "A",
+                ],
+            ),
+            patch("hiveforge.cli.run_record_decision") as mock_run_decision,
+        ):
             # Act
             main()
 
@@ -401,3 +416,183 @@ class TestMainEntryPoint:
 
         # Assert: ヘルプが表示されてexit code 1で終了
         assert result.returncode == 1
+
+
+class TestRunChat:
+    """run_chat関数のテスト"""
+
+    def test_run_chat_success(self, capsys):
+        """Beekeeperとの対話が成功した場合にメッセージが表示される"""
+        # Arrange
+        args = Namespace(message="テストメッセージ")
+
+        mock_beekeeper = AsyncMock()
+        mock_beekeeper.dispatch_tool.return_value = {
+            "status": "success",
+            "actions_taken": 3,
+            "response": "タスクを完了しました",
+        }
+        mock_beekeeper.close = AsyncMock()
+
+        with (
+            patch("hiveforge.core.get_settings") as mock_get_settings,
+            patch("hiveforge.core.AkashicRecord") as mock_ar_class,
+            patch("hiveforge.beekeeper.BeekeeperMCPServer", return_value=mock_beekeeper),
+        ):
+            mock_settings = MagicMock()
+            mock_settings.get_vault_path.return_value = MagicMock()
+            mock_get_settings.return_value = mock_settings
+
+            # Act
+            run_chat(args)
+
+        # Assert
+        captured = capsys.readouterr()
+        assert "Beekeeperと対話します" in captured.out
+        assert "テストメッセージ" in captured.out
+        assert "完了（アクション: 3回）" in captured.out
+        assert "タスクを完了しました" in captured.out
+
+    def test_run_chat_error(self, capsys):
+        """Beekeeperとの対話がエラーの場合にエラーメッセージが表示される"""
+        # Arrange
+        args = Namespace(message="エラーテスト")
+
+        mock_beekeeper = AsyncMock()
+        mock_beekeeper.dispatch_tool.return_value = {
+            "status": "error",
+            "error": "接続に失敗しました",
+        }
+        mock_beekeeper.close = AsyncMock()
+
+        with (
+            patch("hiveforge.core.get_settings") as mock_get_settings,
+            patch("hiveforge.core.AkashicRecord") as mock_ar_class,
+            patch("hiveforge.beekeeper.BeekeeperMCPServer", return_value=mock_beekeeper),
+        ):
+            mock_settings = MagicMock()
+            mock_settings.get_vault_path.return_value = MagicMock()
+            mock_get_settings.return_value = mock_settings
+
+            # Act
+            run_chat(args)
+
+        # Assert
+        captured = capsys.readouterr()
+        assert "エラー: 接続に失敗しました" in captured.out
+
+    def test_run_chat_closes_beekeeper_on_exception(self):
+        """例外発生時もBeekeeperがcloseされる"""
+        # Arrange
+        args = Namespace(message="例外テスト")
+
+        mock_beekeeper = AsyncMock()
+        mock_beekeeper.dispatch_tool.side_effect = RuntimeError("unexpected")
+        mock_beekeeper.close = AsyncMock()
+
+        with (
+            patch("hiveforge.core.get_settings") as mock_get_settings,
+            patch("hiveforge.core.AkashicRecord") as mock_ar_class,
+            patch("hiveforge.beekeeper.BeekeeperMCPServer", return_value=mock_beekeeper),
+        ):
+            mock_settings = MagicMock()
+            mock_settings.get_vault_path.return_value = MagicMock()
+            mock_get_settings.return_value = mock_settings
+
+            # Act & Assert
+            with pytest.raises(RuntimeError, match="unexpected"):
+                run_chat(args)
+
+        # Assert: closeは呼ばれる
+        mock_beekeeper.close.assert_awaited_once()
+
+    def test_chat_command_dispatched(self):
+        """chatコマンドがrun_chatに正しくディスパッチされる"""
+        # Arrange
+        with patch.object(sys, "argv", ["hiveforge", "chat", "hello"]):
+            with patch("hiveforge.cli.run_chat") as mock_run_chat:
+                # Act
+                main()
+
+                # Assert
+                mock_run_chat.assert_called_once()
+                args = mock_run_chat.call_args[0][0]
+                assert args.message == "hello"
+
+
+class TestRunTask:
+    """run_task関数のテスト"""
+
+    def test_run_task_success(self, capsys):
+        """タスク実行が成功した場合"""
+        # Arrange
+        args = Namespace(task="Hello Worldを作成", agent="worker_bee")
+
+        mock_result = MagicMock()
+        mock_result.success = True
+        mock_result.tool_calls_made = 2
+        mock_result.output = "Hello World完了"
+
+        mock_runner = AsyncMock()
+        mock_runner.run.return_value = mock_result
+        mock_runner.register_tool = MagicMock()
+
+        mock_client = AsyncMock()
+        mock_client.close = AsyncMock()
+
+        with (
+            patch("hiveforge.llm.client.LLMClient", return_value=mock_client),
+            patch("hiveforge.llm.runner.AgentRunner", return_value=mock_runner),
+            patch("hiveforge.llm.tools.get_basic_tools", return_value=[]),
+        ):
+            # Act
+            run_task(args)
+
+        # Assert
+        captured = capsys.readouterr()
+        assert "worker_bee がタスクを実行します" in captured.out
+        assert "Hello Worldを作成" in captured.out
+        assert "完了（ツール呼び出し: 2回）" in captured.out
+        assert "Hello World完了" in captured.out
+
+    def test_run_task_failure(self, capsys):
+        """タスク実行が失敗した場合"""
+        # Arrange
+        args = Namespace(task="不可能なタスク", agent="queen_bee")
+
+        mock_result = MagicMock()
+        mock_result.success = False
+        mock_result.error = "LLM呼び出しに失敗"
+
+        mock_runner = AsyncMock()
+        mock_runner.run.return_value = mock_result
+        mock_runner.register_tool = MagicMock()
+
+        mock_client = AsyncMock()
+        mock_client.close = AsyncMock()
+
+        with (
+            patch("hiveforge.llm.client.LLMClient", return_value=mock_client),
+            patch("hiveforge.llm.runner.AgentRunner", return_value=mock_runner),
+            patch("hiveforge.llm.tools.get_basic_tools", return_value=[]),
+        ):
+            # Act
+            run_task(args)
+
+        # Assert
+        captured = capsys.readouterr()
+        assert "エラー: LLM呼び出しに失敗" in captured.out
+
+    def test_run_command_dispatched(self):
+        """runコマンドがrun_taskに正しくディスパッチされる"""
+        # Arrange
+        with patch.object(sys, "argv", ["hiveforge", "run", "テストタスク"]):
+            with patch("hiveforge.cli.run_task") as mock_run_task:
+                # Act
+                main()
+
+                # Assert
+                mock_run_task.assert_called_once()
+                args = mock_run_task.call_args[0][0]
+                assert args.task == "テストタスク"
+                assert args.agent == "worker_bee"

@@ -551,6 +551,156 @@ class TestScenarioGenerator:
         for scenario in scenarios:
             assert scenario.category == ScenarioCategory.BOUNDARY
 
+    def test_config_diff_scenario_with_config_dependency(self):
+        """設定依存がある場合にCONFIG_DIFFシナリオが生成される"""
+        # Arrange: CONFIG依存を含むグラフ
+        graph = ChangeImpactGraph(changed_files=["config.py"])
+        graph.add_node(ImpactNode(node_id="config.py", node_type="file", label="config"))
+        graph.add_node(ImpactNode(node_id="server.py", node_type="file", label="server"))
+        graph.add_edge(
+            DependencyEdge(source="config.py", target="server.py", dep_type=DependencyType.CONFIG)
+        )
+        generator = ScenarioGenerator()
+
+        # Act
+        scenarios = generator.generate(graph, categories=[ScenarioCategory.CONFIG_DIFF])
+
+        # Assert
+        assert len(scenarios) == 1
+        assert scenarios[0].category == ScenarioCategory.CONFIG_DIFF
+        assert "設定差異" in scenarios[0].title
+        assert "config.py" in scenarios[0].target_nodes or "server.py" in scenarios[0].target_nodes
+
+    def test_config_diff_no_config_edges(self):
+        """設定依存がない場合はCONFIG_DIFFシナリオが生成されない"""
+        # Arrange: IMPORTのみ（CONFIGなし）
+        graph = ChangeImpactGraph(changed_files=["events.py"])
+        graph.add_node(ImpactNode(node_id="events.py", node_type="file", label="events"))
+        graph.add_node(ImpactNode(node_id="server.py", node_type="file", label="server"))
+        graph.add_edge(
+            DependencyEdge(source="events.py", target="server.py", dep_type=DependencyType.IMPORT)
+        )
+        generator = ScenarioGenerator()
+
+        # Act
+        scenarios = generator.generate(graph, categories=[ScenarioCategory.CONFIG_DIFF])
+
+        # Assert
+        assert len(scenarios) == 0
+
+    def test_retry_timeout_scenario(self):
+        """リトライ/タイムアウトシナリオが生成される"""
+        # Arrange
+        graph = ChangeImpactGraph(changed_files=["retry.py"])
+        graph.add_node(ImpactNode(node_id="retry.py", node_type="file", label="retry"))
+        generator = ScenarioGenerator()
+
+        # Act
+        scenarios = generator.generate(graph, categories=[ScenarioCategory.RETRY_TIMEOUT])
+
+        # Assert
+        assert len(scenarios) == 1
+        assert scenarios[0].category == ScenarioCategory.RETRY_TIMEOUT
+
+    def test_retry_timeout_empty_changed_files(self):
+        """変更ファイルがない場合はRETRY_TIMEOUTシナリオなし"""
+        # Arrange: ノードあるがchanged_files空
+        graph = ChangeImpactGraph()
+        graph.add_node(ImpactNode(node_id="a.py", node_type="file", label="a"))
+        generator = ScenarioGenerator()
+
+        # Act
+        scenarios = generator.generate(graph, categories=[ScenarioCategory.RETRY_TIMEOUT])
+
+        # Assert
+        assert len(scenarios) == 0
+
+    def test_normal_cross_no_affected_with_changed(self):
+        """影響先がなく変更ファイルのみの場合のフロー確認"""
+        # Arrange: エッジなし（影響先がない）
+        graph = ChangeImpactGraph(changed_files=["standalone.py"])
+        graph.add_node(ImpactNode(node_id="standalone.py", node_type="file", label="standalone"))
+        generator = ScenarioGenerator()
+
+        # Act
+        scenarios = generator.generate(graph, categories=[ScenarioCategory.NORMAL_CROSS])
+
+        # Assert: 変更ファイル自体のフロー確認シナリオが生成される
+        assert len(scenarios) == 1
+        assert "standalone.py" in scenarios[0].title or "standalone.py" in scenarios[0].target_nodes
+
+    def test_normal_cross_empty_changed_no_affected(self):
+        """changed_files=[], affected={}→空リスト（L99）"""
+        # Arrange: ノードだけでchanged_filesもエッジもない
+        graph = ChangeImpactGraph()
+        graph.add_node(ImpactNode(node_id="a.py", node_type="file", label="a"))
+        generator = ScenarioGenerator()
+
+        # Act
+        scenarios = generator.generate(graph, categories=[ScenarioCategory.NORMAL_CROSS])
+
+        # Assert
+        assert len(scenarios) == 0
+
+    def test_boundary_no_target_nodes(self):
+        """target_nodes空→空リスト（L126）"""
+        # Arrange: ノードなし、changed_filesなし
+        graph = ChangeImpactGraph()
+        graph.add_node(ImpactNode(node_id="a.py", node_type="file", label="a"))
+        generator = ScenarioGenerator()
+
+        # Act
+        scenarios = generator.generate(graph, categories=[ScenarioCategory.BOUNDARY])
+
+        # Assert
+        assert len(scenarios) == 0
+
+    def test_order_violation_no_event_flow_edges(self):
+        """EVENT_FLOWエッジなし→空リスト（L157）"""
+        # Arrange: IMPORTのみ
+        graph = ChangeImpactGraph(changed_files=["a.py"])
+        graph.add_node(ImpactNode(node_id="a.py", node_type="file", label="a"))
+        graph.add_node(ImpactNode(node_id="b.py", node_type="file", label="b"))
+        graph.add_edge(DependencyEdge(source="a.py", target="b.py", dep_type=DependencyType.IMPORT))
+        generator = ScenarioGenerator()
+
+        # Act
+        scenarios = generator.generate(graph, categories=[ScenarioCategory.ORDER_VIOLATION])
+
+        # Assert
+        assert len(scenarios) == 0
+
+    def test_concurrent_no_changed_files(self):
+        """changed_files空→並行操作シナリオ空（L179）"""
+        # Arrange: ノードあるがchanged_filesなし
+        graph = ChangeImpactGraph()
+        graph.add_node(ImpactNode(node_id="a.py", node_type="file", label="a"))
+        generator = ScenarioGenerator()
+
+        # Act
+        scenarios = generator.generate(graph, categories=[ScenarioCategory.CONCURRENT])
+
+        # Assert
+        assert len(scenarios) == 0
+
+    def test_generate_unknown_category_skipped(self):
+        """_generatorsに存在しないカテゴリ→スキップ（L63->61）"""
+        # Arrange
+        graph = self._build_simple_graph()
+        generator = ScenarioGenerator()
+        # _generatorsを空にして全カテゴリが生成器なしになるようにする
+        original = generator._generators.copy()
+        generator._generators.clear()
+
+        # Act: カテゴリ指定してもスキップされる
+        scenarios = generator.generate(graph, categories=[ScenarioCategory.NORMAL_CROSS])
+
+        # Assert
+        assert len(scenarios) == 0
+
+        # cleanup
+        generator._generators = original
+
 
 # ==================== M3-4-c: 探索実行エンジン ====================
 

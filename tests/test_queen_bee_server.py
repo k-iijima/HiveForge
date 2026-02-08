@@ -278,6 +278,95 @@ class TestClose:
         assert queen_bee._llm_client is None
         assert queen_bee._agent_runner is None
 
+    @pytest.mark.asyncio
+    async def test_close_with_llm_client(self, queen_bee):
+        """closeでLLMクライアントも閉じられる（L555-556）"""
+        from unittest.mock import AsyncMock, MagicMock
+
+        from hiveforge.llm.client import LLMClient
+
+        # Arrange: LLMクライアントをモックで設定
+        mock_client = MagicMock(spec=LLMClient)
+        mock_client.close = AsyncMock()
+        queen_bee._llm_client = mock_client
+
+        # Act
+        await queen_bee.close()
+
+        # Assert: closeが呼ばれ、Noneになる
+        mock_client.close.assert_awaited_once()
+        assert queen_bee._llm_client is None
+
+
+class TestExecuteGoalCoverage:
+    """execute_goal のカバレッジ補完テスト"""
+
+    @pytest.mark.asyncio
+    async def test_execute_goal_exception_records_run_failed(self, queen_bee):
+        """execute_goal中に例外→RunFailedイベントが記録される（L283-299）"""
+        from unittest.mock import AsyncMock
+
+        # Arrange
+        queen_bee.add_worker("worker-1")
+        queen_bee._plan_tasks = AsyncMock(side_effect=RuntimeError("LLM error"))
+
+        # Act
+        result = await queen_bee.handle_execute_goal({"goal": "Fail goal", "run_id": "run-fail"})
+
+        # Assert
+        assert result["status"] == "error"
+        assert "LLM error" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_execute_goal_empty_plan_uses_goal_as_task(self, queen_bee):
+        """_plan_tasksが空→目標自体を1タスクとして実行（L228）"""
+        from unittest.mock import AsyncMock
+
+        # Arrange
+        queen_bee.add_worker("worker-1")
+        queen_bee._plan_tasks = AsyncMock(return_value=[])
+
+        # Act
+        result = await queen_bee.handle_execute_goal(
+            {"goal": "Simple goal", "run_id": "run-simple"}
+        )
+
+        # Assert: 1タスクとして実行される
+        assert result["tasks_total"] == 1
+
+    @pytest.mark.asyncio
+    async def test_execute_task_no_idle_workers(self, queen_bee):
+        """_execute_taskでidle workerなし→error（L413）"""
+        # Arrange: Workerを追加しない
+
+        # Act
+        result = await queen_bee._execute_task(
+            task_id="task-1", run_id="run-1", goal="Test", context={}
+        )
+
+        # Assert
+        assert result["status"] == "error"
+        assert "No available workers" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_assign_task_with_worker_success(self, queen_bee):
+        """assign_task成功パス（L336-340）"""
+        from unittest.mock import AsyncMock
+
+        # Arrange
+        queen_bee.add_worker("worker-1")
+        queen_bee._execute_task = AsyncMock(
+            return_value={"status": "completed", "task_id": "task-1"}
+        )
+
+        # Act
+        result = await queen_bee.handle_assign_task(
+            {"task_id": "task-1", "run_id": "run-1", "goal": "Do it"}
+        )
+
+        # Assert
+        assert result["status"] == "completed"
+
 
 class TestQueenBeeAgentRunnerPromptContext:
     """Queen BeeのAgentRunnerがvault_pathとcolony_idを渡すテスト"""

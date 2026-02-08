@@ -230,6 +230,95 @@ class TestHiveOverview:
         assert overview is not None
         assert overview.status == "stopped"
 
+    def test_build_with_requirement_lifecycle(self):
+        """要求ライフサイクルがHiveOverviewに反映される"""
+        # Arrange
+        events = [
+            BaseEvent(type=EventType.HIVE_CREATED, payload={"hive_id": "hive-1"}),
+            BaseEvent(type=EventType.REQUIREMENT_CREATED, id="req-1"),
+            BaseEvent(type=EventType.REQUIREMENT_CREATED, id="req-2"),
+            BaseEvent(type=EventType.REQUIREMENT_APPROVED, id="req-1"),
+        ]
+
+        # Act
+        overview = build_hive_overview(events)
+
+        # Assert: req-1は承認済みなので残り1件
+        assert overview is not None
+        assert overview.pending_requirements == 1
+
+    def test_build_with_requirement_rejected(self):
+        """却下された要件はpending_requirementsから除外される"""
+        # Arrange
+        events = [
+            BaseEvent(type=EventType.HIVE_CREATED, payload={"hive_id": "hive-1"}),
+            BaseEvent(type=EventType.REQUIREMENT_CREATED, id="req-1"),
+            BaseEvent(type=EventType.REQUIREMENT_REJECTED, id="req-1"),
+        ]
+
+        # Act
+        overview = build_hive_overview(events)
+
+        # Assert
+        assert overview is not None
+        assert overview.pending_requirements == 0
+
+    def test_build_with_run_completed(self):
+        """完了したRunはactive_run_countから除外される"""
+        # Arrange
+        events = [
+            BaseEvent(type=EventType.HIVE_CREATED, payload={"hive_id": "hive-1"}),
+            BaseEvent(type=EventType.RUN_STARTED, run_id="run-1"),
+            BaseEvent(type=EventType.RUN_COMPLETED, run_id="run-1"),
+        ]
+
+        # Act
+        overview = build_hive_overview(events)
+
+        # Assert
+        assert overview is not None
+        assert overview.active_run_count == 0
+
+    def test_build_without_hive_id(self):
+        """hive_idを含まないイベントリスト"""
+        # Arrange: HIVE_CREATED以外のイベントのみ
+        events = [
+            BaseEvent(type=EventType.COLONY_CREATED, colony_id="colony-1"),
+        ]
+
+        # Act
+        overview = build_hive_overview(events)
+
+        # Assert: hive_idが空なのでNone
+        assert overview is None
+
+    def test_apply_requirement_rejected(self):
+        """REQUIREMENT_REJECTEDイベントの適用"""
+        # Arrange
+        projection = BeekeeperProjection()
+        created = BaseEvent(type=EventType.REQUIREMENT_CREATED, id="req-1")
+        projection.apply_event(created)
+
+        # Act
+        rejected = BaseEvent(type=EventType.REQUIREMENT_REJECTED, id="req-1")
+        projection.apply_event(rejected)
+
+        # Assert
+        assert "req-1" not in projection.pending_instructions
+        assert projection.failed_instructions == 1
+
+    def test_colony_created_no_duplicate(self):
+        """同じcolony_idのCOLONY_CREATEDイベントは重複しない"""
+        # Arrange
+        projection = BeekeeperProjection()
+
+        # Act
+        projection.apply_event(BaseEvent(type=EventType.COLONY_CREATED, colony_id="colony-1"))
+        projection.apply_event(BaseEvent(type=EventType.COLONY_CREATED, colony_id="colony-1"))
+
+        # Assert
+        assert projection.active_colonies.count("colony-1") == 1
+
 
 class TestBeekeeperHandler:
     """BeekeeperHandlerのテスト"""
@@ -1366,3 +1455,257 @@ class TestConferenceManager:
         manager.conclude_session(session.session_id)
 
         assert "No consensus" in session.conclusion
+
+    def test_submit_opinion_on_inactive_session(self):
+        """非アクティブセッションには意見提出不可"""
+        # Arrange
+        manager = ConferenceManager()
+        session = manager.create_session(
+            hive_id="hive-1",
+            topic="テスト",
+            participants=["colony-1"],
+        )
+        # start_sessionしない（PENDINGのまま）
+
+        # Act
+        opinion = manager.submit_opinion(
+            session.session_id,
+            colony_id="colony-1",
+            content="意見",
+        )
+
+        # Assert: PENDINGセッションはis_active()=Falseなので提出不可
+        # ※ PENDINGのis_active()がTrue/Falseかによる
+        # 実装確認: is_active() = status in (IN_PROGRESS, VOTING)
+        assert opinion is None
+
+    def test_submit_opinion_nonexistent_session(self):
+        """存在しないセッションへの意見提出はNone"""
+        # Arrange
+        manager = ConferenceManager()
+
+        # Act
+        opinion = manager.submit_opinion(
+            "nonexistent-id",
+            colony_id="colony-1",
+            content="意見",
+        )
+
+        # Assert
+        assert opinion is None
+
+    def test_cast_vote_on_non_voting_session(self):
+        """投票フェーズでないセッションには投票不可"""
+        # Arrange
+        manager = ConferenceManager()
+        session = manager.create_session(
+            hive_id="hive-1",
+            topic="テスト",
+            participants=["colony-1"],
+        )
+        manager.start_session(session.session_id)
+        # start_votingしない
+
+        # Act
+        vote = manager.cast_vote(
+            session.session_id,
+            colony_id="colony-1",
+            vote_type=VoteType.APPROVE,
+        )
+
+        # Assert
+        assert vote is None
+
+    def test_cast_vote_by_non_participant(self):
+        """参加者以外は投票不可"""
+        # Arrange
+        manager = ConferenceManager()
+        session = manager.create_session(
+            hive_id="hive-1",
+            topic="テスト",
+            participants=["colony-1"],
+        )
+        manager.start_session(session.session_id)
+        manager.start_voting(session.session_id)
+
+        # Act
+        vote = manager.cast_vote(
+            session.session_id,
+            colony_id="colony-99",
+            vote_type=VoteType.APPROVE,
+        )
+
+        # Assert
+        assert vote is None
+
+    def test_cast_vote_nonexistent_session(self):
+        """存在しないセッションへの投票はNone"""
+        # Arrange
+        manager = ConferenceManager()
+
+        # Act
+        vote = manager.cast_vote(
+            "nonexistent",
+            colony_id="colony-1",
+            vote_type=VoteType.APPROVE,
+        )
+
+        # Assert
+        assert vote is None
+
+    def test_start_voting_nonexistent_session(self):
+        """存在しないセッションで投票開始はFalse"""
+        manager = ConferenceManager()
+        assert manager.start_voting("nonexistent") is False
+
+    def test_start_voting_wrong_status(self):
+        """IN_PROGRESS以外で投票開始はFalse"""
+        manager = ConferenceManager()
+        session = manager.create_session(
+            hive_id="hive-1",
+            topic="テスト",
+            participants=["colony-1"],
+        )
+        # PENDINGのまま
+        assert manager.start_voting(session.session_id) is False
+
+    def test_conclude_nonexistent_session(self):
+        """存在しないセッションの結論はFalse"""
+        manager = ConferenceManager()
+        assert manager.conclude_session("nonexistent") is False
+
+    def test_conclude_already_concluded_session(self):
+        """既に結論済みのセッションは再結論不可"""
+        manager = ConferenceManager()
+        session = manager.create_session(
+            hive_id="hive-1",
+            topic="テスト",
+            participants=["colony-1"],
+        )
+        manager.start_session(session.session_id)
+        manager.conclude_session(session.session_id, conclusion="完了")
+
+        # Act: 再度結論
+        result = manager.conclude_session(session.session_id)
+
+        # Assert
+        assert result is False
+
+    def test_cancel_concluded_session(self):
+        """結論済みセッションのキャンセルはFalse"""
+        manager = ConferenceManager()
+        session = manager.create_session(
+            hive_id="hive-1",
+            topic="テスト",
+            participants=["colony-1"],
+        )
+        manager.start_session(session.session_id)
+        manager.conclude_session(session.session_id, conclusion="完了")
+
+        # Act
+        result = manager.cancel_session(session.session_id)
+
+        # Assert
+        assert result is False
+
+    def test_cancel_nonexistent_session(self):
+        """存在しないセッションのキャンセルはFalse"""
+        manager = ConferenceManager()
+        assert manager.cancel_session("nonexistent") is False
+
+    def test_get_vote_summary_nonexistent(self):
+        """存在しないセッションの投票サマリは空dict"""
+        manager = ConferenceManager()
+        assert manager.get_vote_summary("nonexistent") == {}
+
+    def test_get_sessions_by_hive(self):
+        """Hive別セッション取得"""
+        manager = ConferenceManager()
+        manager.create_session(hive_id="hive-1", topic="t1", participants=["c1"])
+        manager.create_session(hive_id="hive-2", topic="t2", participants=["c2"])
+        manager.create_session(hive_id="hive-1", topic="t3", participants=["c3"])
+
+        # Act
+        hive1_sessions = manager.get_sessions_by_hive("hive-1")
+
+        # Assert
+        assert len(hive1_sessions) == 2
+
+    def test_consensus_all_approve(self):
+        """全員一致で承認"""
+        manager = ConferenceManager()
+        agenda = ConferenceAgenda(title="全会一致", requires_consensus=True)
+        session = manager.create_session(
+            hive_id="hive-1",
+            topic="テスト",
+            participants=["colony-1", "colony-2"],
+            agenda=agenda,
+        )
+        manager.start_session(session.session_id)
+        manager.start_voting(session.session_id)
+        manager.cast_vote(session.session_id, "colony-1", VoteType.APPROVE)
+        manager.cast_vote(session.session_id, "colony-2", VoteType.APPROVE)
+
+        manager.conclude_session(session.session_id)
+
+        assert "Consensus reached" in session.conclusion
+
+    def test_consensus_with_abstain(self):
+        """全員一致要求で棄権があるとNoConsensus"""
+        manager = ConferenceManager()
+        agenda = ConferenceAgenda(title="全会一致", requires_consensus=True)
+        session = manager.create_session(
+            hive_id="hive-1",
+            topic="テスト",
+            participants=["colony-1", "colony-2"],
+            agenda=agenda,
+        )
+        manager.start_session(session.session_id)
+        manager.start_voting(session.session_id)
+        manager.cast_vote(session.session_id, "colony-1", VoteType.APPROVE)
+        manager.cast_vote(session.session_id, "colony-2", VoteType.ABSTAIN)
+
+        manager.conclude_session(session.session_id)
+
+        assert "No consensus" in session.conclusion
+        assert "abstention" in session.conclusion
+
+    def test_tied_vote(self):
+        """同数の場合はTied"""
+        manager = ConferenceManager()
+        session = manager.create_session(
+            hive_id="hive-1",
+            topic="テスト",
+            participants=["colony-1", "colony-2"],
+        )
+        manager.start_session(session.session_id)
+        manager.start_voting(session.session_id)
+        manager.cast_vote(session.session_id, "colony-1", VoteType.APPROVE)
+        manager.cast_vote(session.session_id, "colony-2", VoteType.REJECT)
+
+        manager.conclude_session(session.session_id)
+
+        assert "Tied" in session.conclusion
+
+    def test_conclude_with_explicit_conclusion(self):
+        """明示的な結論文を指定できる"""
+        manager = ConferenceManager()
+        session = manager.create_session(
+            hive_id="hive-1",
+            topic="テスト",
+            participants=["colony-1"],
+        )
+        manager.start_session(session.session_id)
+
+        result = manager.conclude_session(
+            session.session_id,
+            conclusion="カスタム結論: REST APIを採用",
+        )
+
+        assert result is True
+        assert session.conclusion == "カスタム結論: REST APIを採用"
+
+    def test_start_session_nonexistent(self):
+        """存在しないセッション開始はFalse"""
+        manager = ConferenceManager()
+        assert manager.start_session("nonexistent") is False

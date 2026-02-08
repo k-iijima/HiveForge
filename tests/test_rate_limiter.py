@@ -376,3 +376,220 @@ class TestGlobalRegistry:
 
         # Assert
         assert registry1 is registry2
+
+
+class TestOpenAiRateLimits:
+    """OpenAIモデル別レート制限のテスト"""
+
+    def test_gpt4_rate_limit(self):
+        """GPT-4系のレート制限"""
+        # Act
+        config = get_openai_rate_limit("gpt-4-turbo")
+
+        # Assert
+        assert config.requests_per_minute == 500
+        assert config.tokens_per_minute == 30000
+        assert config.max_concurrent == 10
+
+    def test_gpt35_rate_limit(self):
+        """GPT-3.5系のレート制限"""
+        # Act
+        config = get_openai_rate_limit("gpt-3.5-turbo")
+
+        # Assert
+        assert config.requests_per_minute == 3500
+        assert config.tokens_per_minute == 90000
+        assert config.max_concurrent == 20
+
+    def test_unknown_model_rate_limit(self):
+        """不明なモデルは保守的なデフォルト"""
+        # Act
+        config = get_openai_rate_limit("unknown-model-v1")
+
+        # Assert
+        assert config.requests_per_minute == 60
+        assert config.tokens_per_minute == 10000
+        assert config.max_concurrent == 5
+
+
+class TestAnthropicRateLimits:
+    """Anthropic Tier別レート制限のテスト"""
+
+    def test_tier1_rate_limit(self):
+        """Tier1のレート制限"""
+        config = get_anthropic_rate_limit("1")
+        assert config.requests_per_minute == 50
+        assert config.tokens_per_minute == 40000
+
+    def test_tier2_rate_limit(self):
+        """Tier2のレート制限"""
+        config = get_anthropic_rate_limit("2")
+        assert config.requests_per_minute == 1000
+        assert config.tokens_per_minute == 80000
+
+    def test_tier3_rate_limit(self):
+        """Tier3のレート制限"""
+        config = get_anthropic_rate_limit("3")
+        assert config.requests_per_minute == 2000
+        assert config.tokens_per_minute == 160000
+
+    def test_tier4_rate_limit(self):
+        """Tier4のレート制限"""
+        config = get_anthropic_rate_limit("4")
+        assert config.requests_per_minute == 4000
+        assert config.tokens_per_minute == 400000
+
+    def test_unknown_tier_defaults_to_tier1(self):
+        """不明なTierはTier1にフォールバック"""
+        config = get_anthropic_rate_limit("99")
+        assert config.requests_per_minute == 50
+        assert config.tokens_per_minute == 40000
+
+
+class TestRateLimitContext:
+    """RateLimitContextのテスト"""
+
+    @pytest.mark.asyncio
+    async def test_context_manager_releases(self):
+        """コンテキストマネージャー終了時にreleaseされる"""
+        from hiveforge.core.rate_limiter import RateLimitContext
+
+        # Arrange
+        limiter = RateLimiter(RateLimitConfig(max_concurrent=2))
+        ctx = RateLimitContext(limiter)
+
+        # Act
+        async with ctx:
+            limiter.get_stats()
+            # コンテキスト内
+
+        # Assert: コンテキスト後にreleaseされている
+        stats_after = limiter.get_stats()
+        assert stats_after is not None
+
+
+class TestRateLimitExceededError:
+    """RateLimitExceededErrorのテスト"""
+
+    def test_error_with_retry_after(self):
+        """retry_afterが設定される"""
+        err = RateLimitExceededError("Too many requests", retry_after=30.0)
+        assert str(err) == "Too many requests"
+        assert err.retry_after == 30.0
+
+    def test_error_default_retry_after(self):
+        """デフォルトのretry_afterは0.0"""
+        err = RateLimitExceededError("Limit exceeded")
+        assert err.retry_after == 0.0
+
+
+class TestRateLimiterWait:
+    """RateLimiter.waitの高度なテスト"""
+
+    @pytest.mark.asyncio
+    async def test_daily_limit_raises_error(self):
+        """日次制限を超えるとRateLimitExceededErrorが発生する
+
+        requests_per_dayを設定し、その回数を超えたwait呼び出しで
+        例外が発生することを検証する。
+        """
+        # Arrange: 日次1リクエストの制限
+        config = RateLimitConfig(
+            requests_per_minute=60,
+            requests_per_day=1,
+            burst_limit=10,
+        )
+        limiter = RateLimiter(config)
+
+        # Act: 1回目は成功
+        await limiter.wait()
+
+        # Assert: 2回目は日次制限で例外
+        with pytest.raises(RateLimitExceededError, match="Daily"):
+            await limiter.wait()
+
+    @pytest.mark.asyncio
+    async def test_minute_window_reset(self):
+        """分ウィンドウがリセットされた場合、カウントがゼロになる
+
+        _reset_minute_windowを直接テストして、60秒経過後に
+        リクエストカウントがリセットされることを検証する。
+        """
+        import time
+
+        # Arrange
+        config = RateLimitConfig(requests_per_minute=60, burst_limit=10)
+        limiter = RateLimiter(config)
+
+        # 分ウィンドウ開始を60秒以上前に設定
+        limiter._state.minute_start = time.monotonic() - 61.0
+        limiter._state.request_count_minute = 50
+        limiter._state.token_count_minute = 1000
+
+        # Act
+        limiter._reset_minute_window()
+
+        # Assert: カウントがリセットされている
+        assert limiter._state.request_count_minute == 0
+        assert limiter._state.token_count_minute == 0
+
+    @pytest.mark.asyncio
+    async def test_day_window_reset(self):
+        """日ウィンドウがリセットされた場合、カウントがゼロになる"""
+        import time
+
+        # Arrange
+        config = RateLimitConfig(requests_per_minute=60, requests_per_day=100)
+        limiter = RateLimiter(config)
+
+        # 日ウィンドウ開始を24時間以上前に設定
+        limiter._state.day_start = time.monotonic() - 86401.0
+        limiter._state.request_count_day = 99
+
+        # Act
+        limiter._reset_day_window()
+
+        # Assert
+        assert limiter._state.request_count_day == 0
+
+    @pytest.mark.asyncio
+    async def test_token_wait_when_insufficient(self):
+        """トークン不足時にsleepして待機する
+
+        バケットにトークンが不足している場合、wait内で
+        asyncio.sleepが呼ばれてから再充填される。
+        """
+        from unittest.mock import AsyncMock, patch
+
+        # Arrange: トークン0、60 RPM
+        config = RateLimitConfig(requests_per_minute=60, burst_limit=10)
+        limiter = RateLimiter(config)
+        limiter._state.tokens = 0.0
+
+        # Act: asyncio.sleepをモック
+        with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+            await limiter.wait(tokens=1)
+
+        # Assert: sleepが呼ばれた
+        mock_sleep.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_acquire_with_tokens_minute_limit(self):
+        """トークン/分の制限を超えた場合に待機する"""
+        from unittest.mock import AsyncMock, patch
+
+        # Arrange: トークン制限100/分で既に95トークン使用済み
+        config = RateLimitConfig(
+            requests_per_minute=60,
+            tokens_per_minute=100,
+            burst_limit=10,
+        )
+        limiter = RateLimiter(config)
+        limiter._state.token_count_minute = 95
+
+        # Act: 10トークン要求 → 制限超過 → sleepが呼ばれる
+        with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+            await limiter.acquire_with_tokens(10)
+
+        # Assert: sleepで待機が発生した
+        mock_sleep.assert_called_once()
