@@ -152,16 +152,28 @@ pip install -e ".[dev]"
 ```
 src/hiveforge/
 ├── core/           # コアロジック（イベント、状態機械、AR）
-│   ├── events.py   # イベントモデル
+│   ├── events/     # イベントモデル（EventType enum等）
 │   ├── models/     # ドメインモデル（ActionClass等）
 │   ├── ar/         # Akashic Record（永続化）
-│   └── state/      # 状態機械
+│   ├── state/      # 状態機械
+│   ├── honeycomb/  # 実行履歴・学習基盤（Episode, KPI）
+│   ├── swarming/   # Swarming Protocol（適応的Colony編成）
+│   ├── activity_bus.py  # Activity Bus
+│   ├── config.py   # 設定管理
+│   ├── lineage.py  # 因果リンク
+│   ├── policy_gate.py # ポリシーゲート
+│   └── rate_limiter.py # レートリミッター
 ├── api/            # FastAPI サーバー
 ├── mcp_server/     # MCP Server
 ├── beekeeper/      # Beekeeper（ユーザー窓口・Hive統括）
 ├── sentinel_hornet/ # Sentinel Hornet（監視・異常検出・強制停止）
 ├── queen_bee/      # Queen Bee（Colony統括）
 ├── worker_bee/     # Worker Bee（タスク実行）
+├── guard_bee/      # Guard Bee（Evidence-first品質検証）
+├── forager_bee/    # Forager Bee（探索的テスト・影響分析）
+├── referee_bee/    # Referee Bee（N案採点・生存選抜）
+├── scout_bee/      # Scout Bee（編成最適化）
+├── waggle_dance/   # Waggle Dance（I/O構造化検証）
 ├── llm/            # LLM統合（AgentRunner, プロンプト管理）
 ├── agent_ui/       # Agent UI MCPサーバー
 ├── vlm/            # VLM（画像解析）

@@ -169,7 +169,7 @@ hiveforge/
 ├── core/                  # コアモジュール（他から参照される）
 │   ├── events/           # イベントモデル（M3-6でパッケージ化）
 │   │   ├── base.py           # BaseEvent
-│   │   ├── types.py          # EventType enum (84種)
+│   │   ├── types.py          # EventType enum (56種)
 │   │   ├── run.py            # Run関連イベント
 │   │   ├── hive.py           # Hive/Colony関連イベント
 │   │   ├── worker.py         # Worker Beeイベント
@@ -449,7 +449,7 @@ class BaseEvent(BaseModel):
 
 ### 4.2 イベント型一覧
 
-主要なイベント型を以下に示します（全量は `core/events.py` の `EventType` enum を参照）:
+主要なイベント型を以下に示します（全量は `core/events/types.py` の `EventType` enum を参照）:
 
 | カテゴリ | イベント型 | 説明 |
 |----------|------------|------|
@@ -474,7 +474,7 @@ class BaseEvent(BaseModel):
 | **System** | `system.heartbeat` / `system.error` / `system.silence_detected` / `system.emergency_stop` | システム |
 | **Unknown** | （任意の文字列） | 前方互換用（`UnknownEvent`として読み込み） |
 
-> 全84 EventType。イベント型の正式なスキーマ定義・payload仕様は [v5-hive-design.md §3](design/v5-hive-design.md) を参照。
+> 全56 EventType。イベント型の正式なスキーマ定義・payload仕様は [v5-hive-design.md §3](design/v5-hive-design.md) を参照。
 
 ### 4.3 RunProjection（状態投影）
 
@@ -710,7 +710,7 @@ HiveForge/
 │   ├── silence.py           # 沈黙検出
 │   ├── core/                # コアモジュール
 │   │   ├── config.py        # 設定管理
-│   │   ├── events/          # イベントモデル (84 EventType)
+│   │   ├── events/          # イベントモデル (56 EventType)
 │   │   │   ├── base.py          # BaseEvent
 │   │   │   ├── types.py         # EventType enum
 │   │   │   ├── run.py           # Run/Task/Requirement

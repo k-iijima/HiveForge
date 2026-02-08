@@ -16,7 +16,7 @@
 | **ユニットテスト** | `pytest` で確認（参考: 1712件 @ 2026-02-07） | 固定値は記載しない（CIで自動取得） |
 | **カバレッジ** | `pytest --cov` で確認 | 同上 |
 | **Lint (Ruff)** | ✅ All passed | — |
-| **EventType数** | 84 | `core/events/types.py` |
+| **EventType数** | 56 | `core/events/types.py` |
 
 > テスト件数・カバレッジは**計測値のみを正とし**、ドキュメントに固定値を書かない。
 
@@ -24,7 +24,7 @@
 
 | コンポーネント | ステータス | 詳細 | 既知の制約 |
 |---------------|-----------|------|------------|
-| **Hive Core** (イベント, AR, 状態機械) | ✅ 完了 | 84 EventType, 5状態機械, ハッシュ連鎖 | — |
+| **Hive Core** (イベント, AR, 状態機械) | ✅ 完了 | 56 EventType, 5状態機械, ハッシュ連鎖 | — |
 | **Hive/Colony AR永続化** | ✅ M1-1完了 | HiveStore + HiveAggregate, JSONL永続化 | — |
 | **API Server** (FastAPI REST) | ✅ 完了 | Hive/Colony CRUD が AR永続化と接続済み | 認証は未有効化 (`auth.enabled: false`) |
 | **MCP Server** (Copilot連携) | ✅ 完了 | 全ツール実装・テスト済 | — |
@@ -116,7 +116,7 @@ M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)  
 - VS Code拡張からHive/Colonyの作成・取得・終了ができる
 - API接続失敗時にユーザーへ適切なエラー通知が出る
 
-#### M2-2: Beekeeper → Queen Bee → Worker Bee統合 ✅ 完了
+#### M2-2: Beekeeper → Queen Bee → Worker Bee統合 ⬜ 未着手
 
 | タスク | 内容 |
 |--------|------|
