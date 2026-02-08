@@ -31,6 +31,15 @@ from hiveforge.core.honeycomb.models import (
 from hiveforge.core.honeycomb.recorder import EpisodeRecorder
 from hiveforge.core.honeycomb.store import HoneycombStore
 
+# Sentinel イベント（P-02: incident_rate 改善用）
+from hiveforge.core.events import (
+    SentinelAlertRaisedEvent,
+    SentinelRollbackEvent,
+    SentinelQuarantineEvent,
+)
+from hiveforge.core.events.sentinel import SentinelKpiDegradationEvent
+from hiveforge.core.events.types import EventType
+
 # =========================================================================
 # Episode モデルのテスト
 # =========================================================================
@@ -1494,3 +1503,345 @@ class TestEpisodeRecorderOutcome:
 
         # Assert
         assert duration == 0.0
+
+
+# =========================================================================
+# P-02: Sentinel Hornet介入を加味したincident_rate テスト
+# =========================================================================
+
+
+class TestEpisodeSentinelField:
+    """Episode.sentinel_intervention_count フィールドのテスト"""
+
+    def test_default_sentinel_count_is_zero(self):
+        """sentinel_intervention_countのデフォルトは0"""
+        # Arrange & Act
+        ep = Episode(
+            episode_id="ep-001",
+            run_id="run-001",
+            colony_id="colony-001",
+            outcome=Outcome.SUCCESS,
+        )
+
+        # Assert
+        assert ep.sentinel_intervention_count == 0
+
+    def test_sentinel_count_can_be_set(self):
+        """sentinel_intervention_countを明示的に設定できる"""
+        # Arrange & Act
+        ep = Episode(
+            episode_id="ep-001",
+            run_id="run-001",
+            colony_id="colony-001",
+            outcome=Outcome.FAILURE,
+            sentinel_intervention_count=3,
+        )
+
+        # Assert
+        assert ep.sentinel_intervention_count == 3
+
+    def test_sentinel_count_must_be_non_negative(self):
+        """sentinel_intervention_countは0以上でなければならない"""
+        # Act & Assert
+        with pytest.raises(Exception):
+            Episode(
+                episode_id="ep-001",
+                run_id="run-001",
+                colony_id="colony-001",
+                outcome=Outcome.SUCCESS,
+                sentinel_intervention_count=-1,
+            )
+
+
+class TestRecorderSentinelCounting:
+    """EpisodeRecorder._count_sentinel_interventions のテスト"""
+
+    @pytest.fixture
+    def ar(self, tmp_path):
+        return AkashicRecord(vault_path=tmp_path / "vault")
+
+    @pytest.fixture
+    def store(self, tmp_path):
+        return HoneycombStore(tmp_path / "honeycomb")
+
+    @pytest.fixture
+    def recorder(self, store, ar):
+        return EpisodeRecorder(store, ar)
+
+    def test_count_zero_when_no_sentinel_events(self, recorder):
+        """Sentinelイベントがない場合は0を返す"""
+        from unittest.mock import MagicMock
+
+        # Arrange: 通常のイベントのみ
+        event1 = MagicMock()
+        event1.type = EventType.RUN_STARTED
+
+        event2 = MagicMock()
+        event2.type = EventType.TASK_COMPLETED
+
+        # Act
+        count = recorder._count_sentinel_interventions([event1, event2])
+
+        # Assert
+        assert count == 0
+
+    def test_count_sentinel_alert_raised(self, recorder):
+        """SENTINEL_ALERT_RAISEDイベントをカウントする"""
+        from unittest.mock import MagicMock
+
+        # Arrange
+        event1 = MagicMock()
+        event1.type = EventType.SENTINEL_ALERT_RAISED
+
+        event2 = MagicMock()
+        event2.type = EventType.SENTINEL_ALERT_RAISED
+
+        # Act
+        count = recorder._count_sentinel_interventions([event1, event2])
+
+        # Assert
+        assert count == 2
+
+    def test_count_mixed_sentinel_events(self, recorder):
+        """各種Sentinelイベントを正しくカウントする"""
+        from unittest.mock import MagicMock
+
+        # Arrange: 5つの異なる介入イベント
+        events = []
+        sentinel_types = [
+            EventType.SENTINEL_ALERT_RAISED,
+            EventType.SENTINEL_ROLLBACK,
+            EventType.SENTINEL_QUARANTINE,
+            EventType.SENTINEL_KPI_DEGRADATION,
+            EventType.EMERGENCY_STOP,
+        ]
+        for et in sentinel_types:
+            e = MagicMock()
+            e.type = et
+            events.append(e)
+
+        # 通常イベントも混ぜる
+        normal = MagicMock()
+        normal.type = EventType.RUN_STARTED
+        events.append(normal)
+
+        # Act
+        count = recorder._count_sentinel_interventions(events)
+
+        # Assert: Sentinelイベント5つだけカウント
+        assert count == 5
+
+    def test_sentinel_report_not_counted(self, recorder):
+        """SENTINEL_REPORT（定期レポート）は介入ではないのでカウントしない"""
+        from unittest.mock import MagicMock
+
+        # Arrange
+        event = MagicMock()
+        event.type = EventType.SENTINEL_REPORT
+
+        # Act
+        count = recorder._count_sentinel_interventions([event])
+
+        # Assert
+        assert count == 0
+
+    def test_count_empty_events(self, recorder):
+        """空のイベントリストでは0を返す"""
+        # Act
+        count = recorder._count_sentinel_interventions([])
+
+        # Assert
+        assert count == 0
+
+
+class TestRecorderSentinelIntegration:
+    """EpisodeRecorder.record_run_episode でsentinel_intervention_countが設定されるテスト"""
+
+    @pytest.fixture
+    def ar(self, tmp_path):
+        return AkashicRecord(vault_path=tmp_path / "vault")
+
+    @pytest.fixture
+    def store(self, tmp_path):
+        return HoneycombStore(tmp_path / "honeycomb")
+
+    @pytest.fixture
+    def recorder(self, store, ar):
+        return EpisodeRecorder(store, ar)
+
+    def test_episode_records_sentinel_count(self, ar, recorder):
+        """record_run_episodeでSentinel介入回数がEpisodeに記録される"""
+        # Arrange: Sentinel介入を含むRunイベント
+        run_id = "run-sentinel-1"
+        ar.append(
+            RunStartedEvent(
+                run_id=run_id,
+                payload={"goal": "test sentinel"},
+            )
+        )
+        ar.append(
+            SentinelAlertRaisedEvent(
+                run_id=run_id,
+                payload={"alert": "high risk detected"},
+            )
+        )
+        ar.append(
+            SentinelRollbackEvent(
+                run_id=run_id,
+                payload={"reason": "quality degradation"},
+            )
+        )
+        ar.append(
+            RunCompletedEvent(
+                run_id=run_id,
+                payload={"status": "completed"},
+            )
+        )
+
+        # Act
+        episode = recorder.record_run_episode(run_id=run_id, colony_id="colony-1")
+
+        # Assert: 2つのSentinel介入（alert + rollback）
+        assert episode.sentinel_intervention_count == 2
+
+    def test_episode_no_sentinel_events(self, ar, recorder):
+        """Sentinel介入なしのRunではsentinel_intervention_count=0"""
+        # Arrange: 通常のRunイベントのみ
+        run_id = "run-normal-1"
+        ar.append(
+            RunStartedEvent(
+                run_id=run_id,
+                payload={"goal": "normal task"},
+            )
+        )
+        ar.append(
+            RunCompletedEvent(
+                run_id=run_id,
+                payload={"status": "completed"},
+            )
+        )
+
+        # Act
+        episode = recorder.record_run_episode(run_id=run_id, colony_id="colony-1")
+
+        # Assert
+        assert episode.sentinel_intervention_count == 0
+
+
+class TestKPICalculatorIncidentRateWithSentinel:
+    """P-02: Sentinel介入を加味したincident_rate計算のテスト"""
+
+    @pytest.fixture
+    def store(self, tmp_path):
+        return HoneycombStore(tmp_path)
+
+    @pytest.fixture
+    def calc(self, store):
+        return KPICalculator(store)
+
+    def _add_episode(
+        self,
+        store: HoneycombStore,
+        episode_id: str,
+        outcome: Outcome = Outcome.SUCCESS,
+        sentinel_intervention_count: int = 0,
+        colony_id: str = "colony-1",
+        template: str = "balanced",
+        failure_class: FailureClass | None = None,
+        duration: float = 100.0,
+    ) -> Episode:
+        """テスト用エピソードを追加（sentinel_intervention_count対応）"""
+        ep = Episode(
+            episode_id=episode_id,
+            run_id=f"run-{episode_id}",
+            colony_id=colony_id,
+            outcome=outcome,
+            template_used=template,
+            failure_class=failure_class,
+            duration_seconds=duration,
+            sentinel_intervention_count=sentinel_intervention_count,
+        )
+        store.append(ep)
+        return ep
+
+    def test_incident_rate_sentinel_only(self, calc, store):
+        """Sentinel介入ありだが成功のエピソードもインシデントとしてカウント
+
+        成功エピソードでもSentinel介入があれば、それはインシデントとして扱う。
+        人間の介入が必要だった＝プロセスに問題があったことを示す。
+        """
+        # Arrange: 4エピソード中、2つにSentinel介入あり（ただし全て成功）
+        self._add_episode(store, "ep-1", Outcome.SUCCESS, sentinel_intervention_count=0)
+        self._add_episode(store, "ep-2", Outcome.SUCCESS, sentinel_intervention_count=2)
+        self._add_episode(store, "ep-3", Outcome.SUCCESS, sentinel_intervention_count=0)
+        self._add_episode(store, "ep-4", Outcome.SUCCESS, sentinel_intervention_count=1)
+
+        # Act
+        scores = calc.calculate_all()
+
+        # Assert: 2/4 = 0.5 (Sentinel介入あり = インシデント)
+        assert scores.incident_rate == 0.5
+
+    def test_incident_rate_failure_and_sentinel(self, calc, store):
+        """失敗とSentinel介入の両方がある場合は重複カウントしない
+
+        1つのエピソードが失敗かつSentinel介入ありでも、
+        インシデントとしては1回だけカウントする。
+        """
+        # Arrange
+        self._add_episode(store, "ep-1", Outcome.SUCCESS, sentinel_intervention_count=0)
+        self._add_episode(
+            store, "ep-2", Outcome.FAILURE, sentinel_intervention_count=1
+        )  # 失敗 + Sentinel
+        self._add_episode(
+            store, "ep-3", Outcome.SUCCESS, sentinel_intervention_count=1
+        )  # 成功だがSentinel介入
+        self._add_episode(store, "ep-4", Outcome.SUCCESS, sentinel_intervention_count=0)
+
+        # Act
+        scores = calc.calculate_all()
+
+        # Assert: 2/4 = 0.5 (ep-2: 失敗, ep-3: Sentinel介入)
+        assert scores.incident_rate == 0.5
+
+    def test_incident_rate_all_incident(self, calc, store):
+        """全エピソードがインシデント（失敗 or Sentinel介入）の場合"""
+        # Arrange
+        self._add_episode(store, "ep-1", Outcome.FAILURE, sentinel_intervention_count=0)
+        self._add_episode(store, "ep-2", Outcome.SUCCESS, sentinel_intervention_count=1)
+        self._add_episode(store, "ep-3", Outcome.PARTIAL, sentinel_intervention_count=2)
+
+        # Act
+        scores = calc.calculate_all()
+
+        # Assert: 3/3 = 1.0
+        assert scores.incident_rate == 1.0
+
+    def test_incident_rate_no_incident(self, calc, store):
+        """全エピソードが正常（失敗なし + Sentinel介入なし）"""
+        # Arrange
+        self._add_episode(store, "ep-1", Outcome.SUCCESS, sentinel_intervention_count=0)
+        self._add_episode(store, "ep-2", Outcome.SUCCESS, sentinel_intervention_count=0)
+
+        # Act
+        scores = calc.calculate_all()
+
+        # Assert: 0/2 = 0.0
+        assert scores.incident_rate == 0.0
+
+    def test_backward_compatible_with_no_sentinel_field(self, calc, store):
+        """sentinel_intervention_count=0のエピソードでも既存ロジック通り動作
+
+        既存テスト test_incident_rate と同じsemanticsを維持。
+        """
+        # Arrange: 既存テストと同じパターン
+        self._add_episode(store, "ep-1", Outcome.SUCCESS)
+        self._add_episode(store, "ep-2", Outcome.FAILURE)
+        self._add_episode(store, "ep-3", Outcome.PARTIAL)
+        self._add_episode(store, "ep-4", Outcome.SUCCESS)
+
+        # Act
+        scores = calc.calculate_all()
+
+        # Assert: 2/4 = 0.5 (後方互換)
+        assert scores.incident_rate == 0.5

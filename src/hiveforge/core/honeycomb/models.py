@@ -108,6 +108,13 @@ class Episode(BaseModel):
     # 失敗分類（失敗時のみ）
     failure_class: FailureClass | None = Field(default=None, description="失敗分類")
 
+    # Sentinel Hornet 介入回数（P-02）
+    sentinel_intervention_count: int = Field(
+        default=0,
+        ge=0,
+        description="Sentinel Hornet介入回数（alert, rollback, quarantine, kpi_degradation, emergency_stop）",
+    )
+
     # KPI計測値
     kpi_scores: KPIScores = Field(
         default_factory=KPIScores,

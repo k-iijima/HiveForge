@@ -69,6 +69,9 @@ class EpisodeRecorder:
         # KPIスコアの算出
         kpi_scores = self._calculate_kpi_scores(events, duration)
 
+        # Sentinel Hornet 介入回数
+        sentinel_count = self._count_sentinel_interventions(events)
+
         episode = Episode(
             episode_id=generate_event_id(),
             run_id=run_id,
@@ -79,6 +82,7 @@ class EpisodeRecorder:
             duration_seconds=duration,
             token_count=self._count_tokens(events),
             failure_class=failure_class,
+            sentinel_intervention_count=sentinel_count,
             kpi_scores=kpi_scores,
             parent_episode_ids=parent_episode_ids or [],
             goal=goal,
@@ -169,6 +173,30 @@ class EpisodeRecorder:
             elif event.type == EventType.WORKER_PROGRESS:
                 total += event.payload.get("tokens_used", 0)
         return total
+
+    # Sentinel Hornet 介入としてカウントするイベントタイプ
+    _SENTINEL_INTERVENTION_TYPES = frozenset(
+        {
+            EventType.SENTINEL_ALERT_RAISED,
+            EventType.SENTINEL_ROLLBACK,
+            EventType.SENTINEL_QUARANTINE,
+            EventType.SENTINEL_KPI_DEGRADATION,
+            EventType.EMERGENCY_STOP,
+        }
+    )
+
+    def _count_sentinel_interventions(self, events: list) -> int:
+        """イベントからSentinel Hornet介入回数を算出
+
+        定期レポート（SENTINEL_REPORT）は介入ではないためカウントしない。
+        カウント対象:
+        - SENTINEL_ALERT_RAISED: アラート発行
+        - SENTINEL_ROLLBACK: ロールバック実行
+        - SENTINEL_QUARANTINE: 隔離実行
+        - SENTINEL_KPI_DEGRADATION: KPI劣化検出
+        - EMERGENCY_STOP: 緊急停止
+        """
+        return sum(1 for e in events if e.type in self._SENTINEL_INTERVENTION_TYPES)
 
     def _calculate_kpi_scores(self, events: list, duration: float) -> KPIScores:
         """イベントからKPIスコアを算出

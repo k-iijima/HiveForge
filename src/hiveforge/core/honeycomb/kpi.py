@@ -126,15 +126,23 @@ class KPICalculator:
         return statistics.mean(durations)
 
     def _calc_incident_rate(self, episodes: list[Episode]) -> float | None:
-        """インシデント率: 失敗またはPartialの比率
+        """インシデント率: 失敗/Partial またはSentinel Hornet介入があったエピソードの比率
 
-        Sentinel Hornet介入の直接計測は未実装のため、
-        現時点では失敗系エピソードの比率で代替。
+        インシデントの定義:
+        - outcome が FAILURE または PARTIAL
+        - sentinel_intervention_count > 0 (成功でもSentinel介入があればインシデント)
+
+        いずれかに該当するエピソードが全体に占める割合を返す。
+        失敗かつSentinel介入のエピソードは重複カウントしない。
         """
         if not episodes:
             return None
 
-        incident_count = sum(1 for e in episodes if e.outcome in (Outcome.FAILURE, Outcome.PARTIAL))
+        incident_count = sum(
+            1
+            for e in episodes
+            if e.outcome in (Outcome.FAILURE, Outcome.PARTIAL) or e.sentinel_intervention_count > 0
+        )
         return incident_count / len(episodes)
 
     def _calc_recurrence_rate(self, episodes: list[Episode]) -> float | None:

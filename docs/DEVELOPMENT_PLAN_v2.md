@@ -33,7 +33,7 @@
 | **Beekeeper handler** | ✅ 完了 | — | — |
 | **Queen Bee** | ✅ M4-1/M4-2完了 | LLMタスク分解・並列実行・ゲート統合実装済 | TaskPlanner + ColonyOrchestrator + ExecutionPipeline |
 | **Worker Bee** | ✅ 完了 | ツール実行, リトライ, Trust | — |
-| **Sentinel Hornet** | ✅ M3-6完了 | 7検出パターン + KPI劣化検出 + ロールバック/隔離 | `_calc_incident_rate()` は失敗エピソード比率で算出（§8 P-02参照） |
+| **Sentinel Hornet** | ✅ M3-6完了 | 7検出パターン + KPI劣化検出 + ロールバック/隔離 | `_calc_incident_rate()` はSentinel介入 + 失敗/Partialで算出（P-02解消済） |
 | **VS Code拡張** (コマンド) | ✅ M2-1完了 | API接続コード作成済、TSコンパイル+Lint確認済 | **実際のE2E動作テスト未実施** (M2-1-f) |
 | **VS Code拡張** (TreeView) | ✅ 完了 | Activity Hierarchy API連動 | — |
 | **VS Code拡張** (Hive Monitor) | ✅ 完了 | リアルタイムWebview | — |
@@ -45,7 +45,7 @@
 | **Forager Bee** | ✅ M3-4完了 | 変更影響グラフ、シナリオ生成、探索実行、違和感検知 | **`_run_single()` はスタブ** — 全シナリオを無条件pass (→ M4-2でLLM統合後に実装) |
 | **Referee Bee** | ✅ M3-5完了 | 5次元スコアリング、Differential Testing、トーナメント選抜 | — |
 | **Waggle Dance** | ✅ M3-7完了 | Pydanticスキーマ検証、バリデーションミドルウェア、ARイベント記録 | — |
-| **KPI Calculator** | ✅ M3-1完了 | HoneycombのKPICalculatorとして実装済 | P-02 `_calc_incident_rate()` のみ残存 (§8参照) |
+| **KPI Calculator** | ✅ M3-1完了 | HoneycombのKPICalculatorとして実装済 | 全KPI実装完了（P-02解消済） |
 | **LLM Orchestrator** | ✅ M4-2完了 | ColonyOrchestrator（層別並列実行）+ ColonyResult（結果集約）+ ExecutionPipeline（ゲート統合） | — |
 | **介入・エスカレーション** | ✅ 完了 | API/MCPハンドラ実装済、InterventionStore JSONL永続化 | — |
 
@@ -89,7 +89,7 @@ M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)  
 
 ## 3. 開発マイルストーン（現在〜今後）
 
-### M2: 接続（信頼できる組み合わせにする）
+### M2: 接続（信頼できる組み合わせにする） ✅ 完了
 
 **目標**: コンポーネント間を実際に接続し、エンドツーエンドで動作することを検証する。
 
@@ -419,9 +419,10 @@ M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)  
 ## 4. 優先順位（2026-02-08 更新）
 
 M1〜M4完了。M5（運用品質）一部着手済み（M5-1/M5-3完了）。
-M2-2 サブタスク全完了、M2-3-b完了、M2-4（LiteLLM統合）完了。
+M1〜M4完了。M2全サブタスク完了（M2-1-f, M2-3-a含む）。M5一部着手済み（M5-1/M5-3完了）。
 
-**レビュー指摘**: M5の残項目（パフォーマンス・KPIダッシュボード等）を進める前に、M2-2/M2-3の統合パスを完成させる必要がある。エージェントチェーンが一気通貫で動作しない限り、M5の運用品質評価は基盤不足。
+**統合パス確立済み**: M2-2/M2-3/M2-4の全タスクが完了し、エージェントチェーンのE2E動作が確立。
+M5（運用品質）の残項目に着手可能な状態。
 
 ```
      高
@@ -435,12 +436,13 @@ M2-2 サブタスク全完了、M2-3-b完了、M2-4（LiteLLM統合）完了。
       │  M2-3-b (MCP→AR永続化)      ✅ 完了（Intervention系含む全操作永続化）
       │  M2-4 (LiteLLM統合)         ✅ 完了（100+プロバイダー統一I/O + Ollama対応）
       │
-      │  ════════ 最優先: 統合パス確立 ════════
-      │  M2-3-a (Copilot↔Beekeeper)  ← 🔴 最優先: @hiveforge → Beekeeper直結
-      │  M2-1-f (VS Code拡張E2E)     ← 🔴 UI入口の動作保証
+      │  ════════ 完了: 統合パス確立 ════════
+      │  M2-3-a (Copilot↔Beekeeper)  ✅ @hiveforge Chat Participant + Beekeeper API
+      │  M2-1-f (VS Code拡張E2E)     ✅ test_vscode_extension_api.py (13テスト)
+      │  S-02 (_ask_user)            ✅ asyncio.Future 非同期実装
       │
-      │  ════════ 次点: 暫定ロジック解消 ════════
-      │  P-02 (KPIインシデント率)    ← 🟡 Sentinel Hornet介入の直接計測
+      │  ════════ 次: 暫定ロジック解消 + 運用品質 ════════
+      │  P-02 (KPIインシデント率)    ← ✅ Sentinel Hornet介入の直接計測 実装済
       │  S-03 (Forager _run_single)  ← 🟡 探索実行のLLM統合
       │
       │  ════════ その後: 運用品質 ════════
@@ -455,12 +457,12 @@ M2-2 サブタスク全完了、M2-3-b完了、M2-4（LiteLLM統合）完了。
 > **方針転換**: M2-2/M2-3を完了してエージェントチェーンのE2E動作を確立することが、
 > M5（運用品質）の前提条件である。統合パスが通らない限り、運用品質の評価軸が作れない。
 >
-> **進捗**:
+> **進捗**: M2全サブタスク完了。統合パス確立。
 > - ✅ M2-2完了: `_ask_user()` 非同期化、Pipeline統合、承認フローE2E、チャットチェーンE2E
-> - ✅ M2-3-b完了: 全MCP操作（Intervention系含む）がAR永続化
+> - ✅ M2-3完了: MCP→AR永続化(M2-3-b) + @hiveforge Chat Participant(M2-3-a)
 > - ✅ M2-4完了: LiteLLM SDK統合（httpx直接→litellm.acompletion、13プロバイダー対応、Ollama対応）
-> - ⬜ M2-3-a残: Copilot Chat `@hiveforge` → Beekeeper直結
-> - 🔴 M2-1-f未実施 → UIの動作保証なし
+> - ✅ M2-1-f完了: test_vscode_extension_api.py (13テスト) + test_beekeeper_api.py (19テスト)
+> - ✅ P-02解消: `_calc_incident_rate()` — Sentinel Hornet介入の直接計測実装。Episode.sentinel_intervention_count追加
 
 ---
 
@@ -514,9 +516,9 @@ M2-2 サブタスク全完了、M2-3-b完了、M2-4（LiteLLM統合）完了。
 | Forager Bee探索範囲 | 過剰な探索によるコスト増大 | 影響グラフの深さ制限、Guard Beeとの分業で範囲を限定 |
 | Referee Beeスコア計算コスト | N案×5指標の計算量 | Nの上限設定、軽量指標から段階的に導入 |
 | LLMタスク分解の品質 | M4の不確実性 | Guard Beeによる分解結果の検証 |
-| **統合パス未確立** | **M5運用品質の評価が不可能** | **M2-2/M2-3を最優先で完了** |
-| **KPI暫定ロジック** | **Sentinel/Honeycombの判断精度** | **P-02解消を統合パス確立後に着手** |
-| **VS Code拡張E2E未検証** | **UI入口の不具合残存リスク** | **M2-1-f完了を品質ゲートに設定** |
+| ~~**統合パス未確立**~~ | ~~**M5運用品質の評価が不可能**~~ | ✅ M2-2/M2-3/M2-4 全完了で解消 |
+| ~~KPI暫定ロジック~~ | ~~Sentinel/Honeycombの判断精度~~ | ~~P-02解消済~~ ✅ |
+| ~~**VS Code拡張E2E未検証**~~ | ~~**UI入口の不具合残存リスク**~~ | ✅ M2-1-f完了 + test_vscode_extension_api.py |
 
 ---
 
@@ -563,7 +565,7 @@ M2-2 サブタスク全完了、M2-3-b完了、M2-4（LiteLLM統合）完了。
 | # | ファイル | 箇所 | 現状 | 解消マイルストーン |
 |---|---------|------|------|-------------------|
 | S-01 | ~~`queen_bee/server.py`~~ → `queen_bee/planner.py` | `_plan_tasks()` | ~~固定1タスク返却~~ → `TaskPlanner` でLLMタスク分解＋依存分析（`execution_order`）＋フォールバック実装済 | ✅ M4-1-a/b 解消 |
-| S-02 | `beekeeper/server.py:728-734` | `_ask_user()` | ユーザー入力を実際に待たず即応答を返却 (`# TODO: VS Code拡張に通知してユーザー入力を待つ`) | M2-2 |
+| S-02 | ~~`beekeeper/server.py`~~ | `_ask_user()` | ~~ユーザー入力を実際に待たず即応答~~ → asyncio.Future ベース非同期実装済。RequirementCreatedEvent AR記録 + approve/reject で resume | ✅ M2-2 解消 |
 | S-03 | `forager_bee/explorer.py:43-52` | `_run_single()` | 全シナリオを無条件 `passed=True` で返却。実際のテスト実行にはLLM統合が必要 | M5以降 |
 
 ### 8.2 暫定ロジック（動作するが精度が不十分）
@@ -571,7 +573,7 @@ M2-2 サブタスク全完了、M2-3-b完了、M2-4（LiteLLM統合）完了。
 | # | ファイル | 箇所 | 現状 | 改善タイミング |
 |---|---------|------|------|---------------|
 | P-01 | `core/honeycomb/kpi.py:86-91` | `_calc_correctness()` | ~~「Guard Beeが未実装のため」コメント~~ → コメント修正済み。Guard Bee実装済を反映 | ✅ 解消 |
-| P-02 | `core/honeycomb/kpi.py:129-134` | `_calc_incident_rate()` | 「Sentinel Hornet介入の直接計測は未実装」— 失敗系エピソード比率で代替 | M4以降 |
+| P-02 | `core/honeycomb/kpi.py:129-148` | `_calc_incident_rate()` | ~~「Sentinel Hornet介入の直接計測は未実装」~~ → Sentinel介入(alert/rollback/quarantine/kpi_degradation/emergency_stop) + 失敗/Partial の OR で算出。Episode に `sentinel_intervention_count` フィールド追加。 | ✅ 解消 |
 | P-03 | `core/honeycomb/recorder.py:174-178` | `_calculate_kpi_scores()` | ~~`lead_time`のみ計算~~ → `correctness`, `incident_rate` も Episode 単位で算出済み | ✅ 解消 |
 | P-04 | `queen_bee/communication.py:253` | デッドロック検出 | ~~「簡易版」~~ → DFSベースの任意長サイクル検出に置換済み | ✅ 解消 |
 | P-05 | `vlm/analyzer.py:78` | UI要素抽出 | キーワードマッチングによる簡易実装 | 必要時 |
@@ -609,9 +611,9 @@ M2-2 サブタスク全完了、M2-3-b完了、M2-4（LiteLLM統合）完了。
 | 優先度 | 項目 | 理由 |
 |--------|------|------|
 | ~~✅ 解消~~ | ~~S-01 `_plan_tasks()`~~ | TaskPlanner でLLMタスク分解＋依存分析実装済 (M4-1-a/b) |
-| **🔴 最優先** | S-02 `_ask_user()` | M2-2の主目標。ユーザーインタラクション未接続。統合パスのボトルネック |
-| **🔴 最優先** | M2-1-f VS Code拡張E2E | UI入口の動作保証がない。ユーザー操作点での品質未検証 |
-| **🟡 次点** | P-02 `_calc_incident_rate()` | Sentinel Hornet/HoneycombのKPI精度に直結。暫定ロジックで運用監視の信頼性が低い |
+| ~~✅ 解消~~ | ~~S-02 `_ask_user()`~~ | asyncio.Future ベース非同期実装済 (M2-2) |
+| ~~✅ 解消~~ | ~~M2-1-f VS Code拡張E2E~~ | test_vscode_extension_api.py (13テスト) で動作保証 |
+| ~~✅ 解消~~ | ~~P-02 `_calc_incident_rate()`~~ | Sentinel Hornet介入の直接計測 + Episode.sentinel_intervention_count 追加 |
 | **🟡 次点** | S-03 `_run_single()` | Foragerの探索実行はスタブのまま。品質判定の根拠が不十分 |
 | **🟢 低** | H-01〜H-08 ハードコード | 現時点で意図的な仮定。必要時にconfig化 |
 | ~~✅ 解消~~ | ~~P-01, P-03, P-04~~ | KPIコメント修正・correctness/incident_rate算出・DFSデッドロック検出 |
