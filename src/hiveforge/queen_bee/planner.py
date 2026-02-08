@@ -26,14 +26,17 @@ TASK_DECOMPOSITION_SYSTEM = """\
 
 ## ルール
 - 各タスクは1つの明確なアクションに対応すること
-- タスクは実行順に並べること
+- タスクには一意のidを付与すること（"task-1", "task-2" 等）
+- タスク間に依存関係がある場合は depends_on で明示すること
+- 依存関係がないタスクは並列実行可能という意味である
 - 最低1タスク、最大10タスクに分解すること
 - 目標が十分具体的であれば、無理に分解せず1タスクのままでよい
 
 ## 出力形式
 以下の形式のJSONのみを出力してください。他のテキストは含めないでください。
 
-{"tasks": [{"goal": "具体的なタスク目標1"}, {"goal": "具体的なタスク目標2"}], \
+{"tasks": [{"id": "task-1", "goal": "具体的なタスク目標1"}, \
+{"id": "task-2", "goal": "具体的なタスク目標2", "depends_on": ["task-1"]}], \
 "reasoning": "分解の理由"}
 """
 
@@ -56,6 +59,10 @@ class PlannedTask(BaseModel):
         max_length=500,
         description="タスクの具体的な目標",
     )
+    depends_on: list[str] = Field(
+        default_factory=list,
+        description="依存するタスクIDのリスト",
+    )
 
 
 class TaskPlan(BaseModel):
@@ -65,6 +72,56 @@ class TaskPlan(BaseModel):
 
     tasks: list[PlannedTask] = Field(..., min_length=1)
     reasoning: str = Field(default="", description="分解の理由・根拠")
+
+    def execution_order(self) -> list[list[str]]:
+        """依存関係を解析し、並列実行可能なグループを返す
+
+        トポロジカルソート（Kahn's algorithm）でタスクを層別にグループ化。
+        同じ層のタスクは並列実行可能。
+
+        Returns:
+            list[list[str]]: 各層のタスクIDリスト。
+                例: [["task-1", "task-2"], ["task-3"]] →
+                    task-1/task-2は並列、task-3は後続
+
+        Raises:
+            ValueError: 循環依存が検出された場合
+        """
+        task_map = {t.task_id: t for t in self.tasks}
+        all_ids = set(task_map.keys())
+
+        # 入次数を計算（不明な依存先は無視）
+        in_degree: dict[str, int] = {tid: 0 for tid in all_ids}
+        for task in self.tasks:
+            for dep in task.depends_on:
+                if dep in all_ids:
+                    in_degree[task.task_id] += 1
+
+        # Kahn's algorithm
+        layers: list[list[str]] = []
+        remaining = dict(in_degree)
+
+        while remaining:
+            # 入次数 0 のノードを収集
+            ready = [tid for tid, deg in remaining.items() if deg == 0]
+            if not ready:
+                raise ValueError("タスクに循環依存があります: " + ", ".join(remaining.keys()))
+            layers.append(sorted(ready))
+            for tid in ready:
+                del remaining[tid]
+            # 削除したノードが向き先の入次数を減らす
+            for tid in remaining:
+                task = task_map[tid]
+                for dep in task.depends_on:
+                    if dep in [r for r in ready]:
+                        remaining[tid] -= 1
+
+        return layers
+
+    def is_parallelizable(self) -> bool:
+        """並列実行可能なタスクがあるか"""
+        layers = self.execution_order()
+        return any(len(layer) > 1 for layer in layers)
 
 
 # ─── TaskPlanner ────────────────────────────────────────
@@ -120,5 +177,11 @@ class TaskPlanner:
         # タスク数上限を適用
         if "tasks" in data and len(data["tasks"]) > self.MAX_TASKS:
             data["tasks"] = data["tasks"][: self.MAX_TASKS]
+
+        # LLM出力の "id" を "task_id" にマッピング
+        if "tasks" in data:
+            for task_data in data["tasks"]:
+                if "id" in task_data and "task_id" not in task_data:
+                    task_data["task_id"] = task_data.pop("id")
 
         return TaskPlan.model_validate(data)

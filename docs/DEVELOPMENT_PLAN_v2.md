@@ -31,7 +31,7 @@
 | **CLI** | ✅ 完了 | `hiveforge chat` 等 | mypy strict未対応 (M1-3) |
 | **Beekeeper server** | ✅ M1-2完了 | 全ハンドラ実装済 | **`_ask_user()` はスタブ** — ユーザー入力を実際に待たず即応答を返す (→ M2-2で解消) |
 | **Beekeeper handler** | ✅ 完了 | — | — |
-| **Queen Bee** | ⚠️ **スタブ** | 基盤完了 | **`_plan_tasks()` が固定1タスク返却** — LLMタスク分解未実装 (→ M4-1) |
+| **Queen Bee** | ✅ M4-1進行中 | LLMタスク分解実装済 | `_plan_tasks()` → `TaskPlanner` でLLM分解＋依存分析＋フォールバック実装済（M4-1-a/b完了） |
 | **Worker Bee** | ✅ 完了 | ツール実行, リトライ, Trust | — |
 | **Sentinel Hornet** | ✅ M3-6完了 | 7検出パターン + KPI劣化検出 + ロールバック/隔離 | `_calc_incident_rate()` は失敗エピソード比率で算出（§8 P-02参照） |
 | **VS Code拡張** (コマンド) | ✅ M2-1完了 | API接続コード作成済、TSコンパイル+Lint確認済 | **実際のE2E動作テスト未実施** (M2-1-f) |
@@ -475,7 +475,7 @@ M1〜M3完了。次は M4（自律）。
 
 | # | ファイル | 箇所 | 現状 | 解消マイルストーン |
 |---|---------|------|------|-------------------|
-| S-01 | `queen_bee/server.py:389-398` | `_plan_tasks()` | 固定1タスク `[{"task_id": ..., "goal": goal}]` を返却。LLMタスク分解なし | M4-1 |
+| S-01 | ~~`queen_bee/server.py`~~ → `queen_bee/planner.py` | `_plan_tasks()` | ~~固定1タスク返却~~ → `TaskPlanner` でLLMタスク分解＋依存分析（`execution_order`）＋フォールバック実装済 | ✅ M4-1-a/b 解消 |
 | S-02 | `beekeeper/server.py:728-734` | `_ask_user()` | ユーザー入力を実際に待たず即応答を返却 (`# TODO: VS Code拡張に通知してユーザー入力を待つ`) | M2-2 |
 | S-03 | `forager_bee/explorer.py:43-52` | `_run_single()` | 全シナリオを無条件 `passed=True` で返却。LLM統合後に実装 | M4-2 |
 
@@ -521,7 +521,7 @@ M1〜M3完了。次は M4（自律）。
 
 | 優先度 | 項目 | 理由 |
 |--------|------|------|
-| **🔴 最優先** | S-01 `_plan_tasks()` | M4-1の主目標。これなしでは自律動作不可 |
+| ~~✅ 解消~~ | ~~S-01 `_plan_tasks()`~~ | TaskPlanner でLLMタスク分解＋依存分析実装済 (M4-1-a/b) |
 | **🔴 最優先** | S-02 `_ask_user()` | M2-2の主目標。ユーザーインタラクション未接続 |
 | **🟡 次点** | S-03 `_run_single()` | M4-2でLLM統合後に自然解消 |
 | **🟡 次点** | P-02 `_calc_incident_rate()` | Sentinel Hornet介入の直接計測は今後の課題 |

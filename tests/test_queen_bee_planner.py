@@ -390,3 +390,231 @@ class TestTaskPlannerPlan:
 
         # Assert
         assert len(plan.tasks) == 1
+
+
+# =========================================================================
+# PlannedTask depends_on のテスト
+# =========================================================================
+
+
+class TestPlannedTaskDependsOn:
+    """PlannedTaskのdepends_onフィールドのテスト"""
+
+    def test_default_no_dependencies(self):
+        """デフォルトでは依存なし（空リスト）"""
+        # Act
+        task = PlannedTask(goal="テスト")
+
+        # Assert
+        assert task.depends_on == []
+
+    def test_with_dependencies(self):
+        """depends_onに依存タスクIDを指定できる"""
+        # Act
+        task = PlannedTask(task_id="task-2", goal="API実装", depends_on=["task-1"])
+
+        # Assert
+        assert task.depends_on == ["task-1"]
+
+    def test_multiple_dependencies(self):
+        """複数の依存タスクを指定できる"""
+        # Act
+        task = PlannedTask(task_id="task-3", goal="結合テスト", depends_on=["task-1", "task-2"])
+
+        # Assert
+        assert len(task.depends_on) == 2
+
+
+# =========================================================================
+# TaskPlan.execution_order のテスト
+# =========================================================================
+
+
+class TestTaskPlanExecutionOrder:
+    """execution_orderメソッドのテスト"""
+
+    def test_single_task(self):
+        """単一タスクは1層"""
+        # Arrange
+        plan = TaskPlan(tasks=[PlannedTask(task_id="t1", goal="テスト")])
+
+        # Act
+        layers = plan.execution_order()
+
+        # Assert
+        assert layers == [["t1"]]
+
+    def test_independent_tasks_are_parallel(self):
+        """依存関係がないタスクは同じ層で並列"""
+        # Arrange
+        plan = TaskPlan(
+            tasks=[
+                PlannedTask(task_id="t1", goal="DB設計"),
+                PlannedTask(task_id="t2", goal="UI設計"),
+            ]
+        )
+
+        # Act
+        layers = plan.execution_order()
+
+        # Assert: 同じ層に2つ
+        assert len(layers) == 1
+        assert sorted(layers[0]) == ["t1", "t2"]
+
+    def test_sequential_dependency(self):
+        """直列依存は複数層に分離"""
+        # Arrange
+        plan = TaskPlan(
+            tasks=[
+                PlannedTask(task_id="t1", goal="DB設計"),
+                PlannedTask(task_id="t2", goal="API実装", depends_on=["t1"]),
+                PlannedTask(task_id="t3", goal="テスト", depends_on=["t2"]),
+            ]
+        )
+
+        # Act
+        layers = plan.execution_order()
+
+        # Assert: 3層
+        assert layers == [["t1"], ["t2"], ["t3"]]
+
+    def test_diamond_dependency(self):
+        """ダイヤモンド依存: t1→(t2,t3)→t4"""
+        # Arrange
+        plan = TaskPlan(
+            tasks=[
+                PlannedTask(task_id="t1", goal="基盤"),
+                PlannedTask(task_id="t2", goal="機能A", depends_on=["t1"]),
+                PlannedTask(task_id="t3", goal="機能B", depends_on=["t1"]),
+                PlannedTask(task_id="t4", goal="結合", depends_on=["t2", "t3"]),
+            ]
+        )
+
+        # Act
+        layers = plan.execution_order()
+
+        # Assert: t1 → (t2,t3) → t4
+        assert layers == [["t1"], ["t2", "t3"], ["t4"]]
+
+    def test_circular_dependency_raises(self):
+        """循環依存はValueErrorを発生させる"""
+        # Arrange
+        plan = TaskPlan(
+            tasks=[
+                PlannedTask(task_id="t1", goal="A", depends_on=["t2"]),
+                PlannedTask(task_id="t2", goal="B", depends_on=["t1"]),
+            ]
+        )
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="循環依存"):
+            plan.execution_order()
+
+    def test_unknown_dependency_ignored(self):
+        """存在しないタスクIDへの依存は無視される"""
+        # Arrange
+        plan = TaskPlan(
+            tasks=[
+                PlannedTask(task_id="t1", goal="テスト", depends_on=["nonexistent"]),
+            ]
+        )
+
+        # Act
+        layers = plan.execution_order()
+
+        # Assert: 不明な依存は無視、t1は実行可能
+        assert layers == [["t1"]]
+
+
+# =========================================================================
+# TaskPlan.is_parallelizable のテスト
+# =========================================================================
+
+
+class TestTaskPlanIsParallelizable:
+    """is_parallelizableメソッドのテスト"""
+
+    def test_single_task_not_parallelizable(self):
+        """単一タスクは並列化不可"""
+        # Arrange
+        plan = TaskPlan(tasks=[PlannedTask(task_id="t1", goal="テスト")])
+
+        # Assert
+        assert plan.is_parallelizable() is False
+
+    def test_independent_tasks_parallelizable(self):
+        """独立タスクは並列化可能"""
+        # Arrange
+        plan = TaskPlan(
+            tasks=[
+                PlannedTask(task_id="t1", goal="A"),
+                PlannedTask(task_id="t2", goal="B"),
+            ]
+        )
+
+        # Assert
+        assert plan.is_parallelizable() is True
+
+    def test_sequential_tasks_not_parallelizable(self):
+        """完全直列タスクは並列化不可"""
+        # Arrange
+        plan = TaskPlan(
+            tasks=[
+                PlannedTask(task_id="t1", goal="A"),
+                PlannedTask(task_id="t2", goal="B", depends_on=["t1"]),
+            ]
+        )
+
+        # Assert
+        assert plan.is_parallelizable() is False
+
+
+# =========================================================================
+# TaskPlanner._parse_response id→task_id マッピングのテスト
+# =========================================================================
+
+
+class TestParseResponseIdMapping:
+    """_parse_responseのid→task_idマッピングテスト"""
+
+    @pytest.fixture
+    def planner(self):
+        mock_client = MagicMock(spec=LLMClient)
+        return TaskPlanner(mock_client)
+
+    def test_maps_id_to_task_id(self, planner):
+        """LLM出力の"id"が"task_id"にマッピングされる"""
+        # Arrange
+        content = json.dumps(
+            {
+                "tasks": [
+                    {"id": "task-1", "goal": "テスト1"},
+                    {"id": "task-2", "goal": "テスト2", "depends_on": ["task-1"]},
+                ]
+            }
+        )
+
+        # Act
+        plan = planner._parse_response(content)
+
+        # Assert
+        assert plan.tasks[0].task_id == "task-1"
+        assert plan.tasks[1].task_id == "task-2"
+        assert plan.tasks[1].depends_on == ["task-1"]
+
+    def test_existing_task_id_not_overwritten(self, planner):
+        """既にtask_idがある場合はidで上書きしない"""
+        # Arrange
+        content = json.dumps(
+            {
+                "tasks": [
+                    {"id": "id-value", "task_id": "real-id", "goal": "テスト"},
+                ]
+            }
+        )
+
+        # Act
+        plan = planner._parse_response(content)
+
+        # Assert
+        assert plan.tasks[0].task_id == "real-id"
