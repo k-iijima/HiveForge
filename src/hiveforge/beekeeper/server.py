@@ -90,6 +90,13 @@ class BeekeeperMCPServer:
 
             self.current_session.set_active()
 
+            if result.get("status") == "error":
+                return {
+                    "status": "error",
+                    "session_id": self.current_session.session_id,
+                    "error": result.get("error", "Unknown error"),
+                }
+
             return {
                 "status": "success",
                 "session_id": self.current_session.session_id,
