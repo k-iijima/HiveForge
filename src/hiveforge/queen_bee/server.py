@@ -388,14 +388,21 @@ class QueenBeeMCPServer:
 
     async def _plan_tasks(self, goal: str, context: dict[str, Any]) -> list[dict[str, Any]]:
         """LLMを使ってタスクを分解"""
-        # TODO: LLMでタスク分解を実装
-        # 現時点では単純に1タスクとして返す
-        return [
-            {
-                "task_id": generate_event_id(),
-                "goal": goal,
-            }
-        ]
+        from hiveforge.queen_bee.planner import TaskPlanner
+
+        try:
+            client = await self._get_llm_client()
+            planner = TaskPlanner(client)
+            plan = await planner.plan(goal, context)
+            return [
+                {"task_id": task.task_id, "goal": task.goal}
+                for task in plan.tasks
+            ]
+        except Exception:
+            logger.warning(
+                "タスク分解に失敗、単一タスクにフォールバック", exc_info=True
+            )
+            return [{"task_id": str(generate_event_id()), "goal": goal}]
 
     async def _execute_task(
         self,
