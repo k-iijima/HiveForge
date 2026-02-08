@@ -97,6 +97,13 @@ class EventType(StrEnum):
     GUARD_CONDITIONAL_PASSED = "guard.conditional_passed"
     GUARD_FAILED = "guard.failed"
 
+    # Pipeline イベント（監査性強化）
+    PIPELINE_STARTED = "pipeline.started"
+    PIPELINE_COMPLETED = "pipeline.completed"
+    PLAN_VALIDATION_FAILED = "plan.validation_failed"
+    PLAN_APPROVAL_REQUIRED = "plan.approval_required"
+    PLAN_FALLBACK_ACTIVATED = "plan.fallback_activated"
+
     # システムイベント
     HEARTBEAT = "system.heartbeat"
     ERROR = "system.error"
