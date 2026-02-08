@@ -5,7 +5,6 @@ GitHub Issue #14: P1-13: Run-Colony紐付け機能
 RunをColonyに紐付ける機能のテスト。v4互換のためcolony_idはオプショナル。
 """
 
-
 from hiveforge.core.events import (
     BaseEvent,
     EventType,

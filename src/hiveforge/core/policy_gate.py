@@ -33,7 +33,7 @@ class PolicyGate:
         Args:
             config: カスタム設定
                 - level3_irreversible_requires_approval: TrueならLevel 3 + IRREVERSIBLEも承認必須
-                - tool_overrides: ツールごとのオーバーライド設定
+                - scope_policies: スコープごとのポリシーオーバーライド（将来拡張用）
         """
         self.config = config or {}
 
@@ -53,12 +53,14 @@ class PolicyGate:
             action_class: READ_ONLY | REVERSIBLE | IRREVERSIBLE
             trust_level: 0-3
             scope: "hive" | "colony" | "run" | "task"
-            scope_id: スコープ対象のID（任意）
-            context: 追加コンテキスト（ツール名、パラメータ等）
+            scope_id: スコープ対象のID（将来のスコープ別ポリシー用）
+            context: 追加コンテキスト（将来のツール別ポリシー用。ツール名、パラメータ等）
 
         Returns:
             PolicyDecision: ALLOW | REQUIRE_APPROVAL | DENY
         """
+        _ = scope_id  # 将来のスコープ別ポリシー拡張用
+        _ = context  # 将来のツール別ポリシー拡張用
         # READ_ONLY は常に許可
         if action_class == ActionClass.READ_ONLY:
             return PolicyDecision.ALLOW

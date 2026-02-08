@@ -8,6 +8,7 @@ VS Code拡張のAgent Monitorパネルにストリーム配信する基盤。
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections import deque
 from collections.abc import Awaitable, Callable
@@ -117,8 +118,11 @@ class ActivityEvent:
 # サブスクライバーの型
 ActivityHandler = Callable[[ActivityEvent], Awaitable[None]]
 
-# 最近のイベント保持上限
-MAX_RECENT_EVENTS = 100
+# 最近のイベント保持上限（デフォルト値）
+DEFAULT_MAX_RECENT_EVENTS = 100
+
+# ハンドラー単位のタイムアウト（秒）
+HANDLER_TIMEOUT = 10.0
 
 
 class ActivityBus:
@@ -126,13 +130,18 @@ class ActivityBus:
 
     各エージェントの活動をリアルタイムに配信する。
     サブスクライバーパターンで、SSEエンドポイントやWebviewに接続。
+
+    Args:
+        max_recent_events: 保持する最近のイベント数の上限。
+            運用環境の流量に応じて調整可能。デフォルトは100。
     """
 
     _instance: ActivityBus | None = None
 
-    def __init__(self) -> None:
+    def __init__(self, max_recent_events: int = DEFAULT_MAX_RECENT_EVENTS) -> None:
+        self._max_recent_events = max_recent_events
         self._subscribers: list[ActivityHandler] = []
-        self._recent_events: deque[ActivityEvent] = deque(maxlen=MAX_RECENT_EVENTS)
+        self._recent_events: deque[ActivityEvent] = deque(maxlen=max_recent_events)
         self._active_agents: dict[str, AgentInfo] = {}  # agent_id -> AgentInfo
 
     @classmethod
@@ -158,7 +167,9 @@ class ActivityBus:
     async def emit(self, event: ActivityEvent) -> None:
         """イベントを発行
 
-        全てのサブスクライバーに通知し、履歴に保存する。
+        全てのサブスクライバーに並列通知し、履歴に保存する。
+        asyncio.gatherで並列実行し、遅いハンドラーが他をブロックしない。
+        ハンドラー単位でタイムアウト制御を行う。
         サブスクライバーのエラーは他のサブスクライバーに影響しない。
         """
         # 履歴に保存
@@ -170,17 +181,27 @@ class ActivityBus:
         elif event.activity_type == ActivityType.AGENT_COMPLETED:
             self._active_agents.pop(event.agent.agent_id, None)
 
-        # サブスクライバーに通知
-        for handler in self._subscribers:
-            try:
-                await handler(event)
-            except Exception:
-                logger.exception(f"アクティビティハンドラーエラー: {handler.__name__}")
+        # サブスクライバーに並列通知（タイムアウト付き）
+        if self._subscribers:
 
-    def get_recent_events(self, limit: int = MAX_RECENT_EVENTS) -> list[ActivityEvent]:
+            async def _safe_call(handler: ActivityHandler) -> None:
+                try:
+                    await asyncio.wait_for(handler(event), timeout=HANDLER_TIMEOUT)
+                except TimeoutError:
+                    logger.warning(f"アクティビティハンドラータイムアウト: {handler.__name__}")
+                except Exception:
+                    logger.exception(f"アクティビティハンドラーエラー: {handler.__name__}")
+
+            await asyncio.gather(
+                *[_safe_call(h) for h in self._subscribers],
+                return_exceptions=True,
+            )
+
+    def get_recent_events(self, limit: int | None = None) -> list[ActivityEvent]:
         """最近のイベント履歴を取得"""
         events = list(self._recent_events)
-        return events[-limit:]
+        effective_limit = limit if limit is not None else self._max_recent_events
+        return events[-effective_limit:]
 
     def get_active_agents(self) -> list[AgentInfo]:
         """アクティブなエージェント一覧を取得"""

@@ -3,7 +3,6 @@
 外部フィードバック対応: 共通のエラー分類と失敗理由の標準化。
 """
 
-
 from hiveforge.core.events import (
     EVENT_TYPE_MAP,
     EventType,

@@ -6,7 +6,10 @@ JCS正規化によるSHA-256ハッシュを持つ。
 """
 
 import json
-from datetime import UTC
+from datetime import UTC, date, timedelta
+from decimal import Decimal
+from pathlib import PurePosixPath
+from uuid import UUID
 
 import pytest
 from pydantic import ValidationError
@@ -170,6 +173,90 @@ class TestComputeHash:
         assert result[0] == "2024-01-01T12:00:00+00:00"
         assert result[1] == "string"
         assert result[2]["nested"] == "2024-01-01T12:00:00+00:00"
+
+    def test_serialize_pydantic_model(self):
+        """Pydanticモデルがdictにシリアライズされる
+
+        payloadにPydanticモデルが混入してもjcs.canonicalizeで
+        例外が発生せず、正しくシリアライズされることを確認。
+        """
+        from pydantic import BaseModel
+
+        from hiveforge.core.events import _serialize_value
+
+        # Arrange: Pydanticモデルを含むデータ
+        class InnerModel(BaseModel):
+            name: str = "test"
+            value: int = 42
+
+        model = InnerModel()
+
+        # Act: シリアライズ
+        result = _serialize_value(model)
+
+        # Assert: dictに変換されている
+        assert isinstance(result, dict)
+        assert result["name"] == "test"
+        assert result["value"] == 42
+
+    def test_serialize_set_and_frozenset(self):
+        """setとfrozensetがソートされたリストにシリアライズされる
+
+        JCS互換のために、順序を決定論的にする必要がある。
+        """
+        from hiveforge.core.events import _serialize_value
+
+        # Arrange: setとfrozensetを含むデータ
+        data_set = {3, 1, 2}
+        data_frozenset = frozenset(["c", "a", "b"])
+
+        # Act: シリアライズ
+        result_set = _serialize_value(data_set)
+        result_frozenset = _serialize_value(data_frozenset)
+
+        # Assert: ソートされたリストに変換
+        assert result_set == [1, 2, 3]
+        assert result_frozenset == ["a", "b", "c"]
+
+    def test_serialize_tuple(self):
+        """tupleがリストにシリアライズされる"""
+        from hiveforge.core.events import _serialize_value
+
+        # Arrange
+        data = (1, "two", 3.0)
+
+        # Act
+        result = _serialize_value(data)
+
+        # Assert
+        assert result == [1, "two", 3.0]
+
+    def test_serialize_bytes(self):
+        """bytesが16進文字列にシリアライズされる"""
+        from hiveforge.core.events import _serialize_value
+
+        # Arrange
+        data = b"\xde\xad\xbe\xef"
+
+        # Act
+        result = _serialize_value(data)
+
+        # Assert
+        assert result == "deadbeef"
+
+    def test_compute_hash_with_pydantic_payload(self):
+        """Pydanticモデルを含むdictでもハッシュが計算できる"""
+        from pydantic import BaseModel
+
+        # Arrange
+        class Payload(BaseModel):
+            msg: str = "hello"
+
+        data = {"type": "test", "payload": Payload()}
+
+        # Act & Assert: 例外が発生しないことを確認
+        hash_value = compute_hash(data)
+        assert len(hash_value) == 64
 
 
 class TestEventImmutability:
@@ -733,3 +820,211 @@ class TestEventTypeMapCompleteness:
         assert missing == set(), (
             f"EVENT_TYPE_MAP に未登録の EventType があります: {sorted(m.value for m in missing)}"
         )
+
+
+class TestSerializeValueJcsSafety:
+    """_serialize_value のJCS互換性安全テスト
+
+    compute_hash前にpayloadの全値がJCS互換のプリミティブ型に
+    変換されることを保証し、チェーン整合性の破綻を未然に防ぐ。
+    """
+
+    def test_serialize_uuid(self):
+        """UUIDが文字列に変換される"""
+        from hiveforge.core.events import _serialize_value
+
+        # Arrange
+        uuid_val = UUID("12345678-1234-5678-1234-567812345678")
+
+        # Act
+        result = _serialize_value(uuid_val)
+
+        # Assert
+        assert result == "12345678-1234-5678-1234-567812345678"
+        assert isinstance(result, str)
+
+    def test_serialize_date(self):
+        """date（datetimeでない）がISO文字列に変換される"""
+        from hiveforge.core.events import _serialize_value
+
+        # Arrange
+        date_val = date(2026, 2, 8)
+
+        # Act
+        result = _serialize_value(date_val)
+
+        # Assert
+        assert result == "2026-02-08"
+        assert isinstance(result, str)
+
+    def test_serialize_timedelta(self):
+        """timedeltaが秒数に変換される"""
+        from hiveforge.core.events import _serialize_value
+
+        # Arrange
+        td = timedelta(hours=1, minutes=30)
+
+        # Act
+        result = _serialize_value(td)
+
+        # Assert
+        assert result == 5400.0
+
+    def test_serialize_decimal(self):
+        """Decimalがfloatに変換される"""
+        from hiveforge.core.events import _serialize_value
+
+        # Arrange
+        dec = Decimal("3.14")
+
+        # Act
+        result = _serialize_value(dec)
+
+        # Assert
+        assert result == 3.14
+        assert isinstance(result, float)
+
+    def test_serialize_decimal_infinity_raises(self):
+        """Decimal('Infinity')はValueErrorを送出する"""
+        from hiveforge.core.events import _serialize_value
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="JCS非互換"):
+            _serialize_value(Decimal("Infinity"))
+
+    def test_serialize_purepath(self):
+        """PurePathが文字列に変換される"""
+        from hiveforge.core.events import _serialize_value
+
+        # Arrange
+        path = PurePosixPath("/workspace/HiveForge/src")
+
+        # Act
+        result = _serialize_value(path)
+
+        # Assert
+        assert result == "/workspace/HiveForge/src"
+        assert isinstance(result, str)
+
+    def test_serialize_float_inf_raises(self):
+        """float('inf')はValueErrorを送出する
+
+        JSON仕様にinfは存在しないため、JCSでの正規化は不可能。
+        """
+        from hiveforge.core.events import _serialize_value
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="inf"):
+            _serialize_value(float("inf"))
+
+    def test_serialize_float_nan_raises(self):
+        """float('nan')はValueErrorを送出する"""
+        from hiveforge.core.events import _serialize_value
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="nan"):
+            _serialize_value(float("nan"))
+
+    def test_serialize_unsupported_type_raises_typeerror(self):
+        """サポート外の型はTypeErrorを送出する
+
+        暗黙的にスルーしてJCSで壊れるのではなく、
+        明示的なエラーで問題箇所を特定しやすくする。
+        """
+        import re
+
+        from hiveforge.core.events import _serialize_value
+
+        # Act & Assert: 正規表現パターンはサポート外
+        with pytest.raises(TypeError, match="JCS互換に変換できない型"):
+            _serialize_value(re.compile(r"test"))
+
+    def test_serialize_custom_object_raises_typeerror(self):
+        """カスタムオブジェクトはTypeErrorを送出する"""
+        from hiveforge.core.events import _serialize_value
+
+        class CustomObj:
+            pass
+
+        # Act & Assert
+        with pytest.raises(TypeError, match="JCS互換に変換できない型"):
+            _serialize_value(CustomObj())
+
+    def test_serialize_none_passthrough(self):
+        """NoneはそのままJCS互換（null）として通る"""
+        from hiveforge.core.events import _serialize_value
+
+        # Act
+        result = _serialize_value(None)
+
+        # Assert
+        assert result is None
+
+    def test_serialize_finite_float_passthrough(self):
+        """有限floatはそのまま通る"""
+        from hiveforge.core.events import _serialize_value
+
+        # Act
+        result = _serialize_value(3.14)
+
+        # Assert
+        assert result == 3.14
+
+    def test_serialize_int_passthrough(self):
+        """intはそのまま通る"""
+        from hiveforge.core.events import _serialize_value
+
+        # Act
+        result = _serialize_value(42)
+
+        # Assert
+        assert result == 42
+
+    def test_serialize_bool_passthrough(self):
+        """boolはそのまま通る（intのサブクラスだが別扱い）"""
+        from hiveforge.core.events import _serialize_value
+
+        # Act & Assert: boolがintにすり替わらないことを確認
+        assert _serialize_value(True) is True
+        assert _serialize_value(False) is False
+
+    def test_compute_hash_with_uuid_payload(self):
+        """UUIDを含むpayloadでcompute_hashが正常に計算できる"""
+        # Arrange
+        data = {
+            "type": "test",
+            "payload": {"request_id": UUID("abcdef01-2345-6789-abcd-ef0123456789")},
+        }
+
+        # Act & Assert: 例外が発生しない
+        result = compute_hash(data)
+        assert len(result) == 64
+
+    def test_compute_hash_with_mixed_types_payload(self):
+        """様々なJCS互換型を含むpayloadの決定論的ハッシュ"""
+        # Arrange
+        data1 = {
+            "type": "test",
+            "payload": {
+                "uuid": UUID("12345678-0000-0000-0000-000000000000"),
+                "date": date(2026, 1, 1),
+                "decimal": Decimal("1.5"),
+                "timedelta": timedelta(seconds=60),
+            },
+        }
+        data2 = {
+            "type": "test",
+            "payload": {
+                "uuid": UUID("12345678-0000-0000-0000-000000000000"),
+                "date": date(2026, 1, 1),
+                "decimal": Decimal("1.5"),
+                "timedelta": timedelta(seconds=60),
+            },
+        }
+
+        # Act
+        hash1 = compute_hash(data1)
+        hash2 = compute_hash(data2)
+
+        # Assert: 同じデータから同じハッシュ
+        assert hash1 == hash2

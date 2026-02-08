@@ -6,15 +6,22 @@ BaseEvent, UnknownEvent, generate_event_id, compute_hash の定義。
 from __future__ import annotations
 
 import hashlib
-from datetime import UTC, datetime
+import math
+from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 from enum import Enum
+from pathlib import PurePath
 from typing import Any
+from uuid import UUID
 
 import jcs
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, field_validator
 from ulid import ULID
 
 from .types import EventType
+
+# UnknownEvent の original_data サイズ上限（バイト）
+MAX_ORIGINAL_DATA_SIZE = 1024 * 1024  # 1MB
 
 
 def generate_event_id() -> str:
@@ -22,17 +29,65 @@ def generate_event_id() -> str:
     return str(ULID())
 
 
+# JCSが直接扱えるプリミティブ型
+_JCS_PRIMITIVES = (str, int, bool, type(None))
+
+
 def _serialize_value(value: Any) -> Any:
-    """JCSシリアライズ用に値を変換"""
-    if isinstance(value, datetime):
+    """JCSシリアライズ用に値を変換
+
+    payloadに含まれうる様々な型をJCS互換のプリミティブ型に変換する。
+    サポート外の型が渡された場合はTypeErrorを送出し、
+    ハッシュ整合性の破綻を未然に防ぐ。
+
+    サポートする型:
+        - プリミティブ: str, int, float(有限値), bool, None
+        - コレクション: dict, list, tuple, set, frozenset
+        - 日時: datetime, date, timedelta
+        - 識別子: UUID, bytes
+        - パス: PurePath (及びサブクラス)
+        - 数値: Decimal
+        - Enum, Pydantic BaseModel
+
+    Raises:
+        TypeError: JCS互換に変換できない型が含まれる場合
+        ValueError: float('inf') / float('nan') が含まれる場合
+    """
+    if isinstance(value, _JCS_PRIMITIVES):
+        return value
+    elif isinstance(value, float):
+        if math.isnan(value) or math.isinf(value):
+            raise ValueError(f"JCS非互換の浮動小数点値: {value} (inf/nanはJSON仕様外です)")
+        return value
+    elif isinstance(value, (datetime, date)):
         return value.isoformat()
+    elif isinstance(value, timedelta):
+        return value.total_seconds()
+    elif isinstance(value, Decimal):
+        # 有限値のみ許可
+        if not value.is_finite():
+            raise ValueError(f"JCS非互換のDecimal値: {value}")
+        return float(value)
+    elif isinstance(value, (UUID, PurePath)):
+        return str(value)
     elif isinstance(value, Enum):
         return value.value
+    elif isinstance(value, BaseModel):
+        return _serialize_value(value.model_dump())
     elif isinstance(value, dict):
         return {k: _serialize_value(v) for k, v in value.items()}
-    elif isinstance(value, list):
+    elif isinstance(value, (list, tuple)):
         return [_serialize_value(v) for v in value]
-    return value
+    elif isinstance(value, (set, frozenset)):
+        return sorted(_serialize_value(v) for v in value)
+    elif isinstance(value, bytes):
+        return value.hex()
+    else:
+        raise TypeError(
+            f"JCS互換に変換できない型です: {type(value).__name__} "
+            f"(値: {value!r}). "
+            "payloadにはJCS互換のプリミティブ型のみを使用してください。"
+        )
 
 
 def compute_hash(data: dict[str, Any]) -> str:
@@ -50,6 +105,7 @@ class BaseEvent(BaseModel):
     """
 
     model_config = {
+        "strict": True,
         "frozen": True,
         "ser_json_timedelta": "iso8601",
     }
@@ -92,10 +148,35 @@ class BaseEvent(BaseModel):
 
 
 class UnknownEvent(BaseEvent):
-    """未知のイベントタイプを表すクラス（前方互換性）"""
+    """未知のイベントタイプを表すクラス（前方互換性）
+
+    外部入力由来の不正・巨大payloadに対するセーフガードとして、
+    original_dataにサイズ上限(MAX_ORIGINAL_DATA_SIZE)を設ける。
+    """
 
     type: str = Field(..., description="未知のイベントタイプ")
     original_data: dict[str, Any] = Field(
         default_factory=dict,
-        description="元のイベントデータ（全フィールドを保持）",
+        description="元のイベントデータ（全フィールドを保持、サイズ上限あり）",
     )
+
+    @field_validator("original_data", mode="before")
+    @classmethod
+    def validate_original_data_size(cls, v: Any) -> Any:
+        """original_dataのサイズを制限し、巨大payloadによるメモリ肥大化を防ぐ"""
+        import json
+
+        if isinstance(v, dict):
+            try:
+                size = len(json.dumps(v, default=str).encode("utf-8"))
+            except (TypeError, ValueError):
+                size = 0
+            if size > MAX_ORIGINAL_DATA_SIZE:
+                # サイズ超過時は切り詰めたメタデータのみ保持
+                return {
+                    "_truncated": True,
+                    "_original_size": size,
+                    "_max_size": MAX_ORIGINAL_DATA_SIZE,
+                    "type": v.get("type", "unknown"),
+                }
+        return v

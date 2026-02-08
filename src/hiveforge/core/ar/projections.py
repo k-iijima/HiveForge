@@ -165,7 +165,9 @@ class RunProjector:
             更新後の投影
         """
         self.projection.event_count += 1
-        handler = getattr(self, f"_handle_{event.type.value.replace('.', '_')}", None)
+        # EventType (StrEnum) または str の両方に対応
+        type_str = event.type.value if hasattr(event.type, "value") else event.type
+        handler = getattr(self, f"_handle_{type_str.replace('.', '_')}", None)
         if handler:
             handler(event)
         return self.projection

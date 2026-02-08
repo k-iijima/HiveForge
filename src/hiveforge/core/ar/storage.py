@@ -70,9 +70,12 @@ class AkashicRecord:
     ) -> str | None:
         """ファイル末尾から最後のイベントのハッシュを取得
 
-        完全なJSONL行が見つかるまでチャンクサイズを拡張しながら読み込む。
+        完全なJSONL行が見つかるまでチャンクサイズを段階的に拡張しながら読み込む。
         これにより、非常に長い行（10KB超のペイロードを含むイベント）でも
         正しくprev_hashを取得できる。
+
+        ファイル全体の読み込みは行わず、段階的にチャンクサイズを拡大して探索する。
+        最大でファイルサイズまで探索するが、メモリ消費を抑制する。
 
         Args:
             f: ファイルオブジェクト（バイナリモード）
@@ -82,11 +85,17 @@ class AkashicRecord:
         Returns:
             最後のイベントのハッシュ、または取得できない場合はNone
         """
-        chunk_size = initial_chunk_size
-        max_chunk_size = min(file_size, 1024 * 1024)  # 最大1MB
+        chunk_size = min(initial_chunk_size, file_size)
+        # 段階的に拡張する上限をファイルサイズまで許容
+        # ただし一度に読み込むのは最大16MBに制限
+        max_chunk_size = min(file_size, 16 * 1024 * 1024)
+        # ファイル全体を読んでいるかどうかのフラグ
+        covers_entire_file = False
 
         while chunk_size <= max_chunk_size:
-            f.seek(max(0, file_size - chunk_size))
+            read_start = max(0, file_size - chunk_size)
+            covers_entire_file = read_start == 0
+            f.seek(read_start)
             chunk_bytes = f.read()
 
             # UTF-8としてデコード（先頭の不完全なマルチバイト文字はスキップ）
@@ -101,27 +110,18 @@ class AkashicRecord:
                         last_event = parse_event(line)
                         return last_event.hash
                     except Exception:
-                        # パースに失敗した場合、行が不完全な可能性がある
+                        if covers_entire_file:
+                            # ファイル全体を読んでいる場合、行は完全なので
+                            # 壊れた行をスキップして次の行を試す
+                            continue
+                        # 部分読み込みの場合、行が不完全な可能性がある
                         # チャンクサイズを拡張して再試行
                         break
 
-            # チャンクサイズを2倍に拡張
-            chunk_size *= 2
-
-        # 最終手段：ファイル全体を読み込む
-        if chunk_size > max_chunk_size and file_size > 0:
-            f.seek(0)
-            chunk_bytes = f.read()
-            chunk = chunk_bytes.decode("utf-8")
-            lines = chunk.strip().split("\n")
-
-            for line in reversed(lines):
-                line = line.strip()
-                if line:
-                    try:
-                        return parse_event(line).hash
-                    except Exception:
-                        pass
+            # チャンクサイズを拡張（最大でfile_sizeまで）
+            if chunk_size >= max_chunk_size:
+                break  # ファイル全範囲を試行済み
+            chunk_size = min(chunk_size * 2, max_chunk_size)
 
         return None
 

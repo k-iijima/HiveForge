@@ -10,6 +10,7 @@
 # --- 列挙型 ---
 # --- 基底クラス・ユーティリティ ---
 from .base import (
+    MAX_ORIGINAL_DATA_SIZE,
     BaseEvent,
     UnknownEvent,
     _serialize_value,
@@ -140,6 +141,7 @@ __all__ = [
     "RiskLevel",
     # 基底
     "BaseEvent",
+    "MAX_ORIGINAL_DATA_SIZE",
     "UnknownEvent",
     "_serialize_value",
     "compute_hash",

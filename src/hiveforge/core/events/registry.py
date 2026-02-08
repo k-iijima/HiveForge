@@ -6,6 +6,7 @@ EVENT_TYPE_MAP と parse_event() の定義。
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from typing import Any
 
 from .base import BaseEvent, UnknownEvent, generate_event_id
@@ -183,6 +184,12 @@ def parse_event(data: dict[str, Any] | str) -> BaseEvent:
     try:
         event_type = EventType(data["type"])
         event_class = EVENT_TYPE_MAP.get(event_type, BaseEvent)
+        # strict=Trueモードではstr→StrEnum/datetime自動変換されないため、
+        # 事前に型変換を行う
+        data = dict(data)
+        data["type"] = event_type
+        if isinstance(data.get("timestamp"), str):
+            data["timestamp"] = datetime.fromisoformat(data["timestamp"])
         return event_class.model_validate(data)
     except ValueError:
         return UnknownEvent(

@@ -4,7 +4,6 @@ GitHub Issue #7: P1-06: Hive REST API エンドポイント
 """
 
 
-
 class TestHiveRoutes:
     """Hive REST APIルートのテスト"""
 

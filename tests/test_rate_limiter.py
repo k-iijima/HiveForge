@@ -558,6 +558,8 @@ class TestRateLimiterWait:
 
         バケットにトークンが不足している場合、wait内で
         asyncio.sleepが呼ばれてから再充填される。
+        ロック外sleepのwhile-loop設計のため、sleepの副作用で
+        時間を進めてループが終了するようにする。
         """
         from unittest.mock import AsyncMock, patch
 
@@ -566,12 +568,18 @@ class TestRateLimiterWait:
         limiter = RateLimiter(config)
         limiter._state.tokens = 0.0
 
-        # Act: asyncio.sleepをモック
+        # Act: asyncio.sleepをモックし、呼ばれたら時間を進める
+        async def advance_time(*args):
+            # sleepが呼ばれたらlast_refillを十分過去にずらし、
+            # 次の_refill_tokensでトークンが補充されるようにする
+            limiter._state.last_refill -= 10.0
+
         with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+            mock_sleep.side_effect = advance_time
             await limiter.wait(tokens=1)
 
-        # Assert: sleepが呼ばれた
-        mock_sleep.assert_called_once()
+        # Assert: sleepが少なくとも1回呼ばれた
+        mock_sleep.assert_called()
 
     @pytest.mark.asyncio
     async def test_acquire_with_tokens_minute_limit(self):
@@ -588,8 +596,122 @@ class TestRateLimiterWait:
         limiter._state.token_count_minute = 95
 
         # Act: 10トークン要求 → 制限超過 → sleepが呼ばれる
+        # sleepが呼ばれたらminute_startを十分過去にしてウィンドウリセットさせる
+        async def advance_time(*args):
+            limiter._state.minute_start -= 120.0
+
         with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+            mock_sleep.side_effect = advance_time
             await limiter.acquire_with_tokens(10)
 
         # Assert: sleepで待機が発生した
-        mock_sleep.assert_called_once()
+        mock_sleep.assert_called()
+
+
+class TestRateLimiterConcurrency:
+    """RateLimiterの並行性テスト
+
+    ロックを保持したままsleepしないことを検証するストレステスト。
+    複数の呼び出しが直列化されず、並行して進行できることを確認する。
+    """
+
+    @pytest.mark.asyncio
+    async def test_concurrent_wait_not_serialized(self):
+        """複数のwait()が並行して進行できる（ロック保持中sleepしない）
+
+        トークン不足時にロック外でsleepすることで、
+        他の呼び出しがロックを取得してトークン補充・消費できることを確認。
+        """
+        # Arrange: トークンが2つだけのリミッター
+        config = RateLimitConfig(
+            requests_per_minute=120,  # 2 tokens/sec
+            burst_limit=2,
+        )
+        limiter = RateLimiter(config)
+
+        results: list[float] = []
+
+        async def timed_wait():
+            start = time.monotonic()
+            await limiter.wait()
+            elapsed = time.monotonic() - start
+            results.append(elapsed)
+
+        # Act: 4リクエストを同時に発行（バースト2 + レート2/sec）
+        tasks = [asyncio.create_task(timed_wait()) for _ in range(4)]
+        await asyncio.gather(*tasks)
+
+        # Assert: 全リクエストが完了している
+        assert len(results) == 4
+        # 全リクエストが4秒以内に完了する（直列化されていれば遅くなる）
+        assert max(results) < 4.0
+
+    @pytest.mark.asyncio
+    async def test_concurrent_acquire_with_tokens_not_serialized(self):
+        """複数のacquire_with_tokens()が並行して進行できる
+
+        ロック外でsleepする構造により、他の呼び出しがブロックされないことを確認。
+        """
+        # Arrange: トークン制限が緩やかなリミッター
+        config = RateLimitConfig(
+            requests_per_minute=120,
+            tokens_per_minute=1000,
+            max_concurrent=10,
+            burst_limit=20,
+        )
+        limiter = RateLimiter(config)
+
+        completed: list[bool] = []
+
+        async def acquire_task(token_count: int):
+            ctx = await limiter.acquire_with_tokens(token_count)
+            async with ctx:
+                completed.append(True)
+
+        # Act: 5リクエストを同時に発行
+        tasks = [asyncio.create_task(acquire_task(100)) for _ in range(5)]
+        await asyncio.gather(*tasks)
+
+        # Assert: 全リクエストが完了
+        assert len(completed) == 5
+
+    @pytest.mark.asyncio
+    async def test_wait_releases_lock_during_sleep(self):
+        """wait()がsleep中にロックを解放していることを検証
+
+        ロック保持確認: wait中に別タスクがlock取得できれば
+        ロックが解放されている証拠。
+        """
+        # Arrange: トークンが1つだけのリミッター
+        config = RateLimitConfig(
+            requests_per_minute=60,
+            burst_limit=1,
+        )
+        limiter = RateLimiter(config)
+
+        # 1つ消費してトークンを枯渇させる
+        await limiter.wait()
+
+        lock_acquired_during_wait = False
+
+        async def try_lock():
+            """wait中にロックを取得できるか試す"""
+            nonlocal lock_acquired_during_wait
+            # 少し待ってからロック取得を試みる（waitがsleepに入った後に）
+            await asyncio.sleep(0.05)
+            # タイムアウト付きでロック取得を試みる
+            try:
+                async with asyncio.timeout(0.5):
+                    async with limiter._lock:
+                        lock_acquired_during_wait = True
+            except TimeoutError:
+                lock_acquired_during_wait = False
+
+        # Act: wait()と並行してロック取得を試みる
+        await asyncio.gather(
+            limiter.wait(),
+            try_lock(),
+        )
+
+        # Assert: wait中にロックが取得できた = ロックが解放されている
+        assert lock_acquired_during_wait, "wait()はsleep中にロックを解放すべき"

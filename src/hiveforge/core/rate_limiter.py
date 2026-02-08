@@ -116,40 +116,47 @@ class RateLimiter:
     async def wait(self, tokens: int = 1) -> None:
         """レート制限に従って待機
 
+        ロックを保持したままsleepしないよう、待機時間の算出後にロックを
+        解放してからsleepし、再取得して再チェックするループ構成。
+
         Args:
             tokens: 消費するトークン数（通常は1）
 
         Raises:
             RateLimitExceededError: 日次制限を超えた場合
         """
-        async with self._lock:
-            self._reset_minute_window()
-            self._reset_day_window()
-            self._refill_tokens()
+        while True:
+            async with self._lock:
+                self._reset_minute_window()
+                self._reset_day_window()
+                self._refill_tokens()
 
-            # 日次制限チェック
-            if (
-                self._config.requests_per_day > 0
-                and self._state.request_count_day >= self._config.requests_per_day
-            ):
-                raise RateLimitExceededError(
-                    "Daily request limit exceeded",
-                    retry_after=self._seconds_until_day_reset(),
-                )
+                # 日次制限チェック
+                if (
+                    self._config.requests_per_day > 0
+                    and self._state.request_count_day >= self._config.requests_per_day
+                ):
+                    raise RateLimitExceededError(
+                        "Daily request limit exceeded",
+                        retry_after=self._seconds_until_day_reset(),
+                    )
 
-            # トークンが足りない場合は待機時間を計算
-            if self._state.tokens < tokens:
-                wait_time = self._calculate_wait_time(tokens)
-                if wait_time > 0:
-                    # ロックを解放して待機
-                    await asyncio.sleep(wait_time)
-                    # 再取得
-                    self._refill_tokens()
+                # トークンが足りない場合は待機時間を計算
+                if self._state.tokens < tokens:
+                    wait_time = self._calculate_wait_time(tokens)
+                else:
+                    wait_time = 0.0
 
-            # トークン消費
-            self._state.tokens -= tokens
-            self._state.request_count_minute += 1
-            self._state.request_count_day += 1
+                if wait_time <= 0:
+                    # トークン消費して終了
+                    self._state.tokens -= tokens
+                    self._state.request_count_minute += 1
+                    self._state.request_count_day += 1
+                    return
+
+            # ロックを解放した状態でsleep
+            await asyncio.sleep(wait_time)
+            # ループ先頭でロック再取得・再チェック
 
     def _calculate_wait_time(self, tokens: int) -> float:
         """必要な待機時間を計算"""
@@ -184,20 +191,33 @@ class RateLimiter:
     async def acquire_with_tokens(self, llm_tokens: int) -> "RateLimitContext":
         """LLMトークン数を考慮してレート制限を取得
 
+        ロックを保持したままsleepしないよう、待機時間の算出後にロックを
+        解放してからsleepし、再取得して再チェックするループ構成。
+
         Args:
             llm_tokens: LLM APIで使用するトークン数（推定）
         """
-        async with self._lock:
-            self._reset_minute_window()
+        while True:
+            async with self._lock:
+                self._reset_minute_window()
 
-            # トークン/分の制限チェック
-            if self._state.token_count_minute + llm_tokens > self._config.tokens_per_minute:
-                wait_time = 60.0 - (time.monotonic() - self._state.minute_start)
-                if wait_time > 0:
-                    await asyncio.sleep(wait_time)
-                    self._reset_minute_window()
+                # トークン/分の制限チェック
+                if self._state.token_count_minute + llm_tokens > self._config.tokens_per_minute:
+                    wait_time = 60.0 - (time.monotonic() - self._state.minute_start)
+                    if wait_time > 0:
+                        # ロック外でsleepするためにbreakせずcontinue
+                        pass
+                    else:
+                        self._reset_minute_window()
+                        self._state.token_count_minute += llm_tokens
+                        break
+                else:
+                    self._state.token_count_minute += llm_tokens
+                    break
 
-            self._state.token_count_minute += llm_tokens
+            # ロックを解放した状態でsleep
+            await asyncio.sleep(wait_time)
+            # ループ先頭でロック再取得・再チェック
 
         return await self.acquire()
 

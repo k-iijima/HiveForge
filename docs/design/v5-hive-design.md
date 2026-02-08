@@ -1170,13 +1170,19 @@ policy:
   # Trust Level 3 でも IRREVERSIBLE は確認必須にするか
   level3_irreversible_requires_approval: true
   
-  # 特定ツールのオーバーライド
-  tool_overrides:
-    run_sql:
-      action_class: irreversible    # 強制的に irreversible に分類
-      always_require_approval: true # Trust Levelに関係なく確認必須
-    read_file:
-      action_class: read_only       # 明示的に read_only
+  # スコープ別ポリシー（将来拡張用）
+  scope_policies:
+    # スコープごとにデフォルト動作をオーバーライド
+    # colony:
+    #   default_trust_level: 2
+  
+  # コンテキスト別ポリシー（将来拡張用。ツール名・パラメータに基づく判定）
+  # context_policies:
+  #   run_sql:
+  #     action_class: irreversible    # 強制的に irreversible に分類
+  #     always_require_approval: true # Trust Levelに関係なく確認必須
+  #   read_file:
+  #     action_class: read_only       # 明示的に read_only
 ```
 
 ---

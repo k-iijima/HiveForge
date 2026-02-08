@@ -3,7 +3,6 @@
 外部フィードバック対応: Action Classの判定ロジックを中央集権化し、散在を防ぐ。
 """
 
-
 from hiveforge.core.models.action_class import ActionClass, TrustLevel
 from hiveforge.core.policy_gate import (
     PolicyDecision,

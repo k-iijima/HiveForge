@@ -3,7 +3,6 @@
 外部フィードバック対応: 操作をリスクレベルで分類し、Trust Levelと連携。
 """
 
-
 from hiveforge.core.models.action_class import (
     ActionClass,
     TrustLevel,

@@ -5,7 +5,6 @@ GitHub Issue #15: P1-14: Colony進捗自動更新
 Colony配下のRun/Task完了時に Colony の進捗を自動更新する。
 """
 
-
 from hiveforge.core.events import (
     RunCompletedEvent,
     RunFailedEvent,

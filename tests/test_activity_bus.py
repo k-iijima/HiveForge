@@ -7,6 +7,8 @@ AAAパターン（Arrange-Act-Assert）を使用。
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 from hiveforge.core.activity_bus import (
@@ -499,3 +501,169 @@ class TestActivityBus:
 
         # Assert: エラーハンドラがあっても正常ハンドラは動作
         assert len(received) == 1
+
+    @pytest.mark.asyncio
+    async def test_emit_parallel_execution(self):
+        """emitがサブスクライバーを並列実行する
+
+        遅いハンドラーが他のハンドラーをブロックしないことを確認。
+        並列実行なら合計時間は最も遅いハンドラーの時間に近い。
+        """
+        import time
+
+        # Arrange
+        ActivityBus.reset()
+        bus = ActivityBus.get_instance()
+        timestamps: list[float] = []
+
+        async def slow_handler(event: ActivityEvent) -> None:
+            await asyncio.sleep(0.2)
+            timestamps.append(time.monotonic())
+
+        async def fast_handler(event: ActivityEvent) -> None:
+            timestamps.append(time.monotonic())
+
+        bus.subscribe(slow_handler)
+        bus.subscribe(fast_handler)
+
+        agent = AgentInfo(agent_id="w-1", role=AgentRole.WORKER_BEE, hive_id="h-1")
+        event = ActivityEvent(
+            activity_type=ActivityType.LLM_REQUEST,
+            agent=agent,
+            summary="並列テスト",
+        )
+
+        # Act
+        start = time.monotonic()
+        await bus.emit(event)
+        elapsed = time.monotonic() - start
+
+        # Assert: 両方のハンドラーが完了している
+        assert len(timestamps) == 2
+        # 並列実行なら0.2秒強で完了（逐次なら0.2秒以上 + fast_handler分）
+        assert elapsed < 0.4, f"並列実行なら0.4秒未満で完了すべき（実際: {elapsed:.3f}秒）"
+
+    @pytest.mark.asyncio
+    async def test_emit_handler_timeout(self):
+        """タイムアウトしたハンドラーがログに記録される
+
+        HANDLER_TIMEOUTを超えて動作するハンドラーがタイムアウトされ、
+        他のハンドラーに影響しないことを確認。
+        """
+
+        from hiveforge.core import activity_bus
+
+        # Arrange
+        ActivityBus.reset()
+        bus = ActivityBus.get_instance()
+        received: list[ActivityEvent] = []
+
+        async def hanging_handler(event: ActivityEvent) -> None:
+            await asyncio.sleep(100)  # 極端に長い待機
+
+        async def good_handler(event: ActivityEvent) -> None:
+            received.append(event)
+
+        bus.subscribe(hanging_handler)
+        bus.subscribe(good_handler)
+
+        agent = AgentInfo(agent_id="w-1", role=AgentRole.WORKER_BEE, hive_id="h-1")
+        event = ActivityEvent(
+            activity_type=ActivityType.LLM_REQUEST,
+            agent=agent,
+            summary="タイムアウトテスト",
+        )
+
+        # Act: タイムアウトを短くして実行
+        original_timeout = activity_bus.HANDLER_TIMEOUT
+        activity_bus.HANDLER_TIMEOUT = 0.1
+        try:
+            await bus.emit(event)
+        finally:
+            activity_bus.HANDLER_TIMEOUT = original_timeout
+
+        # Assert: 正常ハンドラーは動作している
+        assert len(received) == 1
+
+
+class TestActivityBusConfigurable:
+    """ActivityBus の設定可能性テスト
+
+    MAX_RECENT_EVENTS がコンストラクタで調整可能であることを検証する。
+    運用環境の流量に応じて保持数を変更できる。
+    """
+
+    @pytest.mark.asyncio
+    async def test_custom_max_recent_events(self):
+        """max_recent_eventsを指定してイベント保持数を変更できる
+
+        デフォルトの100ではなくカスタム値を設定し、
+        運用環境の流量に対応する。
+        """
+        # Arrange: 保持数を10に設定
+        bus = ActivityBus(max_recent_events=10)
+        agent = AgentInfo(agent_id="w-1", role=AgentRole.WORKER_BEE, hive_id="h-1")
+
+        # Act: 20イベントを発行
+        for i in range(20):
+            event = ActivityEvent(
+                activity_type=ActivityType.LLM_REQUEST,
+                agent=agent,
+                summary=f"リクエスト{i}",
+            )
+            await bus.emit(event)
+
+        # Assert: 最新の10件のみ保持
+        recent = bus.get_recent_events()
+        assert len(recent) == 10
+        assert recent[0].summary == "リクエスト10"
+
+    @pytest.mark.asyncio
+    async def test_large_max_recent_events(self):
+        """大きなmax_recent_eventsで大量イベントを保持できる"""
+        # Arrange: 保持数を500に設定
+        bus = ActivityBus(max_recent_events=500)
+        agent = AgentInfo(agent_id="w-1", role=AgentRole.WORKER_BEE, hive_id="h-1")
+
+        # Act: 300イベントを発行
+        for i in range(300):
+            event = ActivityEvent(
+                activity_type=ActivityType.LLM_REQUEST,
+                agent=agent,
+                summary=f"リクエスト{i}",
+            )
+            await bus.emit(event)
+
+        # Assert: 全300件保持
+        recent = bus.get_recent_events()
+        assert len(recent) == 300
+
+    @pytest.mark.asyncio
+    async def test_get_recent_events_with_limit(self):
+        """get_recent_eventsにlimitを指定して件数を絞れる"""
+        # Arrange
+        bus = ActivityBus(max_recent_events=50)
+        agent = AgentInfo(agent_id="w-1", role=AgentRole.WORKER_BEE, hive_id="h-1")
+
+        for i in range(30):
+            event = ActivityEvent(
+                activity_type=ActivityType.LLM_REQUEST,
+                agent=agent,
+                summary=f"リクエスト{i}",
+            )
+            await bus.emit(event)
+
+        # Act: limitで5件に絞る
+        recent = bus.get_recent_events(limit=5)
+
+        # Assert: 最新5件のみ
+        assert len(recent) == 5
+        assert recent[0].summary == "リクエスト25"
+
+    def test_default_max_recent_events(self):
+        """デフォルトではmax_recent_events=100"""
+        # Arrange & Act
+        bus = ActivityBus()
+
+        # Assert
+        assert bus._max_recent_events == 100

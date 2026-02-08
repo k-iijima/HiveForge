@@ -3,7 +3,6 @@
 外部フィードバック対応: 未知のイベントタイプを例外ではなくUnknownEventとして読み込む。
 """
 
-
 from hiveforge.core.events import BaseEvent, UnknownEvent, parse_event
 
 
@@ -187,3 +186,93 @@ class TestUnknownEventBehavior:
         # Assert
         assert len(event.parents) == 2
         assert "parent-event-001" in event.parents
+
+
+class TestUnknownEventSafeguards:
+    """UnknownEvent のセーフガードテスト
+
+    外部入力由来の不正・巨大payloadに対する防御を検証する。
+    """
+
+    def test_original_data_size_limit_truncates_large_data(self):
+        """巨大なoriginal_dataはサイズ上限で切り詰められる
+
+        1MBを超えるoriginal_dataはメタデータのみ保持し、
+        メモリ・ログ肥大化を防止する。
+        """
+        from hiveforge.core.events import MAX_ORIGINAL_DATA_SIZE
+
+        # Arrange: 1MBを超える大きなデータ
+        large_data = {
+            "type": "malicious.large_event",
+            "payload": "x" * (MAX_ORIGINAL_DATA_SIZE + 1000),
+        }
+
+        # Act
+        event = UnknownEvent(
+            type="malicious.large_event",
+            actor="external",
+            payload={},
+            original_data=large_data,
+        )
+
+        # Assert: 切り詰められている
+        assert event.original_data.get("_truncated") is True
+        assert event.original_data["_original_size"] > MAX_ORIGINAL_DATA_SIZE
+        assert event.original_data["_max_size"] == MAX_ORIGINAL_DATA_SIZE
+        assert event.original_data["type"] == "malicious.large_event"
+        # 元の大きなデータは保持されていない
+        assert "payload" not in event.original_data or event.original_data.get("payload") is None
+
+    def test_normal_size_original_data_preserved(self):
+        """通常サイズのoriginal_dataはそのまま保持される"""
+        # Arrange
+        normal_data = {
+            "type": "future.event",
+            "actor": "system",
+            "payload": {"key": "value"},
+            "extra": "preserved",
+        }
+
+        # Act
+        event = UnknownEvent(
+            type="future.event",
+            actor="system",
+            payload={},
+            original_data=normal_data,
+        )
+
+        # Assert: 全データがそのまま保持
+        assert event.original_data == normal_data
+        assert "_truncated" not in event.original_data
+
+    def test_empty_original_data_accepted(self):
+        """空のoriginal_dataは正常に受理される"""
+        # Act
+        event = UnknownEvent(
+            type="empty.event",
+            actor="system",
+            payload={},
+            original_data={},
+        )
+
+        # Assert
+        assert event.original_data == {}
+
+    def test_parse_event_with_oversized_unknown_data(self):
+        """parse_eventが巨大な未知イベントを安全に処理する"""
+        from hiveforge.core.events import MAX_ORIGINAL_DATA_SIZE
+
+        # Arrange: 1MB超の未知イベントデータ
+        oversized_data = {
+            "type": "future.mega_event",
+            "actor": "external",
+            "payload": {"huge": "a" * (MAX_ORIGINAL_DATA_SIZE + 500)},
+        }
+
+        # Act
+        event = parse_event(oversized_data)
+
+        # Assert: UnknownEventとして安全に処理
+        assert isinstance(event, UnknownEvent)
+        assert event.original_data.get("_truncated") is True

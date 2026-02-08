@@ -5,7 +5,6 @@ GitHub Issue #16: P1-15: Lineage 親イベント自動設定
 イベント作成時に自動的に親イベントを設定する機能のテスト。
 """
 
-
 from hiveforge.core.events import (
     RunCompletedEvent,
     RunStartedEvent,

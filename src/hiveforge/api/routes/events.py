@@ -28,7 +28,7 @@ async def get_events(
         events.append(
             EventResponse(
                 id=event.id,
-                type=event.type.value,
+                type=event.type.value if hasattr(event.type, "value") else event.type,
                 timestamp=event.timestamp,
                 actor=event.actor,
                 payload=event.payload,

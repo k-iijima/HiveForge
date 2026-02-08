@@ -45,15 +45,22 @@ class HiveStore:
         return self._get_hive_dir(hive_id) / "events.jsonl"
 
     def _find_last_hash(self, f, file_size: int) -> str | None:
-        """ファイル末尾から最後のイベントのハッシュを取得"""
+        """ファイル末尾から最後のイベントのハッシュを段階的に取得
+
+        チャンクサイズを段階的に拡大して探索する。
+        ファイル全体の読み込みは行わず、メモリ消費を抑制する。
+        """
         if file_size == 0:
             return None
 
-        chunk_size = 8192
-        max_chunk_size = min(file_size, 1024 * 1024)
+        chunk_size = min(8192, file_size)
+        max_chunk_size = min(file_size, 16 * 1024 * 1024)
+        covers_entire_file = False
 
         while chunk_size <= max_chunk_size:
-            f.seek(max(0, file_size - chunk_size))
+            read_start = max(0, file_size - chunk_size)
+            covers_entire_file = read_start == 0
+            f.seek(read_start)
             chunk_bytes = f.read()
 
             # 先頭の不完全なUTF-8継続バイトをスキップ
@@ -70,20 +77,14 @@ class HiveStore:
                         last_event = parse_event(line)
                         return last_event.hash
                     except Exception:
+                        if covers_entire_file:
+                            # ファイル全体を読んでいる場合、行は完全なので
+                            # 壊れた行をスキップして次の行を試す
+                            continue
                         break
-            chunk_size *= 2
-
-        # 最終手段：ファイル全体を読み込む
-        f.seek(0)
-        chunk = f.read().decode("utf-8")
-        lines = chunk.strip().split("\n")
-        for line in reversed(lines):
-            line = line.strip()
-            if line:
-                try:
-                    return parse_event(line).hash
-                except Exception:
-                    pass
+            if chunk_size >= max_chunk_size:
+                break
+            chunk_size = min(chunk_size * 2, max_chunk_size)
 
         return None
 
