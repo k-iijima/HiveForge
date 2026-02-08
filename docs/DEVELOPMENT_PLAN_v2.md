@@ -116,25 +116,27 @@ M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)  
 - VS Code拡張からHive/Colonyの作成・取得・終了ができる
 - API接続失敗時にユーザーへ適切なエラー通知が出る
 
-#### M2-2: Beekeeper → Queen Bee → Worker Bee統合 ⬜ 未着手
+#### M2-2: Beekeeper → Queen Bee → Worker Bee統合 🚧 進行中
 
-| タスク | 内容 |
-|--------|------|
-| M2-2-a | `hiveforge chat` でBeekeeper経由のHive/Colony作成が動作 |
-| M2-2-b | Beekeeper → Queen Bee へのタスク委譲 |
-| M2-2-c | Worker Bee実行結果がARに記録 → 投影で確認可能 |
-| M2-2-d | 承認フロー（Requirement → approve/reject）がE2Eで動作 |
+| タスク | 内容 | 状態 |
+|--------|------|------|
+| M2-2-a | `hiveforge chat` でBeekeeper経由のHive/Colony作成が動作 | ✅ 完了 |
+| M2-2-b | Beekeeper → Queen Bee へのタスク委譲 | ✅ 完了 |
+| M2-2-c | Worker Bee実行結果がARに記録 → 投影で確認可能 | ✅ 完了 |
+| M2-2-d | 承認フロー（Requirement → approve/reject）がE2Eで動作 | ✅ 完了 |
 
 **完了条件**:
 - `hiveforge chat "ECサイトのログインページを作成"` で全チェーンが動作
 - 全イベントがARに永続化される
 
-#### M2-3: MCP Server ↔ Beekeeper連携 ⬜ 未着手
+> **注**: M2-2-a〜d全サブタスク実装完了。完了条件の確認はLLM APIキー設定後に実施。
 
-| タスク | 内容 |
-|--------|------|
-| M2-3-a | Copilot Chat の `@hiveforge` → Beekeeper直結 |
-| M2-3-b | MCP経由のHive/Colony操作がAR永続化 |
+#### M2-3: MCP Server ↔ Beekeeper連携 🚧 進行中
+
+| タスク | 内容 | 状態 |
+|--------|------|------|
+| M2-3-a | Copilot Chat の `@hiveforge` → Beekeeper直結 | ⬜ 未着手 |
+| M2-3-b | MCP経由のHive/Colony操作がAR永続化 | ✅ 完了 |
 
 ---
 
@@ -389,6 +391,7 @@ M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)  
 ## 4. 優先順位（2026-02-08 更新）
 
 M1〜M4完了。M5（運用品質）一部着手済み（M5-1/M5-3完了）。
+M2-2 サブタスク全完了、M2-3-b完了。
 
 **レビュー指摘**: M5の残項目（パフォーマンス・KPIダッシュボード等）を進める前に、M2-2/M2-3の統合パスを完成させる必要がある。エージェントチェーンが一気通貫で動作しない限り、M5の運用品質評価は基盤不足。
 
@@ -400,11 +403,12 @@ M1〜M4完了。M5（運用品質）一部着手済み（M5-1/M5-3完了）。
       │  M4-2 (LLM Orchestrator)    ✅ 完了
       │  M5-1 (セキュリティ)         ✅ 完了（認証+バリデーション）
       │  M5-3 (CI/CD)               ✅ 完了（3ジョブ+カバレッジゲート）
+      │  M2-2 (エージェント統合)     ✅ 完了（Beekeeper→Queen→Worker E2E）
+      │  M2-3-b (MCP→AR永続化)      ✅ 完了（Intervention系含む全操作永続化）
       │
       │  ════════ 最優先: 統合パス確立 ════════
-      │  M2-2 (エージェント統合)     ← 🔴 最優先: Beekeeper→Queen→Worker E2E
-      │  M2-3 (MCP↔Beekeeper連携)   ← 🔴 最優先: Copilot Chat経由のE2E
-      │  M2-1-f (VS Code拡張E2E)    ← 🔴 UI入口の動作保証
+      │  M2-3-a (Copilot↔Beekeeper)  ← 🔴 最優先: @hiveforge → Beekeeper直結
+      │  M2-1-f (VS Code拡張E2E)     ← 🔴 UI入口の動作保証
       │
       │  ════════ 次点: 暫定ロジック解消 ════════
       │  P-02 (KPIインシデント率)    ← 🟡 Sentinel Hornet介入の直接計測
@@ -422,10 +426,11 @@ M1〜M4完了。M5（運用品質）一部着手済み（M5-1/M5-3完了）。
 > **方針転換**: M2-2/M2-3を完了してエージェントチェーンのE2E動作を確立することが、
 > M5（運用品質）の前提条件である。統合パスが通らない限り、運用品質の評価軸が作れない。
 >
-> **根拠**:
-> - S-02 `_ask_user()` スタブ → ユーザー参加ステップが未接続
-> - M2-1-f 未実施 → UIの動作保証なし
-> - P-02 暫定ロジック → KPI精度不足のまま運用監視に入るリスク
+> **進捗**:
+> - ✅ M2-2完了: `_ask_user()` 非同期化、Pipeline統合、承認フローE2E、チャットチェーンE2E
+> - ✅ M2-3-b完了: 全MCP操作（Intervention系含む）がAR永続化
+> - ⬜ M2-3-a残: Copilot Chat `@hiveforge` → Beekeeper直結
+> - 🔴 M2-1-f未実施 → UIの動作保証なし
 
 ---
 
