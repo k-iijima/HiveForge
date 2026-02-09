@@ -12,6 +12,7 @@ from pathlib import Path
 import portalocker
 
 from ..events import BaseEvent, parse_event
+from .storage import _validate_safe_id
 
 
 class HiveStore:
@@ -35,7 +36,12 @@ class HiveStore:
         self._hives_path.mkdir(parents=True, exist_ok=True)
 
     def _get_hive_dir(self, hive_id: str) -> Path:
-        """Hive用ディレクトリを取得"""
+        """Hive用ディレクトリを取得
+
+        Raises:
+            ValueError: hive_idが安全でない文字列の場合
+        """
+        _validate_safe_id(hive_id, "hive_id")
         hive_dir = self._hives_path / hive_id
         hive_dir.mkdir(parents=True, exist_ok=True)
         return hive_dir

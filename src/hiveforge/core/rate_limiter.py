@@ -197,6 +197,7 @@ class RateLimiter:
         Args:
             llm_tokens: LLM APIで使用するトークン数（推定）
         """
+        wait_time = 0.0
         while True:
             async with self._lock:
                 self._reset_minute_window()

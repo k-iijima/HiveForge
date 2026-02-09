@@ -6,6 +6,7 @@ send_message, get_status, approve, reject を提供。
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -13,6 +14,8 @@ from pydantic import BaseModel, Field
 
 from ...beekeeper.server import BeekeeperMCPServer
 from ..helpers import get_ar, get_hive_store
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/beekeeper", tags=["Beekeeper"])
 
@@ -123,8 +126,9 @@ async def approve(request: ApproveRejectRequest) -> BeekeeperResponse:
             response=result.get("message"),
             data=result,
         )
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception:
+        logger.exception("Failed to approve requirement: %s", request.requirement_id)
+        raise HTTPException(status_code=400, detail="Failed to approve requirement") from None
 
 
 @router.post("/reject", response_model=BeekeeperResponse)
@@ -142,5 +146,6 @@ async def reject(request: ApproveRejectRequest) -> BeekeeperResponse:
             response=result.get("message"),
             data=result,
         )
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception:
+        logger.exception("Failed to reject requirement: %s", request.requirement_id)
+        raise HTTPException(status_code=400, detail="Failed to reject requirement") from None

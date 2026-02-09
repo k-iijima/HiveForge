@@ -272,7 +272,7 @@ class TestBeekeeperApproveRejectRoutes:
         assert data["status"] == "rejected"
 
     def test_approve_with_exception(self, client):
-        """承認処理で例外が発生した場合は400エラー"""
+        """承認処理で例外が発生した場合は400エラー（内部詳細は漏洩しない）"""
         # Arrange
         with patch("hiveforge.api.routes.beekeeper.BeekeeperMCPServer") as MockBeekeeper:
             mock_instance = MockBeekeeper.return_value
@@ -286,10 +286,10 @@ class TestBeekeeperApproveRejectRoutes:
 
         # Assert
         assert response.status_code == 400
-        assert "要件が見つかりません" in response.json()["detail"]
+        assert response.json()["detail"] == "Failed to approve requirement"
 
     def test_reject_with_exception(self, client):
-        """却下処理で例外が発生した場合は400エラー"""
+        """却下処理で例外が発生した場合は400エラー（内部詳細は漏洩しない）"""
         # Arrange
         with patch("hiveforge.api.routes.beekeeper.BeekeeperMCPServer") as MockBeekeeper:
             mock_instance = MockBeekeeper.return_value
@@ -303,7 +303,7 @@ class TestBeekeeperApproveRejectRoutes:
 
         # Assert
         assert response.status_code == 400
-        assert "要件が見つかりません" in response.json()["detail"]
+        assert response.json()["detail"] == "Failed to reject requirement"
 
 
 class TestBeekeeperResponseModel:

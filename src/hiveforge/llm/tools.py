@@ -1,42 +1,106 @@
 """基本ツール
 
 ファイル操作などの基本的なツール定義。
+
+セキュリティ:
+  - ファイル操作は workspace_root 配下に制限（パストラバーサル防止）
+  - コマンド実行は許可リスト方式で制限（コマンドインジェクション防止）
 """
 
 import json
+import logging
+import shlex
 from pathlib import Path
 
 from .runner import ToolDefinition
 
+logger = logging.getLogger(__name__)
+
+# ワークスペースルート（デフォルトはカレントディレクトリ）
+_workspace_root: Path | None = None
+
+# コマンド実行の許可リスト
+ALLOWED_COMMANDS = frozenset({
+    "ls", "cat", "head", "tail", "wc", "find", "grep",
+    "git", "python", "pip", "npm", "node",
+    "ruff", "mypy", "pytest", "black",
+})
+
+
+def set_workspace_root(path: Path | str) -> None:
+    """ワークスペースルートを設定
+
+    ファイル操作はこのディレクトリ配下に制限される。
+
+    Args:
+        path: ワークスペースルートのパス
+    """
+    global _workspace_root
+    _workspace_root = Path(path).resolve()
+
+
+def get_workspace_root() -> Path:
+    """ワークスペースルートを取得"""
+    if _workspace_root is not None:
+        return _workspace_root
+    return Path.cwd().resolve()
+
+
+def _validate_path_within_workspace(file_path: Path) -> Path:
+    """パスがワークスペース内にあることを検証
+
+    Args:
+        file_path: 検証するパス
+
+    Returns:
+        解決済みの絶対パス
+
+    Raises:
+        ValueError: パスがワークスペース外の場合
+    """
+    workspace = get_workspace_root()
+    resolved = file_path.resolve()
+    if not resolved.is_relative_to(workspace):
+        raise ValueError(
+            f"Access denied: path '{file_path}' is outside workspace '{workspace}'"
+        )
+    return resolved
+
 
 async def read_file_handler(path: str) -> str:
-    """ファイルを読み込む"""
+    """ファイルを読み込む（ワークスペース内に制限）"""
     try:
-        file_path = Path(path)
+        file_path = _validate_path_within_workspace(Path(path))
         if not file_path.exists():
             return json.dumps({"error": f"ファイルが見つかりません: {path}"})
 
         content = file_path.read_text(encoding="utf-8")
-        return json.dumps({"content": content, "path": str(file_path.absolute())})
+        return json.dumps({"content": content, "path": str(file_path)})
+    except ValueError as e:
+        logger.warning("Path traversal attempt blocked: %s", path)
+        return json.dumps({"error": str(e)})
     except Exception as e:
         return json.dumps({"error": str(e)})
 
 
 async def write_file_handler(path: str, content: str) -> str:
-    """ファイルを書き込む"""
+    """ファイルを書き込む（ワークスペース内に制限）"""
     try:
-        file_path = Path(path)
+        file_path = _validate_path_within_workspace(Path(path))
         file_path.parent.mkdir(parents=True, exist_ok=True)
         file_path.write_text(content, encoding="utf-8")
-        return json.dumps({"success": True, "path": str(file_path.absolute())})
+        return json.dumps({"success": True, "path": str(file_path)})
+    except ValueError as e:
+        logger.warning("Path traversal attempt blocked: %s", path)
+        return json.dumps({"error": str(e)})
     except Exception as e:
         return json.dumps({"error": str(e)})
 
 
 async def list_directory_handler(path: str = ".") -> str:
-    """ディレクトリの内容を一覧表示"""
+    """ディレクトリの内容を一覧表示（ワークスペース内に制限）"""
     try:
-        dir_path = Path(path)
+        dir_path = _validate_path_within_workspace(Path(path))
         if not dir_path.exists():
             return json.dumps({"error": f"ディレクトリが見つかりません: {path}"})
 
@@ -53,18 +117,38 @@ async def list_directory_handler(path: str = ".") -> str:
                 }
             )
 
-        return json.dumps({"path": str(dir_path.absolute()), "entries": entries})
+        return json.dumps({"path": str(dir_path), "entries": entries})
+    except ValueError as e:
+        logger.warning("Path traversal attempt blocked: %s", path)
+        return json.dumps({"error": str(e)})
     except Exception as e:
         return json.dumps({"error": str(e)})
 
 
 async def run_command_handler(command: str) -> str:
-    """シェルコマンドを実行"""
+    """シェルコマンドを実行（許可リストで制限）
+
+    セキュリティ: コマンドインジェクション防止のため、
+    許可リストに含まれるコマンドのみ実行可能。
+    シェル経由ではなく直接実行（subprocess_exec）を使用。
+    """
     import asyncio
 
     try:
-        process = await asyncio.create_subprocess_shell(
-            command,
+        args = shlex.split(command)
+        if not args:
+            return json.dumps({"error": "Empty command"})
+
+        base_command = Path(args[0]).name
+        if base_command not in ALLOWED_COMMANDS:
+            logger.warning("Blocked disallowed command: %s", base_command)
+            return json.dumps({
+                "error": f"Command '{base_command}' is not allowed. "
+                f"Allowed commands: {sorted(ALLOWED_COMMANDS)}"
+            })
+
+        process = await asyncio.create_subprocess_exec(
+            *args,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )

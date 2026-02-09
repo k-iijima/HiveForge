@@ -6,6 +6,7 @@ JSONLファイル + ファイルロックによる実装。
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
@@ -13,6 +14,26 @@ from pathlib import Path
 import portalocker
 
 from ..events import BaseEvent, parse_event
+
+# IDに許可される文字パターン（英数字、ハイフン、アンダースコア）
+_SAFE_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_\-]+$")
+
+
+def _validate_safe_id(value: str, name: str = "id") -> None:
+    """IDがパストラバーサルを引き起こさない安全な文字列であることを検証
+
+    Args:
+        value: 検証対象の文字列
+        name: エラーメッセージ用のフィールド名
+
+    Raises:
+        ValueError: 安全でないID文字列の場合
+    """
+    if not value or not _SAFE_ID_PATTERN.match(value):
+        raise ValueError(
+            f"Invalid {name}: '{value}'. "
+            f"Only alphanumeric characters, hyphens, and underscores are allowed."
+        )
 
 
 class AkashicRecord:
@@ -35,7 +56,12 @@ class AkashicRecord:
         self._last_hash: str | None = None
 
     def _get_run_dir(self, run_id: str) -> Path:
-        """Run用ディレクトリを取得"""
+        """Run用ディレクトリを取得
+
+        Raises:
+            ValueError: run_idが安全でない文字列の場合
+        """
+        _validate_safe_id(run_id, "run_id")
         run_dir = self.vault_path / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
         return run_dir

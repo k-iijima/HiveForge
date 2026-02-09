@@ -166,11 +166,11 @@ class CORSConfig(BaseModel):
 
     enabled: bool = Field(default=True, description="CORSを有効にするか")
     allow_origins: list[str] = Field(
-        default=["*"],
+        default_factory=list,
         description="許可するオリジン（本番では具体的なオリジンを指定）",
     )
-    allow_credentials: bool = Field(default=True)
-    allow_methods: list[str] = Field(default=["*"])
+    allow_credentials: bool = Field(default=False)
+    allow_methods: list[str] = Field(default=["GET", "POST"])
     allow_headers: list[str] = Field(default=["*"])
 
 
