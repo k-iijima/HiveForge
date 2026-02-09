@@ -12,9 +12,7 @@ import pytest
 from hiveforge.core.config import GitHubConfig
 from hiveforge.core.events.base import BaseEvent
 from hiveforge.core.events.types import EventType
-from hiveforge.core.github.client import GitHubClientError
 from hiveforge.mcp_server.handlers.github import GitHubHandlers
-
 
 # ---------------------------------------------------------------------------
 # fixtures

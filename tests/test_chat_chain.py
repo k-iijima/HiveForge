@@ -14,7 +14,7 @@ import pytest
 
 from hiveforge.beekeeper import BeekeeperMCPServer
 from hiveforge.core import AkashicRecord
-from hiveforge.llm.client import LLMResponse, Message, ToolCall
+from hiveforge.llm.client import LLMResponse, ToolCall
 
 
 @pytest.fixture

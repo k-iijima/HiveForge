@@ -11,7 +11,7 @@ from pathlib import Path
 # srcをパスに追加
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from hiveforge.vlm import OllamaClient, LocalVLMAnalyzer
+from hiveforge.vlm import OllamaClient
 
 
 async def main():

@@ -9,8 +9,8 @@
     python scripts/test_hiveforge_extension_simple.py --demo
 """
 
-import asyncio
 import argparse
+import asyncio
 import os
 import sys
 from pathlib import Path

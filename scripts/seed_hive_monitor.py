@@ -14,9 +14,9 @@ Hive Monitorの動作確認を可能にする。
 """
 
 import asyncio
+import os
 import random
 import sys
-import os
 
 # srcをパスに追加
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
@@ -28,7 +28,6 @@ from hiveforge.core.activity_bus import (
     AgentInfo,
     AgentRole,
 )
-
 
 # ===========================================================================
 # テスト用エージェント定義

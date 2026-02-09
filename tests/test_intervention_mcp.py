@@ -432,7 +432,7 @@ class TestInterventionARPersistence:
 
         # Assert: ARにイベントが永続化されている
         event_id = result["event_id"]
-        stream_key = f"intervention-col-001"
+        stream_key = "intervention-col-001"
         events = list(ar.replay(stream_key))
         assert len(events) == 1
         assert events[0].id == event_id
@@ -499,7 +499,7 @@ class TestInterventionARPersistence:
 
         # Assert: ARにフィードバックイベントが永続化されている
         feedback_event_id = result["event_id"]
-        stream_key = f"intervention-col-003"
+        stream_key = "intervention-col-003"
         events = list(ar.replay(stream_key))
         # 介入 + フィードバック の2イベント
         assert len(events) >= 2

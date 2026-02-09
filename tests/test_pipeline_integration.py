@@ -15,7 +15,6 @@ import pytest
 from hiveforge.core.ar.storage import AkashicRecord
 from hiveforge.core.events.types import EventType
 from hiveforge.core.models.action_class import TrustLevel
-from hiveforge.queen_bee.pipeline import ApprovalRequiredError, PipelineError
 from hiveforge.queen_bee.server import QueenBeeMCPServer
 
 

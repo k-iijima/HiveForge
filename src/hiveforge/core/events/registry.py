@@ -20,6 +20,14 @@ from .decision import (
     DecisionSupersededEvent,
     ProposalCreatedEvent,
 )
+from .github import (
+    GitHubCommentAddedEvent,
+    GitHubIssueClosedEvent,
+    GitHubIssueCreatedEvent,
+    GitHubIssueUpdatedEvent,
+    GitHubLabelAppliedEvent,
+    GitHubProjectSyncedEvent,
+)
 from .guard import (
     GuardConditionalPassedEvent,
     GuardFailedEvent,
@@ -89,14 +97,6 @@ from .worker import (
     WorkerFailedEvent,
     WorkerProgressEvent,
     WorkerStartedEvent,
-)
-from .github import (
-    GitHubCommentAddedEvent,
-    GitHubIssueClosedEvent,
-    GitHubIssueCreatedEvent,
-    GitHubIssueUpdatedEvent,
-    GitHubLabelAppliedEvent,
-    GitHubProjectSyncedEvent,
 )
 
 # イベントタイプからクラスへのマッピング

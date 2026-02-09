@@ -6,7 +6,6 @@ GitHubClient をモックして、イベントごとの正しいマッピング�
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -15,7 +14,6 @@ from hiveforge.core.config import GitHubConfig
 from hiveforge.core.events.base import BaseEvent
 from hiveforge.core.events.types import EventType
 from hiveforge.core.github.projection import GitHubProjection, SyncState
-
 
 # ---------------------------------------------------------------------------
 # fixtures
