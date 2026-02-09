@@ -169,7 +169,7 @@ class TestPipelineApprovalGate:
     async def test_approval_required_records_event(self, queen_with_approval, ar):
         """承認待ち時に PLAN_APPROVAL_REQUIRED イベントが記録される"""
         # Act
-        result = await queen_with_approval.handle_execute_goal(
+        await queen_with_approval.handle_execute_goal(
             {"run_id": "approval-event-001", "goal": "承認必要タスク"}
         )
 

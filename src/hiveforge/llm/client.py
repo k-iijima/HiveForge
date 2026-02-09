@@ -320,9 +320,9 @@ class LLMClient:
             try:
                 # LiteLLM非同期呼び出し
                 response = await litellm.acompletion(**kwargs)
-            except litellm.exceptions.AuthenticationError:
+            except litellm.exceptions.AuthenticationError as err:
                 raise ValueError(
                     f"認証エラー: 環境変数 {self.config.api_key_env} を確認してください"
-                )
+                ) from err
 
             return self._parse_response(response)

@@ -425,13 +425,13 @@ class TestFullAgentChainOllama:
         queen = beekeeper._queens.get(colony_id)
         if queen is None:
             # Beekeeper内部でQueen Beeに委譲
-            queen_result = await beekeeper._delegate_to_queen(
+            await beekeeper._delegate_to_queen(
                 colony_id=colony_id,
                 task=f"{work_dir}/e2e_output.txt に 'Full chain works!' と書いてください。",
                 context={"working_directory": str(work_dir)},
             )
         else:
-            queen_result = await asyncio.wait_for(
+            await asyncio.wait_for(
                 queen.handle_execute_goal(
                     {
                         "goal": f"{work_dir}/e2e_output.txt に 'Full chain works!' と書いてください。",

@@ -54,8 +54,8 @@ class TestBeekeeperRoutes:
             "actions_taken": 0,
         }
 
-        with patch("hiveforge.api.routes.beekeeper.BeekeeperMCPServer") as MockBeekeeper:
-            mock_instance = MockBeekeeper.return_value
+        with patch("hiveforge.api.routes.beekeeper.BeekeeperMCPServer") as mock_beekeeper:
+            mock_instance = mock_beekeeper.return_value
             mock_instance.handle_send_message = AsyncMock(return_value=mock_result)
 
             # Act
@@ -85,8 +85,8 @@ class TestBeekeeperRoutes:
             "actions_taken": 1,
         }
 
-        with patch("hiveforge.api.routes.beekeeper.BeekeeperMCPServer") as MockBeekeeper:
-            mock_instance = MockBeekeeper.return_value
+        with patch("hiveforge.api.routes.beekeeper.BeekeeperMCPServer") as mock_beekeeper:
+            mock_instance = mock_beekeeper.return_value
             mock_instance.handle_send_message = AsyncMock(return_value=mock_result)
 
             # Act
@@ -115,8 +115,8 @@ class TestBeekeeperRoutes:
             "error": "LLM接続タイムアウト",
         }
 
-        with patch("hiveforge.api.routes.beekeeper.BeekeeperMCPServer") as MockBeekeeper:
-            mock_instance = MockBeekeeper.return_value
+        with patch("hiveforge.api.routes.beekeeper.BeekeeperMCPServer") as mock_beekeeper:
+            mock_instance = mock_beekeeper.return_value
             mock_instance.handle_send_message = AsyncMock(return_value=mock_result)
 
             # Act
@@ -151,8 +151,8 @@ class TestBeekeeperStatusRoute:
             "session": None,
         }
 
-        with patch("hiveforge.api.routes.beekeeper.BeekeeperMCPServer") as MockBeekeeper:
-            mock_instance = MockBeekeeper.return_value
+        with patch("hiveforge.api.routes.beekeeper.BeekeeperMCPServer") as mock_beekeeper:
+            mock_instance = mock_beekeeper.return_value
             mock_instance.handle_get_status = AsyncMock(return_value=mock_result)
 
             # Act
@@ -171,8 +171,8 @@ class TestBeekeeperStatusRoute:
             "hives": [{"hive_id": "hive-1", "name": "テスト", "status": "active"}],
         }
 
-        with patch("hiveforge.api.routes.beekeeper.BeekeeperMCPServer") as MockBeekeeper:
-            mock_instance = MockBeekeeper.return_value
+        with patch("hiveforge.api.routes.beekeeper.BeekeeperMCPServer") as mock_beekeeper:
+            mock_instance = mock_beekeeper.return_value
             mock_instance.handle_get_status = AsyncMock(return_value=mock_result)
 
             # Act
@@ -216,8 +216,8 @@ class TestBeekeeperApproveRejectRoutes:
             "requirement_id": "req-001",
         }
 
-        with patch("hiveforge.api.routes.beekeeper.BeekeeperMCPServer") as MockBeekeeper:
-            mock_instance = MockBeekeeper.return_value
+        with patch("hiveforge.api.routes.beekeeper.BeekeeperMCPServer") as mock_beekeeper:
+            mock_instance = mock_beekeeper.return_value
             mock_instance.handle_approve = AsyncMock(return_value=mock_result)
 
             # Act
@@ -256,8 +256,8 @@ class TestBeekeeperApproveRejectRoutes:
             "requirement_id": "req-002",
         }
 
-        with patch("hiveforge.api.routes.beekeeper.BeekeeperMCPServer") as MockBeekeeper:
-            mock_instance = MockBeekeeper.return_value
+        with patch("hiveforge.api.routes.beekeeper.BeekeeperMCPServer") as mock_beekeeper:
+            mock_instance = mock_beekeeper.return_value
             mock_instance.handle_reject = AsyncMock(return_value=mock_result)
 
             # Act
@@ -274,8 +274,8 @@ class TestBeekeeperApproveRejectRoutes:
     def test_approve_with_exception(self, client):
         """承認処理で例外が発生した場合は400エラー（内部詳細は漏洩しない）"""
         # Arrange
-        with patch("hiveforge.api.routes.beekeeper.BeekeeperMCPServer") as MockBeekeeper:
-            mock_instance = MockBeekeeper.return_value
+        with patch("hiveforge.api.routes.beekeeper.BeekeeperMCPServer") as mock_beekeeper:
+            mock_instance = mock_beekeeper.return_value
             mock_instance.handle_approve = AsyncMock(side_effect=Exception("要件が見つかりません"))
 
             # Act
@@ -291,8 +291,8 @@ class TestBeekeeperApproveRejectRoutes:
     def test_reject_with_exception(self, client):
         """却下処理で例外が発生した場合は400エラー（内部詳細は漏洩しない）"""
         # Arrange
-        with patch("hiveforge.api.routes.beekeeper.BeekeeperMCPServer") as MockBeekeeper:
-            mock_instance = MockBeekeeper.return_value
+        with patch("hiveforge.api.routes.beekeeper.BeekeeperMCPServer") as mock_beekeeper:
+            mock_instance = mock_beekeeper.return_value
             mock_instance.handle_reject = AsyncMock(side_effect=Exception("要件が見つかりません"))
 
             # Act

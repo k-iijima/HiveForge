@@ -338,7 +338,7 @@ class TestChatChainWithDelegation:
         )
 
         # Queen BeeのLLMもモック（Worker Beeの実行をシンプルにするため）
-        with patch("hiveforge.queen_bee.server.QueenBeeMCPServer") as MockQueenCls:
+        with patch("hiveforge.queen_bee.server.QueenBeeMCPServer") as mock_queen_cls:
             mock_queen = AsyncMock()
             mock_queen.dispatch_tool = AsyncMock(
                 return_value={
@@ -356,7 +356,7 @@ class TestChatChainWithDelegation:
                 }
             )
             mock_queen.close = AsyncMock()
-            MockQueenCls.return_value = mock_queen
+            mock_queen_cls.return_value = mock_queen
 
             # Act
             result = await beekeeper.dispatch_tool(
