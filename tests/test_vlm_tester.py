@@ -119,6 +119,9 @@ class TestVLMClient:
     @pytest.mark.asyncio
     async def test_analyze_returns_description(self):
         """analyze()は画面の説明を返す"""
+        # Arrange: anthropicモジュールが必要
+        pytest.importorskip("anthropic")
+        
         # Arrange: モッククライアントを設定
         # anthropicモジュールは動的にインポートされるため、sys.modulesにモックを追加
         mock_client_instance = MagicMock()
