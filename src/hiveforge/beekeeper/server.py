@@ -912,7 +912,7 @@ class BeekeeperMCPServer:
                 result = await asyncio.wait_for(future, timeout=timeout)
             else:
                 result = await future
-        except asyncio.TimeoutError:
+        except TimeoutError:
             result = f"タイムアウト: {question} (timeout={timeout}s)"
             logger.warning(f"ユーザー応答タイムアウト: request_id={request_id}")
         finally:

@@ -15,7 +15,8 @@ os.environ["OLLAMA_BASE_URL"] = "http://hiveforge-dev-ollama:11434"
 async def test_screen_capture():
     """画面キャプチャのテスト"""
     from playwright.async_api import async_playwright
-    from hiveforge.vlm_tester import ScreenCapture, ActionExecutor
+
+    from hiveforge.vlm_tester import ScreenCapture
 
     print("=" * 60)
     print("1. Playwright + ScreenCapture テスト")
@@ -50,7 +51,7 @@ async def test_screen_capture():
 
 async def test_local_analysis(image_data: bytes):
     """ローカル分析のテスト（OCR/Diff）"""
-    from hiveforge.vlm_tester import DiffAnalyzer, HybridAnalyzer, AnalysisLevel
+    from hiveforge.vlm_tester import AnalysisLevel, DiffAnalyzer, HybridAnalyzer
 
     print("\n" + "=" * 60)
     print("2. ローカル分析テスト（Diff）")
@@ -81,7 +82,7 @@ async def test_local_analysis(image_data: bytes):
 
 async def test_vlm_providers():
     """VLMプロバイダーの確認"""
-    from hiveforge.vlm_tester import OllamaProvider, AnthropicProvider, MultiProviderVLMClient
+    from hiveforge.vlm_tester import AnthropicProvider, MultiProviderVLMClient, OllamaProvider
 
     print("\n" + "=" * 60)
     print("4. VLMプロバイダー状態確認")
@@ -138,7 +139,8 @@ async def test_ollama_vlm(image_data: bytes):
 async def test_action_executor():
     """ActionExecutorのテスト"""
     from playwright.async_api import async_playwright
-    from hiveforge.vlm_tester import ActionExecutor, ScreenCapture
+
+    from hiveforge.vlm_tester import ActionExecutor
 
     print("\n" + "=" * 60)
     print("6. ActionExecutor テスト")

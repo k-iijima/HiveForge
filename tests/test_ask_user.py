@@ -13,7 +13,6 @@ approve/reject により応答を解決するメカニズムを検証する。
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import AsyncMock, patch
 
 import pytest
 

@@ -242,7 +242,6 @@ class QueenBeeMCPServer:
 
         Guard Bee検証 → 承認ゲート → ColonyOrchestrator並列実行
         """
-        from .approval import ApprovalDecision
         from .pipeline import ApprovalRequiredError, ExecutionPipeline, PipelineError
         from .planner import PlannedTask, TaskPlan
 
