@@ -13,20 +13,18 @@ from __future__ import annotations
 
 import pytest
 
-from hiveforge.core import AkashicRecord, generate_event_id
+from hiveforge.core import AkashicRecord
 from hiveforge.core.ar.projections import RunProjection, build_run_projection
 from hiveforge.core.events import (
     RunCompletedEvent,
     RunStartedEvent,
     TaskCompletedEvent,
     TaskCreatedEvent,
-    TaskFailedEvent,
 )
 from hiveforge.core.events.base import BaseEvent, compute_hash
 from hiveforge.core.events.registry import parse_event
 from hiveforge.core.honeycomb.models import Episode, KPIScores, Outcome
 from hiveforge.core.honeycomb.store import HoneycombStore
-
 
 # =========================================================================
 # ベンチマークデータの準備

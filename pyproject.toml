@@ -59,9 +59,9 @@ hiveforge-vlm = "hiveforge.vlm_tester.server:main"
 hiveforge-agent-ui = "hiveforge.agent_ui.server:main"
 
 [project.urls]
-Homepage = "https://github.com/your-org/hiveforge"
-Documentation = "https://github.com/your-org/hiveforge#readme"
-Repository = "https://github.com/your-org/hiveforge"
+Homepage = "https://github.com/k-iijima/HiveForge"
+Documentation = "https://github.com/k-iijima/HiveForge#readme"
+Repository = "https://github.com/k-iijima/HiveForge"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/hiveforge"]

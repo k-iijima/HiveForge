@@ -1,6 +1,7 @@
 """LLMモジュールのテスト"""
 
 import json
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -140,7 +141,10 @@ class TestReadFileHandler:
     @pytest.mark.asyncio
     async def test_read_existing_file(self, tmp_path):
         """存在するファイルを読み込める"""
+        from hiveforge.llm.tools import set_workspace_root
+
         # Arrange
+        set_workspace_root(tmp_path)
         test_file = tmp_path / "test.txt"
         test_file.write_text("Hello, World!")
 
@@ -150,6 +154,9 @@ class TestReadFileHandler:
 
         # Assert
         assert data["content"] == "Hello, World!"
+
+        # Cleanup
+        set_workspace_root(Path.cwd())
 
     @pytest.mark.asyncio
     async def test_read_nonexistent_file(self):
@@ -169,7 +176,10 @@ class TestReadFileHandler:
         from pathlib import Path
         from unittest.mock import patch
 
+        from hiveforge.llm.tools import set_workspace_root
+
         # Arrange
+        set_workspace_root(tmp_path)
         test_file = tmp_path / "test.txt"
         test_file.write_text("content")
 
@@ -182,6 +192,9 @@ class TestReadFileHandler:
         assert "error" in data
         assert "Access denied" in data["error"]
 
+        # Cleanup
+        set_workspace_root(Path.cwd())
+
 
 class TestWriteFileHandler:
     """write_file ハンドラのテスト"""
@@ -189,6 +202,9 @@ class TestWriteFileHandler:
     @pytest.mark.asyncio
     async def test_write_file(self, tmp_path):
         """ファイルを書き込める"""
+        from hiveforge.llm.tools import set_workspace_root
+
+        set_workspace_root(tmp_path)
         test_file = tmp_path / "output.txt"
 
         result = await write_file_handler(str(test_file), "New content")
@@ -197,9 +213,14 @@ class TestWriteFileHandler:
         assert data["success"] is True
         assert test_file.read_text() == "New content"
 
+        set_workspace_root(Path.cwd())
+
     @pytest.mark.asyncio
     async def test_write_creates_directories(self, tmp_path):
         """親ディレクトリを作成する"""
+        from hiveforge.llm.tools import set_workspace_root
+
+        set_workspace_root(tmp_path)
         test_file = tmp_path / "subdir" / "deep" / "file.txt"
 
         result = await write_file_handler(str(test_file), "Content")
@@ -208,13 +229,18 @@ class TestWriteFileHandler:
         assert data["success"] is True
         assert test_file.exists()
 
+        set_workspace_root(Path.cwd())
+
     @pytest.mark.asyncio
     async def test_write_file_general_exception(self, tmp_path):
         """write_text中の例外がerrorとして返される"""
         from pathlib import Path
         from unittest.mock import patch
 
+        from hiveforge.llm.tools import set_workspace_root
+
         # Arrange
+        set_workspace_root(tmp_path)
         test_file = tmp_path / "output.txt"
 
         # Act: write_textで例外を発生させる
@@ -226,6 +252,8 @@ class TestWriteFileHandler:
         assert "error" in data
         assert "Disk full" in data["error"]
 
+        set_workspace_root(Path.cwd())
+
 
 class TestListDirectoryHandler:
     """list_directory ハンドラのテスト"""
@@ -233,7 +261,10 @@ class TestListDirectoryHandler:
     @pytest.mark.asyncio
     async def test_list_directory(self, tmp_path):
         """ディレクトリ内容を一覧表示できる"""
+        from hiveforge.llm.tools import set_workspace_root
+
         # Arrange
+        set_workspace_root(tmp_path)
         (tmp_path / "file1.txt").write_text("a")
         (tmp_path / "file2.txt").write_text("b")
         (tmp_path / "subdir").mkdir()
@@ -244,6 +275,8 @@ class TestListDirectoryHandler:
 
         # Assert
         assert len(data["entries"]) == 3
+
+        set_workspace_root(Path.cwd())
 
     @pytest.mark.asyncio
     async def test_list_nonexistent_directory(self):
@@ -259,6 +292,11 @@ class TestListDirectoryHandler:
         from pathlib import Path
         from unittest.mock import patch
 
+        from hiveforge.llm.tools import set_workspace_root
+
+        # Arrange
+        set_workspace_root(tmp_path)
+
         # Act: iterdir()で例外を発生させる
         with patch.object(Path, "iterdir", side_effect=PermissionError("No access")):
             result = await list_directory_handler(str(tmp_path))
@@ -267,6 +305,8 @@ class TestListDirectoryHandler:
         # Assert
         assert "error" in data
         assert "No access" in data["error"]
+
+        set_workspace_root(Path.cwd())
 
 
 class TestAgentRunner:
@@ -319,6 +359,11 @@ class TestAgentRunner:
     @pytest.mark.asyncio
     async def test_run_with_tool_call(self, mock_client, tmp_path):
         """ツール呼び出しを含む実行"""
+        from hiveforge.llm.tools import set_workspace_root
+
+        # Arrange: ワークスペースをtmp_pathに設定
+        set_workspace_root(tmp_path)
+
         # Arrange: ファイルを作成
         test_file = tmp_path / "test.txt"
         test_file.write_text("Hello!")
@@ -350,6 +395,9 @@ class TestAgentRunner:
         assert result.success is True
         assert result.tool_calls_made == 1
         assert "Hello!" in result.output
+
+        # Cleanup
+        set_workspace_root(Path.cwd())
 
     @pytest.mark.asyncio
     async def test_run_max_iterations(self, mock_client):
@@ -1302,33 +1350,36 @@ class TestRunCommandHandler:
 
     @pytest.mark.asyncio
     async def test_run_simple_command(self):
-        """シンプルなコマンドを実行できる"""
+        """許可リスト内のシンプルなコマンドを実行できる"""
         from hiveforge.llm.tools import run_command_handler
 
-        # Act
-        result_str = await run_command_handler("echo hello")
+        # Act: 'ls'は許可リストに含まれる
+        result_str = await run_command_handler("ls -la")
         result = json.loads(result_str)
 
         # Assert
         assert result["exit_code"] == 0
-        assert "hello" in result["stdout"]
 
     @pytest.mark.asyncio
     async def test_run_failing_command(self):
-        """失敗するコマンドの結果を取得できる"""
+        """許可リスト外のコマンドはブロックされる"""
         from hiveforge.llm.tools import run_command_handler
 
-        # Act
+        # Act: 'false'は許可リストに含まれない
         result_str = await run_command_handler("false")
         result = json.loads(result_str)
 
         # Assert
-        assert result["exit_code"] != 0
+        assert "error" in result
+        assert "not allowed" in result["error"]
 
     @pytest.mark.asyncio
     async def test_list_directory_not_dir(self, tmp_path):
         """ファイルをディレクトリとして開けない"""
+        from hiveforge.llm.tools import set_workspace_root
+
         # Arrange
+        set_workspace_root(tmp_path)
         file_path = tmp_path / "test.txt"
         file_path.write_text("hello")
 
@@ -1339,3 +1390,5 @@ class TestRunCommandHandler:
         # Assert
         assert "error" in result
         assert "ディレクトリではありません" in result["error"]
+
+        set_workspace_root(Path.cwd())

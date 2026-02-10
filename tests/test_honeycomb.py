@@ -12,15 +12,20 @@ from __future__ import annotations
 import pytest
 
 from hiveforge.core import AkashicRecord, generate_event_id
+
+# Sentinel イベント（P-02: incident_rate 改善用）
 from hiveforge.core.events import (
     RunAbortedEvent,
     RunCompletedEvent,
     RunFailedEvent,
     RunStartedEvent,
+    SentinelAlertRaisedEvent,
+    SentinelRollbackEvent,
     TaskCompletedEvent,
     TaskCreatedEvent,
     TaskFailedEvent,
 )
+from hiveforge.core.events.types import EventType
 from hiveforge.core.honeycomb.kpi import KPICalculator
 from hiveforge.core.honeycomb.models import (
     Episode,
@@ -30,15 +35,6 @@ from hiveforge.core.honeycomb.models import (
 )
 from hiveforge.core.honeycomb.recorder import EpisodeRecorder
 from hiveforge.core.honeycomb.store import HoneycombStore
-
-# Sentinel イベント（P-02: incident_rate 改善用）
-from hiveforge.core.events import (
-    SentinelAlertRaisedEvent,
-    SentinelRollbackEvent,
-    SentinelQuarantineEvent,
-)
-from hiveforge.core.events.sentinel import SentinelKpiDegradationEvent
-from hiveforge.core.events.types import EventType
 
 # =========================================================================
 # Episode モデルのテスト

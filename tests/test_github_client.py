@@ -13,7 +13,6 @@ import pytest
 from hiveforge.core.config import GitHubConfig
 from hiveforge.core.github.client import GitHubClient, GitHubClientError
 
-
 # ---------------------------------------------------------------------------
 # fixtures
 # ---------------------------------------------------------------------------

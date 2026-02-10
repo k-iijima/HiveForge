@@ -9,7 +9,6 @@ import logging
 from typing import Any
 
 from ...core.config import GitHubConfig, get_settings
-from ...core.events.registry import parse_event
 from ...core.github.client import GitHubClient, GitHubClientError
 from ...core.github.projection import GitHubProjection
 from .base import BaseHandler

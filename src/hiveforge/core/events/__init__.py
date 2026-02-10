@@ -30,6 +30,16 @@ from .decision import (
     ProposalCreatedEvent,
 )
 
+# --- GitHub Projection ---
+from .github import (
+    GitHubCommentAddedEvent,
+    GitHubIssueClosedEvent,
+    GitHubIssueCreatedEvent,
+    GitHubIssueUpdatedEvent,
+    GitHubLabelAppliedEvent,
+    GitHubProjectSyncedEvent,
+)
+
 # --- Guard Bee ---
 from .guard import (
     GuardConditionalPassedEvent,
@@ -128,16 +138,6 @@ from .worker import (
     WorkerFailedEvent,
     WorkerProgressEvent,
     WorkerStartedEvent,
-)
-
-# --- GitHub Projection ---
-from .github import (
-    GitHubCommentAddedEvent,
-    GitHubIssueClosedEvent,
-    GitHubIssueCreatedEvent,
-    GitHubIssueUpdatedEvent,
-    GitHubLabelAppliedEvent,
-    GitHubProjectSyncedEvent,
 )
 
 __all__ = [

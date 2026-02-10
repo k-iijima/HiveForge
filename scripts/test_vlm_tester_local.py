@@ -11,6 +11,7 @@ from pathlib import Path
 async def test_screen_capture():
     """画面キャプチャのテスト"""
     from playwright.async_api import async_playwright
+
     from hiveforge.vlm_tester import ScreenCapture
 
     print("=" * 60)
@@ -46,9 +47,11 @@ async def test_screen_capture():
 
 async def test_diff_analysis(image_data: bytes):
     """Diff分析のテスト"""
-    from hiveforge.vlm_tester import DiffAnalyzer
-    from PIL import Image
     import io
+
+    from PIL import Image
+
+    from hiveforge.vlm_tester import DiffAnalyzer
 
     print("\n" + "=" * 60)
     print("2. Diff分析テスト")
@@ -58,7 +61,7 @@ async def test_diff_analysis(image_data: bytes):
 
     # 同一画像の比較
     result = await diff.compare(image_data, image_data)
-    print(f"✓ 同一画像比較:")
+    print("✓ 同一画像比較:")
     print(f"    is_same: {result.data['is_same']}")
     print(f"    diff_ratio: {result.data['diff_ratio']:.6f}")
 
@@ -72,7 +75,7 @@ async def test_diff_analysis(image_data: bytes):
     modified_image = buffer.getvalue()
 
     result2 = await diff.compare(image_data, modified_image)
-    print(f"✓ 異なる画像比較:")
+    print("✓ 異なる画像比較:")
     print(f"    is_same: {result2.data['is_same']}")
     print(f"    diff_ratio: {result2.data['diff_ratio']:.6f}")
 
@@ -86,7 +89,7 @@ async def test_diff_analysis(image_data: bytes):
 
 async def test_hybrid_analyzer(image_data: bytes):
     """HybridAnalyzer (LOCAL_ONLY) のテスト"""
-    from hiveforge.vlm_tester import HybridAnalyzer, AnalysisLevel
+    from hiveforge.vlm_tester import AnalysisLevel, HybridAnalyzer
 
     print("\n" + "=" * 60)
     print("3. HybridAnalyzer (LOCAL_ONLY) テスト")
@@ -120,6 +123,7 @@ async def test_hybrid_analyzer(image_data: bytes):
 async def test_action_executor():
     """ActionExecutorのテスト"""
     from playwright.async_api import async_playwright
+
     from hiveforge.vlm_tester import ActionExecutor, ScreenCapture
 
     print("\n" + "=" * 60)
@@ -168,8 +172,9 @@ async def test_action_executor():
 
 async def test_mcp_server():
     """MCPサーバーの初期化テスト"""
-    from hiveforge.vlm_tester import VLMTesterMCPServer
     import tempfile
+
+    from hiveforge.vlm_tester import VLMTesterMCPServer
 
     print("\n" + "=" * 60)
     print("5. VLMTesterMCPServer 初期化テスト")
@@ -179,7 +184,7 @@ async def test_mcp_server():
         server = VLMTesterMCPServer(captures_dir=tmpdir)
         print(f"✓ サーバー名: {server.server.name}")
         print(f"✓ キャプチャディレクトリ: {server.captures_dir}")
-        print(f"✓ MCPサーバー初期化完了")
+        print("✓ MCPサーバー初期化完了")
 
 
 async def main():

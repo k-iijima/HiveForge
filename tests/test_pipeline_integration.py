@@ -15,7 +15,6 @@ import pytest
 from hiveforge.core.ar.storage import AkashicRecord
 from hiveforge.core.events.types import EventType
 from hiveforge.core.models.action_class import TrustLevel
-from hiveforge.queen_bee.pipeline import ApprovalRequiredError, PipelineError
 from hiveforge.queen_bee.server import QueenBeeMCPServer
 
 
@@ -170,7 +169,7 @@ class TestPipelineApprovalGate:
     async def test_approval_required_records_event(self, queen_with_approval, ar):
         """承認待ち時に PLAN_APPROVAL_REQUIRED イベントが記録される"""
         # Act
-        result = await queen_with_approval.handle_execute_goal(
+        await queen_with_approval.handle_execute_goal(
             {"run_id": "approval-event-001", "goal": "承認必要タスク"}
         )
 

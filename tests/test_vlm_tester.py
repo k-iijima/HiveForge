@@ -119,15 +119,17 @@ class TestVLMClient:
     @pytest.mark.asyncio
     async def test_analyze_returns_description(self):
         """analyze()は画面の説明を返す"""
+        # Arrange: anthropicモジュールが必要
+        pytest.importorskip("anthropic")
+        
         # Arrange: モッククライアントを設定
-        with patch("anthropic.Anthropic") as mock_anthropic:
-            mock_client = MagicMock()
-            mock_anthropic.return_value = mock_client
+        # anthropicモジュールは動的にインポートされるため、sys.modulesにモックを追加
+        mock_client_instance = MagicMock()
+        mock_response = MagicMock()
+        mock_response.content = [MagicMock(text="VS Codeの画面です")]
+        mock_client_instance.messages.create.return_value = mock_response
 
-            mock_response = MagicMock()
-            mock_response.content = [MagicMock(text="VS Codeの画面です")]
-            mock_client.messages.create.return_value = mock_response
-
+        with patch.dict("sys.modules", {"anthropic": MagicMock(Anthropic=MagicMock(return_value=mock_client_instance))}):
             with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
                 client = VLMClient()
 
