@@ -11,6 +11,8 @@ from pathlib import Path
 import httpx
 from pydantic import BaseModel, Field
 
+from hiveforge.prompts.vlm import format_screenshot_prompt
+
 logger = logging.getLogger(__name__)
 
 
@@ -144,14 +146,6 @@ class OllamaClient:
         Returns:
             VLMResponse: UI解析結果
         """
-        prompt = f"""Analyze this screenshot and describe:
-1. Main UI elements visible (sidebar, editor, panels, buttons, etc.)
-2. Any text content visible on screen
-3. Current state of the application
-4. Any errors, warnings, or notifications visible
-
-{f"Additional context: {context}" if context else ""}
-
-Provide a structured analysis."""
+        prompt = format_screenshot_prompt(context)
 
         return await self.analyze_image(image, prompt)

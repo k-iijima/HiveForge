@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 
 from mcp.types import ImageContent, TextContent
 
+from hiveforge.prompts.vlm import format_describe_page_prompt, format_find_element_prompt
 from hiveforge.vlm_tester.hybrid_analyzer import AnalysisLevel, HybridAnalyzer
 from hiveforge.vlm_tester.local_analyzers import DiffAnalyzer
 
@@ -83,9 +84,7 @@ class AgentUIHandlers:
         self._last_capture = image_data
 
         focus = args.get("focus", "")
-        prompt = "この画面を日本語で説明してください。"
-        if focus:
-            prompt += f" 特に「{focus}」に注目してください。"
+        prompt = format_describe_page_prompt(focus)
 
         # VLM分析
         result = await self.analyzer.analyze(
@@ -109,13 +108,7 @@ class AgentUIHandlers:
         image_data = await self.session.capture.capture()
         description = args["description"]
 
-        prompt = f"""この画面で「{description}」の位置を特定してください。
-見つかった場合は以下のJSON形式で回答してください:
-{{"found": true, "x": X座標, "y": Y座標, "description": "要素の説明"}}
-
-見つからない場合は:
-{{"found": false, "reason": "見つからない理由"}}
-"""
+        prompt = format_find_element_prompt(description)
 
         result = await self.analyzer.analyze(
             image_data,

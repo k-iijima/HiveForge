@@ -624,8 +624,11 @@ class TestTaskDecompositionPromptPolicy:
         プロンプトに存在することを確認する。
         """
         # Assert
-        assert "最速完了" in TASK_DECOMPOSITION_SYSTEM
-        assert "並列" in TASK_DECOMPOSITION_SYSTEM
+        assert "parallel" in TASK_DECOMPOSITION_SYSTEM.lower()
+        assert (
+            "fastest" in TASK_DECOMPOSITION_SYSTEM.lower()
+            or "simultaneous" in TASK_DECOMPOSITION_SYSTEM.lower()
+        )
 
     def test_prompt_includes_conflict_avoidance_policy(self):
         """プロンプトに作業競合回避方針が含まれる
@@ -634,8 +637,11 @@ class TestTaskDecompositionPromptPolicy:
         プロンプトに存在することを確認する。
         """
         # Assert
-        assert "競合" in TASK_DECOMPOSITION_SYSTEM
-        assert "ファイル" in TASK_DECOMPOSITION_SYSTEM or "リソース" in TASK_DECOMPOSITION_SYSTEM
+        assert "conflict" in TASK_DECOMPOSITION_SYSTEM.lower()
+        assert (
+            "file" in TASK_DECOMPOSITION_SYSTEM.lower()
+            or "resource" in TASK_DECOMPOSITION_SYSTEM.lower()
+        )
 
     def test_prompt_includes_granularity_policy(self):
         """プロンプトに粒度適正化方針が含まれる
@@ -644,4 +650,4 @@ class TestTaskDecompositionPromptPolicy:
         プロンプトに存在することを確認する。
         """
         # Assert
-        assert "粒度" in TASK_DECOMPOSITION_SYSTEM
+        assert "granularity" in TASK_DECOMPOSITION_SYSTEM.lower()

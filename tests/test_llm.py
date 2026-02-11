@@ -1596,7 +1596,7 @@ class TestAgentRunnerRequireToolUse:
         second_call_messages = mock_client.chat.call_args_list[1][1]["messages"]
         # 末尾のメッセージに再試行プロンプトがある
         retry_messages = [
-            m for m in second_call_messages if m.role == "user" and "ツール" in m.content
+            m for m in second_call_messages if m.role == "user" and "tool" in m.content.lower()
         ]
         assert len(retry_messages) >= 1, (
             f"再試行プロンプトが見つからない: {[(m.role, m.content[:50]) for m in second_call_messages]}"

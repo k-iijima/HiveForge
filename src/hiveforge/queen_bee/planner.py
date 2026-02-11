@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from hiveforge.core import generate_event_id
 from hiveforge.llm.client import LLMClient, Message
+from hiveforge.prompts import TASK_DECOMPOSITION_SYSTEM
 
 if TYPE_CHECKING:
     from hiveforge.guard_bee.models import GuardBeeReport
@@ -22,36 +23,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-# ─── タスク分解プロンプト ───────────────────────────────
-
-TASK_DECOMPOSITION_SYSTEM = """\
-あなたはHiveForgeのQueen Bee（タスク分解エージェント）です。
-ユーザーの目標を、具体的かつ実行可能なタスクリストに分解してください。
-
-## ルール
-- 各タスクは1つの明確なアクションに対応すること
-- タスクには一意のidを付与すること（"task-1", "task-2" 等）
-- タスク間に依存関係がある場合は depends_on で明示すること
-- 依存関係がないタスクは並列実行可能という意味である
-- 最低1タスク、最大10タスクに分解すること
-- 目標が十分具体的であれば、無理に分解せず1タスクのままでよい
-
-## 分解方針（重要）
-1. **最速完了**: なるべく多くのタスクを並列実行できるように分解する。\
-依存関係が不要なタスクを無理に直列にしないこと。
-2. **作業競合の回避**: 各タスクが操作するファイル・リソースが重複しないように分割する。\
-同じファイルを複数タスクが同時に編集する状況を避けること。\
-競合が避けられない場合は depends_on で順序を明示する。
-3. **粒度の適正化**: 1タスクが大きすぎず、細かすぎず、\
-Worker Beeが1回のツール実行ループで完了できる単位にする。
-
-## 出力形式
-以下の形式のJSONのみを出力してください。他のテキストは含めないでください。
-
-{"tasks": [{"id": "task-1", "goal": "具体的なタスク目標1"}, \
-{"id": "task-2", "goal": "具体的なタスク目標2", "depends_on": ["task-1"]}], \
-"reasoning": "分解の理由"}
-"""
+# TASK_DECOMPOSITION_SYSTEM is imported from hiveforge.prompts
 
 
 # ─── Pydantic モデル ────────────────────────────────────

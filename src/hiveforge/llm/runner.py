@@ -12,8 +12,9 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ..core.activity_bus import ActivityBus, ActivityEvent, ActivityType, AgentInfo
+from ..prompts import TOOL_USE_RETRY_PROMPT
+from ..prompts.agents import get_prompt_from_config, get_system_prompt
 from .client import LLMClient, Message, ToolCall
-from .prompts import get_prompt_from_config, get_system_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -65,12 +66,8 @@ class AgentRunner:
     LLM呼び出し → ツール実行 → 結果返却のループを管理。
     """
 
-    # ツール使用再試行時にLLMへ送るプロンプト
-    TOOL_USE_RETRY_PROMPT = (
-        "あなたの応答にはツール呼び出しが含まれていませんでした。"
-        "このタスクでは必ず利用可能なツール（run_command, write_file, read_file等）を"
-        "使って実行してください。テキストで説明するのではなく、実際にツールを呼び出してください。"
-    )
+    # Prompt sent to LLM when it fails to invoke any tool
+    TOOL_USE_RETRY_PROMPT = TOOL_USE_RETRY_PROMPT
 
     def __init__(
         self,

@@ -8,6 +8,8 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
+from hiveforge.prompts.vlm import format_comparison_prompt
+
 from .ollama_client import OllamaClient
 
 
@@ -125,15 +127,7 @@ class LocalVLMAnalyzer:
         before_result = await self.analyze(before)
         after_result = await self.analyze(after)
 
-        prompt = f"""Compare these two UI states:
-
-BEFORE:
-{before_result.analysis}
-
-AFTER:
-{after_result.analysis}
-
-What changed between these two states? List the differences."""
+        prompt = format_comparison_prompt(before_result.analysis, after_result.analysis)
 
         # afterの画像で差分分析
         response = await self.client.analyze_image(after, prompt)
