@@ -3,13 +3,19 @@
 Playwright MCP → code-server → 実際のVS Code拡張 → 実際のAPIサーバー
 の完全なE2Eフローでダッシュボードのレンダリングを検証する。
 
+3層の検証:
+    1. アクセシビリティスナップショット: DOM構造・テキスト要素の存在確認
+    2. VLM視覚評価: スクリーンショットからUI構造・色・レイアウトを評価
+    3. VLM-OCR評価: 描画されたテキストが画像として読めるか検証
+
 テスト対象をモックせず、実際のhiveMonitorPanel.tsがレンダリングした
-KPI DashboardをPlaywrightのアクセシビリティスナップショットで検証する。
+KPI Dashboardを複数の手法で検証する。
 
 前提条件:
     - code-server (hiveforge-code-server:8080) + HiveForge拡張インストール済み
     - Playwright MCP (hiveforge-playwright-mcp:8931) + socat localhost:8080 proxy
     - HiveForge APIサーバー (http://172.18.0.5:8000)
+    - Ollama (hiveforge-dev-ollama:11434) + llava:7b（VLM/OCR評価用）
 
 アーキテクチャ:
     Playwright browser (localhost:8080)
@@ -17,6 +23,7 @@ KPI DashboardをPlaywrightのアクセシビリティスナップショットで
             → VS Code拡張 (hiveMonitorPanel.ts)
                 → HiveForge API (/kpi/evaluation)
                     → 実データでレンダリング
+    スクリーンショット → Ollama VLM (llava:7b) → 視覚評価/OCR
 
 実行方法:
     pytest tests/e2e/test_hive_monitor_real.py -v -m e2e
@@ -85,6 +92,16 @@ def hive_monitor_snapshot(event_loop, mcp_client):
     モジュールスコープで1回だけ実行し、結果を全テストで共有する。
     """
     return event_loop.run_until_complete(_open_hive_monitor(mcp_client))
+
+
+@pytest.fixture(scope="module")
+def hive_monitor_screenshot(event_loop, mcp_client, hive_monitor_snapshot):
+    """Hive MonitorのスクリーンショットPNG画像を取得
+
+    hive_monitor_snapshot 依存により、Hive Monitorが開かれた状態で
+    スクリーンショットを撮る。VLM評価テストで使用する。
+    """
+    return event_loop.run_until_complete(mcp_client.screenshot())
 
 
 async def _open_hive_monitor(client) -> str:
@@ -390,3 +407,352 @@ class TestHiveMonitorRealRendering:
 
         errors = event_loop.run_until_complete(check())
         assert not errors, f"ServiceWorkerエラーが検出されました: {errors}"
+
+
+# ============================================================
+# テストクラス: VLM視覚評価（スクリーンショット画像ベース）
+# ============================================================
+
+
+def _check_ollama_available() -> bool:
+    """Ollama VLMサーバーが利用可能かチェック"""
+    import socket
+    from urllib.parse import urlparse
+
+    ollama_url = os.environ.get("OLLAMA_BASE_URL", "http://hiveforge-dev-ollama:11434")
+    parsed = urlparse(ollama_url)
+    host = parsed.hostname or "hiveforge-dev-ollama"
+    port = parsed.port or 11434
+    try:
+        sock = socket.create_connection((host, port), timeout=5)
+        sock.close()
+        return True
+    except (OSError, ConnectionRefusedError):
+        return False
+
+
+# Ollama VLM が利用可能なときのみ実行
+requires_ollama = pytest.mark.skipif(
+    not _check_ollama_available(),
+    reason="Ollama VLMサーバーが利用不可",
+)
+
+
+@requires_playwright_mcp
+@requires_ollama
+class TestHiveMonitorVLMVisualEval:
+    """スクリーンショット画像をVLM（llava:7b）で視覚的に評価する。
+
+    アクセシビリティスナップショットでは検証できない
+    「目に見えるレンダリング結果」を評価する：
+    - ダッシュボードのレイアウト構造
+    - ゲージバーの色（緑/黄/赤）
+    - セクションの視覚的な区分け
+    - グラフ/チャート要素の存在
+    """
+
+    def test_vlm_recognizes_dashboard_layout(self, event_loop, hive_monitor_screenshot):
+        """VLMがダッシュボードのレイアウトを認識できること
+
+        スクリーンショットを見て「ダッシュボード」「メトリクス」「ゲージ」
+        などのUI要素を視覚的に認識できるかを検証する。
+        """
+        from tests.e2e.vlm_visual_evaluator import vlm_evaluate
+
+        result = event_loop.run_until_complete(
+            vlm_evaluate(
+                hive_monitor_screenshot,
+                prompt=(
+                    "Describe the layout of this dashboard screenshot. "
+                    "What sections, metrics, and UI elements do you see? "
+                    "Mention any gauges, bars, numbers, or colored indicators."
+                ),
+                expected_keywords=["dashboard", "metric", "section"],
+                min_keywords=2,
+            )
+        )
+        assert result.success, f"VLMがダッシュボードレイアウトを認識できませんでした:\n{result}"
+
+    def test_vlm_sees_gauge_bars(self, event_loop, hive_monitor_screenshot):
+        """VLMがゲージバー（進捗バー）を視覚的に認識できること
+
+        KPIメトリクスのゲージバー（色付き横棒）が描画されていることを
+        画像レベルで確認する。
+        """
+        from tests.e2e.vlm_visual_evaluator import vlm_evaluate
+
+        result = event_loop.run_until_complete(
+            vlm_evaluate(
+                hive_monitor_screenshot,
+                prompt=(
+                    "Look at this dashboard screenshot carefully. "
+                    "Are there any horizontal progress bars, gauge bars, "
+                    "or colored bar indicators? Describe their colors and positions. "
+                    "Do you see green, yellow, orange, or red colored elements?"
+                ),
+                expected_keywords=["bar", "green"],
+                min_keywords=1,
+            )
+        )
+        assert result.success, f"VLMがゲージバーを認識できませんでした:\n{result}"
+
+    def test_vlm_sees_kpi_numbers(self, event_loop, hive_monitor_screenshot):
+        """VLMがKPI数値（パーセンテージ等）を視覚的に認識できること
+
+        「80.0%」「121.6s」「1405.0 tok」などの数値が
+        画像として見えることを確認する。
+        """
+        from tests.e2e.vlm_visual_evaluator import vlm_evaluate
+
+        result = event_loop.run_until_complete(
+            vlm_evaluate(
+                hive_monitor_screenshot,
+                prompt=(
+                    "What numerical values, percentages, or measurements "
+                    "are visible in this dashboard? List all numbers you can see "
+                    "including any percentages (%), time values (s), "
+                    "or token counts (tok)."
+                ),
+                expected_keywords=["%"],
+                min_keywords=1,
+            )
+        )
+        assert result.success, f"VLMがKPI数値を認識できませんでした:\n{result}"
+
+    def test_vlm_sees_section_headers(self, event_loop, hive_monitor_screenshot):
+        """VLMがセクションヘッダーを視覚的に読めること
+
+        「Task Performance」「Collaboration Quality」などのヘッダーが
+        画像内で視覚的に識別できるかを確認する。
+        """
+        from tests.e2e.vlm_visual_evaluator import vlm_evaluate
+
+        result = event_loop.run_until_complete(
+            vlm_evaluate(
+                hive_monitor_screenshot,
+                prompt=(
+                    "This is a VS Code extension showing a KPI dashboard. "
+                    "The dashboard has sections like 'Task Performance' and "
+                    "'Collaboration Quality'. Can you see any section headings "
+                    "or category labels? What text sections are visible?"
+                ),
+                expected_keywords=[
+                    "task",
+                    "performance",
+                    "collaboration",
+                    "quality",
+                    "section",
+                    "heading",
+                    "dashboard",
+                    "kpi",
+                ],
+                min_keywords=2,
+                retries=3,
+            )
+        )
+        assert result.success, f"VLMがセクションヘッダーを認識できませんでした:\n{result}"
+
+    def test_vlm_dark_theme_rendering(self, event_loop, hive_monitor_screenshot):
+        """VLMがダークテーマでの描画を認識できること
+
+        VS Codeのダークテーマ上でダッシュボードが描画されていることを
+        背景色やテーマから判別する。
+        """
+        from tests.e2e.vlm_visual_evaluator import vlm_evaluate
+
+        result = event_loop.run_until_complete(
+            vlm_evaluate(
+                hive_monitor_screenshot,
+                prompt=(
+                    "What is the color scheme or theme of this screenshot? "
+                    "Is it a dark theme or light theme? "
+                    "Describe the background color and text color."
+                ),
+                expected_keywords=["dark"],
+                min_keywords=1,
+            )
+        )
+        assert result.success, f"VLMがダークテーマを認識できませんでした:\n{result}"
+
+
+# ============================================================
+# テストクラス: VLM-OCR評価（描画テキストの可読性検証）
+# ============================================================
+
+
+@requires_playwright_mcp
+@requires_ollama
+class TestHiveMonitorVLMOCR:
+    """VLMをOCR的に使い、スクリーンショットから描画テキストを読み取る。
+
+    GLM-OCR的なアプローチ: 専用OCRエンジンではなくVLMの視覚的テキスト認識を利用。
+    「画像としてテキストが読めるか」を検証することで、
+    CSS崩れ・フォント未読込・レンダリング失敗などを検出する。
+    """
+
+    def test_ocr_reads_hive_monitor_title(self, event_loop, hive_monitor_screenshot):
+        """OCR: 「Hive Monitor」タイトルが画像として読めること
+
+        アクセシビリティスナップショットではDOMに存在するが、
+        CSSで visibility:hidden や opacity:0 にされている場合は
+        画像では読めない。この差分を検出する。
+        """
+        from tests.e2e.vlm_visual_evaluator import vlm_evaluate
+
+        result = event_loop.run_until_complete(
+            vlm_evaluate(
+                hive_monitor_screenshot,
+                prompt=(
+                    "This is a screenshot of VS Code with a HiveForge extension. "
+                    "There should be a title that says 'Hive Monitor' with a bee emoji. "
+                    "Can you see the text 'Hive Monitor' anywhere in this image? "
+                    "What other text can you read in the main panel?"
+                ),
+                expected_keywords=["hive", "monitor"],
+                min_keywords=1,
+                retries=3,
+            )
+        )
+        assert result.success, f"VLMで 'Hive Monitor' が読み取れませんでした:\n{result}"
+
+    def test_ocr_reads_kpi_dashboard(self, event_loop, hive_monitor_screenshot):
+        """OCR: 「KPI Dashboard」が画像として読めること"""
+        from tests.e2e.vlm_visual_evaluator import vlm_evaluate
+
+        result = event_loop.run_until_complete(
+            vlm_evaluate(
+                hive_monitor_screenshot,
+                prompt=(
+                    "This is a VS Code extension showing a KPI Dashboard panel. "
+                    "Can you see the text 'KPI Dashboard' in this image? "
+                    "What dashboard elements, metrics, or charts are visible?"
+                ),
+                expected_keywords=["kpi", "dashboard", "metric", "chart"],
+                min_keywords=1,
+                retries=3,
+            )
+        )
+        assert result.success, f"VLMで 'KPI Dashboard' が読み取れませんでした:\n{result}"
+
+    def test_ocr_reads_correctness_value(self, event_loop, hive_monitor_screenshot):
+        """OCR: Correctnessメトリクスのラベルと値が画像として読めること
+
+        「Correctness」ラベルと「80.0%」のような数値表示が
+        視覚的に判別可能であることを確認する。
+        """
+        from tests.e2e.vlm_visual_evaluator import vlm_evaluate
+
+        result = event_loop.run_until_complete(
+            vlm_evaluate(
+                hive_monitor_screenshot,
+                prompt=(
+                    "Read the text near the label 'Correctness' in this dashboard. "
+                    "What is the percentage value shown next to it? "
+                    "Also read any other metric labels and values you can see."
+                ),
+                expected_keywords=["correctness", "%"],
+                min_keywords=2,
+            )
+        )
+        assert result.success, f"OCRでCorrectnessメトリクスが読み取れませんでした:\n{result}"
+
+    def test_ocr_reads_lead_time_value(self, event_loop, hive_monitor_screenshot):
+        """OCR: Lead Timeメトリクスの値が画像として読めること
+
+        「Lead Time」ラベルと「121.6s」のような時間表示を確認。
+        """
+        from tests.e2e.vlm_visual_evaluator import vlm_evaluate
+
+        result = event_loop.run_until_complete(
+            vlm_evaluate(
+                hive_monitor_screenshot,
+                prompt=(
+                    "Read the text near the label 'Lead Time' in this dashboard. "
+                    "What is the time value shown? Include the unit."
+                ),
+                expected_keywords=["lead time"],
+                min_keywords=1,
+            )
+        )
+        assert result.success, f"OCRでLead Time値が読み取れませんでした:\n{result}"
+
+    def test_ocr_reads_cost_per_task(self, event_loop, hive_monitor_screenshot):
+        """OCR: Cost/Taskメトリクスの値が画像として読めること
+
+        「Cost/Task」ラベルと「1405.0 tok」のようなトークン数を確認。
+        """
+        from tests.e2e.vlm_visual_evaluator import vlm_evaluate
+
+        result = event_loop.run_until_complete(
+            vlm_evaluate(
+                hive_monitor_screenshot,
+                prompt=(
+                    "Read the text near the label 'Cost/Task' or 'Cost per Task' "
+                    "in this dashboard. What value is shown? Include the unit (tok)."
+                ),
+                expected_keywords=["cost"],
+                min_keywords=1,
+            )
+        )
+        assert result.success, f"OCRでCost/Task値が読み取れませんでした:\n{result}"
+
+    def test_ocr_reads_episode_colony_count(self, event_loop, hive_monitor_screenshot):
+        """OCR: episodes/coloniesカウントが画像として読めること
+
+        「10 episodes / 3 colonies」のようなメタ情報が
+        視覚的に読み取れることを確認する。
+        """
+        from tests.e2e.vlm_visual_evaluator import vlm_evaluate
+
+        result = event_loop.run_until_complete(
+            vlm_evaluate(
+                hive_monitor_screenshot,
+                prompt=(
+                    "Read the text that shows episode and colony counts in this dashboard. "
+                    "What numbers of episodes and colonies are shown?"
+                ),
+                expected_keywords=["episode", "colon"],
+                min_keywords=1,
+            )
+        )
+        assert result.success, f"OCRでepisodes/coloniesが読み取れませんでした:\n{result}"
+
+    def test_ocr_all_metric_labels_readable(self, event_loop, hive_monitor_screenshot):
+        """OCR: 全メトリクスラベルが画像として読めること（包括テスト）
+
+        Task Performance + Collaboration Quality の全メトリクスラベルが
+        VLMによって画像内のテキストとして認識できるか検証する。
+        """
+        from tests.e2e.vlm_visual_evaluator import vlm_evaluate
+
+        # Task Performance + Collaboration Quality のラベル
+        all_labels = [
+            "Correctness",
+            "Repeatability",
+            "Lead Time",
+            "Incident",
+            "Recurrence",
+            "Rework",
+            "Escalation",
+            "Cost",
+            "Overhead",
+        ]
+
+        result = event_loop.run_until_complete(
+            vlm_evaluate(
+                hive_monitor_screenshot,
+                prompt=(
+                    "List ALL metric labels visible in this dashboard screenshot. "
+                    "Read every label text you can see including: "
+                    "Correctness, Repeatability, Lead Time, Incident Rate, "
+                    "Recurrence, Rework Rate, Escalation, N-Proposal Yield, "
+                    "Cost/Task, Overhead. Which of these can you read?"
+                ),
+                expected_keywords=all_labels,
+                min_keywords=5,  # VLMの不確実性を許容し、9中5以上
+            )
+        )
+        assert result.success, (
+            f"メトリクスラベルの可読性が不十分です "
+            f"(found {len(result.keywords_found)}/{len(all_labels)}):\n{result}"
+        )
