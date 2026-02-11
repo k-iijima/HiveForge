@@ -1,6 +1,6 @@
 # Git Workflow
 
-HiveForge follows a Colony-based parallel development workflow.
+ColonyForge follows a Colony-based parallel development workflow.
 
 ## Branch Model
 

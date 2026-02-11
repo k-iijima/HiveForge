@@ -3,7 +3,7 @@
  */
 
 import * as vscode from 'vscode';
-import { HiveForgeClient, Requirement } from '../client';
+import { ColonyForgeClient, Requirement } from '../client';
 import { escapeHtml } from '../utils/html';
 
 /**
@@ -11,7 +11,7 @@ import { escapeHtml } from '../utils/html';
  */
 export async function showRequirementDetailPanel(
     requirement: Requirement,
-    client: HiveForgeClient,
+    client: ColonyForgeClient,
     onResolved: () => void
 ): Promise<void> {
     const runId = client.getCurrentRunId();

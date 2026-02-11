@@ -5,7 +5,7 @@ import time
 
 import pytest
 
-from hiveforge.core.rate_limiter import (
+from colonyforge.core.rate_limiter import (
     RateLimitConfig,
     RateLimiter,
     RateLimiterRegistry,
@@ -452,7 +452,7 @@ class TestRateLimitContext:
     @pytest.mark.asyncio
     async def test_context_manager_releases(self):
         """コンテキストマネージャー終了時にreleaseされる"""
-        from hiveforge.core.rate_limiter import RateLimitContext
+        from colonyforge.core.rate_limiter import RateLimitContext
 
         # Arrange
         limiter = RateLimiter(RateLimitConfig(max_concurrent=2))

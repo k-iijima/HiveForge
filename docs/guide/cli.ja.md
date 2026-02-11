@@ -1,11 +1,11 @@
 # CLIリファレンス
 
-HiveForgeはサーバー管理、タスク実行、対話セッション用のコマンドラインインターフェースを提供します。
+ColonyForgeはサーバー管理、タスク実行、対話セッション用のコマンドラインインターフェースを提供します。
 
 ## 文法
 
 ```
-hiveforge <command> [options]
+colonyforge <command> [options]
 ```
 
 ## コマンド
@@ -15,7 +15,7 @@ hiveforge <command> [options]
 FastAPI RESTサーバーを起動します。
 
 ```bash
-hiveforge server [--host HOST] [--port PORT] [--reload]
+colonyforge server [--host HOST] [--port PORT] [--reload]
 ```
 
 | オプション | デフォルト | 説明 |
@@ -27,7 +27,7 @@ hiveforge server [--host HOST] [--port PORT] [--reload]
 **例:**
 
 ```bash
-hiveforge server --port 8080 --reload
+colonyforge server --port 8080 --reload
 ```
 
 起動後、Swagger UIは `http://localhost:8000/docs` で利用できます。
@@ -39,7 +39,7 @@ hiveforge server --port 8080 --reload
 GitHub Copilot Chat統合用のModel Context Protocolサーバーを起動します。
 
 ```bash
-hiveforge mcp
+colonyforge mcp
 ```
 
 通信は**stdio**を使用します。`.vscode/mcp.json` で設定：
@@ -47,8 +47,8 @@ hiveforge mcp
 ```json
 {
   "servers": {
-    "hiveforge": {
-      "command": "hiveforge",
+    "colonyforge": {
+      "command": "colonyforge",
       "args": ["mcp"]
     }
   }
@@ -62,7 +62,7 @@ hiveforge mcp
 新しいHiveのスキャフォールディングを作成します。
 
 ```bash
-hiveforge init [--name NAME]
+colonyforge init [--name NAME]
 ```
 
 | オプション | デフォルト | 説明 |
@@ -76,7 +76,7 @@ hiveforge init [--name NAME]
 Runの現在の状態を表示します。
 
 ```bash
-hiveforge status [--run-id RUN_ID]
+colonyforge status [--run-id RUN_ID]
 ```
 
 | オプション | デフォルト | 説明 |
@@ -90,7 +90,7 @@ hiveforge status [--run-id RUN_ID]
 LLMエージェントを使用してタスクをワンパスで実行します。
 
 ```bash
-hiveforge run "タスクの説明" [--agent AGENT]
+colonyforge run "タスクの説明" [--agent AGENT]
 ```
 
 | オプション | デフォルト | 選択肢 | 説明 |
@@ -100,7 +100,7 @@ hiveforge run "タスクの説明" [--agent AGENT]
 **例:**
 
 ```bash
-hiveforge run "ユーザー認証用のRESTエンドポイントを作成" --agent queen_bee
+colonyforge run "ユーザー認証用のRESTエンドポイントを作成" --agent queen_bee
 ```
 
 ---
@@ -110,13 +110,13 @@ hiveforge run "ユーザー認証用のRESTエンドポイントを作成" --age
 Beekeeperエージェントにメッセージを送信し対話します。
 
 ```bash
-hiveforge chat "メッセージ"
+colonyforge chat "メッセージ"
 ```
 
 **例:**
 
 ```bash
-hiveforge chat "現在のプロジェクトの状況は？"
+colonyforge chat "現在のプロジェクトの状況は？"
 ```
 
 ---
@@ -126,7 +126,7 @@ hiveforge chat "現在のプロジェクトの状況は？"
 Akashic RecordにDecisionイベントを記録します。
 
 ```bash
-hiveforge record-decision \
+colonyforge record-decision \
   --key D5 \
   --title "データベースエンジンの選択" \
   --selected "PostgreSQL" \

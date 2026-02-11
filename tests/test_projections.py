@@ -1,6 +1,6 @@
 """投影 (Projections) のテスト"""
 
-from hiveforge.core.ar.projections import (
+from colonyforge.core.ar.projections import (
     RequirementProjection,
     RequirementState,
     RunProjection,
@@ -10,7 +10,7 @@ from hiveforge.core.ar.projections import (
     TaskState,
     build_run_projection,
 )
-from hiveforge.core.events import (
+from colonyforge.core.events import (
     EventType,
     HeartbeatEvent,
     RequirementApprovedEvent,
@@ -185,7 +185,7 @@ class TestRunProjector:
         projector.apply(RunStartedEvent(run_id="run-001", payload={"goal": "Test"}))
 
         # Act: 中断イベント (RUN_ABORTEDイベント)
-        from hiveforge.core.events import BaseEvent
+        from colonyforge.core.events import BaseEvent
 
         abort_event = BaseEvent(type=EventType.RUN_ABORTED, run_id="run-001")
         projector.apply(abort_event)
@@ -206,7 +206,7 @@ class TestRunProjector:
         assert projector.projection.state == RunState.RUNNING
 
         # Act: 緊急停止イベント
-        from hiveforge.core.events import EmergencyStopEvent
+        from colonyforge.core.events import EmergencyStopEvent
 
         stop_event = EmergencyStopEvent(
             run_id="run-001",
@@ -264,7 +264,7 @@ class TestRunProjector:
         assert task.state == TaskState.BLOCKED
 
         # Act: アンブロックイベント (TASK_UNBLOCKEDイベントを手動で作成)
-        from hiveforge.core.events import BaseEvent
+        from colonyforge.core.events import BaseEvent
 
         unblock_event = BaseEvent(
             type=EventType.TASK_UNBLOCKED, run_id="run-001", task_id="task-001"
@@ -320,7 +320,7 @@ class TestRunProjector:
         initial_count = projector.projection.event_count
 
         # Act: LLM_REQUESTなど、ハンドラがないイベントを適用
-        from hiveforge.core.events import BaseEvent
+        from colonyforge.core.events import BaseEvent
 
         unknown_event = BaseEvent(type=EventType.LLM_REQUEST, run_id="run-001")
         projector.apply(unknown_event)
@@ -410,7 +410,7 @@ class TestRunProjector:
         projector = RunProjector("run-001")
 
         # Act: 存在しないタスクへのアンブロックイベント
-        from hiveforge.core.events import BaseEvent
+        from colonyforge.core.events import BaseEvent
 
         event = BaseEvent(type=EventType.TASK_UNBLOCKED, run_id="run-001", task_id="nonexistent")
         projector.apply(event)
@@ -722,8 +722,8 @@ class TestHiveAggregate:
         Hive作成イベントで集約が初期化される。
         """
         # Arrange
-        from hiveforge.core.ar.hive_projections import HiveAggregate
-        from hiveforge.core.events import HiveCreatedEvent
+        from colonyforge.core.ar.hive_projections import HiveAggregate
+        from colonyforge.core.events import HiveCreatedEvent
 
         aggregate = HiveAggregate("hive-001")
 
@@ -735,7 +735,7 @@ class TestHiveAggregate:
         aggregate.apply(event)
 
         # Assert: 状態がACTIVEで、名前が設定される
-        from hiveforge.core.ar.projections import HiveState
+        from colonyforge.core.ar.projections import HiveState
 
         assert aggregate.state == HiveState.ACTIVE
         assert aggregate.name == "Test Hive"
@@ -746,8 +746,8 @@ class TestHiveAggregate:
         Colony作成イベントでColonyが登録される。
         """
         # Arrange
-        from hiveforge.core.ar.hive_projections import HiveAggregate
-        from hiveforge.core.events import ColonyCreatedEvent, HiveCreatedEvent
+        from colonyforge.core.ar.hive_projections import HiveAggregate
+        from colonyforge.core.events import ColonyCreatedEvent, HiveCreatedEvent
 
         aggregate = HiveAggregate("hive-001")
         aggregate.apply(HiveCreatedEvent(payload={"hive_id": "hive-001", "name": "Test"}))
@@ -763,7 +763,7 @@ class TestHiveAggregate:
         assert "colony-001" in aggregate.colonies
         colony = aggregate.colonies["colony-001"]
         assert colony.goal == "Build feature X"
-        from hiveforge.core.ar.projections import ColonyState
+        from colonyforge.core.ar.projections import ColonyState
 
         assert colony.state == ColonyState.PENDING
 
@@ -773,9 +773,9 @@ class TestHiveAggregate:
         Colony開始イベントでColonyの状態がIN_PROGRESSになる。
         """
         # Arrange
-        from hiveforge.core.ar.hive_projections import HiveAggregate
-        from hiveforge.core.ar.projections import ColonyState
-        from hiveforge.core.events import ColonyCreatedEvent, ColonyStartedEvent, HiveCreatedEvent
+        from colonyforge.core.ar.hive_projections import HiveAggregate
+        from colonyforge.core.ar.projections import ColonyState
+        from colonyforge.core.events import ColonyCreatedEvent, ColonyStartedEvent, HiveCreatedEvent
 
         aggregate = HiveAggregate("hive-001")
         aggregate.apply(HiveCreatedEvent(payload={"hive_id": "hive-001", "name": "Test"}))
@@ -796,9 +796,9 @@ class TestHiveAggregate:
         Colony完了イベントでColonyの状態がCOMPLETEDになる。
         """
         # Arrange
-        from hiveforge.core.ar.hive_projections import HiveAggregate
-        from hiveforge.core.ar.projections import ColonyState
-        from hiveforge.core.events import (
+        from colonyforge.core.ar.hive_projections import HiveAggregate
+        from colonyforge.core.ar.projections import ColonyState
+        from colonyforge.core.events import (
             ColonyCompletedEvent,
             ColonyCreatedEvent,
             ColonyStartedEvent,
@@ -825,9 +825,9 @@ class TestHiveAggregate:
         Colony失敗イベントでColonyの状態がFAILEDになる。
         """
         # Arrange
-        from hiveforge.core.ar.hive_projections import HiveAggregate
-        from hiveforge.core.ar.projections import ColonyState
-        from hiveforge.core.events import (
+        from colonyforge.core.ar.hive_projections import HiveAggregate
+        from colonyforge.core.ar.projections import ColonyState
+        from colonyforge.core.events import (
             ColonyCreatedEvent,
             ColonyFailedEvent,
             ColonyStartedEvent,
@@ -855,9 +855,9 @@ class TestHiveAggregate:
         Hive終了イベントでHiveの状態がCLOSEDになる。
         """
         # Arrange
-        from hiveforge.core.ar.hive_projections import HiveAggregate
-        from hiveforge.core.ar.projections import HiveState
-        from hiveforge.core.events import HiveClosedEvent, HiveCreatedEvent
+        from colonyforge.core.ar.hive_projections import HiveAggregate
+        from colonyforge.core.ar.projections import HiveState
+        from colonyforge.core.events import HiveClosedEvent, HiveCreatedEvent
 
         aggregate = HiveAggregate("hive-001")
         aggregate.apply(HiveCreatedEvent(payload={"hive_id": "hive-001", "name": "Test"}))
@@ -875,9 +875,9 @@ class TestHiveAggregate:
         複数のイベントを順に適用してHive状態を再構築する。
         """
         # Arrange
-        from hiveforge.core.ar.hive_projections import build_hive_aggregate
-        from hiveforge.core.ar.projections import ColonyState, HiveState
-        from hiveforge.core.events import (
+        from colonyforge.core.ar.hive_projections import build_hive_aggregate
+        from colonyforge.core.ar.projections import ColonyState, HiveState
+        from colonyforge.core.events import (
             ColonyCompletedEvent,
             ColonyCreatedEvent,
             ColonyStartedEvent,
@@ -908,8 +908,8 @@ class TestHiveAggregate:
     def test_active_colonies_property(self):
         """アクティブなColony一覧を取得"""
         # Arrange
-        from hiveforge.core.ar.hive_projections import HiveAggregate
-        from hiveforge.core.events import (
+        from colonyforge.core.ar.hive_projections import HiveAggregate
+        from colonyforge.core.events import (
             ColonyCompletedEvent,
             ColonyCreatedEvent,
             ColonyStartedEvent,
@@ -941,8 +941,8 @@ class TestRunColonyProjectionNullHandling:
 
     def test_apply_non_run_started_ignored(self):
         """RUN_STARTED以外のイベントは無視される"""
-        from hiveforge.core.events import TaskCreatedEvent
-        from hiveforge.core.state.projections import RunColonyProjection
+        from colonyforge.core.events import TaskCreatedEvent
+        from colonyforge.core.state.projections import RunColonyProjection
 
         proj = RunColonyProjection()
         event = TaskCreatedEvent(
@@ -960,8 +960,8 @@ class TestRunColonyProjectionNullHandling:
 
     def test_apply_run_started_with_none_run_id_ignored(self):
         """run_id=NoneのRUN_STARTEDは無視される"""
-        from hiveforge.core.events import RunStartedEvent
-        from hiveforge.core.state.projections import RunColonyProjection
+        from colonyforge.core.events import RunStartedEvent
+        from colonyforge.core.state.projections import RunColonyProjection
 
         proj = RunColonyProjection()
         event = RunStartedEvent(
@@ -979,8 +979,8 @@ class TestRunColonyProjectionNullHandling:
 
     def test_apply_run_started_without_colony_id_added_to_orphans(self):
         """colony_id=NoneのRunはorphan_runsに追加される"""
-        from hiveforge.core.events import RunStartedEvent
-        from hiveforge.core.state.projections import RunColonyProjection
+        from colonyforge.core.events import RunStartedEvent
+        from colonyforge.core.state.projections import RunColonyProjection
 
         proj = RunColonyProjection()
         event = RunStartedEvent(
@@ -998,8 +998,8 @@ class TestRunColonyProjectionNullHandling:
 
     def test_apply_run_started_with_colony_id_added_to_colony_runs(self):
         """colony_id付きRunはcolony_runsに追加される"""
-        from hiveforge.core.events import RunStartedEvent
-        from hiveforge.core.state.projections import RunColonyProjection
+        from colonyforge.core.events import RunStartedEvent
+        from colonyforge.core.state.projections import RunColonyProjection
 
         proj = RunColonyProjection()
         event = RunStartedEvent(
@@ -1016,8 +1016,8 @@ class TestRunColonyProjectionNullHandling:
 
     def test_duplicate_run_not_added_twice_to_orphans(self):
         """同じrunが2回orphansに追加されない"""
-        from hiveforge.core.events import RunStartedEvent
-        from hiveforge.core.state.projections import RunColonyProjection
+        from colonyforge.core.events import RunStartedEvent
+        from colonyforge.core.state.projections import RunColonyProjection
 
         proj = RunColonyProjection()
         event = RunStartedEvent(run_id="run-001", colony_id=None, payload={"goal": "Test"})
@@ -1031,8 +1031,8 @@ class TestRunColonyProjectionNullHandling:
 
     def test_duplicate_run_not_added_twice_to_colony_runs(self):
         """同じrunが2回colony_runsに追加されない"""
-        from hiveforge.core.events import RunStartedEvent
-        from hiveforge.core.state.projections import RunColonyProjection
+        from colonyforge.core.events import RunStartedEvent
+        from colonyforge.core.state.projections import RunColonyProjection
 
         proj = RunColonyProjection()
         event = RunStartedEvent(run_id="run-001", colony_id="col-001", payload={"goal": "Test"})
@@ -1054,8 +1054,8 @@ class TestHiveAggregateEdgeCases:
         _handlersに登録されていないイベントタイプを適用しても
         例外が発生せず、状態も変化しない。
         """
-        from hiveforge.core.ar.hive_projections import HiveAggregate
-        from hiveforge.core.events import RunStartedEvent
+        from colonyforge.core.ar.hive_projections import HiveAggregate
+        from colonyforge.core.events import RunStartedEvent
 
         # Arrange
         aggregate = HiveAggregate("hive-001")
@@ -1069,14 +1069,14 @@ class TestHiveAggregateEdgeCases:
         aggregate.apply(event)
 
         # Assert: エラーなし、デフォルト状態のまま（HiveCreatedを適用していないので）
-        from hiveforge.core.ar.projections import HiveState
+        from colonyforge.core.ar.projections import HiveState
 
         assert aggregate.state == HiveState.ACTIVE
 
     def test_colony_created_empty_id_ignored(self):
         """colony_idが空のColonyCreatedは無視される"""
-        from hiveforge.core.ar.hive_projections import HiveAggregate
-        from hiveforge.core.events import ColonyCreatedEvent
+        from colonyforge.core.ar.hive_projections import HiveAggregate
+        from colonyforge.core.events import ColonyCreatedEvent
 
         # Arrange
         aggregate = HiveAggregate("hive-001")
@@ -1093,8 +1093,8 @@ class TestHiveAggregateEdgeCases:
 
     def test_colony_started_nonexistent_ignored(self):
         """存在しないColonyのStartedイベントは無視される"""
-        from hiveforge.core.ar.hive_projections import HiveAggregate
-        from hiveforge.core.events import ColonyStartedEvent
+        from colonyforge.core.ar.hive_projections import HiveAggregate
+        from colonyforge.core.events import ColonyStartedEvent
 
         # Arrange
         aggregate = HiveAggregate("hive-001")
@@ -1111,8 +1111,8 @@ class TestHiveAggregateEdgeCases:
 
     def test_colony_completed_nonexistent_ignored(self):
         """存在しないColonyのCompletedイベントは無視される"""
-        from hiveforge.core.ar.hive_projections import HiveAggregate
-        from hiveforge.core.events import ColonyCompletedEvent
+        from colonyforge.core.ar.hive_projections import HiveAggregate
+        from colonyforge.core.events import ColonyCompletedEvent
 
         aggregate = HiveAggregate("hive-001")
         event = ColonyCompletedEvent(
@@ -1124,8 +1124,8 @@ class TestHiveAggregateEdgeCases:
 
     def test_colony_failed_nonexistent_ignored(self):
         """存在しないColonyのFailedイベントは無視される"""
-        from hiveforge.core.ar.hive_projections import HiveAggregate
-        from hiveforge.core.events import ColonyFailedEvent
+        from colonyforge.core.ar.hive_projections import HiveAggregate
+        from colonyforge.core.events import ColonyFailedEvent
 
         aggregate = HiveAggregate("hive-001")
         event = ColonyFailedEvent(
@@ -1137,8 +1137,8 @@ class TestHiveAggregateEdgeCases:
 
     def test_colony_suspended_nonexistent_ignored(self):
         """存在しないColonyのSuspendedイベントは無視される"""
-        from hiveforge.core.ar.hive_projections import HiveAggregate
-        from hiveforge.core.events import BaseEvent, EventType
+        from colonyforge.core.ar.hive_projections import HiveAggregate
+        from colonyforge.core.events import BaseEvent, EventType
 
         aggregate = HiveAggregate("hive-001")
         event = BaseEvent(

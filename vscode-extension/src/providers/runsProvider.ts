@@ -3,7 +3,7 @@
  */
 
 import * as vscode from 'vscode';
-import { HiveForgeClient, Run } from '../client';
+import { ColonyForgeClient, Run } from '../client';
 
 function formatElapsedTime(startedAt: string): string {
     const start = new Date(startedAt).getTime();
@@ -62,7 +62,7 @@ export class RunItem extends vscode.TreeItem {
 
         this.contextValue = run.state === 'running' ? 'runningRun' : 'completedRun';
         this.command = {
-            command: 'hiveforge.selectRun',
+            command: 'colonyforge.selectRun',
             title: 'Select Run',
             arguments: [run.run_id],
         };
@@ -77,7 +77,7 @@ export class RunsProvider implements vscode.TreeDataProvider<RunItem> {
 
     private showCompleted = false;
 
-    constructor(private client: HiveForgeClient) { }
+    constructor(private client: ColonyForgeClient) { }
 
     refresh(): void {
         this._onDidChangeTreeData.fire();
@@ -109,7 +109,7 @@ export class RunsProvider implements vscode.TreeDataProvider<RunItem> {
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             console.error('Failed to get runs:', error);
-            vscode.window.showErrorMessage(`HiveForge: Run一覧の取得に失敗しました: ${message}`);
+            vscode.window.showErrorMessage(`ColonyForge: Run一覧の取得に失敗しました: ${message}`);
             return [];
         }
     }

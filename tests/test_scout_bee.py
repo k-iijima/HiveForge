@@ -8,15 +8,15 @@ from __future__ import annotations
 
 import pytest
 
-from hiveforge.core.honeycomb.models import Episode, Outcome
-from hiveforge.scout_bee.matcher import (
+from colonyforge.core.honeycomb.models import Episode, Outcome
+from colonyforge.scout_bee.matcher import (
     FEATURE_DEFAULT,
     FEATURE_MAX,
     FEATURE_MIN,
     EpisodeMatcher,
     SimilarEpisode,
 )
-from hiveforge.scout_bee.models import (
+from colonyforge.scout_bee.models import (
     OptimizationProposal,
     ScoutReport,
     ScoutVerdict,
@@ -209,7 +209,7 @@ class TestEpisodeMatcher:
 
 # ==================== M3-8-b: テンプレート成功率分析 ====================
 
-from hiveforge.scout_bee.analyzer import TemplateAnalyzer  # noqa: E402
+from colonyforge.scout_bee.analyzer import TemplateAnalyzer  # noqa: E402
 
 
 class TestTemplateAnalyzer:
@@ -344,7 +344,7 @@ class TestTemplateAnalyzer:
 
 # ==================== M3-8-c: Beekeeperへの最適化提案統合 ====================
 
-from hiveforge.scout_bee.scout import ScoutBee  # noqa: E402
+from colonyforge.scout_bee.scout import ScoutBee  # noqa: E402
 
 
 class TestScoutBee:

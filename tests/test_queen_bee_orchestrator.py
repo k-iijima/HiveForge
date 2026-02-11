@@ -11,9 +11,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from hiveforge.queen_bee.context import TaskContext
-from hiveforge.queen_bee.orchestrator import ColonyOrchestrator
-from hiveforge.queen_bee.planner import PlannedTask, TaskPlan
+from colonyforge.queen_bee.context import TaskContext
+from colonyforge.queen_bee.orchestrator import ColonyOrchestrator
+from colonyforge.queen_bee.planner import PlannedTask, TaskPlan
 
 # =========================================================================
 # ColonyOrchestrator の並列実行テスト

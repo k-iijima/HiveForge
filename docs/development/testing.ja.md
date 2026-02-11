@@ -2,7 +2,7 @@
 
 ## テスト戦略
 
-HiveForgeは全コアモジュールで**ブランチカバレッジ100%**を目標とします。
+ColonyForgeは全コアモジュールで**ブランチカバレッジ100%**を目標とします。
 
 > **カバレッジを通すことが目的ではない。そのパスが通る前提や状況を明らかにし、挙動を明確にすることが目的である。**
 
@@ -18,7 +18,7 @@ pytest
 pytest tests/test_events.py -v
 
 # カバレッジ付き
-pytest --cov=hiveforge --cov-report=html
+pytest --cov=colonyforge --cov-report=html
 ```
 
 ### E2Eビジュアルテスト
@@ -31,17 +31,17 @@ devcontainerで以下のサービスが起動していること：
 
 | サービス | ポート | 用途 |
 |---------|-------|-----|
-| `hiveforge-playwright-mcp` | 8931 | ブラウザ操作 |
-| `hiveforge-dev-ollama` | 11434 | VLM画像解析 |
-| `hiveforge-code-server` | 8080 | テスト対象VS Code |
+| `colonyforge-playwright-mcp` | 8931 | ブラウザ操作 |
+| `colonyforge-dev-ollama` | 11434 | VLM画像解析 |
+| `colonyforge-code-server` | 8080 | テスト対象VS Code |
 
 #### E2Eテスト実行
 
 ```bash
-PLAYWRIGHT_MCP_URL="http://hiveforge-playwright-mcp:8931" \
-OLLAMA_BASE_URL="http://hiveforge-dev-ollama:11434" \
+PLAYWRIGHT_MCP_URL="http://colonyforge-playwright-mcp:8931" \
+OLLAMA_BASE_URL="http://colonyforge-dev-ollama:11434" \
 VLM_HEADLESS="true" \
-pytest tests/e2e/test_hiveforge_visual.py -v -m e2e
+pytest tests/e2e/test_colonyforge_visual.py -v -m e2e
 ```
 
 VS Codeタスク経由：コマンドパレット → `Tasks: Run Test Task` → **E2E: ビジュアルテスト (pytest)**

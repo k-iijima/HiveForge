@@ -1,5 +1,5 @@
 {
-  "name": "HiveForge Dev",
+  "name": "ColonyForge Dev",
   // Docker Desktop または WSL Docker で動作
   // 
   // 使用方法:
@@ -8,8 +8,8 @@
   "dockerComposeFile": [
     "docker-compose.dev.yml"
   ],
-  "service": "hiveforge-dev",
-  "workspaceFolder": "/workspace/HiveForge",
+  "service": "colonyforge-dev",
+  "workspaceFolder": "/workspace/ColonyForge",
   // ワークスペースマウントはdocker-compose.dev.ymlで定義（WSLパス形式）
   // Docker ComposeモードではここでのworkspaceMountは機能しないため削除
   "customizations": {
@@ -46,15 +46,15 @@
       }
     }
   },
-  "postCreateCommand": "cd /workspace/HiveForge && pip install -e '.[dev]' && mkdir -p /workspace/HiveForge/Vault && sudo chown -R vscode:vscode /workspace/HiveForge/Vault",
+  "postCreateCommand": "cd /workspace/ColonyForge && pip install -e '.[dev]' && mkdir -p /workspace/ColonyForge/Vault && sudo chown -R vscode:vscode /workspace/ColonyForge/Vault",
   "postStartCommand": "sudo chown root:docker /var/run/docker.sock 2>/dev/null || true; bash .devcontainer/start-ollama.sh || true",
   "waitFor": "postCreateCommand",
   "remoteEnv": {
     "PATH": "${containerEnv:PATH}:/home/vscode/.local/bin",
     "OLLAMA_HOST": "http://ollama:11434",
-    "OLLAMA_BASE_URL": "http://hiveforge-dev-ollama:11434",
-    "HIVEFORGE_GPU": "${localEnv:HIVEFORGE_GPU}",
-    "PLAYWRIGHT_MCP_URL": "http://hiveforge-playwright-mcp:8931",
+    "OLLAMA_BASE_URL": "http://colonyforge-dev-ollama:11434",
+    "COLONYFORGE_GPU": "${localEnv:COLONYFORGE_GPU}",
+    "PLAYWRIGHT_MCP_URL": "http://colonyforge-playwright-mcp:8931",
     "VLM_HEADLESS": "true"
   },
   "remoteUser": "vscode"

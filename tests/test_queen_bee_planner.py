@@ -13,8 +13,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from pydantic import ValidationError
 
-from hiveforge.llm.client import LLMClient
-from hiveforge.queen_bee.planner import (
+from colonyforge.llm.client import LLMClient
+from colonyforge.queen_bee.planner import (
     TASK_DECOMPOSITION_SYSTEM,
     PlannedTask,
     TaskPlan,

@@ -11,7 +11,7 @@ import asyncio
 
 import pytest
 
-from hiveforge.core.activity_bus import (
+from colonyforge.core.activity_bus import (
     ActivityBus,
     ActivityEvent,
     ActivityType,
@@ -551,7 +551,7 @@ class TestActivityBus:
         他のハンドラーに影響しないことを確認。
         """
 
-        from hiveforge.core import activity_bus
+        from colonyforge.core import activity_bus
 
         # Arrange
         ActivityBus.reset()

@@ -1,5 +1,5 @@
 services:
-  hiveforge-api:
+  colonyforge-api:
     build:
       context: .
       dockerfile: Dockerfile
@@ -7,11 +7,11 @@ services:
       - "8000:8000"
     volumes:
       - ./Vault:/app/Vault
-      - ./hiveforge.config.yaml:/app/hiveforge.config.yaml:ro
+      - ./colonyforge.config.yaml:/app/colonyforge.config.yaml:ro
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - HIVEFORGE_API_KEY=${HIVEFORGE_API_KEY:-}
-    command: ["hiveforge", "server", "--host", "0.0.0.0", "--port", "8000"]
+      - COLONYFORGE_API_KEY=${COLONYFORGE_API_KEY:-}
+    command: ["colonyforge", "server", "--host", "0.0.0.0", "--port", "8000"]
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]

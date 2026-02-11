@@ -1,18 +1,18 @@
 /**
- * HiveForge Client Tests
+ * ColonyForge Client Tests
  */
 
 import * as assert from "assert";
 import * as sinon from "sinon";
 import axios from "axios";
-import { HiveForgeClient } from "../client";
+import { ColonyForgeClient } from "../client";
 
-describe("HiveForgeClient", () => {
+describe("ColonyForgeClient", () => {
     let axiosStub: sinon.SinonStub;
 
     beforeEach(() => {
         // クライアントインスタンスを作成してaxios.createが呼ばれることを確認
-        void new HiveForgeClient("http://localhost:8000");
+        void new ColonyForgeClient("http://localhost:8000");
         // axios.create が返すインスタンスをモック
         axiosStub = sinon.stub(axios, "create").returns({
             get: sinon.stub(),
@@ -28,7 +28,7 @@ describe("HiveForgeClient", () => {
     describe("constructor", () => {
         it("should create a client with the given server URL", () => {
             // Arrange & Act
-            const _testClient = new HiveForgeClient("http://test:9000");
+            const _testClient = new ColonyForgeClient("http://test:9000");
             void _testClient; // 使用済みとしてマーク
 
             // Assert (constructor was called with correct URL)
@@ -39,7 +39,7 @@ describe("HiveForgeClient", () => {
     describe("setServerUrl", () => {
         it("should update the base URL", () => {
             // Arrange
-            const newClient = new HiveForgeClient("http://localhost:8000");
+            const newClient = new ColonyForgeClient("http://localhost:8000");
 
             // Act
             newClient.setServerUrl("http://newhost:9000");
@@ -52,7 +52,7 @@ describe("HiveForgeClient", () => {
     describe("currentRunId management", () => {
         it("should set and get current run ID", () => {
             // Arrange
-            const testClient = new HiveForgeClient("http://localhost:8000");
+            const testClient = new ColonyForgeClient("http://localhost:8000");
 
             // Act
             testClient.setCurrentRunId("run-123");
@@ -63,7 +63,7 @@ describe("HiveForgeClient", () => {
 
         it("should return undefined when no run ID is set", () => {
             // Arrange
-            const testClient = new HiveForgeClient("http://localhost:8000");
+            const testClient = new ColonyForgeClient("http://localhost:8000");
 
             // Act & Assert
             assert.strictEqual(testClient.getCurrentRunId(), undefined);
@@ -71,7 +71,7 @@ describe("HiveForgeClient", () => {
 
         it("should allow clearing run ID", () => {
             // Arrange
-            const testClient = new HiveForgeClient("http://localhost:8000");
+            const testClient = new ColonyForgeClient("http://localhost:8000");
             testClient.setCurrentRunId("run-123");
 
             // Act
@@ -83,7 +83,7 @@ describe("HiveForgeClient", () => {
     });
 });
 
-describe("HiveForgeClient API interfaces", () => {
+describe("ColonyForgeClient API interfaces", () => {
     describe("Run interface", () => {
         it("should define correct Run properties", () => {
             // Arrange
@@ -235,8 +235,8 @@ describe("HiveForgeClient API interfaces", () => {
     });
 });
 
-describe("HiveForgeClient Hive/Colony API methods", () => {
-    let client: HiveForgeClient;
+describe("ColonyForgeClient Hive/Colony API methods", () => {
+    let client: ColonyForgeClient;
     let mockAxiosInstance: {
         get: sinon.SinonStub;
         post: sinon.SinonStub;
@@ -253,7 +253,7 @@ describe("HiveForgeClient Hive/Colony API methods", () => {
         sinon.stub(axios, "create").returns(
             mockAxiosInstance as unknown as ReturnType<typeof axios.create>
         );
-        client = new HiveForgeClient("http://localhost:8000");
+        client = new ColonyForgeClient("http://localhost:8000");
     });
 
     afterEach(() => {

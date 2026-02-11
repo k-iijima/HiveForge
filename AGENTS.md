@@ -1,12 +1,12 @@
-# AGENTS.md - HiveForge Development Guidelines
+# AGENTS.md - ColonyForge Development Guidelines
 
-このファイルはAIエージェント（GitHub Copilot、Claude等）がHiveForgeプロジェクトで作業する際のガイドラインです。
+このファイルはAIエージェント（GitHub Copilot、Claude等）がColonyForgeプロジェクトで作業する際のガイドラインです。
 
 ## 核心的信念
 
 > **信頼できる部品を、信頼できる組み合わせ方をして、信頼できるシステムを作る**
 
-この信念がHiveForgeの開発哲学の根幹です。
+この信念がColonyForgeの開発哲学の根幹です。
 
 ## 開発原則
 
@@ -240,7 +240,7 @@ pip install -e ".[dev]"
 ## ディレクトリ構造
 
 ```
-src/hiveforge/
+src/colonyforge/
 ├── core/           # コアロジック（イベント、状態機械、AR）
 │   ├── events/     # イベントモデル（EventType enum等）
 │   ├── models/     # ドメインモデル（ActionClass等）
@@ -296,7 +296,7 @@ pytest
 pytest tests/test_events.py -v
 
 # カバレッジ付き
-pytest --cov=hiveforge --cov-report=html
+pytest --cov=colonyforge --cov-report=html
 ```
 
 ### E2Eビジュアルテスト
@@ -309,9 +309,9 @@ devcontainerで以下のサービスが起動していること：
 
 | サービス | ポート | 用途 |
 |---------|-------|-----|
-| `hiveforge-playwright-mcp` | 8931 | ブラウザ操作 |
-| `hiveforge-dev-ollama` | 11434 | VLM画像解析 |
-| `hiveforge-code-server` | 8080 | テスト対象VS Code |
+| `colonyforge-playwright-mcp` | 8931 | ブラウザ操作 |
+| `colonyforge-dev-ollama` | 11434 | VLM画像解析 |
+| `colonyforge-code-server` | 8080 | テスト対象VS Code |
 
 ```bash
 # サービス起動確認
@@ -322,13 +322,13 @@ docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 
 ```bash
 # 全E2Eテスト
-PLAYWRIGHT_MCP_URL="http://hiveforge-playwright-mcp:8931" \
-OLLAMA_BASE_URL="http://hiveforge-dev-ollama:11434" \
+PLAYWRIGHT_MCP_URL="http://colonyforge-playwright-mcp:8931" \
+OLLAMA_BASE_URL="http://colonyforge-dev-ollama:11434" \
 VLM_HEADLESS="true" \
-pytest tests/e2e/test_hiveforge_visual.py -v -m e2e
+pytest tests/e2e/test_colonyforge_visual.py -v -m e2e
 
 # 特定のテストのみ
-pytest tests/e2e/test_hiveforge_visual.py::TestHiveForgeExtensionVisual::test_can_capture_screen -v -m e2e
+pytest tests/e2e/test_colonyforge_visual.py::TestColonyForgeExtensionVisual::test_can_capture_screen -v -m e2e
 ```
 
 #### VS Codeタスクで実行

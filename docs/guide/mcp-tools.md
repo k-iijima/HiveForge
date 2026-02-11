@@ -1,6 +1,6 @@
 # MCP Tools
 
-HiveForge exposes tools via the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) for use in GitHub Copilot Chat.
+ColonyForge exposes tools via the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) for use in GitHub Copilot Chat.
 
 ## Setup
 
@@ -9,8 +9,8 @@ Create `.vscode/mcp.json` in your workspace:
 ```json
 {
   "servers": {
-    "hiveforge": {
-      "command": "hiveforge",
+    "colonyforge": {
+      "command": "colonyforge",
       "args": ["mcp"],
       "env": {}
     }
@@ -20,7 +20,7 @@ Create `.vscode/mcp.json` in your workspace:
 
 Then reload VS Code (Command Palette → **Developer: Reload Window**).
 
-Use `@hiveforge` in Copilot Chat to access tools.
+Use `@colonyforge` in Copilot Chat to access tools.
 
 ## Tool Reference
 

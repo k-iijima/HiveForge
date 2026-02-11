@@ -1,6 +1,6 @@
 # Issue: 因果リンク（Lineage）の自動設定機能
 
-**GitHub Issue URL**: https://github.com/k-iijima/HiveForge/issues/new
+**GitHub Issue URL**: https://github.com/k-iijima/ColonyForge/issues/new
 
 ---
 
@@ -87,9 +87,9 @@ run.started (01ABC...)
 
 ## 関連ファイル
 
-- `src/hiveforge/mcp_server/server.py`
-- `src/hiveforge/api/server.py`
-- `src/hiveforge/core/events.py`
+- `src/colonyforge/mcp_server/server.py`
+- `src/colonyforge/api/server.py`
+- `src/colonyforge/core/events.py`
 - `docs/コンセプト_v3.md`: 因果リンク仕様
 
 ## ラベル

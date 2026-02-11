@@ -8,11 +8,11 @@ import asyncio
 import os
 
 # Ollama URL設定
-os.environ["OLLAMA_BASE_URL"] = "http://hiveforge-dev-ollama:11434"
+os.environ["OLLAMA_BASE_URL"] = "http://colonyforge-dev-ollama:11434"
 
 
 async def main():
-    from hiveforge.agent_ui.server import AgentUIMCPServer
+    from colonyforge.agent_ui.server import AgentUIMCPServer
 
     print("\n🚀 Agent UI MCP Server 動作テスト\n")
 

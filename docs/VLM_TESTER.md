@@ -67,10 +67,10 @@ pip install easyocr opencv-python
 
 ```bash
 # 例: 完全無料モード
-VLM_ANALYSIS_LEVEL=local_vlm VLM_PROVIDER=ollama hiveforge-vlm
+VLM_ANALYSIS_LEVEL=local_vlm VLM_PROVIDER=ollama colonyforge-vlm
 
 # 例: ハイブリッドモード（推奨）
-VLM_ANALYSIS_LEVEL=hybrid VLM_PROVIDER=ollama hiveforge-vlm
+VLM_ANALYSIS_LEVEL=hybrid VLM_PROVIDER=ollama colonyforge-vlm
 ```
 
 ## 操作を視覚的に確認する方法
@@ -79,7 +79,7 @@ VLM_ANALYSIS_LEVEL=hybrid VLM_PROVIDER=ollama hiveforge-vlm
 
 ```bash
 # ブラウザを表示して操作を見る
-VLM_HEADLESS=false hiveforge-vlm
+VLM_HEADLESS=false colonyforge-vlm
 ```
 
 ### 2. キャプチャ履歴を確認
@@ -98,10 +98,10 @@ Playwright が操作している code-server と同じ URL を別のブラウザ
 
 ```bash
 # 直接実行
-hiveforge-vlm
+colonyforge-vlm
 
 # または Python モジュールとして
-python -m hiveforge.vlm_tester.server
+python -m colonyforge.vlm_tester.server
 ```
 
 ## MCP 設定
@@ -112,7 +112,7 @@ VS Code の `settings.json` または `mcp.json` に追加:
 {
   "mcpServers": {
     "vlm-tester": {
-      "command": "hiveforge-vlm",
+      "command": "colonyforge-vlm",
       "env": {
         "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}",
         "VLM_CAPTURES_DIR": "./vlm_captures"
@@ -134,7 +134,7 @@ VS Code の `settings.json` または `mcp.json` に追加:
 
 **例:**
 ```
-capture_screen(description="HiveForgeダッシュボードの初期状態")
+capture_screen(description="ColonyForgeダッシュボードの初期状態")
 ```
 
 ### analyze_screen

@@ -12,15 +12,15 @@ The following modules are documented via mkdocstrings (auto-generated from docst
 
 ### Core
 
-- [`hiveforge.core.events`](api.md#events) — Event types and models
-- [`hiveforge.core.ar`](api.md#akashic-record) — Akashic Record (persistence)
-- [`hiveforge.core.state`](api.md#state-machines) — State machines
-- [`hiveforge.core.honeycomb`](api.md#honeycomb) — KPI calculation and learning
-- [`hiveforge.core.models`](api.md#domain-models) — ActionClass, TrustLevel
+- [`colonyforge.core.events`](api.md#events) — Event types and models
+- [`colonyforge.core.ar`](api.md#akashic-record) — Akashic Record (persistence)
+- [`colonyforge.core.state`](api.md#state-machines) — State machines
+- [`colonyforge.core.honeycomb`](api.md#honeycomb) — KPI calculation and learning
+- [`colonyforge.core.models`](api.md#domain-models) — ActionClass, TrustLevel
 
 ### Agents
 
-- [`hiveforge.beekeeper`](api.md#beekeeper) — Beekeeper agent
-- [`hiveforge.queen_bee`](api.md#queen-bee) — Queen Bee agent
-- [`hiveforge.worker_bee`](api.md#worker-bee) — Worker Bee agent
-- [`hiveforge.guard_bee`](api.md#guard-bee) — Guard Bee agent
+- [`colonyforge.beekeeper`](api.md#beekeeper) — Beekeeper agent
+- [`colonyforge.queen_bee`](api.md#queen-bee) — Queen Bee agent
+- [`colonyforge.worker_bee`](api.md#worker-bee) — Worker Bee agent
+- [`colonyforge.guard_bee`](api.md#guard-bee) — Guard Bee agent

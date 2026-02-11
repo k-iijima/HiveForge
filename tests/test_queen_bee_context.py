@@ -9,7 +9,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from hiveforge.queen_bee.context import TaskContext, TaskResult
+from colonyforge.queen_bee.context import TaskContext, TaskResult
 
 # =========================================================================
 # TaskResult モデルのテスト

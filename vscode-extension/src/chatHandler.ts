@@ -1,23 +1,23 @@
 /**
- * HiveForge Chat Participant Handler
+ * ColonyForge Chat Participant Handler
  * 
- * @hiveforge メンション経由でBeekeeperに直結する。
+ * @colonyforge メンション経由でBeekeeperに直結する。
  * ユーザーのメッセージをMCPサーバー(Beekeeper)のsend_messageツールに転送し、
  * 応答をCopilot Chatのストリームに流す。
  */
 
 import * as vscode from 'vscode';
-import { HiveForgeClient } from './client';
+import { ColonyForgeClient } from './client';
 
 /** Chat Participant ID（package.json chatParticipants.id と一致させる） */
-export const PARTICIPANT_ID = 'hiveforge-dashboard.hiveforge';
+export const PARTICIPANT_ID = 'colonyforge-dashboard.colonyforge';
 
 /**
- * HiveForge Chat Participant を作成・登録する
+ * ColonyForge Chat Participant を作成・登録する
  */
 export function registerChatParticipant(
     context: vscode.ExtensionContext,
-    client: HiveForgeClient,
+    client: ColonyForgeClient,
 ): vscode.ChatParticipant {
     const handler: vscode.ChatRequestHandler = async (
         request: vscode.ChatRequest,
@@ -43,12 +43,12 @@ async function handleChatRequest(
     chatContext: vscode.ChatContext,
     stream: vscode.ChatResponseStream,
     token: vscode.CancellationToken,
-    client: HiveForgeClient,
+    client: ColonyForgeClient,
 ): Promise<void> {
     const userMessage = request.prompt;
 
     if (!userMessage.trim()) {
-        stream.markdown('メッセージを入力してください。\n\n例: `@hiveforge ECサイトのログインページを作成して`');
+        stream.markdown('メッセージを入力してください。\n\n例: `@colonyforge ECサイトのログインページを作成して`');
         return;
     }
 
@@ -72,11 +72,11 @@ async function handleChatRequest(
  */
 async function handleStatusCommand(
     stream: vscode.ChatResponseStream,
-    client: HiveForgeClient,
+    client: ColonyForgeClient,
 ): Promise<void> {
     try {
         const health = await client.getHealth();
-        stream.markdown(`### 🐝 HiveForge ステータス\n\n`);
+        stream.markdown(`### 🐝 ColonyForge ステータス\n\n`);
         stream.markdown(`- **サーバー**: ${health.status === 'healthy' ? '✅ 正常' : '❌ 異常'}\n`);
         stream.markdown(`- **バージョン**: ${health.version}\n`);
         stream.markdown(`- **アクティブRun数**: ${health.active_runs}\n`);
@@ -95,7 +95,7 @@ async function handleStatusCommand(
         }
     } catch {
         stream.markdown(`⚠️ サーバーに接続できません。\n\n`);
-        stream.markdown(`\`hiveforge.serverUrl\` の設定を確認してください。\n`);
+        stream.markdown(`\`colonyforge.serverUrl\` の設定を確認してください。\n`);
     }
 }
 
@@ -104,12 +104,12 @@ async function handleStatusCommand(
  */
 async function handleHivesCommand(
     stream: vscode.ChatResponseStream,
-    client: HiveForgeClient,
+    client: ColonyForgeClient,
 ): Promise<void> {
     try {
         const hives = await client.getHives();
         if (hives.length === 0) {
-            stream.markdown('Hiveはまだ作成されていません。\n\n`@hiveforge 新しいプロジェクトを開始して` と伝えてください。');
+            stream.markdown('Hiveはまだ作成されていません。\n\n`@colonyforge 新しいプロジェクトを開始して` と伝えてください。');
             return;
         }
         stream.markdown(`### 🏠 Hive一覧 (${hives.length}件)\n\n`);
@@ -128,7 +128,7 @@ async function handleHivesCommand(
 async function handleSendMessage(
     message: string,
     stream: vscode.ChatResponseStream,
-    client: HiveForgeClient,
+    client: ColonyForgeClient,
     token: vscode.CancellationToken,
 ): Promise<void> {
     stream.progress('Beekeeperに転送中...');
@@ -157,9 +157,9 @@ async function handleSendMessage(
         const errorMessage = e instanceof Error ? e.message : String(e);
         if (errorMessage.includes('ECONNREFUSED') || errorMessage.includes('connect')) {
             stream.markdown(
-                `⚠️ HiveForge APIサーバーに接続できません。\n\n` +
+                `⚠️ ColonyForge APIサーバーに接続できません。\n\n` +
                 `サーバーが起動しているか確認してください:\n` +
-                `\`\`\`bash\nhiveforge serve\n\`\`\`\n`
+                `\`\`\`bash\ncolonyforge serve\n\`\`\`\n`
             );
         } else {
             stream.markdown(`⚠️ Beekeeperとの通信でエラーが発生しました: ${errorMessage}\n`);

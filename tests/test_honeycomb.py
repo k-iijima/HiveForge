@@ -15,10 +15,10 @@ from __future__ import annotations
 
 import pytest
 
-from hiveforge.core import AkashicRecord, generate_event_id
+from colonyforge.core import AkashicRecord, generate_event_id
 
 # Sentinel イベント（P-02: incident_rate 改善用）
-from hiveforge.core.events import (
+from colonyforge.core.events import (
     RunAbortedEvent,
     RunCompletedEvent,
     RunFailedEvent,
@@ -29,16 +29,16 @@ from hiveforge.core.events import (
     TaskCreatedEvent,
     TaskFailedEvent,
 )
-from hiveforge.core.events.types import EventType
-from hiveforge.core.honeycomb.kpi import KPICalculator
-from hiveforge.core.honeycomb.models import (
+from colonyforge.core.events.types import EventType
+from colonyforge.core.honeycomb.kpi import KPICalculator
+from colonyforge.core.honeycomb.models import (
     Episode,
     FailureClass,
     KPIScores,
     Outcome,
 )
-from hiveforge.core.honeycomb.recorder import EpisodeRecorder
-from hiveforge.core.honeycomb.store import HoneycombStore
+from colonyforge.core.honeycomb.recorder import EpisodeRecorder
+from colonyforge.core.honeycomb.store import HoneycombStore
 
 # =========================================================================
 # Episode モデルのテスト
@@ -1014,7 +1014,7 @@ class TestEpisodeRecorderTokenCounting:
 
     def _seed_run_with_worker_events(self, ar, run_id: str, worker_payloads: list[dict]):
         """Worker Bee イベント付きRunをシード"""
-        from hiveforge.core.events import WorkerCompletedEvent, WorkerProgressEvent
+        from colonyforge.core.events import WorkerCompletedEvent, WorkerProgressEvent
 
         ar.append(
             RunStartedEvent(
@@ -1464,7 +1464,7 @@ class TestEpisodeRecorderOutcome:
         """created_at属性を持つイベントから所要時間を算出"""
         from unittest.mock import MagicMock
 
-        from hiveforge.core.events import EventType
+        from colonyforge.core.events import EventType
 
         # Arrange: created_atを持つモックイベント
         event1 = MagicMock()
@@ -1487,7 +1487,7 @@ class TestEpisodeRecorderOutcome:
         """created_atが不正なISO形式の場合は0.0を返す"""
         from unittest.mock import MagicMock
 
-        from hiveforge.core.events import EventType
+        from colonyforge.core.events import EventType
 
         # Arrange: 不正なタイムスタンプ
         event1 = MagicMock()
@@ -1856,7 +1856,7 @@ class TestCollaborationMetrics:
     """協調品質メトリクスのテスト
 
     MoA (Wang et al., 2024) の協調効率メトリクスを参考に、
-    HiveForge固有のRework Rate, Escalation Ratio, N案歩留まり等を検証。
+    ColonyForge固有のRework Rate, Escalation Ratio, N案歩留まり等を検証。
     """
 
     @pytest.fixture
@@ -2289,7 +2289,7 @@ class TestCollaborationMetricsModel:
 
     def test_default_values(self):
         """デフォルト値はすべてNone"""
-        from hiveforge.core.honeycomb.models import CollaborationMetrics
+        from colonyforge.core.honeycomb.models import CollaborationMetrics
 
         # Act
         metrics = CollaborationMetrics()
@@ -2303,7 +2303,7 @@ class TestCollaborationMetricsModel:
 
     def test_frozen(self):
         """CollaborationMetricsはイミュータブル"""
-        from hiveforge.core.honeycomb.models import CollaborationMetrics
+        from colonyforge.core.honeycomb.models import CollaborationMetrics
 
         # Arrange
         metrics = CollaborationMetrics(rework_rate=0.5)
@@ -2314,7 +2314,7 @@ class TestCollaborationMetricsModel:
 
     def test_validation_bounds(self):
         """値の範囲バリデーション"""
-        from hiveforge.core.honeycomb.models import CollaborationMetrics
+        from colonyforge.core.honeycomb.models import CollaborationMetrics
 
         # Act & Assert: rework_rate > 1.0 は不正
         with pytest.raises(Exception):
@@ -2326,7 +2326,7 @@ class TestGateAccuracyMetricsModel:
 
     def test_default_values(self):
         """デフォルト値はすべてNone"""
-        from hiveforge.core.honeycomb.models import GateAccuracyMetrics
+        from colonyforge.core.honeycomb.models import GateAccuracyMetrics
 
         # Act
         metrics = GateAccuracyMetrics()
@@ -2337,7 +2337,7 @@ class TestGateAccuracyMetricsModel:
 
     def test_frozen(self):
         """GateAccuracyMetricsはイミュータブル"""
-        from hiveforge.core.honeycomb.models import GateAccuracyMetrics
+        from colonyforge.core.honeycomb.models import GateAccuracyMetrics
 
         # Arrange
         metrics = GateAccuracyMetrics(guard_pass_rate=0.9)
@@ -2352,7 +2352,7 @@ class TestEvaluationSummaryModel:
 
     def test_default_values(self):
         """デフォルト値が正しい"""
-        from hiveforge.core.honeycomb.models import EvaluationSummary
+        from colonyforge.core.honeycomb.models import EvaluationSummary
 
         # Act
         summary = EvaluationSummary()
@@ -2365,7 +2365,7 @@ class TestEvaluationSummaryModel:
 
     def test_frozen(self):
         """EvaluationSummaryはイミュータブル"""
-        from hiveforge.core.honeycomb.models import EvaluationSummary
+        from colonyforge.core.honeycomb.models import EvaluationSummary
 
         # Arrange
         summary = EvaluationSummary(total_episodes=5)

@@ -1,13 +1,13 @@
 # Quick Start
 
-Get HiveForge running and complete your first workflow in 5 minutes.
+Get ColonyForge running and complete your first workflow in 5 minutes.
 
 ## 1. Start the API Server
 
 Press **F5** in VS Code (with devcontainer), or:
 
 ```bash
-hiveforge server
+colonyforge server
 ```
 
 Open Swagger UI: [http://localhost:8000/docs](http://localhost:8000/docs)
@@ -19,7 +19,7 @@ A Hive represents a project — the top-level organizational unit.
 ```bash
 curl -X POST http://localhost:8000/hives \
   -H "Content-Type: application/json" \
-  -d '{"name": "My Project", "description": "First HiveForge project"}'
+  -d '{"name": "My Project", "description": "First ColonyForge project"}'
 ```
 
 ## 3. Create a Colony
@@ -70,7 +70,7 @@ curl -X POST http://localhost:8000/runs/{run_id}/complete
 
 ## 7. View in VS Code
 
-Install the HiveForge extension to see:
+Install the ColonyForge extension to see:
 
 - **Hive Monitor** — Webview dashboard with KPI gauges
 - **Event Log** — TreeView of all events
@@ -83,8 +83,8 @@ Configure `.vscode/mcp.json`:
 ```json
 {
   "servers": {
-    "hiveforge": {
-      "command": "hiveforge",
+    "colonyforge": {
+      "command": "colonyforge",
       "args": ["mcp"],
       "env": {}
     }
@@ -92,7 +92,7 @@ Configure `.vscode/mcp.json`:
 }
 ```
 
-Then use `@hiveforge` in Copilot Chat to operate HiveForge directly.
+Then use `@colonyforge` in Copilot Chat to operate ColonyForge directly.
 
 ## Next Steps
 

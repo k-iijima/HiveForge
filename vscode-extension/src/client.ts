@@ -1,5 +1,5 @@
 /**
- * HiveForge API Client
+ * ColonyForge API Client
  */
 
 import axios, { AxiosInstance } from 'axios';
@@ -125,7 +125,7 @@ export interface ColonyStatusResponse {
     status: string;
 }
 
-export class HiveForgeClient {
+export class ColonyForgeClient {
     private client: AxiosInstance;
     private currentRunId?: string;
 

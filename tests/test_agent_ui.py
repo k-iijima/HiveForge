@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from hiveforge.agent_ui.server import AgentUIMCPServer, BrowserSession
+from colonyforge.agent_ui.server import AgentUIMCPServer, BrowserSession
 
 
 class TestBrowserSession:
@@ -255,9 +255,9 @@ class TestAgentUIHandlers:
             mock_executor = AsyncMock()
             mock_session.executor = mock_executor
 
-            from hiveforge.agent_ui.handlers import AgentUIHandlers
-            from hiveforge.vlm_tester.hybrid_analyzer import HybridAnalyzer
-            from hiveforge.vlm_tester.local_analyzers import DiffAnalyzer
+            from colonyforge.agent_ui.handlers import AgentUIHandlers
+            from colonyforge.vlm_tester.hybrid_analyzer import HybridAnalyzer
+            from colonyforge.vlm_tester.local_analyzers import DiffAnalyzer
 
             mock_analyzer = MagicMock(spec=HybridAnalyzer)
             mock_diff_analyzer = MagicMock(spec=DiffAnalyzer)
@@ -741,8 +741,8 @@ class TestAgentUIHandlersWaitForElement:
             mock_capture.capture = AsyncMock(return_value=b"\x89PNG\r\n\x1a\n")
             mock_session.capture = mock_capture
 
-            from hiveforge.agent_ui.handlers import AgentUIHandlers
-            from hiveforge.vlm_tester.hybrid_analyzer import HybridAnalyzer
+            from colonyforge.agent_ui.handlers import AgentUIHandlers
+            from colonyforge.vlm_tester.hybrid_analyzer import HybridAnalyzer
 
             mock_analyzer = MagicMock(spec=HybridAnalyzer)
 
@@ -891,7 +891,7 @@ class TestAgentUIToolDefinitions:
     def test_get_tool_definitions_returns_list(self):
         """get_tool_definitionsがToolのリストを返す"""
         # Arrange
-        from hiveforge.agent_ui.tools import get_tool_definitions
+        from colonyforge.agent_ui.tools import get_tool_definitions
 
         # Act
         tools = get_tool_definitions()
@@ -907,7 +907,7 @@ class TestAgentUIToolDefinitions:
     def test_tool_definitions_include_required_tools(self):
         """必須ツールが含まれている"""
         # Arrange
-        from hiveforge.agent_ui.tools import get_tool_definitions
+        from colonyforge.agent_ui.tools import get_tool_definitions
 
         # Act
         tools = get_tool_definitions()

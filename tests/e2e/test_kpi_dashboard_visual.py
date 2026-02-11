@@ -6,12 +6,12 @@ Playwright MCPを使用して、KPIダッシュボードのUI要素を検証す�
   2. VLM画像分析 — VLMモデル（llava等）が利用可能な場合のみ実行
 
 前提条件:
-    - Playwright MCPサーバー (hiveforge-playwright-mcp:8931)
-    - （VLMテスト用）Ollama VLMサーバー (hiveforge-dev-ollama:11434) + llavaモデル
+    - Playwright MCPサーバー (colonyforge-playwright-mcp:8931)
+    - （VLMテスト用）Ollama VLMサーバー (colonyforge-dev-ollama:11434) + llavaモデル
 
 実行方法:
-    PLAYWRIGHT_MCP_URL="http://hiveforge-playwright-mcp:8931" \\
-    OLLAMA_BASE_URL="http://hiveforge-dev-ollama:11434" \\
+    PLAYWRIGHT_MCP_URL="http://colonyforge-playwright-mcp:8931" \\
+    OLLAMA_BASE_URL="http://colonyforge-dev-ollama:11434" \\
     VLM_HEADLESS="true" \\
     pytest tests/e2e/test_kpi_dashboard_visual.py -v -m e2e
 """
@@ -29,7 +29,7 @@ from pathlib import Path
 import pytest
 
 # テスト環境設定
-os.environ.setdefault("OLLAMA_BASE_URL", "http://hiveforge-dev-ollama:11434")
+os.environ.setdefault("OLLAMA_BASE_URL", "http://colonyforge-dev-ollama:11434")
 os.environ.setdefault("VLM_HEADLESS", "true")
 
 # E2Eマーカー + VLM揺らぎ対策リトライ
@@ -43,7 +43,7 @@ def _check_vlm_available() -> bool:
     """VLMモデル（llava等の画像認識モデル）が利用可能かチェック"""
     import httpx
 
-    base_url = os.environ.get("OLLAMA_BASE_URL", "http://hiveforge-dev-ollama:11434")
+    base_url = os.environ.get("OLLAMA_BASE_URL", "http://colonyforge-dev-ollama:11434")
     try:
         resp = httpx.get(f"{base_url}/api/tags", timeout=5)
         if resp.status_code == 200:
@@ -326,7 +326,7 @@ def kpi_http_server(kpi_html_path: str) -> Generator[str, None, None]:
 @pytest.fixture
 async def agent_ui_server():
     """Agent UI サーバーのフィクスチャ"""
-    from hiveforge.agent_ui.server import AgentUIMCPServer
+    from colonyforge.agent_ui.server import AgentUIMCPServer
 
     captures_dir = Path(__file__).parent / "test_captures_e2e"
     captures_dir.mkdir(exist_ok=True)

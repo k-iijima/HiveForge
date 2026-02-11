@@ -7,13 +7,13 @@
 import * as assert from "assert";
 import * as sinon from "sinon";
 import * as vscode from "vscode";
-import { HiveForgeClient } from "../client";
+import { ColonyForgeClient } from "../client";
 import { createColony, startColony, completeColony, registerColonyCommands, setHiveTreeProviderForColony } from "../commands/colonyCommands";
 import { HiveTreeDataProvider } from "../views/hiveTreeView";
 
 describe("Colony Commands", () => {
     let sandbox: sinon.SinonSandbox;
-    let mockClient: sinon.SinonStubbedInstance<HiveForgeClient>;
+    let mockClient: sinon.SinonStubbedInstance<ColonyForgeClient>;
     let mockTreeProvider: sinon.SinonStubbedInstance<HiveTreeDataProvider>;
     let showInputBoxStub: sinon.SinonStub;
     let showErrorMessageStub: sinon.SinonStub;
@@ -24,8 +24,8 @@ describe("Colony Commands", () => {
     beforeEach(() => {
         sandbox = sinon.createSandbox();
 
-        // HiveForgeClientのモック
-        mockClient = sandbox.createStubInstance(HiveForgeClient);
+        // ColonyForgeClientのモック
+        mockClient = sandbox.createStubInstance(ColonyForgeClient);
 
         // HiveTreeDataProviderのモック
         mockTreeProvider = sandbox.createStubInstance(HiveTreeDataProvider);
@@ -42,7 +42,7 @@ describe("Colony Commands", () => {
             subscriptions: [] as { dispose(): void }[],
         } as unknown as vscode.ExtensionContext;
         setHiveTreeProviderForColony(mockTreeProvider as unknown as HiveTreeDataProvider);
-        registerColonyCommands(context, mockClient as unknown as HiveForgeClient);
+        registerColonyCommands(context, mockClient as unknown as ColonyForgeClient);
     });
 
     afterEach(() => {
@@ -266,12 +266,12 @@ describe("Colony Commands", () => {
             const registerStub = sandbox.stub(vscode.commands, "registerCommand").returns({ dispose: () => { } });
 
             // Act
-            registerColonyCommands(context, mockClient as unknown as HiveForgeClient);
+            registerColonyCommands(context, mockClient as unknown as ColonyForgeClient);
 
             // Assert
-            assert.ok(registerStub.calledWith("hiveforge.createColony"));
-            assert.ok(registerStub.calledWith("hiveforge.startColony"));
-            assert.ok(registerStub.calledWith("hiveforge.completeColony"));
+            assert.ok(registerStub.calledWith("colonyforge.createColony"));
+            assert.ok(registerStub.calledWith("colonyforge.startColony"));
+            assert.ok(registerStub.calledWith("colonyforge.completeColony"));
         });
     });
 });

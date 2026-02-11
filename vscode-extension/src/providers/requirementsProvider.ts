@@ -4,7 +4,7 @@
  */
 
 import * as vscode from 'vscode';
-import { HiveForgeClient, Requirement } from '../client';
+import { ColonyForgeClient, Requirement } from '../client';
 
 export class RequirementItem extends vscode.TreeItem {
     constructor(
@@ -36,7 +36,7 @@ export class RequirementItem extends vscode.TreeItem {
 
         // クリックで詳細表示（承認/却下はインラインボタンで行う）
         this.command = {
-            command: 'hiveforge.showRequirementDetail',
+            command: 'colonyforge.showRequirementDetail',
             title: 'Show Requirement Detail',
             arguments: [requirement],
         };
@@ -51,7 +51,7 @@ export class RequirementsProvider implements vscode.TreeDataProvider<Requirement
 
     private showResolved = false;
 
-    constructor(private client: HiveForgeClient) { }
+    constructor(private client: ColonyForgeClient) { }
 
     refresh(): void {
         this._onDidChangeTreeData.fire();
@@ -92,7 +92,7 @@ export class RequirementsProvider implements vscode.TreeDataProvider<Requirement
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             console.error('Failed to get requirements:', error);
-            vscode.window.showErrorMessage(`HiveForge: 確認要請一覧の取得に失敗しました: ${message}`);
+            vscode.window.showErrorMessage(`ColonyForge: 確認要請一覧の取得に失敗しました: ${message}`);
             return [];
         }
     }

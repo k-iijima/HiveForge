@@ -3,7 +3,7 @@
  */
 
 import * as vscode from 'vscode';
-import { HiveForgeClient, Task } from '../client';
+import { ColonyForgeClient, Task } from '../client';
 
 export class TaskItem extends vscode.TreeItem {
     constructor(
@@ -47,7 +47,7 @@ export class TasksProvider implements vscode.TreeDataProvider<TaskItem> {
 
     private showCompleted = false;
 
-    constructor(private client: HiveForgeClient) { }
+    constructor(private client: ColonyForgeClient) { }
 
     refresh(): void {
         this._onDidChangeTreeData.fire();
@@ -86,7 +86,7 @@ export class TasksProvider implements vscode.TreeDataProvider<TaskItem> {
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             console.error('Failed to get tasks:', error);
-            vscode.window.showErrorMessage(`HiveForge: Task一覧の取得に失敗しました: ${message}`);
+            vscode.window.showErrorMessage(`ColonyForge: Task一覧の取得に失敗しました: ${message}`);
             return [];
         }
     }

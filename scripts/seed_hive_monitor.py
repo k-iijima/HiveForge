@@ -7,7 +7,7 @@ Hive Monitorの動作確認を可能にする。
 
 使い方:
   1. 別ターミナルでAPIサーバーを起動:
-     uvicorn hiveforge.api.server:app --reload
+     uvicorn colonyforge.api.server:app --reload
 
   2. このスクリプトを実行:
      python scripts/seed_hive_monitor.py
@@ -21,7 +21,7 @@ import sys
 # srcをパスに追加
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from hiveforge.core.activity_bus import (
+from colonyforge.core.activity_bus import (
     ActivityBus,
     ActivityEvent,
     ActivityType,
@@ -336,13 +336,13 @@ async def main():
     ActivityBus.reset()
 
     # AppStateをリセット（HiveStore含む）
-    from hiveforge.api.dependencies import AppState
+    from colonyforge.api.dependencies import AppState
 
     AppState.reset()
 
     # APIサーバーをバックグラウンドで起動
     config = uvicorn.Config(
-        "hiveforge.api.server:app",
+        "colonyforge.api.server:app",
         host="0.0.0.0",
         port=8000,
         log_level="warning",

@@ -1,6 +1,6 @@
 # アーキテクチャ
 
-HiveForgeの技術アーキテクチャドキュメント。
+ColonyForgeの技術アーキテクチャドキュメント。
 
 | トピック | 説明 |
 |---------|------|
@@ -13,10 +13,10 @@ HiveForgeの技術アーキテクチャドキュメント。
 graph TB
     subgraph "VS Code"
         CP[GitHub Copilot Chat]
-        EXT[HiveForge 拡張機能]
+        EXT[ColonyForge 拡張機能]
     end
 
-    subgraph "HiveForge コア"
+    subgraph "ColonyForge コア"
         MCP[MCP Server<br/>stdio通信]
         API[API Server<br/>FastAPI/REST]
         AR[Akashic Record<br/>JSONL イベントストア]
@@ -72,7 +72,7 @@ graph TB
 ## ソースコード構造
 
 ```
-src/hiveforge/
+src/colonyforge/
 ├── core/           # コアロジック（イベント、状態機械、AR）
 │   ├── events/     # イベントモデル（EventType enum等）
 │   ├── models/     # ドメインモデル（ActionClass等）

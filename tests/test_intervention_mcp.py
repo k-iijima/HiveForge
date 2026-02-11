@@ -9,9 +9,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from hiveforge.core import AkashicRecord
-from hiveforge.core.intervention import InterventionStore
-from hiveforge.mcp_server.handlers.intervention import InterventionHandlers
+from colonyforge.core import AkashicRecord
+from colonyforge.core.intervention import InterventionStore
+from colonyforge.mcp_server.handlers.intervention import InterventionHandlers
 
 
 @pytest.fixture

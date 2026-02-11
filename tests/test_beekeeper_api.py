@@ -1,6 +1,6 @@
 """Beekeeper REST API エンドポイントのテスト
 
-M2-3-a: Copilot Chat @hiveforge → Beekeeper直結
+M2-3-a: Copilot Chat @colonyforge → Beekeeper直結
 FastAPI /beekeeper/* エンドポイントのテスト。
 """
 
@@ -54,7 +54,7 @@ class TestBeekeeperRoutes:
             "actions_taken": 0,
         }
 
-        with patch("hiveforge.api.routes.beekeeper.BeekeeperMCPServer") as mock_beekeeper:
+        with patch("colonyforge.api.routes.beekeeper.BeekeeperMCPServer") as mock_beekeeper:
             mock_instance = mock_beekeeper.return_value
             mock_instance.handle_send_message = AsyncMock(return_value=mock_result)
 
@@ -85,7 +85,7 @@ class TestBeekeeperRoutes:
             "actions_taken": 1,
         }
 
-        with patch("hiveforge.api.routes.beekeeper.BeekeeperMCPServer") as mock_beekeeper:
+        with patch("colonyforge.api.routes.beekeeper.BeekeeperMCPServer") as mock_beekeeper:
             mock_instance = mock_beekeeper.return_value
             mock_instance.handle_send_message = AsyncMock(return_value=mock_result)
 
@@ -115,7 +115,7 @@ class TestBeekeeperRoutes:
             "error": "LLM接続タイムアウト",
         }
 
-        with patch("hiveforge.api.routes.beekeeper.BeekeeperMCPServer") as mock_beekeeper:
+        with patch("colonyforge.api.routes.beekeeper.BeekeeperMCPServer") as mock_beekeeper:
             mock_instance = mock_beekeeper.return_value
             mock_instance.handle_send_message = AsyncMock(return_value=mock_result)
 
@@ -151,7 +151,7 @@ class TestBeekeeperStatusRoute:
             "session": None,
         }
 
-        with patch("hiveforge.api.routes.beekeeper.BeekeeperMCPServer") as mock_beekeeper:
+        with patch("colonyforge.api.routes.beekeeper.BeekeeperMCPServer") as mock_beekeeper:
             mock_instance = mock_beekeeper.return_value
             mock_instance.handle_get_status = AsyncMock(return_value=mock_result)
 
@@ -171,7 +171,7 @@ class TestBeekeeperStatusRoute:
             "hives": [{"hive_id": "hive-1", "name": "テスト", "status": "active"}],
         }
 
-        with patch("hiveforge.api.routes.beekeeper.BeekeeperMCPServer") as mock_beekeeper:
+        with patch("colonyforge.api.routes.beekeeper.BeekeeperMCPServer") as mock_beekeeper:
             mock_instance = mock_beekeeper.return_value
             mock_instance.handle_get_status = AsyncMock(return_value=mock_result)
 
@@ -216,7 +216,7 @@ class TestBeekeeperApproveRejectRoutes:
             "requirement_id": "req-001",
         }
 
-        with patch("hiveforge.api.routes.beekeeper.BeekeeperMCPServer") as mock_beekeeper:
+        with patch("colonyforge.api.routes.beekeeper.BeekeeperMCPServer") as mock_beekeeper:
             mock_instance = mock_beekeeper.return_value
             mock_instance.handle_approve = AsyncMock(return_value=mock_result)
 
@@ -256,7 +256,7 @@ class TestBeekeeperApproveRejectRoutes:
             "requirement_id": "req-002",
         }
 
-        with patch("hiveforge.api.routes.beekeeper.BeekeeperMCPServer") as mock_beekeeper:
+        with patch("colonyforge.api.routes.beekeeper.BeekeeperMCPServer") as mock_beekeeper:
             mock_instance = mock_beekeeper.return_value
             mock_instance.handle_reject = AsyncMock(return_value=mock_result)
 
@@ -274,7 +274,7 @@ class TestBeekeeperApproveRejectRoutes:
     def test_approve_with_exception(self, client):
         """承認処理で例外が発生した場合は400エラー（内部詳細は漏洩しない）"""
         # Arrange
-        with patch("hiveforge.api.routes.beekeeper.BeekeeperMCPServer") as mock_beekeeper:
+        with patch("colonyforge.api.routes.beekeeper.BeekeeperMCPServer") as mock_beekeeper:
             mock_instance = mock_beekeeper.return_value
             mock_instance.handle_approve = AsyncMock(side_effect=Exception("要件が見つかりません"))
 
@@ -291,7 +291,7 @@ class TestBeekeeperApproveRejectRoutes:
     def test_reject_with_exception(self, client):
         """却下処理で例外が発生した場合は400エラー（内部詳細は漏洩しない）"""
         # Arrange
-        with patch("hiveforge.api.routes.beekeeper.BeekeeperMCPServer") as mock_beekeeper:
+        with patch("colonyforge.api.routes.beekeeper.BeekeeperMCPServer") as mock_beekeeper:
             mock_instance = mock_beekeeper.return_value
             mock_instance.handle_reject = AsyncMock(side_effect=Exception("要件が見つかりません"))
 
@@ -311,7 +311,7 @@ class TestBeekeeperResponseModel:
 
     def test_response_model_fields(self):
         """レスポンスモデルの必須/オプションフィールド"""
-        from hiveforge.api.routes.beekeeper import BeekeeperResponse
+        from colonyforge.api.routes.beekeeper import BeekeeperResponse
 
         # Arrange / Act: 最小限のフィールドで作成
         response = BeekeeperResponse(status="success")
@@ -326,7 +326,7 @@ class TestBeekeeperResponseModel:
 
     def test_response_model_full(self):
         """全フィールド指定のレスポンスモデル"""
-        from hiveforge.api.routes.beekeeper import BeekeeperResponse
+        from colonyforge.api.routes.beekeeper import BeekeeperResponse
 
         # Arrange / Act
         response = BeekeeperResponse(

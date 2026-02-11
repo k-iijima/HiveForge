@@ -15,7 +15,7 @@
  */
 
 import * as vscode from 'vscode';
-import { HiveForgeClient, ActivityHierarchy, ActivityEvent, AgentInfo, EvaluationSummary } from '../client';
+import { ColonyForgeClient, ActivityHierarchy, ActivityEvent, AgentInfo, EvaluationSummary } from '../client';
 
 // 拡張したHive/Colony情報
 interface HiveInfo {
@@ -44,7 +44,7 @@ export class HiveMonitorPanel {
 
     private constructor(
         panel: vscode.WebviewPanel,
-        private client: HiveForgeClient,
+        private client: ColonyForgeClient,
     ) {
         this._panel = panel;
         this._initHtml();
@@ -71,10 +71,10 @@ export class HiveMonitorPanel {
                         this._update();
                         break;
                     case 'selectHive':
-                        vscode.commands.executeCommand('hiveforge.selectHive', message.hiveId);
+                        vscode.commands.executeCommand('colonyforge.selectHive', message.hiveId);
                         break;
                     case 'selectColony':
-                        vscode.commands.executeCommand('hiveforge.selectColony', message.colonyId);
+                        vscode.commands.executeCommand('colonyforge.selectColony', message.colonyId);
                         break;
                 }
             },
@@ -83,7 +83,7 @@ export class HiveMonitorPanel {
         );
     }
 
-    public static createOrShow(extensionUri: vscode.Uri, client: HiveForgeClient): void {
+    public static createOrShow(extensionUri: vscode.Uri, client: ColonyForgeClient): void {
         const column = vscode.window.activeTextEditor
             ? vscode.window.activeTextEditor.viewColumn
             : undefined;
@@ -95,7 +95,7 @@ export class HiveMonitorPanel {
         }
 
         const panel = vscode.window.createWebviewPanel(
-            'hiveforgeHiveMonitor',
+            'colonyforgeHiveMonitor',
             'Hive Monitor',
             column || vscode.ViewColumn.One,
             {
@@ -429,7 +429,7 @@ export class HiveMonitorPanel {
             overlay.innerHTML = '<div class="error-box">'
                 + '<h2>接続エラー</h2>'
                 + '<p>' + esc(message) + '</p>'
-                + '<p class="hint">HiveForge APIサーバーが起動しているか確認してください</p>'
+                + '<p class="hint">ColonyForge APIサーバーが起動しているか確認してください</p>'
                 + '</div>';
             overlay.style.display = 'flex';
         }

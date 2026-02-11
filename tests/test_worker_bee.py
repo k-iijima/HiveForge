@@ -4,10 +4,10 @@ import asyncio
 
 import pytest
 
-from hiveforge.core import AkashicRecord
-from hiveforge.core.events import EventType
-from hiveforge.worker_bee import WorkerBeeMCPServer
-from hiveforge.worker_bee.server import WorkerState
+from colonyforge.core import AkashicRecord
+from colonyforge.core.events import EventType
+from colonyforge.worker_bee import WorkerBeeMCPServer
+from colonyforge.worker_bee.server import WorkerState
 
 
 @pytest.fixture
@@ -384,20 +384,20 @@ class TestDispatchTool:
 
 
 # Worker Projection テスト
-from hiveforge.core.events import (  # noqa: E402
+from colonyforge.core.events import (  # noqa: E402
     WorkerAssignedEvent,
     WorkerCompletedEvent,
     WorkerFailedEvent,
     WorkerProgressEvent,
     WorkerStartedEvent,
 )
-from hiveforge.worker_bee.projections import (  # noqa: E402
+from colonyforge.worker_bee.projections import (  # noqa: E402
     WorkerPoolProjection,
     WorkerProjection,
     build_worker_pool_projection,
     build_worker_projection,
 )
-from hiveforge.worker_bee.projections import (  # noqa: E402
+from colonyforge.worker_bee.projections import (  # noqa: E402
     WorkerState as ProjectionWorkerState,
 )
 
@@ -719,7 +719,7 @@ class TestWorkerProjectionEdgeCases:
 # Worker Process Manager テスト
 import pytest  # noqa: E402
 
-from hiveforge.worker_bee.process import (  # noqa: E402
+from colonyforge.worker_bee.process import (  # noqa: E402
     WorkerPoolConfig,
     WorkerProcess,
     WorkerProcessManager,
@@ -1085,7 +1085,7 @@ class TestWorkerProcessManager:
 # Tool Executor テスト
 import pytest  # noqa: E402
 
-from hiveforge.worker_bee.tools import (  # noqa: E402
+from colonyforge.worker_bee.tools import (  # noqa: E402
     ToolCategory,
     ToolDefinition,
     ToolExecutor,
@@ -1508,7 +1508,7 @@ class TestWorkerProcessManagerCoverageGaps:
 
 
 # Retry Executor テスト
-from hiveforge.worker_bee.retry import (  # noqa: E402
+from colonyforge.worker_bee.retry import (  # noqa: E402
     RetryExecutor,
     RetryPolicy,
     RetryStrategy,
@@ -1797,7 +1797,7 @@ class TestRetryExecutorAdditional:
     @pytest.mark.asyncio
     async def test_timeout_with_retry_behavior(self):
         """タイムアウト時にリトライする挙動"""
-        from hiveforge.worker_bee.retry import TimeoutBehavior
+        from colonyforge.worker_bee.retry import TimeoutBehavior
 
         policy = RetryPolicy(
             strategy=RetryStrategy.FIXED,
@@ -1859,7 +1859,7 @@ class TestRetryExecutorAdditional:
 
 
 # ActionClass・TrustLevel テスト
-from hiveforge.worker_bee.trust import (  # noqa: E402
+from colonyforge.worker_bee.trust import (  # noqa: E402
     ActionClass,
     ConfirmationRequest,
     ConfirmationResponse,
@@ -2109,7 +2109,7 @@ class TestWorkerBeeAgentRunnerPromptContext:
         # Arrange: LLMクライアントをモックで事前設定
         from unittest.mock import AsyncMock, MagicMock
 
-        from hiveforge.llm.client import LLMClient
+        from colonyforge.llm.client import LLMClient
 
         mock_client = MagicMock(spec=LLMClient)
         mock_client.chat = AsyncMock()
@@ -2129,8 +2129,8 @@ class TestWorkerBeeAgentRunnerPromptContext:
         # Arrange
         from unittest.mock import AsyncMock, MagicMock
 
-        from hiveforge.core.activity_bus import AgentRole
-        from hiveforge.llm.client import LLMClient
+        from colonyforge.core.activity_bus import AgentRole
+        from colonyforge.llm.client import LLMClient
 
         mock_client = MagicMock(spec=LLMClient)
         mock_client.chat = AsyncMock()

@@ -1,4 +1,4 @@
-"""HiveForge テスト設定"""
+"""ColonyForge テスト設定"""
 
 import shutil
 import tempfile
@@ -19,14 +19,14 @@ def temp_vault():
 @pytest.fixture
 def mock_settings(temp_vault, monkeypatch):
     """テスト用の設定"""
-    from hiveforge.core.config import HiveConfig, HiveForgeSettings
+    from colonyforge.core.config import HiveConfig, ColonyForgeSettings
 
-    settings = HiveForgeSettings(hive=HiveConfig(name="test-hive", vault_path=str(temp_vault)))
+    settings = ColonyForgeSettings(hive=HiveConfig(name="test-hive", vault_path=str(temp_vault)))
 
     def mock_get_settings():
         return settings
 
-    monkeypatch.setattr("hiveforge.core.config.get_settings", mock_get_settings)
+    monkeypatch.setattr("colonyforge.core.config.get_settings", mock_get_settings)
     return settings
 
 
@@ -35,10 +35,10 @@ def client(tmp_path):
     """テスト用FastAPIクライアント"""
     from fastapi.testclient import TestClient
 
-    from hiveforge.api.dependencies import AppState
-    from hiveforge.api.helpers import clear_active_runs, set_ar, set_hive_store
-    from hiveforge.api.server import app
-    from hiveforge.core.ar.hive_storage import HiveStore
+    from colonyforge.api.dependencies import AppState
+    from colonyforge.api.helpers import clear_active_runs, set_ar, set_hive_store
+    from colonyforge.api.server import app
+    from colonyforge.core.ar.hive_storage import HiveStore
 
     # グローバル状態をリセット
     AppState.reset()
@@ -55,8 +55,8 @@ def client(tmp_path):
     mock_s.server.cors.enabled = False
 
     with (
-        patch("hiveforge.api.server.get_settings", return_value=mock_s),
-        patch("hiveforge.api.helpers.get_settings", return_value=mock_s),
+        patch("colonyforge.api.server.get_settings", return_value=mock_s),
+        patch("colonyforge.api.helpers.get_settings", return_value=mock_s),
         TestClient(app) as client,
     ):
         yield client

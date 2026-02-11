@@ -12,10 +12,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from hiveforge.api.helpers import clear_active_runs, set_ar
-from hiveforge.api.server import app
-from hiveforge.core.honeycomb import Episode, HoneycombStore, Outcome
-from hiveforge.core.honeycomb.models import FailureClass
+from colonyforge.api.helpers import clear_active_runs, set_ar
+from colonyforge.api.server import app
+from colonyforge.core.honeycomb import Episode, HoneycombStore, Outcome
+from colonyforge.core.honeycomb.models import FailureClass
 
 
 @pytest.fixture
@@ -29,9 +29,9 @@ def client(tmp_path):
     mock_s.server.cors.enabled = False
 
     with (
-        patch("hiveforge.api.server.get_settings", return_value=mock_s),
-        patch("hiveforge.api.helpers.get_settings", return_value=mock_s),
-        patch("hiveforge.api.routes.kpi.get_settings", return_value=mock_s),
+        patch("colonyforge.api.server.get_settings", return_value=mock_s),
+        patch("colonyforge.api.helpers.get_settings", return_value=mock_s),
+        patch("colonyforge.api.routes.kpi.get_settings", return_value=mock_s),
         TestClient(app) as c,
     ):
         yield c, tmp_path

@@ -38,7 +38,7 @@
 
 ### 蜂の生態との対応
 
-| 蜂の生態 | HiveForgeでの役割 |
+| 蜂の生態 | ColonyForgeでの役割 |
 |---------|------------------|
 | Hive（巣箱） | プロジェクト全体。1つの目標に向かう環境 |
 | Colony（群れ） | 専門領域のチーム。UI/UX、API、Dataなど |
@@ -734,7 +734,7 @@ POST   /hives/{hive_id}/close         # Hiveクローズ（全Colony完了時の
 
 補足: 「削除」ではなく「クローズ」を基本とする
 
-- HiveForgeはイベントソーシングであり、AR上の履歴は監査目的で保持される。
+- ColonyForgeはイベントソーシングであり、AR上の履歴は監査目的で保持される。
 - 物理削除（DELETE）は運用・監査上の扱いが難しいため、設計上は `hive.closed` を発行するクローズ操作を基本にする。
 - 物理削除が必要な場合は別途「管理者向けメンテナンス機能（危険操作）」として切り出す。
 
@@ -849,7 +849,7 @@ create_task(title: str, parent_task_id: str | None = None) -> TaskInfo
 ### 7.1 新規View
 
 ```
-HiveForge Panel (サイドバー)
+ColonyForge Panel (サイドバー)
 ├── 🏠 Hive Overview          # Hive全体概要（プロジェクト）
 ├── ⚠️ Escalations (2)        # 未対応エスカレーション（直訴）
 ├── 🐝 Colonies               # Colony一覧
@@ -1165,7 +1165,7 @@ async def create_task(run_id: str, request: CreateTaskRequest, state: AppState):
 Policy Gateの振る舞いは設定ファイルでカスタマイズ可能：
 
 ```yaml
-# hiveforge.config.yaml
+# colonyforge.config.yaml
 policy:
   # Trust Level 3 でも IRREVERSIBLE は確認必須にするか
   level3_irreversible_requires_approval: true
@@ -1529,17 +1529,17 @@ decision = policy_gate(
 
 ```bash
 # メインリポジトリ
-cd /workspace/HiveForge
+cd /workspace/ColonyForge
 
 # スライスごとにworktreeを作成（物理的に並列作業可能）
-git worktree add ../hiveforge-1.7-A feature/1.7-A-hive-crud
-git worktree add ../hiveforge-1.7-B feature/1.7-B-colony-crud
-git worktree add ../hiveforge-1.7-C feature/1.7-C-conference
-git worktree add ../hiveforge-1.7-D feature/1.7-D-direct-intervention
+git worktree add ../colonyforge-1.7-A feature/1.7-A-hive-crud
+git worktree add ../colonyforge-1.7-B feature/1.7-B-colony-crud
+git worktree add ../colonyforge-1.7-C feature/1.7-C-conference
+git worktree add ../colonyforge-1.7-D feature/1.7-D-direct-intervention
 
 # 各Queenは自分のworktreeで作業
-# Core Queen: ../hiveforge-1.7-A/src/hiveforge/core/
-# API Queen:  ../hiveforge-1.7-A/src/hiveforge/api/
+# Core Queen: ../colonyforge-1.7-A/src/colonyforge/core/
+# API Queen:  ../colonyforge-1.7-A/src/colonyforge/api/
 ```
 
 #### 運用ルール

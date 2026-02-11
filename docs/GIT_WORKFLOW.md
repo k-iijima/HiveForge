@@ -1,4 +1,4 @@
-# HiveForge Git ワークフロー
+# ColonyForge Git ワークフロー
 
 > **目的**: Colony ベースの並列開発を安全かつ効率的に回すための Git 運用規約。
 > ARが正本（Single Source of Truth）、GitHub は射影（Read Model）という原則の上で、
@@ -98,7 +98,7 @@ refactor: 認証ミドルウェアの責務分割
 ### 基本概念
 
 `git worktree` は 1 リポジトリで複数の作業ツリーを同時に持てる機能。
-Colony 単位（api / ui / infra）を並列で回す HiveForge に適している。
+Colony 単位（api / ui / infra）を並列で回す ColonyForge に適している。
 
 ### ライフサイクル
 
@@ -317,7 +317,7 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev]"
       - name: Design consistency check
-        run: python -m hiveforge.guard_bee.cli --check-design || true
+        run: python -m colonyforge.guard_bee.cli --check-design || true
 
   forager-regression:
     name: forager-regression

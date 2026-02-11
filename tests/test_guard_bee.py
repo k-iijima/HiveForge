@@ -11,9 +11,9 @@ from __future__ import annotations
 
 import pytest
 
-from hiveforge.core import AkashicRecord
-from hiveforge.core.events import EventType
-from hiveforge.guard_bee.models import (
+from colonyforge.core import AkashicRecord
+from colonyforge.core.events import EventType
+from colonyforge.guard_bee.models import (
     Evidence,
     EvidenceType,
     GuardBeeReport,
@@ -21,7 +21,7 @@ from hiveforge.guard_bee.models import (
     Verdict,
     VerificationLevel,
 )
-from hiveforge.guard_bee.rules import (
+from colonyforge.guard_bee.rules import (
     AllTestsPassRule,
     CoverageThresholdRule,
     DiffExistsRule,
@@ -29,7 +29,7 @@ from hiveforge.guard_bee.rules import (
     RuleRegistry,
     TypeCheckRule,
 )
-from hiveforge.guard_bee.verifier import GuardBeeVerifier
+from colonyforge.guard_bee.verifier import GuardBeeVerifier
 
 # =========================================================================
 # Verdict / VerificationLevel 列挙型テスト

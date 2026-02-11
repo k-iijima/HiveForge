@@ -15,10 +15,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from hiveforge.beekeeper.server import BeekeeperMCPServer
-from hiveforge.core import AkashicRecord
-from hiveforge.core.events import EventType
-from hiveforge.queen_bee.server import QueenBeeMCPServer
+from colonyforge.beekeeper.server import BeekeeperMCPServer
+from colonyforge.core import AkashicRecord
+from colonyforge.core.events import EventType
+from colonyforge.queen_bee.server import QueenBeeMCPServer
 
 
 @pytest.fixture
@@ -167,7 +167,7 @@ class TestQueenBeeLifecycleEvents:
         """
         # Arrange: Worker BeeのLLM実行をモック
         with patch(
-            "hiveforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
+            "colonyforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
             new_callable=AsyncMock,
             return_value={"status": "completed", "result": "done", "llm_output": "ok"},
         ):
@@ -190,7 +190,7 @@ class TestQueenBeeLifecycleEvents:
         """execute_goal実行時にColonyStartedイベントが発行される"""
         # Arrange
         with patch(
-            "hiveforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
+            "colonyforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
             new_callable=AsyncMock,
             return_value={"status": "completed", "result": "done", "llm_output": "ok"},
         ):
@@ -210,7 +210,7 @@ class TestQueenBeeLifecycleEvents:
         """全タスク成功時にRunCompletedイベントが発行される"""
         # Arrange
         with patch(
-            "hiveforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
+            "colonyforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
             new_callable=AsyncMock,
             return_value={"status": "completed", "result": "done", "llm_output": "ok"},
         ):
@@ -232,7 +232,7 @@ class TestQueenBeeLifecycleEvents:
         """タスク失敗時にRunFailedイベントが発行される"""
         # Arrange
         with patch(
-            "hiveforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
+            "colonyforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
             new_callable=AsyncMock,
             return_value={"status": "failed", "reason": "LLM error"},
         ):
@@ -257,7 +257,7 @@ class TestQueenBeeLifecycleEvents:
         """
         # Arrange
         with patch(
-            "hiveforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
+            "colonyforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
             new_callable=AsyncMock,
             side_effect=RuntimeError("接続エラー"),
         ):
@@ -278,7 +278,7 @@ class TestQueenBeeLifecycleEvents:
         """タスク実行時にTaskAssignedイベントが発行される"""
         # Arrange
         with patch(
-            "hiveforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
+            "colonyforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
             new_callable=AsyncMock,
             return_value={"status": "completed", "result": "done", "llm_output": "ok"},
         ):
@@ -298,7 +298,7 @@ class TestQueenBeeLifecycleEvents:
         """タスク成功時にTaskCompletedイベントが発行される"""
         # Arrange
         with patch(
-            "hiveforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
+            "colonyforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
             new_callable=AsyncMock,
             return_value={"status": "completed", "result": "done", "llm_output": "output"},
         ):
@@ -317,7 +317,7 @@ class TestQueenBeeLifecycleEvents:
         """タスク失敗時にTaskFailedイベントが発行される"""
         # Arrange
         with patch(
-            "hiveforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
+            "colonyforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
             new_callable=AsyncMock,
             return_value={"status": "failed", "reason": "テスト失敗"},
         ):
@@ -349,7 +349,7 @@ class TestFullChainIntegration:
         クラスレベルでパッチする必要がある。
         """
         with patch(
-            "hiveforge.queen_bee.server.QueenBeeMCPServer._plan_tasks",
+            "colonyforge.queen_bee.server.QueenBeeMCPServer._plan_tasks",
             new_callable=AsyncMock,
             side_effect=lambda goal, context=None: [
                 {"task_id": "task-001", "goal": goal, "depends_on": []}
@@ -366,7 +366,7 @@ class TestFullChainIntegration:
         """
         # Arrange: Worker BeeのLLM実行をモック
         with patch(
-            "hiveforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
+            "colonyforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
             new_callable=AsyncMock,
             return_value={
                 "status": "completed",
@@ -395,7 +395,7 @@ class TestFullChainIntegration:
         """
         # Arrange
         with patch(
-            "hiveforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
+            "colonyforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
             new_callable=AsyncMock,
             return_value={
                 "status": "completed",
@@ -438,7 +438,7 @@ class TestFullChainIntegration:
         """
         # Arrange: Worker BeeのLLM実行をモック
         with patch(
-            "hiveforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
+            "colonyforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
             new_callable=AsyncMock,
             return_value={
                 "status": "completed",
@@ -483,7 +483,7 @@ class TestFullChainIntegration:
         """タスク失敗時にRunFailedイベントがARに記録される"""
         # Arrange
         with patch(
-            "hiveforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
+            "colonyforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
             new_callable=AsyncMock,
             return_value={"status": "failed", "reason": "コンパイルエラー"},
         ):
@@ -511,7 +511,7 @@ class TestFullChainIntegration:
         """同じColony IDへの2回目の委譲はQueen Beeを再利用する"""
         # Arrange
         with patch(
-            "hiveforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
+            "colonyforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
             new_callable=AsyncMock,
             return_value={"status": "completed", "result": "done", "llm_output": "ok"},
         ):
@@ -555,7 +555,7 @@ class TestEventCompleteness:
         """
         # Arrange
         with patch(
-            "hiveforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
+            "colonyforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
             new_callable=AsyncMock,
             return_value={"status": "completed", "result": "ok", "llm_output": "done"},
         ):
@@ -604,7 +604,7 @@ class TestEventCompleteness:
         """
         # Arrange
         with patch(
-            "hiveforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
+            "colonyforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
             new_callable=AsyncMock,
             return_value={"status": "failed", "reason": "エラー"},
         ):
@@ -635,7 +635,7 @@ class TestEventCompleteness:
         """全イベントが同一のrun_idを持つ"""
         # Arrange
         with patch(
-            "hiveforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
+            "colonyforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
             new_callable=AsyncMock,
             return_value={"status": "completed", "result": "ok", "llm_output": "done"},
         ):
@@ -655,7 +655,7 @@ class TestEventCompleteness:
         """Queen Beeが発行する全イベントのactorが正しい"""
         # Arrange
         with patch(
-            "hiveforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
+            "colonyforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
             new_callable=AsyncMock,
             return_value={"status": "completed", "result": "ok", "llm_output": "done"},
         ):
@@ -720,14 +720,14 @@ class TestBeekeeperSwarmingIntegration:
 
         with (
             patch(
-                "hiveforge.queen_bee.server.QueenBeeMCPServer._plan_tasks",
+                "colonyforge.queen_bee.server.QueenBeeMCPServer._plan_tasks",
                 new_callable=AsyncMock,
                 side_effect=lambda goal, context=None: [
                     {"task_id": "task-001", "goal": goal, "depends_on": []}
                 ],
             ),
             patch(
-                "hiveforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
+                "colonyforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
                 new_callable=AsyncMock,
                 return_value={"status": "completed", "result": "ok", "llm_output": "done"},
             ),

@@ -4,7 +4,7 @@ hide:
   - toc
 ---
 
-# HiveForge
+# ColonyForge
 
 <div class="grid cards" markdown>
 
@@ -12,7 +12,7 @@ hide:
 
     ---
 
-    HiveForgeをインストールして数分で使い始めましょう。
+    ColonyForgeをインストールして数分で使い始めましょう。
 
     [:octicons-arrow-right-24: クイックスタート](getting-started/quickstart.md)
 
@@ -42,9 +42,9 @@ hide:
 
 </div>
 
-## HiveForgeとは？
+## ColonyForgeとは？
 
-HiveForgeは、LLMを活用した**マルチエージェント協調開発システム**です。Beekeeper、Queen Bee、Worker Bee、Sentinel Hornet、Guard Bee、Forager Bee、Referee Beeの専門エージェントが協調し、VS Code + GitHub Copilot Chatと連携してソフトウェア開発を支援します。
+ColonyForgeは、LLMを活用した**マルチエージェント協調開発システム**です。Beekeeper、Queen Bee、Worker Bee、Sentinel Hornet、Guard Bee、Forager Bee、Referee Beeの専門エージェントが協調し、VS Code + GitHub Copilot Chatと連携してソフトウェア開発を支援します。
 
 ### 核心的信念
 

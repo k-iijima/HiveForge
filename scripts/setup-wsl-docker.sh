@@ -4,7 +4,7 @@
 
 set -e
 
-echo "🐝 HiveForge - Ubuntu WSL Docker (GPU対応)"
+echo "🐝 ColonyForge - Ubuntu WSL Docker (GPU対応)"
 echo "============================================"
 
 # Docker サービスを起動

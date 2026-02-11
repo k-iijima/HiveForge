@@ -2,8 +2,8 @@
 
 import pytest
 
-from hiveforge.core.ar.projections import RequirementState, RunState, TaskState
-from hiveforge.core.events import (
+from colonyforge.core.ar.projections import RequirementState, RunState, TaskState
+from colonyforge.core.events import (
     EventType,
     RequirementApprovedEvent,
     RunCompletedEvent,
@@ -12,7 +12,7 @@ from hiveforge.core.events import (
     TaskCreatedEvent,
     TaskFailedEvent,
 )
-from hiveforge.core.state import (
+from colonyforge.core.state import (
     GovernanceError,
     OscillationDetector,
     RequirementStateMachine,
@@ -253,8 +253,8 @@ class TestHiveStateMachine:
         # Arrange: なし
 
         # Act: Hive状態機械を作成
-        from hiveforge.core.ar.projections import HiveState
-        from hiveforge.core.state import HiveStateMachine
+        from colonyforge.core.ar.projections import HiveState
+        from colonyforge.core.state import HiveStateMachine
 
         sm = HiveStateMachine()
 
@@ -267,9 +267,9 @@ class TestHiveStateMachine:
         全てのColonyが完了したときにIDLE状態に遷移。
         """
         # Arrange: ACTIVE状態のHive
-        from hiveforge.core.ar.projections import HiveState
-        from hiveforge.core.events import ColonyCompletedEvent
-        from hiveforge.core.state import HiveStateMachine
+        from colonyforge.core.ar.projections import HiveState
+        from colonyforge.core.events import ColonyCompletedEvent
+        from colonyforge.core.state import HiveStateMachine
 
         sm = HiveStateMachine()
 
@@ -286,9 +286,9 @@ class TestHiveStateMachine:
         新しいColonyが作成されたときにACTIVE状態に戻る。
         """
         # Arrange: IDLE状態のHive
-        from hiveforge.core.ar.projections import HiveState
-        from hiveforge.core.events import ColonyCreatedEvent
-        from hiveforge.core.state import HiveStateMachine
+        from colonyforge.core.ar.projections import HiveState
+        from colonyforge.core.events import ColonyCreatedEvent
+        from colonyforge.core.state import HiveStateMachine
 
         sm = HiveStateMachine()
         sm.current_state = HiveState.IDLE
@@ -306,9 +306,9 @@ class TestHiveStateMachine:
         HiveがクローズされたときにCLOSED状態に遷移。
         """
         # Arrange: ACTIVE状態のHive
-        from hiveforge.core.ar.projections import HiveState
-        from hiveforge.core.events import HiveClosedEvent
-        from hiveforge.core.state import HiveStateMachine
+        from colonyforge.core.ar.projections import HiveState
+        from colonyforge.core.events import HiveClosedEvent
+        from colonyforge.core.state import HiveStateMachine
 
         sm = HiveStateMachine()
 
@@ -325,9 +325,9 @@ class TestHiveStateMachine:
         待機中のHiveもクローズ可能。
         """
         # Arrange: IDLE状態のHive
-        from hiveforge.core.ar.projections import HiveState
-        from hiveforge.core.events import HiveClosedEvent
-        from hiveforge.core.state import HiveStateMachine
+        from colonyforge.core.ar.projections import HiveState
+        from colonyforge.core.events import HiveClosedEvent
+        from colonyforge.core.state import HiveStateMachine
 
         sm = HiveStateMachine()
         sm.current_state = HiveState.IDLE
@@ -345,9 +345,9 @@ class TestHiveStateMachine:
         クローズされたHiveは再利用できない。
         """
         # Arrange: CLOSED状態のHive
-        from hiveforge.core.ar.projections import HiveState
-        from hiveforge.core.events import ColonyCreatedEvent
-        from hiveforge.core.state import HiveStateMachine
+        from colonyforge.core.ar.projections import HiveState
+        from colonyforge.core.events import ColonyCreatedEvent
+        from colonyforge.core.state import HiveStateMachine
 
         sm = HiveStateMachine()
         sm.current_state = HiveState.CLOSED
@@ -360,8 +360,8 @@ class TestHiveStateMachine:
     def test_get_valid_events_from_active(self):
         """ACTIVE状態から遷移可能なイベント一覧"""
         # Arrange: ACTIVE状態のHive
-        from hiveforge.core.events import EventType
-        from hiveforge.core.state import HiveStateMachine
+        from colonyforge.core.events import EventType
+        from colonyforge.core.state import HiveStateMachine
 
         sm = HiveStateMachine()
 
@@ -388,8 +388,8 @@ class TestColonyStateMachine:
         # Arrange: なし
 
         # Act: Colony状態機械を作成
-        from hiveforge.core.ar.projections import ColonyState
-        from hiveforge.core.state import ColonyStateMachine
+        from colonyforge.core.ar.projections import ColonyState
+        from colonyforge.core.state import ColonyStateMachine
 
         sm = ColonyStateMachine()
 
@@ -402,9 +402,9 @@ class TestColonyStateMachine:
         Colony開始時にIN_PROGRESS状態に遷移。
         """
         # Arrange: PENDING状態のColony
-        from hiveforge.core.ar.projections import ColonyState
-        from hiveforge.core.events import ColonyStartedEvent
-        from hiveforge.core.state import ColonyStateMachine
+        from colonyforge.core.ar.projections import ColonyState
+        from colonyforge.core.events import ColonyStartedEvent
+        from colonyforge.core.state import ColonyStateMachine
 
         sm = ColonyStateMachine()
 
@@ -421,9 +421,9 @@ class TestColonyStateMachine:
         全Run完了時にCOMPLETED状態に遷移。
         """
         # Arrange: IN_PROGRESS状態のColony
-        from hiveforge.core.ar.projections import ColonyState
-        from hiveforge.core.events import ColonyCompletedEvent
-        from hiveforge.core.state import ColonyStateMachine
+        from colonyforge.core.ar.projections import ColonyState
+        from colonyforge.core.events import ColonyCompletedEvent
+        from colonyforge.core.state import ColonyStateMachine
 
         sm = ColonyStateMachine()
         sm.current_state = ColonyState.IN_PROGRESS
@@ -441,9 +441,9 @@ class TestColonyStateMachine:
         致命的エラー発生時にFAILED状態に遷移。
         """
         # Arrange: IN_PROGRESS状態のColony
-        from hiveforge.core.ar.projections import ColonyState
-        from hiveforge.core.events import ColonyFailedEvent
-        from hiveforge.core.state import ColonyStateMachine
+        from colonyforge.core.ar.projections import ColonyState
+        from colonyforge.core.events import ColonyFailedEvent
+        from colonyforge.core.state import ColonyStateMachine
 
         sm = ColonyStateMachine()
         sm.current_state = ColonyState.IN_PROGRESS
@@ -458,9 +458,9 @@ class TestColonyStateMachine:
     def test_completed_state_is_terminal(self):
         """COMPLETED状態からは遷移不可（終端状態）"""
         # Arrange: COMPLETED状態のColony
-        from hiveforge.core.ar.projections import ColonyState
-        from hiveforge.core.events import ColonyStartedEvent
-        from hiveforge.core.state import ColonyStateMachine
+        from colonyforge.core.ar.projections import ColonyState
+        from colonyforge.core.events import ColonyStartedEvent
+        from colonyforge.core.state import ColonyStateMachine
 
         sm = ColonyStateMachine()
         sm.current_state = ColonyState.COMPLETED
@@ -473,9 +473,9 @@ class TestColonyStateMachine:
     def test_failed_state_is_terminal(self):
         """FAILED状態からは遷移不可（終端状態）"""
         # Arrange: FAILED状態のColony
-        from hiveforge.core.ar.projections import ColonyState
-        from hiveforge.core.events import ColonyStartedEvent
-        from hiveforge.core.state import ColonyStateMachine
+        from colonyforge.core.ar.projections import ColonyState
+        from colonyforge.core.events import ColonyStartedEvent
+        from colonyforge.core.state import ColonyStateMachine
 
         sm = ColonyStateMachine()
         sm.current_state = ColonyState.FAILED
@@ -488,8 +488,8 @@ class TestColonyStateMachine:
     def test_get_valid_events_from_pending(self):
         """PENDING状態から遷移可能なイベント一覧"""
         # Arrange: PENDING状態のColony
-        from hiveforge.core.events import EventType
-        from hiveforge.core.state import ColonyStateMachine
+        from colonyforge.core.events import EventType
+        from colonyforge.core.state import ColonyStateMachine
 
         sm = ColonyStateMachine()
 

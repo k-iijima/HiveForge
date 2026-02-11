@@ -7,18 +7,18 @@ Beekeeper ↔ Queen Bee ↔ Worker Bee のエンドツーエンド連携テス�
 
 import pytest
 
-from hiveforge.beekeeper.conference import ConferenceManager, VoteType
-from hiveforge.beekeeper.conflict import ConflictDetector, ConflictType, ResourceClaim
-from hiveforge.beekeeper.escalation import (
+from colonyforge.beekeeper.conference import ConferenceManager, VoteType
+from colonyforge.beekeeper.conflict import ConflictDetector, ConflictType, ResourceClaim
+from colonyforge.beekeeper.escalation import (
     EscalationManager,
     EscalationSeverity,
     EscalationType,
 )
-from hiveforge.beekeeper.resolver import ConflictResolver, ResolutionStrategy
-from hiveforge.beekeeper.session import BeekeeperSession, SessionState
-from hiveforge.core import AkashicRecord
-from hiveforge.core.config import HiveForgeSettings
-from hiveforge.core.events import (
+from colonyforge.beekeeper.resolver import ConflictResolver, ResolutionStrategy
+from colonyforge.beekeeper.session import BeekeeperSession, SessionState
+from colonyforge.core import AkashicRecord
+from colonyforge.core.config import ColonyForgeSettings
+from colonyforge.core.events import (
     EventType,
     RunCompletedEvent,
     RunStartedEvent,
@@ -26,13 +26,13 @@ from hiveforge.core.events import (
     TaskCompletedEvent,
     TaskCreatedEvent,
 )
-from hiveforge.queen_bee.communication import ColonyMessenger, MessagePriority, MessageType
-from hiveforge.queen_bee.progress import ProgressCollector, TaskProgress
-from hiveforge.queen_bee.scheduler import ColonyPriority, ColonyScheduler
-from hiveforge.worker_bee.process import WorkerProcess, WorkerProcessState
-from hiveforge.worker_bee.retry import RetryExecutor, RetryPolicy, RetryStrategy
-from hiveforge.worker_bee.tools import ToolCategory, ToolDefinition, ToolExecutor
-from hiveforge.worker_bee.trust import ActionClass, TrustLevel, requires_confirmation
+from colonyforge.queen_bee.communication import ColonyMessenger, MessagePriority, MessageType
+from colonyforge.queen_bee.progress import ProgressCollector, TaskProgress
+from colonyforge.queen_bee.scheduler import ColonyPriority, ColonyScheduler
+from colonyforge.worker_bee.process import WorkerProcess, WorkerProcessState
+from colonyforge.worker_bee.retry import RetryExecutor, RetryPolicy, RetryStrategy
+from colonyforge.worker_bee.tools import ToolCategory, ToolDefinition, ToolExecutor
+from colonyforge.worker_bee.trust import ActionClass, TrustLevel, requires_confirmation
 
 
 class TestIntegrationBasic:
@@ -46,12 +46,12 @@ class TestIntegrationBasic:
     @pytest.fixture
     def settings(self):
         """テスト用設定"""
-        return HiveForgeSettings()
+        return ColonyForgeSettings()
 
     def test_config_loads_all_sections(self, settings):
         """設定が全セクション読み込める
 
-        HiveForgeの設定が正しく読み込まれ、全セクションにアクセスできることを確認。
+        ColonyForgeの設定が正しく読み込まれ、全セクションにアクセスできることを確認。
         """
         # Arrange & Act: 設定は fixture で読み込み済み
 

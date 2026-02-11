@@ -11,15 +11,15 @@
       ]
     },
     "agent-ui": {
-      "command": "hiveforge-agent-ui",
+      "command": "colonyforge-agent-ui",
       "args": [],
       "env": {
-        "OLLAMA_BASE_URL": "http://hiveforge-dev-ollama:11434",
+        "OLLAMA_BASE_URL": "http://colonyforge-dev-ollama:11434",
         "VLM_HEADLESS": "true"
       }
     },
-    "hiveforge": {
-      "command": "hiveforge",
+    "colonyforge": {
+      "command": "colonyforge",
       "args": [
         "mcp"
       ],

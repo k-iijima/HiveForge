@@ -2,9 +2,9 @@
 
 import pytest
 
-from hiveforge.core import AkashicRecord
-from hiveforge.core.events import EventType
-from hiveforge.queen_bee import TaskDispatcher
+from colonyforge.core import AkashicRecord
+from colonyforge.core.events import EventType
+from colonyforge.queen_bee import TaskDispatcher
 
 
 @pytest.fixture
@@ -223,14 +223,14 @@ class TestReassignTask:
 
 
 # Progress Collector テスト
-from hiveforge.core.events import (  # noqa: E402
+from colonyforge.core.events import (  # noqa: E402
     WorkerAssignedEvent,
     WorkerCompletedEvent,
     WorkerFailedEvent,
     WorkerProgressEvent,
     WorkerStartedEvent,
 )
-from hiveforge.queen_bee.progress import ProgressCollector, TaskProgress  # noqa: E402
+from colonyforge.queen_bee.progress import ProgressCollector, TaskProgress  # noqa: E402
 
 
 class TestProgressCollector:
@@ -583,7 +583,7 @@ class TestCompletionStats:
 
 
 # Retry Manager テスト
-from hiveforge.queen_bee.retry import (  # noqa: E402
+from colonyforge.queen_bee.retry import (  # noqa: E402
     RetryManager,
     RetryPolicy,
     RetryStrategy,
@@ -710,7 +710,7 @@ class TestRetryStateManagement:
 
 
 # Colony Scheduler テスト
-from hiveforge.queen_bee.scheduler import (  # noqa: E402
+from colonyforge.queen_bee.scheduler import (  # noqa: E402
     ColonyPriority,
     ColonyScheduler,
 )
@@ -881,7 +881,7 @@ class TestPreemption:
 
 
 # Colony Communication テスト
-from hiveforge.queen_bee.communication import (  # noqa: E402
+from colonyforge.queen_bee.communication import (  # noqa: E402
     ColonyMessenger,
     MessagePriority,
     MessageType,
@@ -1288,7 +1288,7 @@ class TestProgressCollectorEdgeCases:
 
     def test_get_failed_tasks_empty(self):
         """失敗タスクがない場合"""
-        from hiveforge.queen_bee.progress import ProgressCollector
+        from colonyforge.queen_bee.progress import ProgressCollector
 
         collector = ProgressCollector()
         collector._task_progress["task-1"] = TaskProgress(
@@ -1300,7 +1300,7 @@ class TestProgressCollectorEdgeCases:
 
     def test_overall_progress_with_completed(self):
         """完了タスクを含む進捗計算"""
-        from hiveforge.queen_bee.progress import ProgressCollector
+        from colonyforge.queen_bee.progress import ProgressCollector
 
         collector = ProgressCollector()
         collector._task_progress["task-1"] = TaskProgress(
@@ -1315,7 +1315,7 @@ class TestProgressCollectorEdgeCases:
 
     def test_get_task_progress_existing(self):
         """存在するタスクの進捗取得"""
-        from hiveforge.queen_bee.progress import ProgressCollector
+        from colonyforge.queen_bee.progress import ProgressCollector
 
         # Arrange
         collector = ProgressCollector()
@@ -1330,14 +1330,14 @@ class TestProgressCollectorEdgeCases:
 
     def test_get_task_progress_nonexistent(self):
         """存在しないタスクの進捗はNone"""
-        from hiveforge.queen_bee.progress import ProgressCollector
+        from colonyforge.queen_bee.progress import ProgressCollector
 
         collector = ProgressCollector()
         assert collector.get_task_progress("nonexistent") is None
 
     def test_get_pending_tasks(self):
         """保留中タスクの取得"""
-        from hiveforge.queen_bee.progress import ProgressCollector
+        from colonyforge.queen_bee.progress import ProgressCollector
 
         collector = ProgressCollector()
         collector._task_progress["task-1"] = TaskProgress(
@@ -1353,7 +1353,7 @@ class TestProgressCollectorEdgeCases:
 
     def test_get_in_progress_tasks(self):
         """進行中タスクの取得"""
-        from hiveforge.queen_bee.progress import ProgressCollector
+        from colonyforge.queen_bee.progress import ProgressCollector
 
         collector = ProgressCollector()
         collector._task_progress["task-1"] = TaskProgress(
@@ -1369,8 +1369,8 @@ class TestProgressCollectorEdgeCases:
 
     def test_process_event_without_task_id_ignored(self):
         """task_idがないイベントは無視される"""
-        from hiveforge.core.events import BaseEvent, EventType
-        from hiveforge.queen_bee.progress import ProgressCollector
+        from colonyforge.core.events import BaseEvent, EventType
+        from colonyforge.queen_bee.progress import ProgressCollector
 
         collector = ProgressCollector()
 

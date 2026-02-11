@@ -6,7 +6,7 @@
  */
 
 import * as vscode from 'vscode';
-import { HiveForgeClient, ActivityHierarchy } from '../client';
+import { ColonyForgeClient, ActivityHierarchy } from '../client';
 
 /**
  * Hive/Colony ツリーアイテム
@@ -94,7 +94,7 @@ export class HiveTreeDataProvider implements vscode.TreeDataProvider<HiveTreeIte
     readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
     private _hierarchy: ActivityHierarchy = {};
-    private _client: HiveForgeClient | undefined;
+    private _client: ColonyForgeClient | undefined;
 
     constructor() {
         // 定期リフレッシュ（5秒ごと）
@@ -104,7 +104,7 @@ export class HiveTreeDataProvider implements vscode.TreeDataProvider<HiveTreeIte
     /**
      * APIクライアントを設定
      */
-    setClient(client: HiveForgeClient): void {
+    setClient(client: ColonyForgeClient): void {
         this._client = client;
         this.refresh();
     }

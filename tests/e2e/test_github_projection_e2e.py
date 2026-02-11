@@ -26,40 +26,54 @@ from pathlib import Path
 
 import pytest
 
-from hiveforge.core import AkashicRecord
-from hiveforge.core.config import GitHubConfig, LLMConfig
-from hiveforge.core.github.client import GitHubClient
-from hiveforge.core.github.projection import GitHubProjection
+from colonyforge.core import AkashicRecord
+from colonyforge.core.config import GitHubConfig, LLMConfig
+from colonyforge.core.github.client import GitHubClient
+from colonyforge.core.github.projection import GitHubProjection
 
 # ---------------------------------------------------------------------------
 # マーカー
 # ---------------------------------------------------------------------------
-pytestmark = [pytest.mark.e2e, pytest.mark.asyncio]
+# heavyweight: 大量のAPI呼び出し（最大124回）を含むためCI(クラウドAPI)では実行禁止
+# ローカルのみ: pytest tests/e2e/test_github_projection_e2e.py -v -m "e2e and heavyweight"
+pytestmark = [pytest.mark.e2e, pytest.mark.asyncio, pytest.mark.heavyweight]
 
 # ---------------------------------------------------------------------------
-# 設定
+# 設定 — 環境変数でプロバイダー切替可能
 # ---------------------------------------------------------------------------
-OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://hiveforge-dev-ollama:11434")
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen3:4b")
+LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "ollama_chat")
+LLM_MODEL = os.environ.get("LLM_MODEL", os.environ.get("OLLAMA_MODEL", "qwen3:4b"))
+LLM_API_BASE = os.environ.get(
+    "LLM_API_BASE", os.environ.get("OLLAMA_BASE_URL", "http://colonyforge-dev-ollama:11434")
+)
+LLM_API_KEY_ENV = os.environ.get("LLM_API_KEY_ENV", "")
 LLM_TIMEOUT = int(os.environ.get("LLM_TIMEOUT", "180"))
 
 GITHUB_OWNER = os.environ.get("GITHUB_OWNER", "k-iijima")
 GITHUB_TOKEN_ENV = "GITHUB_TOKEN"
-E2E_REPO_NAME = "hiveforge-e2e-sandbox"
+E2E_REPO_NAME = "colonyforge-e2e-sandbox"
+
+# ローカルプロバイダー（APIキー不要）
+_LOCAL_PROVIDERS = {"ollama", "ollama_chat"}
 
 
 # ---------------------------------------------------------------------------
 # スキップ判定
 # ---------------------------------------------------------------------------
-def _is_ollama_available() -> bool:
-    import urllib.request
+def _is_llm_available() -> bool:
+    """LLMプロバイダーに到達可能か判定"""
+    if LLM_PROVIDER in _LOCAL_PROVIDERS:
+        import urllib.request
 
-    try:
-        req = urllib.request.Request(f"{OLLAMA_BASE_URL}/api/tags", method="GET")
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            return resp.status == 200
-    except Exception:
-        return False
+        try:
+            req = urllib.request.Request(f"{LLM_API_BASE}/api/tags", method="GET")
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                return resp.status == 200
+        except Exception:
+            return False
+    else:
+        key_env = LLM_API_KEY_ENV or f"{LLM_PROVIDER.upper()}_API_KEY"
+        return bool(os.environ.get(key_env))
 
 
 def _is_github_available() -> bool:
@@ -83,8 +97,8 @@ def _is_github_available() -> bool:
 
 
 e2e_required = pytest.mark.skipif(
-    not (_is_ollama_available() and _is_github_available()),
-    reason="Ollama or GitHub API not available",
+    not (_is_llm_available() and _is_github_available()),
+    reason=f"LLM provider '{LLM_PROVIDER}' or GitHub API not available",
 )
 
 
@@ -168,14 +182,18 @@ class GitHubRepoManager:
 # フィクスチャ
 # ---------------------------------------------------------------------------
 @pytest.fixture
-def ollama_config() -> LLMConfig:
-    return LLMConfig(
-        provider="ollama_chat",
-        model=OLLAMA_MODEL,
-        api_base=OLLAMA_BASE_URL,
-        max_tokens=2048,
-        temperature=0.2,
-    )
+def llm_config() -> LLMConfig:
+    config_kwargs: dict = {
+        "provider": LLM_PROVIDER,
+        "model": LLM_MODEL,
+        "max_tokens": 2048,
+        "temperature": 0.2,
+    }
+    if LLM_PROVIDER in _LOCAL_PROVIDERS:
+        config_kwargs["api_base"] = LLM_API_BASE
+    if LLM_API_KEY_ENV:
+        config_kwargs["api_key_env"] = LLM_API_KEY_ENV
+    return LLMConfig(**config_kwargs)
 
 
 @pytest.fixture
@@ -185,7 +203,7 @@ def github_config() -> GitHubConfig:
         token_env=GITHUB_TOKEN_ENV,
         owner=GITHUB_OWNER,
         repo=E2E_REPO_NAME,
-        label_prefix="hiveforge:",
+        label_prefix="colonyforge:",
     )
 
 
@@ -207,7 +225,7 @@ def repo_manager() -> GitHubRepoManager:
 
 @pytest.fixture
 def temp_vault():
-    vault_path = Path(tempfile.mkdtemp(prefix="hiveforge_e2e_gh_"))
+    vault_path = Path(tempfile.mkdtemp(prefix="colonyforge_e2e_gh_"))
     yield vault_path
     shutil.rmtree(vault_path, ignore_errors=True)
 
@@ -239,7 +257,7 @@ class TestGitHubProjectionE2E:
 
     async def test_full_scenario_with_github_projection(
         self,
-        ollama_config: LLMConfig,
+        llm_config: LLMConfig,
         github_config: GitHubConfig,
         github_projection: GitHubProjection,
         repo_manager: GitHubRepoManager,
@@ -249,18 +267,18 @@ class TestGitHubProjectionE2E:
     ):
         """エージェントチェーンがリポジトリ作成→アプリ開発→pushし、
         GitHub Projectionが Issue で進捗を追跡する"""
-        from hiveforge.beekeeper.server import BeekeeperMCPServer
-        from hiveforge.core.config import HiveConfig, HiveForgeSettings
+        from colonyforge.beekeeper.server import BeekeeperMCPServer
+        from colonyforge.core.config import HiveConfig, ColonyForgeSettings
 
         # ---------------------------------------------------------------
         # Arrange
         # ---------------------------------------------------------------
-        settings = HiveForgeSettings(
+        settings = ColonyForgeSettings(
             hive=HiveConfig(name="e2e-github", vault_path=str(ar.vault_path)),
-            llm=ollama_config,
+            llm=llm_config,
             github=github_config,
         )
-        monkeypatch.setattr("hiveforge.core.config.get_settings", lambda: settings)
+        monkeypatch.setattr("colonyforge.core.config.get_settings", lambda: settings)
 
         github_token = os.environ.get(GITHUB_TOKEN_ENV, "")  # noqa: F841
         repo_full = f"{GITHUB_OWNER}/{E2E_REPO_NAME}"
@@ -271,7 +289,7 @@ class TestGitHubProjectionE2E:
             print(f"  [cleanup] Deleted existing repo {E2E_REPO_NAME}")
             await asyncio.sleep(3)
 
-        beekeeper = BeekeeperMCPServer(ar=ar, llm_config=ollama_config)
+        beekeeper = BeekeeperMCPServer(ar=ar, llm_config=llm_config)
 
         try:
             # ---------------------------------------------------------------

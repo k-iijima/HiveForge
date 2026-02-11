@@ -3,17 +3,17 @@
  */
 
 import * as vscode from 'vscode';
-import { HiveForgeClient } from '../client';
+import { ColonyForgeClient } from '../client';
 import { TaskItem } from '../providers/tasksProvider';
 
 export function registerTaskCommands(
     context: vscode.ExtensionContext,
-    client: HiveForgeClient,
+    client: ColonyForgeClient,
     refresh: () => void
 ): void {
     // タスクを自分に割り当て
     context.subscriptions.push(
-        vscode.commands.registerCommand('hiveforge.assignTask', async (item: TaskItem) => {
+        vscode.commands.registerCommand('colonyforge.assignTask', async (item: TaskItem) => {
             const runId = client.getCurrentRunId();
             if (!runId) {
                 vscode.window.showErrorMessage('Runが選択されていません');
@@ -32,7 +32,7 @@ export function registerTaskCommands(
 
     // タスクの進捗を更新
     context.subscriptions.push(
-        vscode.commands.registerCommand('hiveforge.updateProgress', async (item: TaskItem) => {
+        vscode.commands.registerCommand('colonyforge.updateProgress', async (item: TaskItem) => {
             const runId = client.getCurrentRunId();
             if (!runId) {
                 vscode.window.showErrorMessage('Runが選択されていません');
@@ -73,7 +73,7 @@ export function registerTaskCommands(
 
     // タスクを完了
     context.subscriptions.push(
-        vscode.commands.registerCommand('hiveforge.completeTask', async (item: TaskItem) => {
+        vscode.commands.registerCommand('colonyforge.completeTask', async (item: TaskItem) => {
             const runId = client.getCurrentRunId();
             if (!runId) {
                 vscode.window.showErrorMessage('Runが選択されていません');
@@ -97,7 +97,7 @@ export function registerTaskCommands(
 
     // タスクを失敗
     context.subscriptions.push(
-        vscode.commands.registerCommand('hiveforge.failTask', async (item: TaskItem) => {
+        vscode.commands.registerCommand('colonyforge.failTask', async (item: TaskItem) => {
             const runId = client.getCurrentRunId();
             if (!runId) {
                 vscode.window.showErrorMessage('Runが選択されていません');
@@ -125,7 +125,7 @@ export function registerTaskCommands(
 
     // タスク作成
     context.subscriptions.push(
-        vscode.commands.registerCommand('hiveforge.createTask', async () => {
+        vscode.commands.registerCommand('colonyforge.createTask', async () => {
             const runId = client.getCurrentRunId();
             if (!runId) {
                 vscode.window.showErrorMessage('Runが選択されていません');

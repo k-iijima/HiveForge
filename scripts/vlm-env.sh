@@ -1,5 +1,5 @@
 #!/bin/bash
-# HiveForge VLMテスト環境管理スクリプト
+# ColonyForge VLMテスト環境管理スクリプト
 # Ollama（ローカルVLM）+ code-server（テスト対象）
 
 set -e
@@ -34,7 +34,7 @@ detect_gpu() {
 }
 
 # GPU検出（環境変数で上書き可能）
-GPU_TYPE="${HIVEFORGE_GPU:-$(detect_gpu)}"
+GPU_TYPE="${COLONYFORGE_GPU:-$(detect_gpu)}"
 
 # Composeファイル選択
 if [ "$GPU_TYPE" = "nvidia" ]; then
@@ -45,7 +45,7 @@ else
     GPU_LABEL="💻 CPU"
 fi
 
-echo "🐝 HiveForge VLM Environment"
+echo "🐝 ColonyForge VLM Environment"
 echo "============================="
 echo "   Mode: $GPU_LABEL"
 echo ""
@@ -60,17 +60,17 @@ case "$ACTION" in
         echo ""
         echo "🦙 LLaVAモデルをダウンロード中（初回のみ数分かかります）..."
         sleep 5
-        $DOCKER_CMD exec hiveforge-ollama ollama pull llava:7b
+        $DOCKER_CMD exec colonyforge-ollama ollama pull llava:7b
         
         echo ""
         echo "✅ セットアップ完了!"
         echo ""
         echo "使い方:"
-        echo "  code-server: http://localhost:8080 (パスワード: hiveforge)"
+        echo "  code-server: http://localhost:8080 (パスワード: colonyforge)"
         echo "  Ollama API:  http://localhost:11434"
         echo ""
         echo "Pythonから使用:"
-        echo "  from hiveforge.vlm import LocalVLMAnalyzer"
+        echo "  from colonyforge.vlm import LocalVLMAnalyzer"
         echo "  analyzer = LocalVLMAnalyzer()"
         echo "  result = await analyzer.analyze('screenshot.png')"
         ;;
@@ -92,16 +92,16 @@ case "$ACTION" in
         
     status)
         echo "📊 コンテナ状態:"
-        $DOCKER_CMD ps --filter "name=hiveforge-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+        $DOCKER_CMD ps --filter "name=colonyforge-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
         
         echo ""
         echo "🦙 Ollamaモデル:"
-        $DOCKER_CMD exec hiveforge-ollama ollama list 2>/dev/null || echo "  (Ollamaが起動していません)"
+        $DOCKER_CMD exec colonyforge-ollama ollama list 2>/dev/null || echo "  (Ollamaが起動していません)"
         
         echo ""
         echo "🎮 GPU状態:"
         if [ "$GPU_TYPE" = "nvidia" ]; then
-            $DOCKER_CMD exec hiveforge-ollama nvidia-smi --query-gpu=name,memory.used,memory.total --format=csv,noheader 2>/dev/null || echo "  GPU情報を取得できません"
+            $DOCKER_CMD exec colonyforge-ollama nvidia-smi --query-gpu=name,memory.used,memory.total --format=csv,noheader 2>/dev/null || echo "  GPU情報を取得できません"
         else
             echo "  CPUモードで動作中"
         fi
@@ -111,7 +111,7 @@ case "$ACTION" in
         echo "🧪 VLM解析テストを実行中..."
         python -c "
 import asyncio
-from hiveforge.vlm import LocalVLMAnalyzer
+from colonyforge.vlm import LocalVLMAnalyzer
 
 async def test():
     analyzer = LocalVLMAnalyzer()
@@ -147,7 +147,7 @@ asyncio.run(test())
         
     shell)
         echo "🐚 Ollamaコンテナに接続中..."
-        $DOCKER_CMD exec -it hiveforge-ollama bash
+        $DOCKER_CMD exec -it colonyforge-ollama bash
         ;;
         
     clean)
@@ -172,8 +172,8 @@ asyncio.run(test())
         echo ""
         echo "GPU設定:"
         echo "  自動検出: NVIDIA GPUがあれば自動的に使用"
-        echo "  強制CPU: HIVEFORGE_GPU=cpu $0 start"
-        echo "  強制GPU: HIVEFORGE_GPU=nvidia $0 start"
+        echo "  強制CPU: COLONYFORGE_GPU=cpu $0 start"
+        echo "  強制GPU: COLONYFORGE_GPU=nvidia $0 start"
         echo ""
         echo "アーキテクチャ:"
         echo "  ┌─────────────────────┐"
@@ -182,8 +182,8 @@ asyncio.run(test())
         echo "  └──────────┬──────────┘"
         echo "             │ screenshot.png"
         echo "  ┌──────────▼──────────┐"
-        echo "  │  LocalVLMAnalyzer   │ ← HiveForge（解析）"
-        echo "  │  (hiveforge.vlm)    │"
+        echo "  │  LocalVLMAnalyzer   │ ← ColonyForge（解析）"
+        echo "  │  (colonyforge.vlm)    │"
         echo "  └──────────┬──────────┘"
         echo "             │"
         echo "  ┌──────────▼──────────┐"

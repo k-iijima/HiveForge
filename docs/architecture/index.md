@@ -1,6 +1,6 @@
 # Architecture
 
-Technical architecture documentation for HiveForge.
+Technical architecture documentation for ColonyForge.
 
 | Topic | Description |
 |-------|-------------|
@@ -13,10 +13,10 @@ Technical architecture documentation for HiveForge.
 graph TB
     subgraph "VS Code"
         CP[GitHub Copilot Chat]
-        EXT[HiveForge Extension]
+        EXT[ColonyForge Extension]
     end
 
-    subgraph "HiveForge Core"
+    subgraph "ColonyForge Core"
         MCP[MCP Server<br/>stdio]
         API[API Server<br/>FastAPI/REST]
         AR[Akashic Record<br/>JSONL Event Store]
@@ -71,14 +71,14 @@ Causal link tracking for tracing "why" from any artifact.
 
 ## Source Code Structure
 
-::: hiveforge
+::: colonyforge
     options:
       show_root_heading: false
       show_source: false
       members: false
 
 ```
-src/hiveforge/
+src/colonyforge/
 ├── core/           # Core logic (events, state machines, AR)
 │   ├── events/     # Event models (EventType enum, etc.)
 │   ├── models/     # Domain models (ActionClass, etc.)

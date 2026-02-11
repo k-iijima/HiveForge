@@ -14,9 +14,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from hiveforge.api.helpers import clear_active_runs, set_ar
-from hiveforge.api.server import app
-from hiveforge.core.activity_bus import (
+from colonyforge.api.helpers import clear_active_runs, set_ar
+from colonyforge.api.server import app
+from colonyforge.core.activity_bus import (
     ActivityBus,
     ActivityEvent,
     ActivityType,
@@ -44,8 +44,8 @@ def client(tmp_path):
     mock_s.server.cors.enabled = False
 
     with (
-        patch("hiveforge.api.server.get_settings", return_value=mock_s),
-        patch("hiveforge.api.helpers.get_settings", return_value=mock_s),
+        patch("colonyforge.api.server.get_settings", return_value=mock_s),
+        patch("colonyforge.api.helpers.get_settings", return_value=mock_s),
         TestClient(app) as c,
     ):
         yield c
@@ -230,7 +230,7 @@ class TestActivityStream:
         ActivityBusにイベントを発行すると、SSEジェネレータが
         'data: {...}\\n\\n' 形式の文字列をyieldすることを検証する。
         """
-        from hiveforge.api.routes.activity import stream_events
+        from colonyforge.api.routes.activity import stream_events
 
         # Arrange
         bus = ActivityBus.get_instance()
@@ -260,7 +260,7 @@ class TestActivityStream:
         SSEプロトコルではdata:行の後にJSON文字列が続く。
         クライアントがJSON.parse()できることを検証する。
         """
-        from hiveforge.api.routes.activity import stream_events
+        from colonyforge.api.routes.activity import stream_events
 
         # Arrange
         bus = ActivityBus.get_instance()
@@ -288,7 +288,7 @@ class TestActivityStream:
         15秒間イベントがない場合、SSE接続維持のために
         ': keep-alive\\n\\n' コメント行を送信する。
         """
-        from hiveforge.api.routes.activity import stream_events
+        from colonyforge.api.routes.activity import stream_events
 
         # Arrange: wait_forが即座にTimeoutErrorを発生させるようにする
         with patch.object(asyncio, "wait_for", side_effect=TimeoutError):
@@ -310,7 +310,7 @@ class TestActivityStream:
         SSE接続にはCache-Control: no-cacheと
         Connection: keep-aliveヘッダが必要。
         """
-        from hiveforge.api.routes.activity import stream_events
+        from colonyforge.api.routes.activity import stream_events
 
         # Act
         response = await stream_events()
@@ -331,7 +331,7 @@ class TestActivityStream:
         SSE接続が切断された場合、ジェネレータのfinallyブロックで
         unsubscribeが呼ばれ、メモリリークを防ぐ。
         """
-        from hiveforge.api.routes.activity import stream_events
+        from colonyforge.api.routes.activity import stream_events
 
         # Arrange
         bus = ActivityBus.get_instance()

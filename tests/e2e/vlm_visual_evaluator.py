@@ -1,7 +1,13 @@
 """VLM視覚評価ヘルパー
 
-Playwright MCPでキャプチャしたスクリーンショットをOllama VLM (llava:7b) で
-視覚的に評価するためのヘルパーモジュール。
+VLM（Vision Language Model）でスクリーンショットを視覚的に評価するヘルパーモジュール。
+
+サポートプロバイダー:
+    - Ollama (ローカル): llava:7b 等
+    - Anthropic (クラウド): Claude Vision API
+
+環境変数 VLM_PROVIDER で切替可能（デフォルト: 自動検出）。
+CI環境では ANTHROPIC_API_KEY を設定して Anthropic プロバイダーを使用する。
 
 2つの評価軸:
     1. VLM構造評価: UIの構造・レイアウト・色・ゲージの視覚的正しさを評価
@@ -25,27 +31,55 @@ from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
 
-OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://hiveforge-dev-ollama:11434")
+# ---------------------------------------------------------------------------
+# VLMプロバイダー設定
+# ---------------------------------------------------------------------------
+# VLM_PROVIDER: "ollama" | "anthropic" | None (自動検出)
+VLM_PROVIDER = os.environ.get("VLM_PROVIDER")
+OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://colonyforge-dev-ollama:11434")
 VLM_MODEL = os.environ.get("VLM_MODEL", "llava:7b")
 
 
-def _check_ollama_available() -> bool:
-    """OllamaサーバーへのTCP接続チェック"""
-    import socket
-    from urllib.parse import urlparse
+def _get_vlm_client():
+    """VLMクライアントを取得する（MultiProviderVLMClient経由）
 
-    parsed = urlparse(OLLAMA_BASE_URL)
-    host = parsed.hostname or "hiveforge-dev-ollama"
-    port = parsed.port or 11434
+    VLM_PROVIDER 環境変数でプロバイダーを選択:
+        - "ollama": Ollama ローカルサーバー
+        - "anthropic": Anthropic Claude Vision API
+        - 未設定: 利用可能なプロバイダーを自動検出
+    """
+    from colonyforge.vlm_tester.vlm_providers import (
+        AnthropicProvider,
+        MultiProviderVLMClient,
+        OllamaProvider,
+    )
+
+    providers = [
+        OllamaProvider(base_url=OLLAMA_BASE_URL, model=VLM_MODEL),
+        AnthropicProvider(),
+    ]
+    return MultiProviderVLMClient(
+        preferred_provider=VLM_PROVIDER,
+        providers=providers,
+    )
+
+
+def _check_vlm_available() -> bool:
+    """いずれかのVLMプロバイダーが利用可能かチェック"""
     try:
-        sock = socket.create_connection((host, port), timeout=5)
-        sock.close()
-        return True
-    except (OSError, ConnectionRefusedError):
+        client = _get_vlm_client()
+        available = client.get_available_providers()
+        if available:
+            logger.info("VLM providers available: %s", available)
+            return True
+        logger.warning("No VLM provider available")
+        return False
+    except Exception as e:
+        logger.warning("VLM availability check failed: %s", e)
         return False
 
 
-OLLAMA_AVAILABLE = _check_ollama_available()
+VLM_AVAILABLE = _check_vlm_available()
 
 
 # ============================================================
@@ -204,16 +238,14 @@ async def vlm_evaluate(
     Returns:
         VLMEvalResult: 評価結果
     """
-    from hiveforge.vlm.ollama_client import OllamaClient
-
-    client = OllamaClient(base_url=OLLAMA_BASE_URL, model=model or VLM_MODEL, timeout=120)
+    vlm_client = _get_vlm_client()
     threshold = min_keywords if min_keywords is not None else len(expected_keywords)
 
     best_result: VLMEvalResult | None = None
 
     for attempt in range(retries):
         try:
-            vlm_response = await client.analyze_image(image_data, prompt)
+            vlm_response = await vlm_client.analyze(image_data, prompt)
             response_lower = vlm_response.response.lower()
 
             found = [kw for kw in expected_keywords if kw.lower() in response_lower]
@@ -235,11 +267,12 @@ async def vlm_evaluate(
                 best_result = result
 
             logger.info(
-                "VLM eval attempt %d/%d: found %d/%d keywords",
+                "VLM eval attempt %d/%d: found %d/%d keywords (provider=%s)",
                 attempt + 1,
                 retries,
                 len(found),
                 threshold,
+                vlm_response.provider,
             )
 
         except Exception as e:
@@ -273,9 +306,7 @@ async def vlm_ocr_extract(
     Returns:
         抽出されたテキスト
     """
-    from hiveforge.vlm.ollama_client import OllamaClient
-
-    client = OllamaClient(base_url=OLLAMA_BASE_URL, model=model or VLM_MODEL, timeout=120)
+    vlm_client = _get_vlm_client()
 
     # OCR特化プロンプト: テキストのみを正確に読み取るよう指示
     ocr_prompt = (
@@ -290,7 +321,7 @@ async def vlm_ocr_extract(
 
     for attempt in range(retries):
         try:
-            vlm_response = await client.analyze_image(image_data, ocr_prompt)
+            vlm_response = await vlm_client.analyze(image_data, ocr_prompt)
             text = vlm_response.response.strip()
 
             # よりテキストが多い応答を採用
@@ -323,8 +354,6 @@ async def vlm_visual_qa(
     Returns:
         VLMの応答テキスト
     """
-    from hiveforge.vlm.ollama_client import OllamaClient
-
-    client = OllamaClient(base_url=OLLAMA_BASE_URL, model=model or VLM_MODEL, timeout=120)
-    vlm_response = await client.analyze_image(image_data, question)
+    vlm_client = _get_vlm_client()
+    vlm_response = await vlm_client.analyze(image_data, question)
     return vlm_response.response.strip()

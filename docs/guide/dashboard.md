@@ -1,6 +1,6 @@
 # Dashboard
 
-The HiveForge VS Code extension provides a real-time dashboard for monitoring Runs, Tasks, and KPIs.
+The ColonyForge VS Code extension provides a real-time dashboard for monitoring Runs, Tasks, and KPIs.
 
 ## Installation
 
@@ -70,7 +70,7 @@ The bottom status bar shows:
 Data refreshes automatically on Run state changes. Manual refresh:
 
 - Click the refresh button in the Hive Monitor toolbar
-- Command Palette → **HiveForge: Refresh Dashboard**
+- Command Palette → **ColonyForge: Refresh Dashboard**
 
 ## Configuration
 
@@ -80,6 +80,6 @@ Configure in VS Code settings:
 
 ```json
 {
-  "hiveforge.apiUrl": "http://localhost:8000"
+  "colonyforge.apiUrl": "http://localhost:8000"
 }
 ```

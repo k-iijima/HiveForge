@@ -1,4 +1,4 @@
-# HiveForge 実装状況サマリー
+# ColonyForge 実装状況サマリー
 
 > 最終更新: 2026-02-01
 
@@ -124,14 +124,14 @@ Worker Beeのツール実行とセキュリティ。
   - エンドツーエンドシナリオ
   - 複数Colony協調テスト
 - `core/config.py` - エージェント/衝突/Conference設定モデル
-- `hiveforge.config.yaml` - 詳細コメント付き設定ファイル
+- `colonyforge.config.yaml` - 詳細コメント付き設定ファイル
 
 ---
 
 ## モジュール構成
 
 ```
-src/hiveforge/
+src/colonyforge/
 ├── core/                    # コア基盤
 │   ├── events.py           # イベントモデル (40+イベント型)
 │   ├── config.py           # 設定管理

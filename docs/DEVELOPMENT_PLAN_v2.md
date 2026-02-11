@@ -1,4 +1,4 @@
-# HiveForge 開発計画 v2
+# ColonyForge 開発計画 v2
 
 > **策定日**: 2026-02-08
 > **前版**: [DEVELOPMENT_PLAN_v1.md](archive/DEVELOPMENT_PLAN_v1.md) — 2026-02-07策定
@@ -28,7 +28,7 @@
 | **Hive/Colony AR永続化** | ✅ M1-1完了 | HiveStore + HiveAggregate, JSONL永続化 | — |
 | **API Server** (FastAPI REST) | ✅ 完了 | Hive/Colony CRUD が AR永続化と接続済み | 認証ミドルウェア実装済 (`auth.enabled: false` がデフォルト) |
 | **MCP Server** (Copilot連携) | ✅ 完了 | 全ツール実装・テスト済 | — |
-| **CLI** | ✅ 完了 | `hiveforge chat` 等 | mypy strict未対応 (M1-3) |
+| **CLI** | ✅ 完了 | `colonyforge chat` 等 | mypy strict未対応 (M1-3) |
 | **Beekeeper server** | ✅ M2-2完了 | 全ハンドラ実装済 | — |
 | **Beekeeper handler** | ✅ 完了 | — | — |
 | **Queen Bee** | ✅ M4-1/M4-2完了 | LLMタスク分解・並列実行・ゲート統合実装済 | TaskPlanner + ColonyOrchestrator + ExecutionPipeline |
@@ -99,7 +99,7 @@ M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)  
 - コアモジュール (`sentinel_hornet/monitor.py`)
 - 4検出パターン実装（ループ/暴走/コスト/セキュリティ）
 - Colony強制停止フロー (`sentinel.alert_raised` → `colony.suspended`)
-- 設定ベース閾値 (`hiveforge.config.yaml`)
+- 設定ベース閾値 (`colonyforge.config.yaml`)
 - **コミット**: `c942f65`, `522013e`
 
 #### M2-1: VS Code拡張のAPI接続 ✅ 完了
@@ -123,13 +123,13 @@ M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)  
 
 | タスク | 内容 | 状態 |
 |--------|------|------|
-| M2-2-a | `hiveforge chat` でBeekeeper経由のHive/Colony作成が動作 | ✅ 完了 |
+| M2-2-a | `colonyforge chat` でBeekeeper経由のHive/Colony作成が動作 | ✅ 完了 |
 | M2-2-b | Beekeeper → Queen Bee へのタスク委譲 | ✅ 完了 |
 | M2-2-c | Worker Bee実行結果がARに記録 → 投影で確認可能 | ✅ 完了 |
 | M2-2-d | 承認フロー（Requirement → approve/reject）がE2Eで動作 | ✅ 完了 |
 
 **完了条件**:
-- `hiveforge chat "ECサイトのログインページを作成"` で全チェーンが動作
+- `colonyforge chat "ECサイトのログインページを作成"` で全チェーンが動作
 - 全イベントがARに永続化される
 
 > **注**: M2-2-a〜d全サブタスク実装完了。完了条件の確認はLLM APIキー設定後に実施。
@@ -138,11 +138,11 @@ M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)  
 
 | タスク | 内容 | 状態 |
 |--------|------|------|
-| M2-3-a | Copilot Chat の `@hiveforge` → Beekeeper直結 | ✅ 完了 |
+| M2-3-a | Copilot Chat の `@colonyforge` → Beekeeper直結 | ✅ 完了 |
 | M2-3-b | MCP経由のHive/Colony操作がAR永続化 | ✅ 完了 |
 
 **M2-3-a 実装内容**:
-- `chatHandler.ts`: VS Code Chat Participant (`@hiveforge`) を実装。`/status`, `/hives` コマンド + 自由文メッセージ送信
+- `chatHandler.ts`: VS Code Chat Participant (`@colonyforge`) を実装。`/status`, `/hives` コマンド + 自由文メッセージ送信
 - `beekeeper.py` (API route): FastAPI `/beekeeper/send_message`, `/status`, `/approve`, `/reject` エンドポイント
 - MCP Server dispatch: `send_message`, `get_beekeeper_status`, `approve`, `reject` → BeekeeperMCPServer委譲
 - **テスト**: `test_beekeeper_api.py` (19テスト), `test_mcp_server.py::TestDispatchBeekeeperTools` (6テスト)
@@ -154,7 +154,7 @@ M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)  
 | M2-4-a | LLMClient→LiteLLM SDK移行（client.py書換え） | ✅ 完了 |
 | M2-4-b | config拡張（13プロバイダー対応、api_base/fallback/num_retries） | ✅ 完了 |
 | M2-4-c | テスト書換え（litellm.acompletion モック化） | ✅ 完了 |
-| M2-4-d | hiveforge.config.yaml/ドキュメント更新 | ✅ 完了 |
+| M2-4-d | colonyforge.config.yaml/ドキュメント更新 | ✅ 完了 |
 
 **変更内容**:
 - LLMClientをhttpx直接呼出しからLiteLLM SDK (`litellm.acompletion`) に全面移行
@@ -165,7 +165,7 @@ M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)  
 
 **責務分界**:
 - **LiteLLMに委譲**: モデル抽象化、プロバイダー間フォーマット変換、リトライ/フォールバック、コスト追跡
-- **HiveForge保持**: Swarming Protocol、Honeycomb学習、Guard Bee L2、Sentinel Hornet、Waggle Dance、エージェント固有レートリミッター
+- **ColonyForge保持**: Swarming Protocol、Honeycomb学習、Guard Bee L2、Sentinel Hornet、Waggle Dance、エージェント固有レートリミッター
 
 ---
 
@@ -203,7 +203,7 @@ M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)  
 | M3-2-b | Colonyテンプレート定義 (Speed/Balanced/Quality/Recovery) | `core/swarming/templates.py` |
 | M3-2-c | 特徴量→テンプレート選択ロジック | `core/swarming/engine.py` |
 | M3-2-d | Beekeeperへの統合（タスク分析→Swarming評価→提案） | `beekeeper/server.py` |
-| M3-2-e | 設定ファイルのテンプレートカスタマイズ | `hiveforge.config.yaml` |
+| M3-2-e | 設定ファイルのテンプレートカスタマイズ | `colonyforge.config.yaml` |
 
 **完了条件**:
 - タスクの特徴量から自動的にテンプレートが選択される
@@ -376,7 +376,7 @@ M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)  
 | M5-6 | ユーザードキュメント完成 | 未着手 |
 
 #### M5-1a 実装詳細
-- `src/hiveforge/api/auth.py`: `verify_api_key` FastAPI依存
+- `src/colonyforge/api/auth.py`: `verify_api_key` FastAPI依存
 - X-API-Key ヘッダー + Authorization: Bearer トークン
 - `secrets.compare_digest` でタイミング攻撃防止
 - 除外パス: `/health`, `/docs`, `/redoc`, `/openapi.json`
@@ -416,7 +416,7 @@ M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)  
 |--------|------|
 | M1-3-a〜f | 各モジュールの mypy --strict エラー解消 |
 
-**完了条件**: `mypy --strict src/hiveforge/` がエラー 0
+**完了条件**: `mypy --strict src/colonyforge/` がエラー 0
 
 #### M1-4: カバレッジ改善
 
@@ -522,7 +522,7 @@ M1〜M4完了。M2全サブタスク完了（M2-0〜M2-4）。M5一部着手済�
 ### M2完了時 — 「信頼できる組み合わせ」（α版）
 
 - VS CodeからHive/Colony操作が実際に動作する
-- `hiveforge chat` で全エージェントチェーンが動く
+- `colonyforge chat` で全エージェントチェーンが動く
 - 全操作がARに記録され追跡可能
 
 ### M3完了時 — 「学習するシステム」（β版）
@@ -583,7 +583,7 @@ M1〜M4完了。M2全サブタスク完了（M2-0〜M2-4）。M5一部着手済�
 | H-05 | `core/rate_limiter.py` 不明モデルデフォルト | AGENTS.md §3 safe-side fallback コメント追加 |
 | H-06 | `core/models/action_class.py` 不明ツール | AGENTS.md §3 safe-side fallback コメント追加 |
 | H-07 | `vlm/ollama_client.py` 画像入力 | `_resolve_image_to_base64()` に明示的バリデーション追加、不正入力で `ValueError` |
-| H-08 | `llm/prompts.py` システムプロンプト | `hiveforge.prompts/` パッケージに集約・英語化 |
+| H-08 | `llm/prompts.py` システムプロンプト | `colonyforge.prompts/` パッケージに集約・英語化 |
 
 #### クリティカルスタブ — 全件解消
 

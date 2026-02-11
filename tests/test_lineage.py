@@ -5,7 +5,7 @@ GitHub Issue #16: P1-15: Lineage 親イベント自動設定
 イベント作成時に自動的に親イベントを設定する機能のテスト。
 """
 
-from hiveforge.core.events import (
+from colonyforge.core.events import (
     RunCompletedEvent,
     RunStartedEvent,
     TaskAssignedEvent,
@@ -13,7 +13,7 @@ from hiveforge.core.events import (
     TaskCreatedEvent,
     TaskProgressedEvent,
 )
-from hiveforge.core.lineage import LineageResolver
+from colonyforge.core.lineage import LineageResolver
 
 
 class TestLineageResolverClass:

@@ -32,7 +32,7 @@ jobs:
 
       - name: Type check with mypy
         run: |
-          mypy src/hiveforge --ignore-missing-imports
+          mypy src/colonyforge --ignore-missing-imports
         continue-on-error: true  # 段階的に厳格化（M1-3で完全対応予定）
 
   test:
@@ -56,11 +56,16 @@ jobs:
       - name: Run tests with coverage
         run: |
           pytest tests --ignore=tests/e2e \
-            --cov=hiveforge \
+            --cov=colonyforge \
             --cov-report=xml \
             --cov-report=term-missing \
             --cov-fail-under=96 \
             -v --tb=short
+
+      - name: Run L1 E2E tests (API flow, no external deps)
+        run: |
+          pytest tests/e2e/test_hive_flow.py \
+            -v --tb=short --timeout=60
 
       - name: Upload coverage to Codecov
         if: always()

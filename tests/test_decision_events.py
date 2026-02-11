@@ -3,7 +3,7 @@
 外部フィードバック対応: 誰が記録したか、どこに効くか、何を上書きしたかを追跡。
 """
 
-from hiveforge.core.events import (
+from colonyforge.core.events import (
     DecisionAppliedEvent,
     DecisionRecordedEvent,
     DecisionScope,

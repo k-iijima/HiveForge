@@ -9,7 +9,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from hiveforge.waggle_dance.models import (
+from colonyforge.waggle_dance.models import (
     MessageDirection,
     OpinionRequest,
     OpinionResponse,
@@ -17,7 +17,7 @@ from hiveforge.waggle_dance.models import (
     TaskResult,
     WaggleDanceResult,
 )
-from hiveforge.waggle_dance.models import (
+from colonyforge.waggle_dance.models import (
     ValidationError as WDValidationError,
 )
 
@@ -124,7 +124,7 @@ class TestTaskResult:
             task_id="task-001",
             colony_id="colony-001",
             success=True,
-            artifacts=["src/hiveforge/core/events.py"],
+            artifacts=["src/colonyforge/core/events.py"],
             evidence={"tests_passed": 10, "tests_total": 10},
         )
 
@@ -159,7 +159,7 @@ class TestMessageDirection:
 # ==================== M3-7-b: 検証ミドルウェア ====================
 
 
-from hiveforge.waggle_dance.validator import WaggleDanceValidator  # noqa: E402
+from colonyforge.waggle_dance.validator import WaggleDanceValidator  # noqa: E402
 
 
 class TestWaggleDanceValidator:
@@ -271,8 +271,8 @@ class TestWaggleDanceResult:
 # ==================== M3-7-c: 検証エラーのARイベント記録 ====================
 
 
-from hiveforge.core.events import EventType  # noqa: E402
-from hiveforge.waggle_dance.recorder import WaggleDanceRecorder  # noqa: E402
+from colonyforge.core.events import EventType  # noqa: E402
+from colonyforge.waggle_dance.recorder import WaggleDanceRecorder  # noqa: E402
 
 
 class TestWaggleDanceRecorder:

@@ -5,13 +5,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from hiveforge.api.helpers import (
+from colonyforge.api.helpers import (
     clear_active_runs,
     get_active_runs,
     get_ar,
     set_ar,
 )
-from hiveforge.api.server import app
+from colonyforge.api.server import app
 
 
 @pytest.fixture
@@ -27,8 +27,8 @@ def client(tmp_path):
     mock_s.server.cors.enabled = False
 
     with (
-        patch("hiveforge.api.server.get_settings", return_value=mock_s),
-        patch("hiveforge.api.helpers.get_settings", return_value=mock_s),
+        patch("colonyforge.api.server.get_settings", return_value=mock_s),
+        patch("colonyforge.api.helpers.get_settings", return_value=mock_s),
         TestClient(app) as client,
     ):
         yield client
@@ -344,7 +344,7 @@ class TestTasksEndpoints:
         Issue #001 のルール: task.created -> run.started
         """
         # Arrange
-        from hiveforge.core.events import EventType
+        from colonyforge.core.events import EventType
 
         run_resp = client.post("/runs", json={"goal": "auto parents"})
         run_id = run_resp.json()["run_id"]
@@ -444,7 +444,7 @@ class TestTasksEndpoints:
         Issue #001 のルール: task.assigned -> task.created
         """
         # Arrange
-        from hiveforge.core.events import EventType
+        from colonyforge.core.events import EventType
 
         run_resp = client.post("/runs", json={"goal": "auto parents"})
         run_id = run_resp.json()["run_id"]
@@ -555,7 +555,7 @@ class TestRunCompletionAutoParents:
         Issue #001 のルール: run.completed -> all task.completed
         """
         # Arrange
-        from hiveforge.core.events import EventType
+        from colonyforge.core.events import EventType
 
         run_resp = client.post("/runs", json={"goal": "complete run"})
         run_id = run_resp.json()["run_id"]
@@ -583,7 +583,7 @@ class TestRunCompletionAutoParents:
     def test_run_completed_explicit_parents_are_preserved(self, client):
         """run.completed でparentsを明示した場合は自動補完せず、そのまま使う"""
         # Arrange
-        from hiveforge.core.events import EventType
+        from colonyforge.core.events import EventType
 
         run_resp = client.post("/runs", json={"goal": "complete run"})
         run_id = run_resp.json()["run_id"]
@@ -616,7 +616,7 @@ class TestRequirementAutoParents:
         Issue #001 のルール: requirement.created -> run.started
         """
         # Arrange
-        from hiveforge.core.events import EventType
+        from colonyforge.core.events import EventType
 
         run_resp = client.post("/runs", json={"goal": "auto parents requirement"})
         run_id = run_resp.json()["run_id"]
@@ -637,7 +637,7 @@ class TestRequirementAutoParents:
     def test_requirement_approved_auto_parents_defaults_to_requirement_created(self, client):
         """requirement.approved は対応する requirement.created をparentsに持つ"""
         # Arrange
-        from hiveforge.core.events import EventType
+        from colonyforge.core.events import EventType
 
         run_resp = client.post("/runs", json={"goal": "auto parents requirement"})
         run_id = run_resp.json()["run_id"]
@@ -673,7 +673,7 @@ class TestRequirementAutoParents:
     def test_requirement_rejected_auto_parents_defaults_to_requirement_created(self, client):
         """requirement.rejected は対応する requirement.created をparentsに持つ"""
         # Arrange
-        from hiveforge.core.events import EventType
+        from colonyforge.core.events import EventType
 
         run_resp = client.post("/runs", json={"goal": "auto parents requirement"})
         run_id = run_resp.json()["run_id"]
@@ -824,8 +824,8 @@ class TestLineageWithParents:
         first_event_id = events_resp.json()[0]["id"]
 
         # parentsを持つイベントを直接追加
-        import hiveforge.api.helpers as helpers_module
-        from hiveforge.core.events import HeartbeatEvent
+        import colonyforge.api.helpers as helpers_module
+        from colonyforge.core.events import HeartbeatEvent
 
         ar = helpers_module.get_ar()
         # 2番目のイベント：最初のイベントを親に持つ
@@ -863,8 +863,8 @@ class TestLineageWithParents:
         events_resp = client.get(f"/runs/{run_id}/events")
         first_event_id = events_resp.json()[0]["id"]
 
-        import hiveforge.api.helpers as helpers_module
-        from hiveforge.core.events import HeartbeatEvent
+        import colonyforge.api.helpers as helpers_module
+        from colonyforge.core.events import HeartbeatEvent
 
         ar = helpers_module.get_ar()
         # 子イベント：最初のイベントを親に持つ
@@ -894,8 +894,8 @@ class TestLineageWithParents:
         events_resp = client.get(f"/runs/{run_id}/events")
         first_event_id = events_resp.json()[0]["id"]
 
-        import hiveforge.api.helpers as helpers_module
-        from hiveforge.core.events import HeartbeatEvent
+        import colonyforge.api.helpers as helpers_module
+        from colonyforge.core.events import HeartbeatEvent
 
         ar = helpers_module.get_ar()
 
@@ -929,8 +929,8 @@ class TestLineageWithParents:
         events_resp = client.get(f"/runs/{run_id}/events")
         first_event_id = events_resp.json()[0]["id"]
 
-        import hiveforge.api.helpers as helpers_module
-        from hiveforge.core.events import HeartbeatEvent
+        import colonyforge.api.helpers as helpers_module
+        from colonyforge.core.events import HeartbeatEvent
 
         ar = helpers_module.get_ar()
 
@@ -961,8 +961,8 @@ class TestLineageWithParents:
         run_resp = client.post("/runs", json={"goal": "存在しない親テスト"})
         run_id = run_resp.json()["run_id"]
 
-        import hiveforge.api.helpers as helpers_module
-        from hiveforge.core.events import HeartbeatEvent
+        import colonyforge.api.helpers as helpers_module
+        from colonyforge.core.events import HeartbeatEvent
 
         ar = helpers_module.get_ar()
 
@@ -1017,7 +1017,7 @@ class TestGetArFunction:
 
         set_ar(None)
 
-        with patch("hiveforge.api.helpers.get_settings") as mock_settings:
+        with patch("colonyforge.api.helpers.get_settings") as mock_settings:
             mock_s = MagicMock()
             mock_s.get_vault_path.return_value = tmp_path / "Vault"
             mock_settings.return_value = mock_s
@@ -1053,8 +1053,8 @@ class TestLifespanRunRecovery:
 
     def test_lifespan_recovers_running_runs(self, tmp_path):
         """起動時にRUNNING状態のRunを復元する"""
-        from hiveforge.core.ar.storage import AkashicRecord
-        from hiveforge.core.events import RunStartedEvent
+        from colonyforge.core.ar.storage import AkashicRecord
+        from colonyforge.core.events import RunStartedEvent
 
         # 事前にRunを作成
         vault_path = tmp_path / "Vault"
@@ -1076,8 +1076,8 @@ class TestLifespanRunRecovery:
         mock_s.server.cors.enabled = False
 
         with (
-            patch("hiveforge.api.server.get_settings", return_value=mock_s),
-            patch("hiveforge.api.helpers.get_settings", return_value=mock_s),
+            patch("colonyforge.api.server.get_settings", return_value=mock_s),
+            patch("colonyforge.api.helpers.get_settings", return_value=mock_s),
         ):
             # Act
             with TestClient(app):
@@ -1209,8 +1209,8 @@ class TestListRunsEdgeCases:
         mock_s.server.cors.enabled = False
 
         with (
-            patch("hiveforge.api.server.get_settings", return_value=mock_s),
-            patch("hiveforge.api.helpers.get_settings", return_value=mock_s),
+            patch("colonyforge.api.server.get_settings", return_value=mock_s),
+            patch("colonyforge.api.helpers.get_settings", return_value=mock_s),
         ):
             with TestClient(app) as client:
                 # Act: 全てのRunをリスト
@@ -1245,8 +1245,8 @@ class TestLifespanNoRuns:
         mock_s.server.cors.enabled = False
 
         with (
-            patch("hiveforge.api.server.get_settings", return_value=mock_s),
-            patch("hiveforge.api.helpers.get_settings", return_value=mock_s),
+            patch("colonyforge.api.server.get_settings", return_value=mock_s),
+            patch("colonyforge.api.helpers.get_settings", return_value=mock_s),
         ):
             # Act & Assert: エラーなく起動
             with TestClient(app) as client:
@@ -1260,8 +1260,8 @@ class TestLifespanNoRuns:
 
     def test_lifespan_with_completed_run_only(self, tmp_path):
         """COMPLETEDのRunのみの場合、アクティブに追加されない"""
-        from hiveforge.core.ar.storage import AkashicRecord
-        from hiveforge.core.events import RunCompletedEvent, RunStartedEvent
+        from colonyforge.core.ar.storage import AkashicRecord
+        from colonyforge.core.events import RunCompletedEvent, RunStartedEvent
 
         vault_path = tmp_path / "CompletedVault"
         ar = AkashicRecord(vault_path)
@@ -1290,8 +1290,8 @@ class TestLifespanNoRuns:
         mock_s.server.cors.enabled = False
 
         with (
-            patch("hiveforge.api.server.get_settings", return_value=mock_s),
-            patch("hiveforge.api.helpers.get_settings", return_value=mock_s),
+            patch("colonyforge.api.server.get_settings", return_value=mock_s),
+            patch("colonyforge.api.helpers.get_settings", return_value=mock_s),
         ):
             # Act
             with TestClient(app):

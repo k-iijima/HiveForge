@@ -5,7 +5,7 @@
  */
 
 import * as vscode from 'vscode';
-import { HiveForgeClient, Run } from '../client';
+import { ColonyForgeClient, Run } from '../client';
 
 export class DashboardPanel {
     public static currentPanel: DashboardPanel | undefined;
@@ -18,7 +18,7 @@ export class DashboardPanel {
     private constructor(
         panel: vscode.WebviewPanel,
         extensionUri: vscode.Uri,
-        private client: HiveForgeClient
+        private client: ColonyForgeClient
     ) {
         this._panel = panel;
         this._extensionUri = extensionUri;
@@ -42,7 +42,7 @@ export class DashboardPanel {
         );
     }
 
-    public static createOrShow(extensionUri: vscode.Uri, client: HiveForgeClient): void {
+    public static createOrShow(extensionUri: vscode.Uri, client: ColonyForgeClient): void {
         const column = vscode.window.activeTextEditor
             ? vscode.window.activeTextEditor.viewColumn
             : undefined;
@@ -54,8 +54,8 @@ export class DashboardPanel {
         }
 
         const panel = vscode.window.createWebviewPanel(
-            'hiveforgeDashboard',
-            'HiveForge Dashboard',
+            'colonyforgeDashboard',
+            'ColonyForge Dashboard',
             column || vscode.ViewColumn.One,
             {
                 enableScripts: true,
@@ -121,7 +121,7 @@ export class DashboardPanel {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HiveForge Dashboard</title>
+    <title>ColonyForge Dashboard</title>
     <style>
         ${this._getBaseStyles()}
         .no-run {
@@ -146,7 +146,7 @@ export class DashboardPanel {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HiveForge Dashboard</title>
+    <title>ColonyForge Dashboard</title>
     <style>
         ${this._getBaseStyles()}
         .error {
@@ -184,7 +184,7 @@ export class DashboardPanel {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HiveForge Dashboard</title>
+    <title>ColonyForge Dashboard</title>
     <style>
         ${this._getBaseStyles()}
         .header {

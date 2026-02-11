@@ -11,15 +11,15 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from hiveforge.core.activity_bus import (
+from colonyforge.core.activity_bus import (
     ActivityBus,
     ActivityEvent,
     ActivityType,
     AgentInfo,
     AgentRole,
 )
-from hiveforge.llm.client import LLMClient, LLMResponse, ToolCall
-from hiveforge.llm.runner import AgentRunner, ToolDefinition
+from colonyforge.llm.client import LLMClient, LLMResponse, ToolCall
+from colonyforge.llm.runner import AgentRunner, ToolDefinition
 
 # =============================================================================
 # フィクスチャ

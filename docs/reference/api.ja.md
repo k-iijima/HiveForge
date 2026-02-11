@@ -1,6 +1,6 @@
 # REST APIリファレンス
 
-HiveForgeはFastAPIベースのREST APIを提供します。サーバー起動後、`http://localhost:8000/docs`（Swagger UI）で完全な対話型ドキュメントを利用できます。
+ColonyForgeはFastAPIベースのREST APIを提供します。サーバー起動後、`http://localhost:8000/docs`（Swagger UI）で完全な対話型ドキュメントを利用できます。
 
 ## ベースURL
 
@@ -121,38 +121,38 @@ http://localhost:8000
 
 ### イベント
 
-::: hiveforge.core.events.base
+::: colonyforge.core.events.base
     options:
       show_root_heading: true
       members_order: source
 
-::: hiveforge.core.events.types
+::: colonyforge.core.events.types
     options:
       show_root_heading: true
       members_order: source
 
 ### Akashic Record
 
-::: hiveforge.core.ar.storage
+::: colonyforge.core.ar.storage
     options:
       show_root_heading: true
       members_order: source
 
 ### Honeycomb
 
-::: hiveforge.core.honeycomb.kpi
+::: colonyforge.core.honeycomb.kpi
     options:
       show_root_heading: true
       members_order: source
 
-::: hiveforge.core.honeycomb.models
+::: colonyforge.core.honeycomb.models
     options:
       show_root_heading: true
       members_order: source
 
 ### ドメインモデル
 
-::: hiveforge.core.models.action_class
+::: colonyforge.core.models.action_class
     options:
       show_root_heading: true
       members_order: source

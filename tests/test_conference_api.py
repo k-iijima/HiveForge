@@ -7,8 +7,8 @@ Conference REST APIのテスト。
 import pytest
 from fastapi.testclient import TestClient
 
-from hiveforge.api.routes.conferences import get_conference_store
-from hiveforge.api.server import app
+from colonyforge.api.routes.conferences import get_conference_store
+from colonyforge.api.server import app
 
 
 @pytest.fixture

@@ -5,7 +5,7 @@
 
 import pytest
 
-from hiveforge.core.events import (
+from colonyforge.core.events import (
     EVENT_TYPE_MAP,
     DecisionAppliedEvent,
     DecisionSupersededEvent,

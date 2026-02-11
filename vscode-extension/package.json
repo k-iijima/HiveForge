@@ -1,9 +1,9 @@
 {
-  "name": "hiveforge-dashboard",
-  "displayName": "HiveForge Dashboard",
-  "description": "HiveForge 自律型ソフトウェア組立システムのダッシュボード",
+  "name": "colonyforge-dashboard",
+  "displayName": "ColonyForge Dashboard",
+  "description": "ColonyForge 自律型ソフトウェア組立システムのダッシュボード",
   "version": "0.1.0",
-  "publisher": "hiveforge",
+  "publisher": "colonyforge",
   "engines": {
     "vscode": "^1.100.0"
   },
@@ -17,15 +17,15 @@
   "contributes": {
     "chatParticipants": [
       {
-        "id": "hiveforge-dashboard.hiveforge",
-        "fullName": "HiveForge",
-        "name": "hiveforge",
-        "description": "HiveForge自律型ソフトウェア組立システムとの対話",
+        "id": "colonyforge-dashboard.colonyforge",
+        "fullName": "ColonyForge",
+        "name": "colonyforge",
+        "description": "ColonyForge自律型ソフトウェア組立システムとの対話",
         "isSticky": true,
         "commands": [
           {
             "name": "status",
-            "description": "HiveForgeのステータスを確認"
+            "description": "ColonyForgeのステータスを確認"
           },
           {
             "name": "hives",
@@ -36,286 +36,286 @@
     ],
     "commands": [
       {
-        "command": "hiveforge.showDashboard",
-        "title": "HiveForge: ダッシュボードを表示",
+        "command": "colonyforge.showDashboard",
+        "title": "ColonyForge: ダッシュボードを表示",
         "icon": "$(dashboard)"
       },
       {
-        "command": "hiveforge.showHiveMonitor",
-        "title": "HiveForge: Hive Monitorを表示",
+        "command": "colonyforge.showHiveMonitor",
+        "title": "ColonyForge: Hive Monitorを表示",
         "icon": "$(type-hierarchy)"
       },
       {
-        "command": "hiveforge.showAgentMonitor",
-        "title": "HiveForge: Agent Monitorを表示",
+        "command": "colonyforge.showAgentMonitor",
+        "title": "ColonyForge: Agent Monitorを表示",
         "icon": "$(pulse)"
       },
       {
-        "command": "hiveforge.startRun",
-        "title": "HiveForge: 新しいRunを開始",
+        "command": "colonyforge.startRun",
+        "title": "ColonyForge: 新しいRunを開始",
         "icon": "$(add)"
       },
       {
-        "command": "hiveforge.viewEvents",
-        "title": "HiveForge: イベントログを表示"
+        "command": "colonyforge.viewEvents",
+        "title": "ColonyForge: イベントログを表示"
       },
       {
-        "command": "hiveforge.approveRequirement",
+        "command": "colonyforge.approveRequirement",
         "title": "承認",
         "icon": "$(check)"
       },
       {
-        "command": "hiveforge.rejectRequirement",
+        "command": "colonyforge.rejectRequirement",
         "title": "却下",
         "icon": "$(x)"
       },
       {
-        "command": "hiveforge.showRequirementDetail",
-        "title": "HiveForge: 確認要請の詳細を表示"
+        "command": "colonyforge.showRequirementDetail",
+        "title": "ColonyForge: 確認要請の詳細を表示"
       },
       {
-        "command": "hiveforge.toggleRunsFilter",
+        "command": "colonyforge.toggleRunsFilter",
         "title": "完了済みを表示/非表示",
         "icon": "$(eye-closed)"
       },
       {
-        "command": "hiveforge.toggleTasksFilter",
+        "command": "colonyforge.toggleTasksFilter",
         "title": "完了済みを表示/非表示",
         "icon": "$(eye-closed)"
       },
       {
-        "command": "hiveforge.toggleRequirementsFilter",
+        "command": "colonyforge.toggleRequirementsFilter",
         "title": "解決済みを表示/非表示",
         "icon": "$(eye-closed)"
       },
       {
-        "command": "hiveforge.toggleRunsFilterOn",
+        "command": "colonyforge.toggleRunsFilterOn",
         "title": "完了済みを非表示",
         "icon": "$(eye)"
       },
       {
-        "command": "hiveforge.toggleTasksFilterOn",
+        "command": "colonyforge.toggleTasksFilterOn",
         "title": "完了済みを非表示",
         "icon": "$(eye)"
       },
       {
-        "command": "hiveforge.toggleRequirementsFilterOn",
+        "command": "colonyforge.toggleRequirementsFilterOn",
         "title": "解決済みを非表示",
         "icon": "$(eye)"
       },
       {
-        "command": "hiveforge.completeRun",
+        "command": "colonyforge.completeRun",
         "title": "Runを完了",
         "icon": "$(check)"
       },
       {
-        "command": "hiveforge.abortRun",
+        "command": "colonyforge.abortRun",
         "title": "Runを中止",
         "icon": "$(stop)"
       },
       {
-        "command": "hiveforge.createTask",
+        "command": "colonyforge.createTask",
         "title": "タスクを作成",
         "icon": "$(add)"
       },
       {
-        "command": "hiveforge.assignTask",
+        "command": "colonyforge.assignTask",
         "title": "タスクを割り当て",
         "icon": "$(account)"
       },
       {
-        "command": "hiveforge.updateProgress",
+        "command": "colonyforge.updateProgress",
         "title": "進捗を更新",
         "icon": "$(dashboard)"
       },
       {
-        "command": "hiveforge.completeTask",
+        "command": "colonyforge.completeTask",
         "title": "タスクを完了",
         "icon": "$(check)"
       },
       {
-        "command": "hiveforge.failTask",
+        "command": "colonyforge.failTask",
         "title": "タスクを失敗",
         "icon": "$(error)"
       },
       {
-        "command": "hiveforge.toggleEventsTreeMode",
+        "command": "colonyforge.toggleEventsTreeMode",
         "title": "ツリー/フラット表示切替",
         "icon": "$(list-flat)"
       },
       {
-        "command": "hiveforge.toggleEventsTreeModeOn",
+        "command": "colonyforge.toggleEventsTreeModeOn",
         "title": "フラット/ツリー表示切替",
         "icon": "$(list-tree)"
       },
       {
-        "command": "hiveforge.createHive",
-        "title": "HiveForge: Hiveを作成",
+        "command": "colonyforge.createHive",
+        "title": "ColonyForge: Hiveを作成",
         "icon": "$(add)"
       },
       {
-        "command": "hiveforge.closeHive",
-        "title": "HiveForge: Hiveを終了",
+        "command": "colonyforge.closeHive",
+        "title": "ColonyForge: Hiveを終了",
         "icon": "$(close)"
       },
       {
-        "command": "hiveforge.refreshHives",
-        "title": "HiveForge: Hive一覧を更新",
+        "command": "colonyforge.refreshHives",
+        "title": "ColonyForge: Hive一覧を更新",
         "icon": "$(refresh)"
       },
       {
-        "command": "hiveforge.createColony",
-        "title": "HiveForge: Colonyを作成",
+        "command": "colonyforge.createColony",
+        "title": "ColonyForge: Colonyを作成",
         "icon": "$(add)"
       },
       {
-        "command": "hiveforge.startColony",
-        "title": "HiveForge: Colonyを開始",
+        "command": "colonyforge.startColony",
+        "title": "ColonyForge: Colonyを開始",
         "icon": "$(play)"
       },
       {
-        "command": "hiveforge.completeColony",
-        "title": "HiveForge: Colonyを完了",
+        "command": "colonyforge.completeColony",
+        "title": "ColonyForge: Colonyを完了",
         "icon": "$(check)"
       }
     ],
     "menus": {
       "view/title": [
         {
-          "command": "hiveforge.showHiveMonitor",
-          "when": "view == hiveforge.hives",
+          "command": "colonyforge.showHiveMonitor",
+          "when": "view == colonyforge.hives",
           "group": "navigation@0"
         },
         {
-          "command": "hiveforge.createHive",
-          "when": "view == hiveforge.hives",
+          "command": "colonyforge.createHive",
+          "when": "view == colonyforge.hives",
           "group": "navigation@1"
         },
         {
-          "command": "hiveforge.refreshHives",
-          "when": "view == hiveforge.hives",
+          "command": "colonyforge.refreshHives",
+          "when": "view == colonyforge.hives",
           "group": "navigation@2"
         },
         {
-          "command": "hiveforge.startRun",
-          "when": "view == hiveforge.runs",
+          "command": "colonyforge.startRun",
+          "when": "view == colonyforge.runs",
           "group": "navigation@1"
         },
         {
-          "command": "hiveforge.toggleRunsFilter",
-          "when": "view == hiveforge.runs && !hiveforge.runsShowCompleted",
+          "command": "colonyforge.toggleRunsFilter",
+          "when": "view == colonyforge.runs && !colonyforge.runsShowCompleted",
           "group": "navigation@2"
         },
         {
-          "command": "hiveforge.toggleRunsFilterOn",
-          "when": "view == hiveforge.runs && hiveforge.runsShowCompleted",
+          "command": "colonyforge.toggleRunsFilterOn",
+          "when": "view == colonyforge.runs && colonyforge.runsShowCompleted",
           "group": "navigation@2"
         },
         {
-          "command": "hiveforge.toggleTasksFilter",
-          "when": "view == hiveforge.tasks && !hiveforge.tasksShowCompleted",
+          "command": "colonyforge.toggleTasksFilter",
+          "when": "view == colonyforge.tasks && !colonyforge.tasksShowCompleted",
           "group": "navigation@2"
         },
         {
-          "command": "hiveforge.toggleTasksFilterOn",
-          "when": "view == hiveforge.tasks && hiveforge.tasksShowCompleted",
+          "command": "colonyforge.toggleTasksFilterOn",
+          "when": "view == colonyforge.tasks && colonyforge.tasksShowCompleted",
           "group": "navigation@2"
         },
         {
-          "command": "hiveforge.createTask",
-          "when": "view == hiveforge.tasks",
+          "command": "colonyforge.createTask",
+          "when": "view == colonyforge.tasks",
           "group": "navigation@1"
         },
         {
-          "command": "hiveforge.toggleRequirementsFilter",
-          "when": "view == hiveforge.requirements && !hiveforge.requirementsShowResolved",
+          "command": "colonyforge.toggleRequirementsFilter",
+          "when": "view == colonyforge.requirements && !colonyforge.requirementsShowResolved",
           "group": "navigation"
         },
         {
-          "command": "hiveforge.toggleRequirementsFilterOn",
-          "when": "view == hiveforge.requirements && hiveforge.requirementsShowResolved",
+          "command": "colonyforge.toggleRequirementsFilterOn",
+          "when": "view == colonyforge.requirements && colonyforge.requirementsShowResolved",
           "group": "navigation"
         },
         {
-          "command": "hiveforge.toggleEventsTreeMode",
-          "when": "view == hiveforge.events && hiveforge.eventsTreeMode",
+          "command": "colonyforge.toggleEventsTreeMode",
+          "when": "view == colonyforge.events && colonyforge.eventsTreeMode",
           "group": "navigation"
         },
         {
-          "command": "hiveforge.toggleEventsTreeModeOn",
-          "when": "view == hiveforge.events && !hiveforge.eventsTreeMode",
+          "command": "colonyforge.toggleEventsTreeModeOn",
+          "when": "view == colonyforge.events && !colonyforge.eventsTreeMode",
           "group": "navigation"
         }
       ],
       "view/item/context": [
         {
-          "command": "hiveforge.closeHive",
-          "when": "view == hiveforge.hives && viewItem == activeHive",
+          "command": "colonyforge.closeHive",
+          "when": "view == colonyforge.hives && viewItem == activeHive",
           "group": "inline@1"
         },
         {
-          "command": "hiveforge.createColony",
-          "when": "view == hiveforge.hives && viewItem == activeHive",
+          "command": "colonyforge.createColony",
+          "when": "view == colonyforge.hives && viewItem == activeHive",
           "group": "inline@2"
         },
         {
-          "command": "hiveforge.startColony",
-          "when": "view == hiveforge.hives && viewItem == pendingColony",
+          "command": "colonyforge.startColony",
+          "when": "view == colonyforge.hives && viewItem == pendingColony",
           "group": "inline@1"
         },
         {
-          "command": "hiveforge.completeColony",
-          "when": "view == hiveforge.hives && viewItem =~ /^(runningColony|inProgressColony)$/",
+          "command": "colonyforge.completeColony",
+          "when": "view == colonyforge.hives && viewItem =~ /^(runningColony|inProgressColony)$/",
           "group": "inline@1"
         },
         {
-          "command": "hiveforge.approveRequirement",
-          "when": "view == hiveforge.requirements && viewItem == pendingRequirement",
+          "command": "colonyforge.approveRequirement",
+          "when": "view == colonyforge.requirements && viewItem == pendingRequirement",
           "group": "inline@1"
         },
         {
-          "command": "hiveforge.rejectRequirement",
-          "when": "view == hiveforge.requirements && viewItem == pendingRequirement",
+          "command": "colonyforge.rejectRequirement",
+          "when": "view == colonyforge.requirements && viewItem == pendingRequirement",
           "group": "inline@2"
         },
         {
-          "command": "hiveforge.showDashboard",
-          "when": "view == hiveforge.runs",
+          "command": "colonyforge.showDashboard",
+          "when": "view == colonyforge.runs",
           "group": "inline@0"
         },
         {
-          "command": "hiveforge.showAgentMonitor",
-          "when": "view == hiveforge.runs",
+          "command": "colonyforge.showAgentMonitor",
+          "when": "view == colonyforge.runs",
           "group": "inline@0"
         },
         {
-          "command": "hiveforge.completeRun",
-          "when": "view == hiveforge.runs && viewItem == runningRun",
+          "command": "colonyforge.completeRun",
+          "when": "view == colonyforge.runs && viewItem == runningRun",
           "group": "inline@1"
         },
         {
-          "command": "hiveforge.abortRun",
-          "when": "view == hiveforge.runs && viewItem == runningRun",
+          "command": "colonyforge.abortRun",
+          "when": "view == colonyforge.runs && viewItem == runningRun",
           "group": "inline@2"
         },
         {
-          "command": "hiveforge.assignTask",
-          "when": "view == hiveforge.tasks && viewItem == pending",
+          "command": "colonyforge.assignTask",
+          "when": "view == colonyforge.tasks && viewItem == pending",
           "group": "inline@1"
         },
         {
-          "command": "hiveforge.updateProgress",
-          "when": "view == hiveforge.tasks && viewItem =~ /^(assigned|in_progress)$/",
+          "command": "colonyforge.updateProgress",
+          "when": "view == colonyforge.tasks && viewItem =~ /^(assigned|in_progress)$/",
           "group": "inline@1"
         },
         {
-          "command": "hiveforge.completeTask",
-          "when": "view == hiveforge.tasks && viewItem =~ /^(assigned|in_progress)$/",
+          "command": "colonyforge.completeTask",
+          "when": "view == colonyforge.tasks && viewItem =~ /^(assigned|in_progress)$/",
           "group": "inline@2"
         },
         {
-          "command": "hiveforge.failTask",
-          "when": "view == hiveforge.tasks && viewItem =~ /^(assigned|in_progress)$/",
+          "command": "colonyforge.failTask",
+          "when": "view == colonyforge.tasks && viewItem =~ /^(assigned|in_progress)$/",
           "group": "inline@3"
         }
       ]
@@ -323,59 +323,59 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "hiveforge",
-          "title": "HiveForge",
+          "id": "colonyforge",
+          "title": "ColonyForge",
           "icon": "resources/hive-icon.svg"
         }
       ]
     },
     "views": {
-      "hiveforge": [
+      "colonyforge": [
         {
-          "id": "hiveforge.hives",
+          "id": "colonyforge.hives",
           "name": "Hives"
         },
         {
-          "id": "hiveforge.runs",
+          "id": "colonyforge.runs",
           "name": "Runs"
         },
         {
-          "id": "hiveforge.tasks",
+          "id": "colonyforge.tasks",
           "name": "Tasks"
         },
         {
-          "id": "hiveforge.requirements",
+          "id": "colonyforge.requirements",
           "name": "確認要請"
         },
         {
-          "id": "hiveforge.decisions",
+          "id": "colonyforge.decisions",
           "name": "Decisions"
         },
         {
-          "id": "hiveforge.events",
+          "id": "colonyforge.events",
           "name": "イベントログ"
         }
       ]
     },
     "configuration": {
-      "title": "HiveForge",
+      "title": "ColonyForge",
       "properties": {
-        "hiveforge.serverUrl": {
+        "colonyforge.serverUrl": {
           "type": "string",
           "default": "http://localhost:8000",
-          "description": "HiveForge APIサーバーのURL"
+          "description": "ColonyForge APIサーバーのURL"
         },
-        "hiveforge.decisionsRunId": {
+        "colonyforge.decisionsRunId": {
           "type": "string",
           "default": "meta-decisions",
           "description": "Decision（decision.recorded）を格納するRun ID"
         },
-        "hiveforge.autoRefresh": {
+        "colonyforge.autoRefresh": {
           "type": "boolean",
           "default": true,
           "description": "ダッシュボードを自動更新"
         },
-        "hiveforge.refreshInterval": {
+        "colonyforge.refreshInterval": {
           "type": "number",
           "default": 5000,
           "description": "自動更新の間隔（ミリ秒）"
@@ -397,6 +397,7 @@
     "@types/vscode": "^1.100.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
+    "@vscode/vsce": "^3.7.1",
     "eslint": "^9.0.0",
     "mocha": "^11.7.5",
     "sinon": "^21.0.1",

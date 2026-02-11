@@ -1,6 +1,6 @@
 # イベント型
 
-HiveForgeの全状態変更は、型付きの不変イベントとしてAkashic Recordに記録されます。
+ColonyForgeの全状態変更は、型付きの不変イベントとしてAkashic Recordに記録されます。
 
 ## イベントスキーマ
 
@@ -159,7 +159,7 @@ class BaseEvent(BaseModel):
 
 ## 自動生成リファレンス
 
-::: hiveforge.core.events.types.EventType
+::: colonyforge.core.events.types.EventType
     options:
       show_root_heading: true
       members_order: source

@@ -1,6 +1,6 @@
 # Agents
 
-HiveForge uses a hierarchical multi-agent architecture inspired by bee colony organization.
+ColonyForge uses a hierarchical multi-agent architecture inspired by bee colony organization.
 
 ## Agent Hierarchy
 

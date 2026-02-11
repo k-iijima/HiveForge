@@ -1,4 +1,4 @@
-# HiveForge ロードマップ
+# ColonyForge ロードマップ
 
 > 最終更新: 2026-02-01
 

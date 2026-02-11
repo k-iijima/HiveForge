@@ -3,13 +3,13 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "hiveforge"
+name = "colonyforge"
 version = "0.1.0"
-description = "HiveForge - 自律型ソフトウェア組立システム"
+description = "ColonyForge - 自律型ソフトウェア組立システム"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
-authors = [{ name = "HiveForge Team" }]
+authors = [{ name = "ColonyForge Team" }]
 keywords = ["ai", "automation", "mcp", "llm"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -65,17 +65,17 @@ docs = [
 ]
 
 [project.scripts]
-hiveforge = "hiveforge.cli:main"
-hiveforge-vlm = "hiveforge.vlm_tester.server:main"
-hiveforge-agent-ui = "hiveforge.agent_ui.server:main"
+colonyforge = "colonyforge.cli:main"
+colonyforge-vlm = "colonyforge.vlm_tester.server:main"
+colonyforge-agent-ui = "colonyforge.agent_ui.server:main"
 
 [project.urls]
-Homepage = "https://github.com/k-iijima/HiveForge"
-Documentation = "https://github.com/k-iijima/HiveForge#readme"
-Repository = "https://github.com/k-iijima/HiveForge"
+Homepage = "https://github.com/k-iijima/ColonyForge"
+Documentation = "https://github.com/k-iijima/ColonyForge#readme"
+Repository = "https://github.com/k-iijima/ColonyForge"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/hiveforge"]
+packages = ["src/colonyforge"]
 
 [tool.ruff]
 line-length = 100
@@ -102,11 +102,12 @@ addopts = "-v --tb=short -m 'not e2e and not benchmark' --benchmark-disable"
 markers = [
     "e2e: marks tests as end-to-end tests (requires Playwright browser or MCP container)",
     "benchmark: marks tests as performance benchmarks (run with --benchmark-enable)",
+    "heavyweight: marks tests with excessive API calls (>50 calls) — never run against cloud APIs in CI",
 ]
 
 [tool.coverage.run]
 branch = true
-source = ["src/hiveforge"]
+source = ["src/colonyforge"]
 omit = ["*/__pycache__/*", "*/tests/*", "*/vlm_tester/*"]
 
 [tool.coverage.report]

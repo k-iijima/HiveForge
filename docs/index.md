@@ -4,7 +4,7 @@ hide:
   - toc
 ---
 
-# HiveForge
+# ColonyForge
 
 <div class="grid cards" markdown>
 
@@ -12,7 +12,7 @@ hide:
 
     ---
 
-    Install HiveForge and get up and running in minutes.
+    Install ColonyForge and get up and running in minutes.
 
     [:octicons-arrow-right-24: Quick Start](getting-started/quickstart.md)
 
@@ -42,9 +42,9 @@ hide:
 
 </div>
 
-## What is HiveForge?
+## What is ColonyForge?
 
-HiveForge is a **multi-agent collaborative development system** powered by LLMs. Specialized agents — Beekeeper, Queen Bee, Worker Bee, Sentinel Hornet, Guard Bee, Forager Bee, and Referee Bee — work together through VS Code and GitHub Copilot Chat to assist software development.
+ColonyForge is a **multi-agent collaborative development system** powered by LLMs. Specialized agents — Beekeeper, Queen Bee, Worker Bee, Sentinel Hornet, Guard Bee, Forager Bee, and Referee Bee — work together through VS Code and GitHub Copilot Chat to assist software development.
 
 ### Core Philosophy
 

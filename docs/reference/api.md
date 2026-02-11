@@ -1,6 +1,6 @@
 # REST API Reference
 
-HiveForge provides a FastAPI-based REST API. Full interactive documentation is available at `http://localhost:8000/docs` (Swagger UI) when the server is running.
+ColonyForge provides a FastAPI-based REST API. Full interactive documentation is available at `http://localhost:8000/docs` (Swagger UI) when the server is running.
 
 ## Base URL
 
@@ -121,38 +121,38 @@ http://localhost:8000
 
 ### Events
 
-::: hiveforge.core.events.base
+::: colonyforge.core.events.base
     options:
       show_root_heading: true
       members_order: source
 
-::: hiveforge.core.events.types
+::: colonyforge.core.events.types
     options:
       show_root_heading: true
       members_order: source
 
 ### Akashic Record
 
-::: hiveforge.core.ar.storage
+::: colonyforge.core.ar.storage
     options:
       show_root_heading: true
       members_order: source
 
 ### Honeycomb
 
-::: hiveforge.core.honeycomb.kpi
+::: colonyforge.core.honeycomb.kpi
     options:
       show_root_heading: true
       members_order: source
 
-::: hiveforge.core.honeycomb.models
+::: colonyforge.core.honeycomb.models
     options:
       show_root_heading: true
       members_order: source
 
 ### Domain Models
 
-::: hiveforge.core.models.action_class
+::: colonyforge.core.models.action_class
     options:
       show_root_heading: true
       members_order: source

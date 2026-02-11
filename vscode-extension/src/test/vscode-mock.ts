@@ -107,7 +107,7 @@ export const workspace = {
     } {
         return {
             get<T>(key: string, defaultValue?: T): T | undefined {
-                if (section === "hiveforge") {
+                if (section === "colonyforge") {
                     if (key === "serverUrl") {
                         return ("http://localhost:8000" as unknown) as T;
                     }

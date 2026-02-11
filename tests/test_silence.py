@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from hiveforge.silence import HeartbeatManager, SilenceDetector
+from colonyforge.silence import HeartbeatManager, SilenceDetector
 
 
 class TestSilenceDetector:
@@ -14,7 +14,7 @@ class TestSilenceDetector:
     def test_record_activity_updates_last_activity(self, temp_vault):
         """record_activityで最終アクティビティ時刻が更新される"""
         # Arrange
-        from hiveforge.core import AkashicRecord
+        from colonyforge.core import AkashicRecord
 
         ar = AkashicRecord(temp_vault)
         detector = SilenceDetector(ar=ar, run_id="run-001", interval_seconds=10)
@@ -29,7 +29,7 @@ class TestSilenceDetector:
     def test_record_activity_without_timestamp_uses_now(self, temp_vault):
         """タイムスタンプなしでrecord_activityすると現在時刻が使われる"""
         # Arrange
-        from hiveforge.core import AkashicRecord
+        from colonyforge.core import AkashicRecord
 
         ar = AkashicRecord(temp_vault)
         detector = SilenceDetector(ar=ar, run_id="run-001", interval_seconds=10)
@@ -47,7 +47,7 @@ class TestSilenceDetector:
     async def test_start_and_stop(self, temp_vault):
         """start/stopで検出器が正しく開始・停止する"""
         # Arrange
-        from hiveforge.core import AkashicRecord
+        from colonyforge.core import AkashicRecord
 
         ar = AkashicRecord(temp_vault)
         detector = SilenceDetector(ar=ar, run_id="run-001", interval_seconds=1)
@@ -66,7 +66,7 @@ class TestSilenceDetector:
     async def test_silence_detection_triggers_callback(self, temp_vault):
         """沈黙が検出されるとコールバックが呼ばれる"""
         # Arrange
-        from hiveforge.core import AkashicRecord
+        from colonyforge.core import AkashicRecord
 
         ar = AkashicRecord(temp_vault)
 
@@ -106,7 +106,7 @@ class TestSilenceDetector:
     async def test_silence_detection_creates_event(self, temp_vault):
         """沈黙検出時にイベントが記録される"""
         # Arrange
-        from hiveforge.core import AkashicRecord
+        from colonyforge.core import AkashicRecord
 
         ar = AkashicRecord(temp_vault)
 
@@ -132,7 +132,7 @@ class TestSilenceDetector:
     async def test_monitor_loop_respects_running_flag(self, temp_vault):
         """監視ループは_runningフラグを尊重する"""
         # Arrange
-        from hiveforge.core import AkashicRecord
+        from colonyforge.core import AkashicRecord
 
         ar = AkashicRecord(temp_vault)
         detector = SilenceDetector(ar=ar, run_id="run-001", interval_seconds=1)
@@ -149,7 +149,7 @@ class TestSilenceDetector:
     async def test_stop_without_task(self, temp_vault):
         """タスクがない状態でstopしてもエラーにならない"""
         # Arrange
-        from hiveforge.core import AkashicRecord
+        from colonyforge.core import AkashicRecord
 
         ar = AkashicRecord(temp_vault)
         detector = SilenceDetector(ar=ar, run_id="run-001", interval_seconds=10)
@@ -164,7 +164,7 @@ class TestSilenceDetector:
     async def test_monitor_loop_breaks_when_stopped_during_sleep(self, temp_vault):
         """sleep中に停止フラグが変わった場合にループを抜ける"""
         # Arrange
-        from hiveforge.core import AkashicRecord
+        from colonyforge.core import AkashicRecord
 
         ar = AkashicRecord(temp_vault)
         detector = SilenceDetector(ar=ar, run_id="run-001", interval_seconds=1)
@@ -186,7 +186,7 @@ class TestSilenceDetector:
     async def test_no_silence_with_recent_activity(self, temp_vault):
         """最近のアクティビティがあれば沈黙は検出されない"""
         # Arrange
-        from hiveforge.core import AkashicRecord
+        from colonyforge.core import AkashicRecord
 
         ar = AkashicRecord(temp_vault)
 
@@ -222,7 +222,7 @@ class TestHeartbeatManager:
     def test_add_silence_callback(self, temp_vault):
         """コールバックを追加できる"""
         # Arrange
-        from hiveforge.core import AkashicRecord
+        from colonyforge.core import AkashicRecord
 
         ar = AkashicRecord(temp_vault)
         manager = HeartbeatManager(ar)
@@ -240,7 +240,7 @@ class TestHeartbeatManager:
     async def test_start_and_stop_monitoring(self, temp_vault):
         """Runの監視を開始・停止できる"""
         # Arrange
-        from hiveforge.core import AkashicRecord
+        from colonyforge.core import AkashicRecord
 
         ar = AkashicRecord(temp_vault)
         manager = HeartbeatManager(ar)
@@ -261,7 +261,7 @@ class TestHeartbeatManager:
     async def test_stop_monitoring_nonexistent_run(self, temp_vault):
         """存在しないRunの監視停止はエラーにならない"""
         # Arrange
-        from hiveforge.core import AkashicRecord
+        from colonyforge.core import AkashicRecord
 
         ar = AkashicRecord(temp_vault)
         manager = HeartbeatManager(ar)
@@ -272,7 +272,7 @@ class TestHeartbeatManager:
     def test_record_heartbeat(self, temp_vault):
         """ハートビートを記録できる"""
         # Arrange
-        from hiveforge.core import AkashicRecord
+        from colonyforge.core import AkashicRecord
 
         ar = AkashicRecord(temp_vault)
         manager = HeartbeatManager(ar)
@@ -291,7 +291,7 @@ class TestHeartbeatManager:
     def test_record_heartbeat_nonexistent_run(self, temp_vault):
         """存在しないRunへのハートビートは無視される"""
         # Arrange
-        from hiveforge.core import AkashicRecord
+        from colonyforge.core import AkashicRecord
 
         ar = AkashicRecord(temp_vault)
         manager = HeartbeatManager(ar)
@@ -303,7 +303,7 @@ class TestHeartbeatManager:
     async def test_stop_all(self, temp_vault):
         """全ての監視を停止できる"""
         # Arrange
-        from hiveforge.core import AkashicRecord
+        from colonyforge.core import AkashicRecord
 
         ar = AkashicRecord(temp_vault)
         manager = HeartbeatManager(ar)
@@ -322,7 +322,7 @@ class TestHeartbeatManager:
     async def test_silence_callback_is_called_for_all_registered(self, temp_vault):
         """沈黙検出時に登録されたすべてのコールバックが呼ばれる"""
         # Arrange
-        from hiveforge.core import AkashicRecord
+        from colonyforge.core import AkashicRecord
 
         ar = AkashicRecord(temp_vault)
         manager = HeartbeatManager(ar)

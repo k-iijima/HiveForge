@@ -5,7 +5,7 @@ GitHub Issue #14: P1-13: Run-Colony紐付け機能
 RunをColonyに紐付ける機能のテスト。v4互換のためcolony_idはオプショナル。
 """
 
-from hiveforge.core.events import (
+from colonyforge.core.events import (
     BaseEvent,
     EventType,
     RunStartedEvent,
@@ -62,7 +62,7 @@ class TestColonyRunProjection:
     def test_run_colony_projection_exists(self):
         """RunColonyProjectionクラスが存在する"""
         # Arrange & Act: インポートできることを確認
-        from hiveforge.core.state.projections import RunColonyProjection
+        from colonyforge.core.state.projections import RunColonyProjection
 
         # Assert: クラスが存在
         assert RunColonyProjection is not None
@@ -70,7 +70,7 @@ class TestColonyRunProjection:
     def test_run_colony_projection_apply_run_started(self):
         """RunStartedEventを適用するとColony-Run紐付けが記録される"""
         # Arrange
-        from hiveforge.core.state.projections import RunColonyProjection
+        from colonyforge.core.state.projections import RunColonyProjection
 
         projection = RunColonyProjection()
         event = RunStartedEvent(
@@ -88,7 +88,7 @@ class TestColonyRunProjection:
     def test_run_colony_projection_multiple_runs(self):
         """同じColonyに複数のRunを紐付けできる"""
         # Arrange
-        from hiveforge.core.state.projections import RunColonyProjection
+        from colonyforge.core.state.projections import RunColonyProjection
 
         projection = RunColonyProjection()
         event1 = RunStartedEvent(run_id="run-001", colony_id="colony-001")
@@ -107,7 +107,7 @@ class TestColonyRunProjection:
     def test_run_colony_projection_no_colony_id(self):
         """colony_idがNoneのRunは独立として扱う"""
         # Arrange
-        from hiveforge.core.state.projections import RunColonyProjection
+        from colonyforge.core.state.projections import RunColonyProjection
 
         projection = RunColonyProjection()
         event = RunStartedEvent(run_id="run-orphan", colony_id=None)
@@ -121,7 +121,7 @@ class TestColonyRunProjection:
     def test_get_runs_by_colony(self):
         """ColonyIDからRun一覧を取得できる"""
         # Arrange
-        from hiveforge.core.state.projections import RunColonyProjection
+        from colonyforge.core.state.projections import RunColonyProjection
 
         projection = RunColonyProjection()
         projection.apply(RunStartedEvent(run_id="run-001", colony_id="colony-001"))
@@ -136,7 +136,7 @@ class TestColonyRunProjection:
     def test_get_runs_by_colony_empty(self):
         """存在しないColonyは空リストを返す"""
         # Arrange
-        from hiveforge.core.state.projections import RunColonyProjection
+        from colonyforge.core.state.projections import RunColonyProjection
 
         projection = RunColonyProjection()
 

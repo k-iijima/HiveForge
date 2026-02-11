@@ -9,20 +9,20 @@ from __future__ import annotations
 
 import pytest
 
-from hiveforge.guard_bee.models import (
+from colonyforge.guard_bee.models import (
     Evidence,
     EvidenceType,
     Verdict,
     VerificationLevel,
 )
-from hiveforge.guard_bee.plan_rules import (
+from colonyforge.guard_bee.plan_rules import (
     PlanGoalCoverageRule,
     PlanStructureRule,
     create_plan_evidence,
 )
-from hiveforge.guard_bee.rules import RuleRegistry
-from hiveforge.guard_bee.verifier import GuardBeeVerifier
-from hiveforge.queen_bee.planner import PlannedTask, TaskPlan, TaskPlanner
+from colonyforge.guard_bee.rules import RuleRegistry
+from colonyforge.guard_bee.verifier import GuardBeeVerifier
+from colonyforge.queen_bee.planner import PlannedTask, TaskPlan, TaskPlanner
 
 # =========================================================================
 # create_plan_evidence ヘルパーのテスト
@@ -345,7 +345,7 @@ class TestTaskPlannerValidate:
     @pytest.fixture
     def plan_verifier(self, tmp_path):
         """プラン検証用のGuardBeeVerifierを構築"""
-        from hiveforge.core import AkashicRecord
+        from colonyforge.core import AkashicRecord
 
         ar = AkashicRecord(vault_path=tmp_path)
         registry = RuleRegistry()

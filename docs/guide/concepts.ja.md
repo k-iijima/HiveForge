@@ -2,7 +2,7 @@
 
 ## 階層モデル
 
-HiveForgeは4階層構造で作業を組織化します：
+ColonyForgeは4階層構造で作業を組織化します：
 
 ```mermaid
 graph TD
@@ -56,7 +56,7 @@ graph TD
 
 ## イベントソーシング
 
-HiveForgeの全状態変更は**不変イベント**としてAkashic Record (AR) に記録されます。
+ColonyForgeの全状態変更は**不変イベント**としてAkashic Record (AR) に記録されます。
 
 ```mermaid
 sequenceDiagram

@@ -1,6 +1,6 @@
 # MCPツール
 
-HiveForgeは[Model Context Protocol (MCP)](https://modelcontextprotocol.io/)を通じてGitHub Copilot Chatで使用できるツールを公開しています。
+ColonyForgeは[Model Context Protocol (MCP)](https://modelcontextprotocol.io/)を通じてGitHub Copilot Chatで使用できるツールを公開しています。
 
 ## セットアップ
 
@@ -9,8 +9,8 @@ HiveForgeは[Model Context Protocol (MCP)](https://modelcontextprotocol.io/)を�
 ```json
 {
   "servers": {
-    "hiveforge": {
-      "command": "hiveforge",
+    "colonyforge": {
+      "command": "colonyforge",
       "args": ["mcp"],
       "env": {}
     }
@@ -20,7 +20,7 @@ HiveForgeは[Model Context Protocol (MCP)](https://modelcontextprotocol.io/)を�
 
 VS Codeを再読み込み（コマンドパレット → **Developer: Reload Window**）。
 
-Copilot Chatで `@hiveforge` を入力してツールにアクセスします。
+Copilot Chatで `@colonyforge` を入力してツールにアクセスします。
 
 ## ツールリファレンス
 

@@ -4,18 +4,18 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from hiveforge.mcp_server.server import HiveForgeMCPServer
+from colonyforge.mcp_server.server import ColonyForgeMCPServer
 
 
 @pytest.fixture
 def mcp_server(tmp_path):
     """テスト用MCPサーバー"""
-    with patch("hiveforge.mcp_server.server.get_settings") as mock_settings:
+    with patch("colonyforge.mcp_server.server.get_settings") as mock_settings:
         mock_s = MagicMock()
         mock_s.get_vault_path.return_value = tmp_path / "Vault"
         mock_settings.return_value = mock_s
 
-        server = HiveForgeMCPServer()
+        server = ColonyForgeMCPServer()
 
         # ハンドラーへのショートカットを追加（テスト互換性のため）
         server._handle_start_run = server._run_handlers.handle_start_run
@@ -35,18 +35,18 @@ def mcp_server(tmp_path):
         yield server
 
 
-class TestHiveForgeMCPServerInit:
+class TestColonyForgeMCPServerInit:
     """MCP Server初期化のテスト"""
 
     def test_server_initialization(self, tmp_path):
         """サーバーが初期化される"""
-        with patch("hiveforge.mcp_server.server.get_settings") as mock_settings:
+        with patch("colonyforge.mcp_server.server.get_settings") as mock_settings:
             mock_s = MagicMock()
             mock_s.get_vault_path.return_value = tmp_path / "Vault"
             mock_settings.return_value = mock_s
 
             # Act
-            server = HiveForgeMCPServer()
+            server = ColonyForgeMCPServer()
 
             # Assert
             assert server.server is not None
@@ -184,7 +184,7 @@ class TestHandleCreateTask:
         Issue #001 のルール: task.created -> run.started
         """
         # Arrange
-        from hiveforge.core.events import EventType
+        from colonyforge.core.events import EventType
 
         await mcp_server._handle_start_run({"goal": "auto parents"})
         run_id = mcp_server._current_run_id
@@ -207,7 +207,7 @@ class TestHandleCreateTask:
     async def test_create_task_explicit_parents_are_preserved(self, mcp_server):
         """parentsを明示した場合は自動補完せず、そのまま使う"""
         # Arrange
-        from hiveforge.core.events import EventType
+        from colonyforge.core.events import EventType
 
         await mcp_server._handle_start_run({"goal": "explicit parents"})
         run_id = mcp_server._current_run_id
@@ -272,7 +272,7 @@ class TestHandleAssignTask:
         Issue #001 のルール: task.assigned -> task.created
         """
         # Arrange
-        from hiveforge.core.events import EventType
+        from colonyforge.core.events import EventType
 
         await mcp_server._handle_start_run({"goal": "auto parents"})
         run_id = mcp_server._current_run_id
@@ -487,7 +487,7 @@ class TestHandleCreateRequirement:
         Issue #001 のルール: requirement.created -> run.started
         """
         # Arrange
-        from hiveforge.core.events import EventType
+        from colonyforge.core.events import EventType
 
         start_result = await mcp_server._handle_start_run({"goal": "auto parents requirement"})
         run_id = start_result["run_id"]
@@ -854,7 +854,7 @@ class TestGetLineageWithParents:
     @pytest.mark.asyncio
     async def test_get_lineage_finds_ancestors(self, mcp_server):
         """parentsを持つイベントの祖先を取得できる"""
-        from hiveforge.core.events import HeartbeatEvent
+        from colonyforge.core.events import HeartbeatEvent
 
         # Arrange
         await mcp_server._handle_start_run({"goal": "祖先探索テスト"})
@@ -886,7 +886,7 @@ class TestGetLineageWithParents:
     @pytest.mark.asyncio
     async def test_get_lineage_finds_descendants(self, mcp_server):
         """子孫を取得できる"""
-        from hiveforge.core.events import HeartbeatEvent
+        from colonyforge.core.events import HeartbeatEvent
 
         # Arrange
         await mcp_server._handle_start_run({"goal": "子孫探索テスト"})
@@ -918,7 +918,7 @@ class TestGetLineageWithParents:
     @pytest.mark.asyncio
     async def test_get_lineage_truncated(self, mcp_server):
         """深度制限を超えるとtruncatedになる"""
-        from hiveforge.core.events import HeartbeatEvent
+        from colonyforge.core.events import HeartbeatEvent
 
         # Arrange
         await mcp_server._handle_start_run({"goal": "深度制限テスト"})
@@ -953,7 +953,7 @@ class TestGetLineageWithParents:
     @pytest.mark.asyncio
     async def test_get_lineage_descendants_depth_truncated(self, mcp_server):
         """子孫探索で深度制限を超えるとtruncatedになる"""
-        from hiveforge.core.events import HeartbeatEvent
+        from colonyforge.core.events import HeartbeatEvent
 
         # Arrange
         await mcp_server._handle_start_run({"goal": "子孫深度テスト"})
@@ -989,7 +989,7 @@ class TestGetLineageWithParents:
     @pytest.mark.asyncio
     async def test_get_lineage_with_nonexistent_parent(self, mcp_server):
         """存在しない親を持つイベントでもエラーにならない"""
-        from hiveforge.core.events import HeartbeatEvent
+        from colonyforge.core.events import HeartbeatEvent
 
         # Arrange
         await mcp_server._handle_start_run({"goal": "存在しない親テスト"})
@@ -1022,7 +1022,7 @@ class TestMainFunction:
 
     def test_main_function_exists(self):
         """main関数が存在する"""
-        from hiveforge.mcp_server.server import main
+        from colonyforge.mcp_server.server import main
 
         assert callable(main)
 
@@ -1034,7 +1034,7 @@ class TestIfNameMain:
         """モジュールをスクリプトとして実行できる"""
         # この行は if __name__ == "__main__" がpragma: no coverされているので
         # main関数が呼び出し可能であることを確認するだけ
-        from hiveforge.mcp_server.server import main
+        from colonyforge.mcp_server.server import main
 
         assert callable(main)
 
@@ -1258,7 +1258,7 @@ class TestMCPToolDefinitions:
     def test_get_tool_definitions_returns_list(self):
         """get_tool_definitionsがToolのリストを返す"""
         # Arrange
-        from hiveforge.mcp_server.tools import get_tool_definitions
+        from colonyforge.mcp_server.tools import get_tool_definitions
 
         # Act
         tools = get_tool_definitions()
@@ -1274,7 +1274,7 @@ class TestMCPToolDefinitions:
     def test_tool_definitions_include_required_tools(self):
         """必須ツールが含まれている"""
         # Arrange
-        from hiveforge.mcp_server.tools import get_tool_definitions
+        from colonyforge.mcp_server.tools import get_tool_definitions
 
         # Act
         tools = get_tool_definitions()
@@ -1995,7 +1995,7 @@ class TestGuardBeeToolDefinitions:
 
     def test_verify_colony_tool_defined(self):
         """verify_colonyツールが定義されている"""
-        from hiveforge.mcp_server.tools import get_tool_definitions
+        from colonyforge.mcp_server.tools import get_tool_definitions
 
         tools = get_tool_definitions()
         tool_names = [t.name for t in tools]
@@ -2003,7 +2003,7 @@ class TestGuardBeeToolDefinitions:
 
     def test_get_guard_report_tool_defined(self):
         """get_guard_reportツールが定義されている"""
-        from hiveforge.mcp_server.tools import get_tool_definitions
+        from colonyforge.mcp_server.tools import get_tool_definitions
 
         tools = get_tool_definitions()
         tool_names = [t.name for t in tools]
@@ -2011,7 +2011,7 @@ class TestGuardBeeToolDefinitions:
 
     def test_verify_colony_schema_has_required_fields(self):
         """verify_colonyスキーマに必須フィールドがある"""
-        from hiveforge.mcp_server.tools import get_tool_definitions
+        from colonyforge.mcp_server.tools import get_tool_definitions
 
         tools = get_tool_definitions()
         verify_tool = next(t for t in tools if t.name == "verify_colony")
@@ -2261,7 +2261,7 @@ class TestDispatchBeekeeperTools:
     @pytest.mark.asyncio
     async def test_beekeeper_tools_in_definitions(self, mcp_server):
         """Beekeeper関連ツールがツール定義に含まれる"""
-        from hiveforge.mcp_server.tools import get_tool_definitions
+        from colonyforge.mcp_server.tools import get_tool_definitions
 
         # Act
         tools = get_tool_definitions()

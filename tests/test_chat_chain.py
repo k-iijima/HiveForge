@@ -3,7 +3,7 @@
 send_message → run_with_llm → AgentRunner.run() → LLMClient.chat()
 の統合フローをモックLLMで検証する。
 
-CLI `hiveforge chat "..."` の裏で動くパイプライン全体の正当性を担保する。
+CLI `colonyforge chat "..."` の裏で動くパイプライン全体の正当性を担保する。
 """
 
 from __future__ import annotations
@@ -12,9 +12,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from hiveforge.beekeeper import BeekeeperMCPServer
-from hiveforge.core import AkashicRecord
-from hiveforge.llm.client import LLMResponse, ToolCall
+from colonyforge.beekeeper import BeekeeperMCPServer
+from colonyforge.core import AkashicRecord
+from colonyforge.llm.client import LLMResponse, ToolCall
 
 
 @pytest.fixture
@@ -338,7 +338,7 @@ class TestChatChainWithDelegation:
         )
 
         # Queen BeeのLLMもモック（Worker Beeの実行をシンプルにするため）
-        with patch("hiveforge.queen_bee.server.QueenBeeMCPServer") as mock_queen_cls:
+        with patch("colonyforge.queen_bee.server.QueenBeeMCPServer") as mock_queen_cls:
             mock_queen = AsyncMock()
             mock_queen.dispatch_tool = AsyncMock(
                 return_value={
@@ -395,7 +395,7 @@ class TestChatChainSessionState:
         await beekeeper.dispatch_tool("send_message", {"message": "test"})
 
         # Assert: セッションはACTIVE
-        from hiveforge.beekeeper.session import SessionState
+        from colonyforge.beekeeper.session import SessionState
 
         assert beekeeper.current_session.state == SessionState.ACTIVE
 
@@ -418,7 +418,7 @@ class TestChatChainSessionState:
         await beekeeper.dispatch_tool("send_message", {"message": "test"})
 
         # Assert: エラーでもACTIVEに戻る
-        from hiveforge.beekeeper.session import SessionState
+        from colonyforge.beekeeper.session import SessionState
 
         assert beekeeper.current_session.state == SessionState.ACTIVE
 

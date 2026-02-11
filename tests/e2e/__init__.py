@@ -1,1 +1,1 @@
-"""HiveForge E2Eテストパッケージ"""
+"""ColonyForge E2Eテストパッケージ"""

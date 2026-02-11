@@ -5,11 +5,11 @@
  */
 
 import * as vscode from 'vscode';
-import { HiveForgeClient } from '../client';
+import { ColonyForgeClient } from '../client';
 import { HiveTreeDataProvider } from '../views/hiveTreeView';
 
 let hiveTreeProvider: HiveTreeDataProvider | undefined;
-let apiClient: HiveForgeClient | undefined;
+let apiClient: ColonyForgeClient | undefined;
 
 /**
  * Hive TreeProviderを設定
@@ -23,7 +23,7 @@ export function setHiveTreeProviderForColony(provider: HiveTreeDataProvider): vo
  */
 export async function createColony(hiveId?: string): Promise<void> {
     if (!apiClient) {
-        vscode.window.showErrorMessage('HiveForge: サーバーに接続されていません');
+        vscode.window.showErrorMessage('ColonyForge: サーバーに接続されていません');
         return;
     }
 
@@ -89,7 +89,7 @@ export async function createColony(hiveId?: string): Promise<void> {
  */
 export async function startColony(colonyId?: string): Promise<void> {
     if (!apiClient) {
-        vscode.window.showErrorMessage('HiveForge: サーバーに接続されていません');
+        vscode.window.showErrorMessage('ColonyForge: サーバーに接続されていません');
         return;
     }
 
@@ -113,7 +113,7 @@ export async function startColony(colonyId?: string): Promise<void> {
  */
 export async function completeColony(colonyId?: string): Promise<void> {
     if (!apiClient) {
-        vscode.window.showErrorMessage('HiveForge: サーバーに接続されていません');
+        vscode.window.showErrorMessage('ColonyForge: サーバーに接続されていません');
         return;
     }
 
@@ -145,13 +145,13 @@ export async function completeColony(colonyId?: string): Promise<void> {
  */
 export function registerColonyCommands(
     context: vscode.ExtensionContext,
-    client: HiveForgeClient
+    client: ColonyForgeClient
 ): void {
     apiClient = client;
     context.subscriptions.push(
-        vscode.commands.registerCommand('hiveforge.createColony', createColony),
-        vscode.commands.registerCommand('hiveforge.startColony', startColony),
-        vscode.commands.registerCommand('hiveforge.completeColony', completeColony)
+        vscode.commands.registerCommand('colonyforge.createColony', createColony),
+        vscode.commands.registerCommand('colonyforge.startColony', startColony),
+        vscode.commands.registerCommand('colonyforge.completeColony', completeColony)
     );
 }
 

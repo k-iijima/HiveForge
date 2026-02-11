@@ -1,6 +1,6 @@
 # Event Types
 
-All state changes in HiveForge are recorded as typed, immutable events in the Akashic Record.
+All state changes in ColonyForge are recorded as typed, immutable events in the Akashic Record.
 
 ## Event Schema
 
@@ -159,7 +159,7 @@ class BaseEvent(BaseModel):
 
 ## Auto-generated Reference
 
-::: hiveforge.core.events.types.EventType
+::: colonyforge.core.events.types.EventType
     options:
       show_root_heading: true
       members_order: source

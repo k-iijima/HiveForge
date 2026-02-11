@@ -1,5 +1,5 @@
 /**
- * HiveForge VS Code Extension
+ * ColonyForge VS Code Extension
  * 
  * エントリポイント - 初期化と設定管理のみを担当
  */
@@ -10,14 +10,14 @@ import { TasksProvider } from './providers/tasksProvider';
 import { RequirementsProvider } from './providers/requirementsProvider';
 import { EventsProvider } from './providers/eventsProvider';
 import { DecisionsProvider } from './providers/decisionsProvider';
-import { HiveForgeClient } from './client';
+import { ColonyForgeClient } from './client';
 import { registerRunCommands, registerRequirementCommands, registerFilterCommands, registerTaskCommands, registerDecisionCommands, Providers, registerHiveCommands, setHiveTreeProvider, registerColonyCommands, setHiveTreeProviderForColony } from './commands';
 import { HiveTreeDataProvider } from './views/hiveTreeView';
 import { AgentMonitorPanel } from './views/agentMonitorPanel';
 import { HiveMonitorPanel } from './views/hiveMonitorPanel';
 import { registerChatParticipant } from './chatHandler';
 
-let client: HiveForgeClient;
+let client: ColonyForgeClient;
 let providers: Providers;
 let hiveTreeProvider: HiveTreeDataProvider;
 let refreshInterval: NodeJS.Timeout | undefined;
@@ -25,14 +25,14 @@ let runsTreeView: vscode.TreeView<unknown>;
 let requirementsTreeView: vscode.TreeView<unknown>;
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('HiveForge Dashboard is now active');
+    console.log('ColonyForge Dashboard is now active');
 
     // 初期化
-    const config = vscode.workspace.getConfiguration('hiveforge');
+    const config = vscode.workspace.getConfiguration('colonyforge');
     const serverUrl = config.get<string>('serverUrl', 'http://localhost:8000');
     const decisionsRunId = config.get<string>('decisionsRunId', 'meta-decisions');
 
-    client = new HiveForgeClient(serverUrl);
+    client = new ColonyForgeClient(serverUrl);
     providers = {
         runs: new RunsProvider(client),
         tasks: new TasksProvider(client),
@@ -50,7 +50,7 @@ export function activate(context: vscode.ExtensionContext) {
     setHiveTreeProvider(hiveTreeProvider);
     setHiveTreeProviderForColony(hiveTreeProvider);
     context.subscriptions.push(
-        vscode.window.registerTreeDataProvider('hiveforge.hives', hiveTreeProvider)
+        vscode.window.registerTreeDataProvider('colonyforge.hives', hiveTreeProvider)
     );
 
     // コマンドを登録
@@ -64,28 +64,28 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Hive Monitor コマンド
     context.subscriptions.push(
-        vscode.commands.registerCommand('hiveforge.showHiveMonitor', () => {
+        vscode.commands.registerCommand('colonyforge.showHiveMonitor', () => {
             HiveMonitorPanel.createOrShow(context.extensionUri, client);
         })
     );
 
     // Agent Monitor コマンド
     context.subscriptions.push(
-        vscode.commands.registerCommand('hiveforge.showAgentMonitor', () => {
+        vscode.commands.registerCommand('colonyforge.showAgentMonitor', () => {
             AgentMonitorPanel.createOrShow(context.extensionUri, client);
         })
     );
 
-    // Chat Participant (@hiveforge) を登録
+    // Chat Participant (@colonyforge) を登録
     // Note: vscode.chat API may not be available in all environments (e.g., code-server)
     try {
         if (typeof vscode.chat !== 'undefined' && typeof vscode.chat.createChatParticipant === 'function') {
             registerChatParticipant(context, client);
         } else {
-            console.log('HiveForge: Chat API not available, skipping chat participant registration');
+            console.log('ColonyForge: Chat API not available, skipping chat participant registration');
         }
     } catch (e) {
-        console.warn('HiveForge: Failed to register chat participant:', e);
+        console.warn('ColonyForge: Failed to register chat participant:', e);
     }
 
     // 自動更新を設定
@@ -94,7 +94,7 @@ export function activate(context: vscode.ExtensionContext) {
     // 設定変更を監視
     context.subscriptions.push(
         vscode.workspace.onDidChangeConfiguration(e => {
-            if (e.affectsConfiguration('hiveforge')) {
+            if (e.affectsConfiguration('colonyforge')) {
                 updateConfiguration();
             }
         })
@@ -109,19 +109,19 @@ export function deactivate() {
 
 function registerTreeViews(context: vscode.ExtensionContext): void {
     // TreeViewを作成（バッジ更新のため）
-    runsTreeView = vscode.window.createTreeView('hiveforge.runs', {
+    runsTreeView = vscode.window.createTreeView('colonyforge.runs', {
         treeDataProvider: providers.runs,
     });
-    requirementsTreeView = vscode.window.createTreeView('hiveforge.requirements', {
+    requirementsTreeView = vscode.window.createTreeView('colonyforge.requirements', {
         treeDataProvider: providers.requirements,
     });
 
     context.subscriptions.push(
         runsTreeView,
         requirementsTreeView,
-        vscode.window.registerTreeDataProvider('hiveforge.tasks', providers.tasks),
-        vscode.window.registerTreeDataProvider('hiveforge.events', providers.events),
-        vscode.window.registerTreeDataProvider('hiveforge.decisions', providers.decisions)
+        vscode.window.registerTreeDataProvider('colonyforge.tasks', providers.tasks),
+        vscode.window.registerTreeDataProvider('colonyforge.events', providers.events),
+        vscode.window.registerTreeDataProvider('colonyforge.decisions', providers.decisions)
     );
 }
 
@@ -133,7 +133,7 @@ function setupAutoRefresh(config: vscode.WorkspaceConfiguration): void {
 }
 
 function updateConfiguration(): void {
-    const config = vscode.workspace.getConfiguration('hiveforge');
+    const config = vscode.workspace.getConfiguration('colonyforge');
 
     // サーバーURLを更新
     const serverUrl = config.get<string>('serverUrl', 'http://localhost:8000');

@@ -9,11 +9,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from hiveforge.core.config import GitHubConfig
-from hiveforge.core.events.base import BaseEvent
-from hiveforge.core.events.types import EventType
-from hiveforge.core.github.client import GitHubClientError
-from hiveforge.mcp_server.handlers.github import GitHubHandlers
+from colonyforge.core.config import GitHubConfig
+from colonyforge.core.events.base import BaseEvent
+from colonyforge.core.events.types import EventType
+from colonyforge.core.github.client import GitHubClientError
+from colonyforge.mcp_server.handlers.github import GitHubHandlers
 
 # ---------------------------------------------------------------------------
 # fixtures
@@ -22,7 +22,7 @@ from hiveforge.mcp_server.handlers.github import GitHubHandlers
 
 @pytest.fixture
 def mock_server() -> MagicMock:
-    """モック HiveForgeMCPServer"""
+    """モック ColonyForgeMCPServer"""
     server = MagicMock()
     server._current_run_id = "01HACTIVE_RUN"
     return server

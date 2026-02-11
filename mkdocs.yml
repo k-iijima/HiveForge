@@ -1,11 +1,11 @@
-site_name: HiveForge Documentation
-site_url: https://k-iijima.github.io/HiveForge/
-site_description: HiveForge - Multi-Agent Collaborative Development System
-site_author: HiveForge Team
-repo_url: https://github.com/k-iijima/HiveForge
-repo_name: k-iijima/HiveForge
+site_name: ColonyForge Documentation
+site_url: https://k-iijima.github.io/ColonyForge/
+site_description: ColonyForge - Multi-Agent Collaborative Development System
+site_author: ColonyForge Team
+repo_url: https://github.com/k-iijima/ColonyForge
+repo_name: k-iijima/ColonyForge
 
-copyright: Copyright &copy; 2024-2026 HiveForge Team
+copyright: Copyright &copy; 2024-2026 ColonyForge Team
 
 theme:
   name: material
@@ -122,7 +122,7 @@ markdown_extensions:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/k-iijima/HiveForge
+      link: https://github.com/k-iijima/ColonyForge
 
 nav:
   - Home:

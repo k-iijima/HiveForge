@@ -68,7 +68,7 @@ v5設計に基づき、Hive/Colony関連のイベント型を `core/events.py` �
 Hive/Colonyの状態を表すenumを定義する。
 
 ### タスク
-- [ ] `src/hiveforge/core/hive.py` を新規作成
+- [ ] `src/colonyforge/core/hive.py` を新規作成
 - [ ] `HiveState` enum定義: `ACTIVE`, `IDLE`, `CLOSED`
 - [ ] `ColonyState` enum定義: `IDLE`, `ACTIVE`, `COMPLETED`, `FAILED`, `SUSPENDED`
 - [ ] `EscalationType` enum定義
@@ -156,7 +156,7 @@ Colony状態遷移ロジックを実装する。
 Hive/Colonyイベントを格納する専用ストレージを実装する（v4のAkashicRecordとは別）。
 
 ### タスク
-- [ ] `src/hiveforge/core/ar/hive_storage.py` を新規作成
+- [ ] `src/colonyforge/core/ar/hive_storage.py` を新規作成
 - [ ] `HiveStorage` クラス: `Vault/hives/{hive_id}/events.jsonl` に格納
 - [ ] `append()`, `replay()`, `get_last_event()` メソッド
 - [ ] インデックス管理: `Vault/hives/{hive_id}/colonies/{colony_id}/runs.json`
@@ -186,7 +186,7 @@ Hive/Colonyイベントを格納する専用ストレージを実装する（v4�
 イベントからColonyの現在状態を投影するプロジェクターを実装する。
 
 ### タスク
-- [ ] `src/hiveforge/core/ar/colony_projections.py` を新規作成
+- [ ] `src/colonyforge/core/ar/colony_projections.py` を新規作成
 - [ ] `ColonyProjection` dataclass: id, name, domain, state, runs, workers, created_at
 - [ ] `HiveProjection` dataclass: id, name, goal, state, colonies
 - [ ] `ColonyProjector` クラス: イベント適用メソッド
@@ -247,7 +247,7 @@ P1-01〜P1-06の全機能をカバーするユニットテストを追加する�
 Hive操作のREST APIエンドポイントを実装する。
 
 ### タスク
-- [ ] `src/hiveforge/api/routes/hives.py` を新規作成
+- [ ] `src/colonyforge/api/routes/hives.py` を新規作成
 - [ ] `POST /hives` - Hive作成
 - [ ] `GET /hives` - Hive一覧
 - [ ] `GET /hives/{hive_id}` - Hive詳細
@@ -277,7 +277,7 @@ Hive操作のREST APIエンドポイントを実装する。
 Colony操作のREST APIエンドポイントを実装する。
 
 ### タスク
-- [ ] `src/hiveforge/api/routes/colonies.py` を新規作成
+- [ ] `src/colonyforge/api/routes/colonies.py` を新規作成
 - [ ] `POST /hives/{hive_id}/colonies` - Colony作成
 - [ ] `GET /hives/{hive_id}/colonies` - Colony一覧
 - [ ] `GET /colonies/{colony_id}` - Colony詳細
@@ -357,7 +357,7 @@ Hive/Colony APIのE2Eテストを追加する。
 Hive操作のMCPツールを実装する。
 
 ### タスク
-- [ ] `src/hiveforge/mcp_server/handlers/hive.py` を新規作成
+- [ ] `src/colonyforge/mcp_server/handlers/hive.py` を新規作成
 - [ ] `create_hive` ツール
 - [ ] `list_hives` ツール
 - [ ] `get_hive_status` ツール
@@ -387,7 +387,7 @@ Hive操作のMCPツールを実装する。
 Colony操作のMCPツールを実装する。
 
 ### タスク
-- [ ] `src/hiveforge/mcp_server/handlers/colony.py` を新規作成
+- [ ] `src/colonyforge/mcp_server/handlers/colony.py` を新規作成
 - [ ] `create_colony` ツール
 - [ ] `list_colonies` ツール
 - [ ] `get_colony_status` ツール
@@ -470,9 +470,9 @@ VS CodeコマンドパレットからColony操作ができるようにする。
 
 ### タスク
 - [ ] `vscode-extension/src/commands/colonyCommands.ts` を新規作成
-- [ ] `hiveforge.createColony` コマンド
-- [ ] `hiveforge.suspendColony` コマンド
-- [ ] `hiveforge.resumeColony` コマンド
+- [ ] `colonyforge.createColony` コマンド
+- [ ] `colonyforge.suspendColony` コマンド
+- [ ] `colonyforge.resumeColony` コマンド
 - [ ] TreeViewのコンテキストメニューに追加
 
 ### 受け入れ基準

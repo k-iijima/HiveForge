@@ -8,13 +8,13 @@ from __future__ import annotations
 
 import pytest
 
-from hiveforge.core.models.action_class import ActionClass, TrustLevel
-from hiveforge.queen_bee.approval import (
+from colonyforge.core.models.action_class import ActionClass, TrustLevel
+from colonyforge.queen_bee.approval import (
     ApprovalDecision,
     PlanApprovalGate,
     PlanApprovalRequest,
 )
-from hiveforge.queen_bee.planner import PlannedTask, TaskPlan
+from colonyforge.queen_bee.planner import PlannedTask, TaskPlan
 
 # =========================================================================
 # PlanApprovalGate.classify_plan のテスト

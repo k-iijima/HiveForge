@@ -7,7 +7,7 @@ Forager Beeは変更の影響範囲を広く探索し、潜在的な不整合や
 import pytest
 
 # ==================== M3-4-a: 変更影響グラフ ====================
-from hiveforge.forager_bee.models import (
+from colonyforge.forager_bee.models import (
     AnomalyType,
     ChangeImpactGraph,
     DependencyEdge,
@@ -31,13 +31,13 @@ class TestImpactNode:
         """
         # Arrange & Act
         node = ImpactNode(
-            node_id="src/hiveforge/core/events.py",
+            node_id="src/colonyforge/core/events.py",
             node_type="file",
             label="events.py",
         )
 
         # Assert
-        assert node.node_id == "src/hiveforge/core/events.py"
+        assert node.node_id == "src/colonyforge/core/events.py"
         assert node.node_type == "file"
         assert node.label == "events.py"
 
@@ -395,7 +395,7 @@ class TestForagerReport:
 # ==================== M3-4-a: 影響グラフ構築ロジック ====================
 
 
-from hiveforge.forager_bee.graph_builder import GraphBuilder  # noqa: E402
+from colonyforge.forager_bee.graph_builder import GraphBuilder  # noqa: E402
 
 
 class TestGraphBuilder:
@@ -407,11 +407,11 @@ class TestGraphBuilder:
         builder = GraphBuilder()
 
         # Act: 変更ファイルからグラフ構築
-        graph = builder.build_from_files(["src/hiveforge/core/events.py"])
+        graph = builder.build_from_files(["src/colonyforge/core/events.py"])
 
         # Assert: 変更ファイルがノードとして含まれる
-        assert graph.get_node("src/hiveforge/core/events.py") is not None
-        assert graph.changed_files == ["src/hiveforge/core/events.py"]
+        assert graph.get_node("src/colonyforge/core/events.py") is not None
+        assert graph.changed_files == ["src/colonyforge/core/events.py"]
 
     def test_build_with_imports(self):
         """import依存を解析してエッジを追加"""
@@ -461,7 +461,7 @@ class TestGraphBuilder:
 # ==================== M3-4-b: シナリオ生成ロジック ====================
 
 
-from hiveforge.forager_bee.scenario_generator import ScenarioGenerator  # noqa: E402
+from colonyforge.forager_bee.scenario_generator import ScenarioGenerator  # noqa: E402
 
 
 class TestScenarioGenerator:
@@ -705,7 +705,7 @@ class TestScenarioGenerator:
 # ==================== M3-4-c: 探索実行エンジン ====================
 
 
-from hiveforge.forager_bee.explorer import ForagerExplorer  # noqa: E402
+from colonyforge.forager_bee.explorer import ForagerExplorer  # noqa: E402
 
 
 class TestForagerExplorer:
@@ -948,7 +948,7 @@ class TestForagerExplorerLLMIntegration:
 # ==================== M3-4-d: 違和感検知 ====================
 
 
-from hiveforge.forager_bee.anomaly_detector import AnomalyDetector  # noqa: E402
+from colonyforge.forager_bee.anomaly_detector import AnomalyDetector  # noqa: E402
 
 
 class TestAnomalyDetector:
@@ -1018,7 +1018,7 @@ class TestAnomalyDetector:
 # ==================== M3-4-e: Guard Bee連携 ====================
 
 
-from hiveforge.forager_bee.reporter import ForagerReporter  # noqa: E402
+from colonyforge.forager_bee.reporter import ForagerReporter  # noqa: E402
 
 
 class TestForagerReporter:

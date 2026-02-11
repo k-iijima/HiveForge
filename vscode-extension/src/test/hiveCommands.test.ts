@@ -7,13 +7,13 @@
 import * as assert from "assert";
 import * as sinon from "sinon";
 import * as vscode from "vscode";
-import { HiveForgeClient } from "../client";
+import { ColonyForgeClient } from "../client";
 import { createHive, closeHive, refreshHives, registerHiveCommands, setHiveTreeProvider } from "../commands/hiveCommands";
 import { HiveTreeDataProvider } from "../views/hiveTreeView";
 
 describe("Hive Commands", () => {
     let sandbox: sinon.SinonSandbox;
-    let mockClient: sinon.SinonStubbedInstance<HiveForgeClient>;
+    let mockClient: sinon.SinonStubbedInstance<ColonyForgeClient>;
     let mockTreeProvider: sinon.SinonStubbedInstance<HiveTreeDataProvider>;
     let showInputBoxStub: sinon.SinonStub;
     let showErrorMessageStub: sinon.SinonStub;
@@ -24,8 +24,8 @@ describe("Hive Commands", () => {
     beforeEach(() => {
         sandbox = sinon.createSandbox();
 
-        // HiveForgeClientのモック
-        mockClient = sandbox.createStubInstance(HiveForgeClient);
+        // ColonyForgeClientのモック
+        mockClient = sandbox.createStubInstance(ColonyForgeClient);
 
         // HiveTreeDataProviderのモック
         mockTreeProvider = sandbox.createStubInstance(HiveTreeDataProvider);
@@ -42,7 +42,7 @@ describe("Hive Commands", () => {
             subscriptions: [] as { dispose(): void }[],
         } as unknown as vscode.ExtensionContext;
         setHiveTreeProvider(mockTreeProvider as unknown as HiveTreeDataProvider);
-        registerHiveCommands(context, mockClient as unknown as HiveForgeClient);
+        registerHiveCommands(context, mockClient as unknown as ColonyForgeClient);
     });
 
     afterEach(() => {
@@ -241,12 +241,12 @@ describe("Hive Commands", () => {
             const registerStub = sandbox.stub(vscode.commands, "registerCommand").returns({ dispose: () => { } });
 
             // Act
-            registerHiveCommands(context, mockClient as unknown as HiveForgeClient);
+            registerHiveCommands(context, mockClient as unknown as ColonyForgeClient);
 
             // Assert: createHive, closeHive, refreshHives の3つ
-            assert.ok(registerStub.calledWith("hiveforge.createHive"));
-            assert.ok(registerStub.calledWith("hiveforge.closeHive"));
-            assert.ok(registerStub.calledWith("hiveforge.refreshHives"));
+            assert.ok(registerStub.calledWith("colonyforge.createHive"));
+            assert.ok(registerStub.calledWith("colonyforge.closeHive"));
+            assert.ok(registerStub.calledWith("colonyforge.refreshHives"));
         });
     });
 });

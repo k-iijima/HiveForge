@@ -1,4 +1,4 @@
-# HiveForge 開発計画 v1
+# ColonyForge 開発計画 v1
 
 > **策定日**: 2026-02-07
 > **トリガー**: レビュー監査による指摘（ドキュメント矛盾、設計乖離、未接続レイヤーの発見）
@@ -13,7 +13,7 @@
 | 指標 | 実測値 | 備考 |
 |------|--------|------|
 | **ユニットテスト** | **1305 passed** | `pytest tests --ignore=tests/e2e` |
-| **カバレッジ** | **90.63%** | `--cov=hiveforge`（ブランチカバレッジ込み） |
+| **カバレッジ** | **90.63%** | `--cov=colonyforge`（ブランチカバレッジ込み） |
 | **mypy --strict エラー** | **187件 / 45ファイル** | `no-untyped-def` が主因 |
 | **Lint (Ruff)** | ✅ All passed | — |
 
@@ -145,7 +145,7 @@ M0 (現在)  → M1 (基盤固め) → M2 (接続) → M3 (自律) → M4 (運�
 | M1-3-f | `mcp_server/`, `cli.py`, `agent_ui/`, `vlm/` の型注釈追加 |
 
 **完了条件**:
-- `mypy --strict src/hiveforge/` がエラー 0
+- `mypy --strict src/colonyforge/` がエラー 0
 - CIに mypy チェックを追加
 
 #### M1-4: カバレッジ改善
@@ -186,7 +186,7 @@ M0 (現在)  → M1 (基盤固め) → M2 (接続) → M3 (自律) → M4 (運�
 | M2-0-e | セキュリティ違反検出（ActionClass×TrustLevelポリシーチェック） |
 | M2-0-f | Colony強制停止フロー（`sentinel.alert_raised` → `colony.suspended` → Beekeeper報告） |
 | M2-0-g | Sentinelイベント型（`sentinel.alert_raised`, `sentinel.report`） |
-| M2-0-h | 設定ベースの閾値調整（`hiveforge.config.yaml`） |
+| M2-0-h | 設定ベースの閾値調整（`colonyforge.config.yaml`） |
 
 **完了条件**:
 - ループするモックエージェントがSentinel Hornetにより自動停止される
@@ -211,13 +211,13 @@ M0 (現在)  → M1 (基盤固め) → M2 (接続) → M3 (自律) → M4 (運�
 
 | タスク | 内容 |
 |--------|------|
-| M2-2-a | `hiveforge chat` でBeekeeper経由のHive/Colony作成が動作 |
+| M2-2-a | `colonyforge chat` でBeekeeper経由のHive/Colony作成が動作 |
 | M2-2-b | Beekeeper → Queen Bee へのタスク委譲が実際のColonyコンテキストを持つ |
 | M2-2-c | Worker Bee実行結果がARに記録され、投影で確認可能 |
 | M2-2-d | 承認フロー（Requirement → approve/reject）がE2Eで動作 |
 
 **完了条件**:
-- `hiveforge chat "ECサイトのログインページを作成"` で、Beekeeper→Queen Bee→Worker Beeの全チェーンが動作
+- `colonyforge chat "ECサイトのログインページを作成"` で、Beekeeper→Queen Bee→Worker Beeの全チェーンが動作
 - 全イベントがARに永続化される
 - VS Code拡張のTreeViewに結果が反映される
 
@@ -225,7 +225,7 @@ M0 (現在)  → M1 (基盤固め) → M2 (接続) → M3 (自律) → M4 (運�
 
 | タスク | 内容 |
 |--------|------|
-| M2-3-a | Copilot Chat の `@hiveforge` コマンドがBeekeeperに直結 |
+| M2-3-a | Copilot Chat の `@colonyforge` コマンドがBeekeeperに直結 |
 | M2-3-b | MCP経由でのHive/Colony操作がAR永続化される |
 
 **完了条件**:
@@ -353,7 +353,7 @@ M0 (現在)  → M1 (基盤固め) → M2 (接続) → M3 (自律) → M4 (運�
 ### M2完了時 — 「信頼できる組み合わせ」（α版）
 
 - VS CodeからHive/Colony操作が実際に動作する
-- `hiveforge chat` でBeekeeper→Worker Beeの全チェーンが動く
+- `colonyforge chat` でBeekeeper→Worker Beeの全チェーンが動く
 - 全操作がARに記録され追跡可能
 
 ### M3完了時 — 「自律的な開発支援」（β版）

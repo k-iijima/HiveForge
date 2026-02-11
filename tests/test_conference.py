@@ -5,14 +5,14 @@
 
 import pytest
 
-from hiveforge.core.events import (
+from colonyforge.core.events import (
     EVENT_TYPE_MAP,
     ConferenceEndedEvent,
     ConferenceStartedEvent,
     EventType,
     parse_event,
 )
-from hiveforge.core.state.conference import (
+from colonyforge.core.state.conference import (
     ConferenceProjection,
     ConferenceState,
     ConferenceStore,

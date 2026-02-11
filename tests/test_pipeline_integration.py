@@ -12,17 +12,17 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from hiveforge.core.ar.storage import AkashicRecord
-from hiveforge.core.events.types import EventType
-from hiveforge.core.models.action_class import TrustLevel
-from hiveforge.queen_bee.server import QueenBeeMCPServer
+from colonyforge.core.ar.storage import AkashicRecord
+from colonyforge.core.events.types import EventType
+from colonyforge.core.models.action_class import TrustLevel
+from colonyforge.queen_bee.server import QueenBeeMCPServer
 
 
 @pytest.fixture(autouse=True)
 def _mock_plan_tasks():
     """_plan_tasksをモックし、LLM依存を排除する"""
     with patch(
-        "hiveforge.queen_bee.server.QueenBeeMCPServer._plan_tasks",
+        "colonyforge.queen_bee.server.QueenBeeMCPServer._plan_tasks",
         new_callable=AsyncMock,
         side_effect=lambda goal, context=None: [
             {"task_id": "task-001", "goal": goal, "depends_on": []}
@@ -89,7 +89,7 @@ class TestPipelineIntegration:
         """
         # Arrange
         with patch(
-            "hiveforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
+            "colonyforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
             new_callable=AsyncMock,
             return_value={"status": "completed", "result": "完了", "llm_output": "OK"},
         ):
@@ -118,7 +118,7 @@ class TestPipelineIntegration:
         """RunStartedイベントがPIPELINE_STARTEDより前に記録される"""
         # Arrange
         with patch(
-            "hiveforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
+            "colonyforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
             new_callable=AsyncMock,
             return_value={"status": "completed", "result": "ok", "llm_output": "done"},
         ):
@@ -140,7 +140,7 @@ class TestPipelineIntegration:
         """Pipeline経由の結果にColonyResult情報が含まれる"""
         # Arrange
         with patch(
-            "hiveforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
+            "colonyforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
             new_callable=AsyncMock,
             return_value={"status": "completed", "result": "成果", "llm_output": "LLM出力"},
         ):
@@ -203,7 +203,7 @@ class TestPipelineApprovalGate:
 
         # Act: 承認付きで再実行
         with patch(
-            "hiveforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
+            "colonyforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
             new_callable=AsyncMock,
             return_value={"status": "completed", "result": "ok", "llm_output": "done"},
         ):
@@ -250,7 +250,7 @@ class TestBackwardCompatibility:
         """use_pipeline=False 時は従来通り直接実行される"""
         # Arrange
         with patch(
-            "hiveforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
+            "colonyforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
             new_callable=AsyncMock,
             return_value={"status": "completed", "result": "ok", "llm_output": "done"},
         ):
@@ -296,7 +296,7 @@ class TestPipelineFailureHandling:
         """Pipeline経由でWorkerが失敗した場合にRunFailedが記録される"""
         # Arrange
         with patch(
-            "hiveforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
+            "colonyforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
             new_callable=AsyncMock,
             return_value={"status": "failed", "reason": "コンパイルエラー"},
         ):

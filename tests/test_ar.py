@@ -4,8 +4,8 @@ from datetime import UTC
 
 import pytest
 
-from hiveforge.core.ar import AkashicRecord
-from hiveforge.core.events import (
+from colonyforge.core.ar import AkashicRecord
+from colonyforge.core.events import (
     RunStartedEvent,
     TaskCreatedEvent,
     parse_event,
@@ -667,8 +667,8 @@ class TestHiveStore:
         Hiveイベントは hive_id をキーとして保存される。
         """
         # Arrange: HiveStore を作成
-        from hiveforge.core.ar.hive_storage import HiveStore
-        from hiveforge.core.events import ColonyCreatedEvent, HiveCreatedEvent
+        from colonyforge.core.ar.hive_storage import HiveStore
+        from colonyforge.core.events import ColonyCreatedEvent, HiveCreatedEvent
 
         store = HiveStore(temp_vault)
         hive_id = "test-hive-001"
@@ -698,8 +698,8 @@ class TestHiveStore:
         prev_hash が正しく設定される。
         """
         # Arrange
-        from hiveforge.core.ar.hive_storage import HiveStore
-        from hiveforge.core.events import HiveClosedEvent, HiveCreatedEvent
+        from colonyforge.core.ar.hive_storage import HiveStore
+        from colonyforge.core.events import HiveClosedEvent, HiveCreatedEvent
 
         store = HiveStore(temp_vault)
         hive_id = "test-hive-chain"
@@ -721,8 +721,8 @@ class TestHiveStore:
         複数のHiveを作成して一覧で取得できる。
         """
         # Arrange
-        from hiveforge.core.ar.hive_storage import HiveStore
-        from hiveforge.core.events import HiveCreatedEvent
+        from colonyforge.core.ar.hive_storage import HiveStore
+        from colonyforge.core.events import HiveCreatedEvent
 
         store = HiveStore(temp_vault)
 
@@ -745,9 +745,9 @@ class TestHiveStore:
         Vault/hives/ 配下のみを対象とする。
         """
         # Arrange: HiveStoreとAkashicRecordを両方使用
-        from hiveforge.core.ar.hive_storage import HiveStore
-        from hiveforge.core.ar.storage import AkashicRecord
-        from hiveforge.core.events import HiveCreatedEvent, RunStartedEvent
+        from colonyforge.core.ar.hive_storage import HiveStore
+        from colonyforge.core.ar.storage import AkashicRecord
+        from colonyforge.core.events import HiveCreatedEvent, RunStartedEvent
 
         hive_store = HiveStore(temp_vault)
         ar = AkashicRecord(temp_vault)
@@ -771,8 +771,8 @@ class TestHiveStore:
     def test_storage_path_is_under_hives_directory(self, temp_vault):
         """Hiveイベントは Vault/hives/{hive_id}/ に保存される"""
         # Arrange
-        from hiveforge.core.ar.hive_storage import HiveStore
-        from hiveforge.core.events import HiveCreatedEvent
+        from colonyforge.core.ar.hive_storage import HiveStore
+        from colonyforge.core.events import HiveCreatedEvent
 
         store = HiveStore(temp_vault)
         hive_id = "test-hive-path"
@@ -788,8 +788,8 @@ class TestHiveStore:
     def test_count_events(self, temp_vault):
         """イベント数のカウント"""
         # Arrange
-        from hiveforge.core.ar.hive_storage import HiveStore
-        from hiveforge.core.events import ColonyCreatedEvent
+        from colonyforge.core.ar.hive_storage import HiveStore
+        from colonyforge.core.events import ColonyCreatedEvent
 
         store = HiveStore(temp_vault)
         hive_id = "test-hive-count"
@@ -805,7 +805,7 @@ class TestHiveStore:
 
 
 # HiveStore追加テスト
-from hiveforge.core.ar.hive_storage import HiveStore  # noqa: E402
+from colonyforge.core.ar.hive_storage import HiveStore  # noqa: E402
 
 
 class TestHiveStoreBasics:
@@ -813,7 +813,7 @@ class TestHiveStoreBasics:
 
     def test_append_and_replay(self, tmp_path):
         """イベント追加とリプレイ"""
-        from hiveforge.core.events import BaseEvent, EventType
+        from colonyforge.core.events import BaseEvent, EventType
 
         store = HiveStore(tmp_path)
         event = BaseEvent(type=EventType.HIVE_CREATED, data={"name": "test"})
@@ -826,7 +826,7 @@ class TestHiveStoreBasics:
 
     def test_list_hives(self, tmp_path):
         """Hive一覧取得"""
-        from hiveforge.core.events import BaseEvent, EventType
+        from colonyforge.core.events import BaseEvent, EventType
 
         store = HiveStore(tmp_path)
         store.append(BaseEvent(type=EventType.HIVE_CREATED, data={}), "hive-1")
@@ -838,7 +838,7 @@ class TestHiveStoreBasics:
 
     def test_count_events(self, tmp_path):
         """イベント数カウント"""
-        from hiveforge.core.events import BaseEvent, EventType
+        from colonyforge.core.events import BaseEvent, EventType
 
         store = HiveStore(tmp_path)
         store.append(BaseEvent(type=EventType.HIVE_CREATED, data={}), "hive-1")
@@ -861,7 +861,7 @@ class TestHiveStoreBasics:
 
     def test_prev_hash_chain(self, tmp_path):
         """prev_hashチェーンが正しく形成される"""
-        from hiveforge.core.events import BaseEvent, EventType
+        from colonyforge.core.events import BaseEvent, EventType
 
         store = HiveStore(tmp_path)
         _event1 = store.append(BaseEvent(type=EventType.HIVE_CREATED, data={}), "hive-1")

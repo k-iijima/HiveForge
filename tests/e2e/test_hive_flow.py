@@ -7,7 +7,7 @@ Hive作成 → Colony作成 → Run実行 → 完了 の基本フローをテス
 import pytest
 from fastapi.testclient import TestClient
 
-from hiveforge.api.server import app
+from colonyforge.api.server import app
 
 
 @pytest.fixture

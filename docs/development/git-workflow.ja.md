@@ -1,6 +1,6 @@
 # Gitワークフロー
 
-HiveForgeはColonyベースの並列開発ワークフローに従います。
+ColonyForgeはColonyベースの並列開発ワークフローに従います。
 
 ## ブランチモデル
 

@@ -2,8 +2,8 @@
 
 import pytest
 
-from hiveforge.core import AkashicRecord
-from hiveforge.queen_bee.server import QueenBeeMCPServer
+from colonyforge.core import AkashicRecord
+from colonyforge.queen_bee.server import QueenBeeMCPServer
 
 
 @pytest.fixture
@@ -292,7 +292,7 @@ class TestClose:
         """closeでLLMクライアントも閉じられる（L555-556）"""
         from unittest.mock import AsyncMock, MagicMock
 
-        from hiveforge.llm.client import LLMClient
+        from colonyforge.llm.client import LLMClient
 
         # Arrange: LLMクライアントをモックで設定
         mock_client = MagicMock(spec=LLMClient)
@@ -390,7 +390,7 @@ class TestQueenBeeAgentRunnerPromptContext:
         # Arrange: LLMクライアントをモックで事前設定
         from unittest.mock import AsyncMock, MagicMock
 
-        from hiveforge.llm.client import LLMClient
+        from colonyforge.llm.client import LLMClient
 
         mock_client = MagicMock(spec=LLMClient)
         mock_client.chat = AsyncMock()
@@ -410,8 +410,8 @@ class TestQueenBeeAgentRunnerPromptContext:
         # Arrange
         from unittest.mock import AsyncMock, MagicMock
 
-        from hiveforge.core.activity_bus import AgentRole
-        from hiveforge.llm.client import LLMClient
+        from colonyforge.core.activity_bus import AgentRole
+        from colonyforge.llm.client import LLMClient
 
         mock_client = MagicMock(spec=LLMClient)
         mock_client.chat = AsyncMock()
@@ -443,7 +443,7 @@ class TestPlanTasksDependsOn:
         """
         from unittest.mock import AsyncMock, MagicMock
 
-        from hiveforge.llm.client import LLMClient
+        from colonyforge.llm.client import LLMClient
 
         # Arrange: LLMが依存関係付きのタスクを返すようモック
         mock_client = MagicMock(spec=LLMClient)
@@ -481,7 +481,7 @@ class TestPlanTasksDependsOn:
         """
         from unittest.mock import AsyncMock, MagicMock
 
-        from hiveforge.llm.client import LLMClient
+        from colonyforge.llm.client import LLMClient
 
         # Arrange: LLM呼び出しが失敗
         mock_client = MagicMock(spec=LLMClient)

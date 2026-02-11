@@ -19,21 +19,21 @@
             "problemMatcher": "$tsc-watch"
         },
         {
-            "label": "E2E: HiveForge拡張ビジュアルテスト",
+            "label": "E2E: ColonyForge拡張ビジュアルテスト",
             "type": "shell",
             "command": "python",
             "args": [
                 "-m",
                 "pytest",
-                "tests/e2e/test_hiveforge_extension.py",
+                "tests/e2e/test_colonyforge_extension.py",
                 "-v",
                 "--tb=short"
             ],
             "options": {
                 "cwd": "${workspaceFolder}",
                 "env": {
-                    "CODE_SERVER_URL": "http://hiveforge-code-server:8080",
-                    "OLLAMA_BASE_URL": "http://hiveforge-dev-ollama:11434",
+                    "CODE_SERVER_URL": "http://colonyforge-code-server:8080",
+                    "OLLAMA_BASE_URL": "http://colonyforge-dev-ollama:11434",
                     "VLM_HEADLESS": "true"
                 }
             },
@@ -45,13 +45,13 @@
             "type": "shell",
             "command": "python",
             "args": [
-                "tests/e2e/test_hiveforge_extension.py"
+                "tests/e2e/test_colonyforge_extension.py"
             ],
             "options": {
                 "cwd": "${workspaceFolder}",
                 "env": {
-                    "CODE_SERVER_URL": "http://hiveforge-code-server:8080",
-                    "OLLAMA_BASE_URL": "http://hiveforge-dev-ollama:11434",
+                    "CODE_SERVER_URL": "http://colonyforge-code-server:8080",
+                    "OLLAMA_BASE_URL": "http://colonyforge-dev-ollama:11434",
                     "VLM_HEADLESS": "true"
                 }
             },
@@ -63,13 +63,13 @@
             "type": "shell",
             "command": "python",
             "args": [
-                "tests/e2e/test_hiveforge_extension.py"
+                "tests/e2e/test_colonyforge_extension.py"
             ],
             "options": {
                 "cwd": "${workspaceFolder}",
                 "env": {
-                    "CODE_SERVER_URL": "http://hiveforge-code-server:8080",
-                    "OLLAMA_BASE_URL": "http://hiveforge-dev-ollama:11434",
+                    "CODE_SERVER_URL": "http://colonyforge-code-server:8080",
+                    "OLLAMA_BASE_URL": "http://colonyforge-dev-ollama:11434",
                     "VLM_HEADLESS": "false"
                 }
             },
@@ -93,7 +93,7 @@
             "args": [
                 "-m",
                 "pytest",
-                "tests/e2e/test_hiveforge_visual.py",
+                "tests/e2e/test_colonyforge_visual.py",
                 "-v",
                 "--tb=short",
                 "-m",
@@ -102,8 +102,8 @@
             "options": {
                 "cwd": "${workspaceFolder}",
                 "env": {
-                    "PLAYWRIGHT_MCP_URL": "http://hiveforge-playwright-mcp:8931",
-                    "OLLAMA_BASE_URL": "http://hiveforge-dev-ollama:11434",
+                    "PLAYWRIGHT_MCP_URL": "http://colonyforge-playwright-mcp:8931",
+                    "OLLAMA_BASE_URL": "http://colonyforge-dev-ollama:11434",
                     "VLM_HEADLESS": "true"
                 }
             },
@@ -129,8 +129,8 @@
             "options": {
                 "cwd": "${workspaceFolder}",
                 "env": {
-                    "PLAYWRIGHT_MCP_URL": "http://hiveforge-playwright-mcp:8931",
-                    "OLLAMA_BASE_URL": "http://hiveforge-dev-ollama:11434",
+                    "PLAYWRIGHT_MCP_URL": "http://colonyforge-playwright-mcp:8931",
+                    "OLLAMA_BASE_URL": "http://colonyforge-dev-ollama:11434",
                     "VLM_HEADLESS": "true"
                 }
             },

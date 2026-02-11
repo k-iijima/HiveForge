@@ -6,16 +6,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from hiveforge.llm.client import (
+from colonyforge.llm.client import (
     LLMClient,
     LLMResponse,
     Message,
     ToolCall,
     _build_litellm_model_name,
 )
-from hiveforge.llm.prompts import WORKER_BEE_SYSTEM, get_system_prompt
-from hiveforge.llm.runner import AgentContext, AgentRunner, RunResult
-from hiveforge.llm.tools import (
+from colonyforge.llm.prompts import WORKER_BEE_SYSTEM, get_system_prompt
+from colonyforge.llm.runner import AgentContext, AgentRunner, RunResult
+from colonyforge.llm.tools import (
     READ_FILE_TOOL,
     WRITE_FILE_TOOL,
     get_basic_tools,
@@ -141,7 +141,7 @@ class TestReadFileHandler:
     @pytest.mark.asyncio
     async def test_read_existing_file(self, tmp_path):
         """存在するファイルを読み込める"""
-        from hiveforge.llm.tools import set_workspace_root
+        from colonyforge.llm.tools import set_workspace_root
 
         # Arrange
         set_workspace_root(tmp_path)
@@ -176,7 +176,7 @@ class TestReadFileHandler:
         from pathlib import Path
         from unittest.mock import patch
 
-        from hiveforge.llm.tools import set_workspace_root
+        from colonyforge.llm.tools import set_workspace_root
 
         # Arrange
         set_workspace_root(tmp_path)
@@ -202,7 +202,7 @@ class TestWriteFileHandler:
     @pytest.mark.asyncio
     async def test_write_file(self, tmp_path):
         """ファイルを書き込める"""
-        from hiveforge.llm.tools import set_workspace_root
+        from colonyforge.llm.tools import set_workspace_root
 
         set_workspace_root(tmp_path)
         test_file = tmp_path / "output.txt"
@@ -218,7 +218,7 @@ class TestWriteFileHandler:
     @pytest.mark.asyncio
     async def test_write_creates_directories(self, tmp_path):
         """親ディレクトリを作成する"""
-        from hiveforge.llm.tools import set_workspace_root
+        from colonyforge.llm.tools import set_workspace_root
 
         set_workspace_root(tmp_path)
         test_file = tmp_path / "subdir" / "deep" / "file.txt"
@@ -237,7 +237,7 @@ class TestWriteFileHandler:
         from pathlib import Path
         from unittest.mock import patch
 
-        from hiveforge.llm.tools import set_workspace_root
+        from colonyforge.llm.tools import set_workspace_root
 
         # Arrange
         set_workspace_root(tmp_path)
@@ -261,7 +261,7 @@ class TestListDirectoryHandler:
     @pytest.mark.asyncio
     async def test_list_directory(self, tmp_path):
         """ディレクトリ内容を一覧表示できる"""
-        from hiveforge.llm.tools import set_workspace_root
+        from colonyforge.llm.tools import set_workspace_root
 
         # Arrange
         set_workspace_root(tmp_path)
@@ -292,7 +292,7 @@ class TestListDirectoryHandler:
         from pathlib import Path
         from unittest.mock import patch
 
-        from hiveforge.llm.tools import set_workspace_root
+        from colonyforge.llm.tools import set_workspace_root
 
         # Arrange
         set_workspace_root(tmp_path)
@@ -359,7 +359,7 @@ class TestAgentRunner:
     @pytest.mark.asyncio
     async def test_run_with_tool_call(self, mock_client, tmp_path):
         """ツール呼び出しを含む実行"""
-        from hiveforge.llm.tools import set_workspace_root
+        from colonyforge.llm.tools import set_workspace_root
 
         # Arrange: ワークスペースをtmp_pathに設定
         set_workspace_root(tmp_path)
@@ -749,56 +749,56 @@ class TestBuildLiteLLMModelName:
 
     def test_openai_adds_prefix(self):
         """OpenAIプロバイダーはopenai/プレフィックスを付与"""
-        from hiveforge.core.config import LLMConfig
+        from colonyforge.core.config import LLMConfig
 
         config = LLMConfig(provider="openai", model="gpt-4o")
         assert _build_litellm_model_name(config) == "openai/gpt-4o"
 
     def test_anthropic_adds_prefix(self):
         """Anthropicプロバイダーはanthropic/プレフィックスを付与"""
-        from hiveforge.core.config import LLMConfig
+        from colonyforge.core.config import LLMConfig
 
         config = LLMConfig(provider="anthropic", model="claude-3-5-sonnet-20241022")
         assert _build_litellm_model_name(config) == "anthropic/claude-3-5-sonnet-20241022"
 
     def test_ollama_chat_adds_prefix(self):
         """Ollama chatプロバイダーはollama_chat/プレフィックスを付与"""
-        from hiveforge.core.config import LLMConfig
+        from colonyforge.core.config import LLMConfig
 
         config = LLMConfig(provider="ollama_chat", model="qwen3-coder")
         assert _build_litellm_model_name(config) == "ollama_chat/qwen3-coder"
 
     def test_ollama_adds_prefix(self):
         """Ollamaプロバイダーはollama/プレフィックスを付与"""
-        from hiveforge.core.config import LLMConfig
+        from colonyforge.core.config import LLMConfig
 
         config = LLMConfig(provider="ollama", model="llama3.1")
         assert _build_litellm_model_name(config) == "ollama/llama3.1"
 
     def test_model_with_existing_prefix_kept(self):
         """既にprefix/model形式の場合はそのまま"""
-        from hiveforge.core.config import LLMConfig
+        from colonyforge.core.config import LLMConfig
 
         config = LLMConfig(provider="openai", model="openai/gpt-4o-mini")
         assert _build_litellm_model_name(config) == "openai/gpt-4o-mini"
 
     def test_litellm_proxy_no_prefix(self):
         """litellm_proxyはプレフィックスを付与しない"""
-        from hiveforge.core.config import LLMConfig
+        from colonyforge.core.config import LLMConfig
 
         config = LLMConfig(provider="litellm_proxy", model="my-model")
         assert _build_litellm_model_name(config) == "my-model"
 
     def test_groq_adds_prefix(self):
         """Groqプロバイダーはgroq/プレフィックスを付与"""
-        from hiveforge.core.config import LLMConfig
+        from colonyforge.core.config import LLMConfig
 
         config = LLMConfig(provider="groq", model="llama-3.1-70b-versatile")
         assert _build_litellm_model_name(config) == "groq/llama-3.1-70b-versatile"
 
     def test_deepseek_adds_prefix(self):
         """DeepSeekプロバイダーはdeepseek/プレフィックスを付与"""
-        from hiveforge.core.config import LLMConfig
+        from colonyforge.core.config import LLMConfig
 
         config = LLMConfig(provider="deepseek", model="deepseek-chat")
         assert _build_litellm_model_name(config) == "deepseek/deepseek-chat"
@@ -810,7 +810,7 @@ class TestLLMClient:
     @pytest.fixture
     def llm_config(self):
         """テスト用LLM設定"""
-        from hiveforge.core.config import LLMConfig
+        from colonyforge.core.config import LLMConfig
 
         return LLMConfig(
             provider="openai",
@@ -861,7 +861,7 @@ class TestLLMClient:
 
     def test_get_api_key_ollama_returns_none(self, monkeypatch):
         """Ollamaプロバイダーの場合APIキーはNone"""
-        from hiveforge.core.config import LLMConfig
+        from colonyforge.core.config import LLMConfig
 
         # Arrange
         config = LLMConfig(provider="ollama", model="llama3.1")
@@ -887,7 +887,7 @@ class TestLLMClient:
         mock_response = _make_mock_model_response(content="Hello!")
 
         with patch(
-            "hiveforge.llm.client.litellm.acompletion", new_callable=AsyncMock
+            "colonyforge.llm.client.litellm.acompletion", new_callable=AsyncMock
         ) as mock_acomp:
             mock_acomp.return_value = mock_response
 
@@ -917,7 +917,7 @@ class TestLLMClient:
         )
 
         with patch(
-            "hiveforge.llm.client.litellm.acompletion", new_callable=AsyncMock
+            "colonyforge.llm.client.litellm.acompletion", new_callable=AsyncMock
         ) as mock_acomp:
             mock_acomp.return_value = mock_response
 
@@ -947,7 +947,7 @@ class TestLLMClient:
         mock_response = _make_mock_model_response(content="Bonjour!")
 
         with patch(
-            "hiveforge.llm.client.litellm.acompletion", new_callable=AsyncMock
+            "colonyforge.llm.client.litellm.acompletion", new_callable=AsyncMock
         ) as mock_acomp:
             mock_acomp.return_value = mock_response
 
@@ -981,7 +981,7 @@ class TestLLMClient:
         )
 
         with patch(
-            "hiveforge.llm.client.litellm.acompletion", new_callable=AsyncMock
+            "colonyforge.llm.client.litellm.acompletion", new_callable=AsyncMock
         ) as mock_acomp:
             mock_acomp.return_value = mock_response
 
@@ -1002,7 +1002,7 @@ class TestLLMClient:
         mock_response = _make_mock_model_response(content="OK")
 
         with patch(
-            "hiveforge.llm.client.litellm.acompletion", new_callable=AsyncMock
+            "colonyforge.llm.client.litellm.acompletion", new_callable=AsyncMock
         ) as mock_acomp:
             mock_acomp.return_value = mock_response
 
@@ -1028,7 +1028,7 @@ class TestLLMClient:
         mock_response = _make_mock_model_response(content="Done")
 
         with patch(
-            "hiveforge.llm.client.litellm.acompletion", new_callable=AsyncMock
+            "colonyforge.llm.client.litellm.acompletion", new_callable=AsyncMock
         ) as mock_acomp:
             mock_acomp.return_value = mock_response
 
@@ -1053,7 +1053,7 @@ class TestLLMClient:
     @pytest.mark.asyncio
     async def test_chat_ollama(self, monkeypatch, mock_rate_limiter):
         """OllamaプロバイダーをLiteLLM経由で呼び出す（APIキー不要）"""
-        from hiveforge.core.config import LLMConfig
+        from colonyforge.core.config import LLMConfig
 
         # Arrange
         config = LLMConfig(
@@ -1066,7 +1066,7 @@ class TestLLMClient:
         mock_response = _make_mock_model_response(content="Hello from Ollama!")
 
         with patch(
-            "hiveforge.llm.client.litellm.acompletion", new_callable=AsyncMock
+            "colonyforge.llm.client.litellm.acompletion", new_callable=AsyncMock
         ) as mock_acomp:
             mock_acomp.return_value = mock_response
 
@@ -1084,7 +1084,7 @@ class TestLLMClient:
     @pytest.mark.asyncio
     async def test_chat_litellm_proxy(self, monkeypatch, mock_rate_limiter):
         """LiteLLM Proxy経由でモデルを呼び出す"""
-        from hiveforge.core.config import LLMConfig
+        from colonyforge.core.config import LLMConfig
 
         # Arrange
         config = LLMConfig(
@@ -1098,7 +1098,7 @@ class TestLLMClient:
         mock_response = _make_mock_model_response(content="Proxy response")
 
         with patch(
-            "hiveforge.llm.client.litellm.acompletion", new_callable=AsyncMock
+            "colonyforge.llm.client.litellm.acompletion", new_callable=AsyncMock
         ) as mock_acomp:
             mock_acomp.return_value = mock_response
 
@@ -1124,7 +1124,7 @@ class TestLLMClient:
         mock_response = _make_mock_model_response(content="OK")
 
         with patch(
-            "hiveforge.llm.client.litellm.acompletion", new_callable=AsyncMock
+            "colonyforge.llm.client.litellm.acompletion", new_callable=AsyncMock
         ) as mock_acomp:
             mock_acomp.return_value = mock_response
 
@@ -1145,7 +1145,7 @@ class TestLLMClient:
         monkeypatch.setenv("TEST_API_KEY", "invalid-key")
 
         with patch(
-            "hiveforge.llm.client.litellm.acompletion", new_callable=AsyncMock
+            "colonyforge.llm.client.litellm.acompletion", new_callable=AsyncMock
         ) as mock_acomp:
             mock_acomp.side_effect = litellm.exceptions.AuthenticationError(
                 message="Invalid API key",
@@ -1166,7 +1166,7 @@ class TestLLMClient:
         mock_response = _make_mock_model_response(content="OK")
 
         with patch(
-            "hiveforge.llm.client.litellm.acompletion", new_callable=AsyncMock
+            "colonyforge.llm.client.litellm.acompletion", new_callable=AsyncMock
         ) as mock_acomp:
             mock_acomp.return_value = mock_response
 
@@ -1212,7 +1212,7 @@ class TestLLMClient:
 
     def test_check_api_key_ollama_always_true(self):
         """Ollamaプロバイダーでは常にTrueを返す"""
-        from hiveforge.core.config import LLMConfig
+        from colonyforge.core.config import LLMConfig
 
         # Arrange
         config = LLMConfig(provider="ollama", model="llama3")
@@ -1223,7 +1223,7 @@ class TestLLMClient:
 
     def test_check_api_key_ollama_chat_always_true(self):
         """Ollama chatプロバイダーでは常にTrueを返す"""
-        from hiveforge.core.config import LLMConfig
+        from colonyforge.core.config import LLMConfig
 
         # Arrange
         config = LLMConfig(provider="ollama_chat", model="qwen3-coder")
@@ -1345,7 +1345,7 @@ class TestRunCommandHandler:
     @pytest.mark.asyncio
     async def test_run_simple_command(self):
         """許可リスト内のシンプルなコマンドを実行できる"""
-        from hiveforge.llm.tools import run_command_handler
+        from colonyforge.llm.tools import run_command_handler
 
         # Act: 'ls'は許可リストに含まれる
         result_str = await run_command_handler("ls -la")
@@ -1357,7 +1357,7 @@ class TestRunCommandHandler:
     @pytest.mark.asyncio
     async def test_run_failing_command(self):
         """許可リスト外のコマンドはブロックされる"""
-        from hiveforge.llm.tools import run_command_handler
+        from colonyforge.llm.tools import run_command_handler
 
         # Act: 'false'は許可リストに含まれない
         result_str = await run_command_handler("false")
@@ -1370,7 +1370,7 @@ class TestRunCommandHandler:
     @pytest.mark.asyncio
     async def test_list_directory_not_dir(self, tmp_path):
         """ファイルをディレクトリとして開けない"""
-        from hiveforge.llm.tools import set_workspace_root
+        from colonyforge.llm.tools import set_workspace_root
 
         # Arrange
         set_workspace_root(tmp_path)

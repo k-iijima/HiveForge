@@ -5,29 +5,29 @@ services:
   # テスト対象: code-server（ブラウザVS Code）
   code-server:
     image: codercom/code-server:latest
-    container_name: hiveforge-code-server
+    container_name: colonyforge-code-server
     ports:
       - "8080:8080"
     environment:
-      - PASSWORD=hiveforge
+      - PASSWORD=colonyforge
     volumes:
-      - .:/workspace/HiveForge
-    command: ["--bind-addr", "0.0.0.0:8080", "--auth", "password", "/workspace/HiveForge"]
+      - .:/workspace/ColonyForge
+    command: ["--bind-addr", "0.0.0.0:8080", "--auth", "password", "/workspace/ColonyForge"]
     restart: unless-stopped
     networks:
-      - hiveforge-net
+      - colonyforge-net
 
   # Ollama: ローカルVLM with GPU
   ollama:
     image: ollama/ollama:latest
-    container_name: hiveforge-ollama
+    container_name: colonyforge-ollama
     ports:
       - "11434:11434"
     volumes:
       - ollama_models:/root/.ollama
     restart: unless-stopped
     networks:
-      - hiveforge-net
+      - colonyforge-net
     deploy:
       resources:
         reservations:
@@ -38,9 +38,9 @@ services:
 
 volumes:
   ollama_models:
-    name: hiveforge_ollama_models
+    name: colonyforge_ollama_models
 
 networks:
-  hiveforge-net:
-    name: hiveforge_default
+  colonyforge-net:
+    name: colonyforge_default
     external: true

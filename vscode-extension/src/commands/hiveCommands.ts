@@ -5,11 +5,11 @@
  */
 
 import * as vscode from 'vscode';
-import { HiveForgeClient } from '../client';
+import { ColonyForgeClient } from '../client';
 import { HiveTreeDataProvider } from '../views/hiveTreeView';
 
 let hiveTreeProvider: HiveTreeDataProvider | undefined;
-let apiClient: HiveForgeClient | undefined;
+let apiClient: ColonyForgeClient | undefined;
 
 /**
  * Hive TreeProviderを設定
@@ -23,7 +23,7 @@ export function setHiveTreeProvider(provider: HiveTreeDataProvider): void {
  */
 export async function createHive(): Promise<void> {
     if (!apiClient) {
-        vscode.window.showErrorMessage('HiveForge: サーバーに接続されていません');
+        vscode.window.showErrorMessage('ColonyForge: サーバーに接続されていません');
         return;
     }
 
@@ -62,7 +62,7 @@ export async function createHive(): Promise<void> {
  */
 export async function closeHive(hiveId?: string): Promise<void> {
     if (!apiClient) {
-        vscode.window.showErrorMessage('HiveForge: サーバーに接続されていません');
+        vscode.window.showErrorMessage('ColonyForge: サーバーに接続されていません');
         return;
     }
 
@@ -122,13 +122,13 @@ export function refreshHives(): void {
  */
 export function registerHiveCommands(
     context: vscode.ExtensionContext,
-    client: HiveForgeClient
+    client: ColonyForgeClient
 ): void {
     apiClient = client;
     context.subscriptions.push(
-        vscode.commands.registerCommand('hiveforge.createHive', createHive),
-        vscode.commands.registerCommand('hiveforge.closeHive', closeHive),
-        vscode.commands.registerCommand('hiveforge.refreshHives', refreshHives)
+        vscode.commands.registerCommand('colonyforge.createHive', createHive),
+        vscode.commands.registerCommand('colonyforge.closeHive', closeHive),
+        vscode.commands.registerCommand('colonyforge.refreshHives', refreshHives)
     );
 }
 

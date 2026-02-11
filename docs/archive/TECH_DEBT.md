@@ -1,6 +1,6 @@
 # 技術的負債一覧
 
-HiveForge プロジェクトの技術的負債を追跡・管理するドキュメント。
+ColonyForge プロジェクトの技術的負債を追跡・管理するドキュメント。
 
 **最終更新**: 2026-02-01  
 **Phase 1 完了時点での状態**
@@ -38,9 +38,9 @@ HiveForge プロジェクトの技術的負債を追跡・管理するドキュ�
 
 ### 主要な問題ファイル
 
-1. **`src/hiveforge/cli.py`** - CLIコマンド関数に型がない
-2. **`src/hiveforge/agent_ui/server.py`** - ハンドラ関数に型がない
-3. **`src/hiveforge/vlm_tester/`** - VLM関連モジュール全体
+1. **`src/colonyforge/cli.py`** - CLIコマンド関数に型がない
+2. **`src/colonyforge/agent_ui/server.py`** - ハンドラ関数に型がない
+3. **`src/colonyforge/vlm_tester/`** - VLM関連モジュール全体
 
 ### 対応方針
 
@@ -79,10 +79,10 @@ HiveForge プロジェクトの技術的負債を追跡・管理するドキュ�
 ## 3. TODOコメント
 
 ```
-src/hiveforge/api/routes/colonies.py:52
+src/colonyforge/api/routes/colonies.py:52
 # TODO: Phase 2でAkashic Recordに移行
 
-src/hiveforge/api/routes/hives.py:50
+src/colonyforge/api/routes/hives.py:50
 # TODO: Phase 2でAkashic Recordに移行
 ```
 

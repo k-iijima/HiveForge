@@ -7,9 +7,9 @@ HiveStoreにイベントを書き込み、新しいHiveStoreインスタンス�
 
 from pathlib import Path
 
-from hiveforge.core.ar.hive_projections import build_hive_aggregate
-from hiveforge.core.ar.hive_storage import HiveStore
-from hiveforge.core.events import (
+from colonyforge.core.ar.hive_projections import build_hive_aggregate
+from colonyforge.core.ar.hive_storage import HiveStore
+from colonyforge.core.events import (
     ColonyCompletedEvent,
     ColonyCreatedEvent,
     ColonyStartedEvent,
@@ -254,7 +254,7 @@ class TestApiPersistence:
         hive_id = response.json()["hive_id"]
 
         # Assert: HiveStoreに直接アクセスして永続化を確認
-        from hiveforge.api.helpers import get_hive_store
+        from colonyforge.api.helpers import get_hive_store
 
         store = get_hive_store()
         events = list(store.replay(hive_id))
@@ -275,7 +275,7 @@ class TestApiPersistence:
         assert colony_response.status_code == 201
 
         # Assert: HiveStoreにColonyイベントが記録される
-        from hiveforge.api.helpers import get_hive_store
+        from colonyforge.api.helpers import get_hive_store
 
         store = get_hive_store()
         events = list(store.replay(hive_id))

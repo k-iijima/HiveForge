@@ -3,7 +3,7 @@
 外部フィードバック対応: 未知のイベントタイプを例外ではなくUnknownEventとして読み込む。
 """
 
-from hiveforge.core.events import BaseEvent, UnknownEvent, parse_event
+from colonyforge.core.events import BaseEvent, UnknownEvent, parse_event
 
 
 class TestUnknownEventClass:
@@ -100,7 +100,7 @@ class TestParseEventForwardCompatibility:
     def test_parse_event_still_works_for_known_types(self):
         """既知のイベントタイプは従来通り正しくパースされる"""
         # Arrange
-        from hiveforge.core.events import EventType, RunStartedEvent
+        from colonyforge.core.events import EventType, RunStartedEvent
 
         data = {
             "type": "run.started",
@@ -200,7 +200,7 @@ class TestUnknownEventSafeguards:
         1MBを超えるoriginal_dataはメタデータのみ保持し、
         メモリ・ログ肥大化を防止する。
         """
-        from hiveforge.core.events import MAX_ORIGINAL_DATA_SIZE
+        from colonyforge.core.events import MAX_ORIGINAL_DATA_SIZE
 
         # Arrange: 1MBを超える大きなデータ
         large_data = {
@@ -261,7 +261,7 @@ class TestUnknownEventSafeguards:
 
     def test_parse_event_with_oversized_unknown_data(self):
         """parse_eventが巨大な未知イベントを安全に処理する"""
-        from hiveforge.core.events import MAX_ORIGINAL_DATA_SIZE
+        from colonyforge.core.events import MAX_ORIGINAL_DATA_SIZE
 
         # Arrange: 1MB超の未知イベントデータ
         oversized_data = {

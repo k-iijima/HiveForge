@@ -1,14 +1,14 @@
 services:
-  hiveforge-dev:
+  colonyforge-dev:
     build:
       context: ..
       dockerfile: .devcontainer/Dockerfile.dev
     volumes:
       # WSL Docker環境用：Windowsパスを/mnt/形式に変換
       # Docker Desktop with WSL backend では /mnt/d/... 形式が必要
-      - /mnt/d/projects/biz/HiveForge:/workspace/HiveForge:cached
+      - /mnt/d/projects/biz/ColonyForge:/workspace/ColonyForge:cached
       # .venvは/home/vscode/.venv に配置してpipのユーザーインストールと分離
-      - hiveforge-venv:/home/vscode/.venv
+      - colonyforge-venv:/home/vscode/.venv
       - /var/run/docker.sock:/var/run/docker.sock
     command: sleep infinity
     user: vscode
@@ -19,12 +19,12 @@ services:
     environment:
       - OLLAMA_HOST=http://ollama:11434
     networks:
-      - hiveforge-dev-net
+      - colonyforge-dev-net
 
   # GPU対応Ollama（GPUがある場合のみ起動）
   ollama:
     image: ollama/ollama:latest
-    container_name: hiveforge-dev-ollama
+    container_name: colonyforge-dev-ollama
     profiles:
       - gpu
     ports:
@@ -33,10 +33,10 @@ services:
       - ollama_models:/root/.ollama
     restart: unless-stopped
     networks:
-      hiveforge-dev-net:
+      colonyforge-dev-net:
         aliases:
           - ollama
-          - hiveforge-dev-ollama
+          - colonyforge-dev-ollama
     deploy:
       resources:
         reservations:
@@ -48,7 +48,7 @@ services:
   # CPU版Ollama（GPUがない場合のフォールバック）
   ollama-cpu:
     image: ollama/ollama:latest
-    container_name: hiveforge-dev-ollama-cpu
+    container_name: colonyforge-dev-ollama-cpu
     profiles:
       - cpu
     ports:
@@ -57,25 +57,25 @@ services:
       - ollama_models:/root/.ollama
     restart: unless-stopped
     networks:
-      hiveforge-dev-net:
+      colonyforge-dev-net:
         aliases:
           - ollama
-          - hiveforge-dev-ollama
+          - colonyforge-dev-ollama
 
   # code-server: ブラウザ版VS Code（VLMテスト対象）
   code-server:
     image: codercom/code-server:latest
-    container_name: hiveforge-code-server
+    container_name: colonyforge-code-server
     ports:
       - "8080:8080"
     environment:
-      - PASSWORD=hiveforge
+      - PASSWORD=colonyforge
     volumes:
       # 名前付きボリュームを使用（Windowsパス問題を回避）
-      - hiveforge-workspace:/workspace/HiveForge
+      - colonyforge-workspace:/workspace/ColonyForge
     restart: unless-stopped
     networks:
-      - hiveforge-dev-net
+      - colonyforge-dev-net
 
   # Playwright MCP Server（ローカルDockerfile使用）
   # ローカルにPlaywrightをインストールせずにMCP経由でブラウザ操作可能
@@ -85,7 +85,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.playwright-mcp
-    container_name: hiveforge-playwright-mcp
+    container_name: colonyforge-playwright-mcp
     ports:
       - "8931:8931"
     tmpfs:
@@ -96,22 +96,22 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
-        socat TCP-LISTEN:8080,fork,reuseaddr TCP:hiveforge-code-server:8080 &
+        socat TCP-LISTEN:8080,fork,reuseaddr TCP:colonyforge-code-server:8080 &
         exec npx @playwright/mcp@latest --port 8931 --host 0.0.0.0 --no-sandbox --browser chromium --viewport-size=1920x1080 --allowed-hosts '*'
     restart: unless-stopped
     networks:
-      hiveforge-dev-net:
+      colonyforge-dev-net:
         aliases:
           - playwright-mcp
-          - hiveforge-playwright-mcp
+          - colonyforge-playwright-mcp
 
 volumes:
-  hiveforge-venv:
-  hiveforge-workspace:
+  colonyforge-venv:
+  colonyforge-workspace:
     # code-server用のワークスペースボリューム
   ollama_models:
-    name: hiveforge_ollama_models
+    name: colonyforge_ollama_models
 
 networks:
-  hiveforge-dev-net:
-    name: hiveforge-dev-network
+  colonyforge-dev-net:
+    name: colonyforge-dev-network

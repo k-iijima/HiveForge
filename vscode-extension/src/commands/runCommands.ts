@@ -3,7 +3,7 @@
  */
 
 import * as vscode from 'vscode';
-import { HiveForgeClient } from '../client';
+import { ColonyForgeClient } from '../client';
 import { RunsProvider } from '../providers/runsProvider';
 import { TasksProvider } from '../providers/tasksProvider';
 import { RequirementsProvider } from '../providers/requirementsProvider';
@@ -27,23 +27,23 @@ export interface Providers {
  */
 export function registerRunCommands(
     context: vscode.ExtensionContext,
-    client: HiveForgeClient,
+    client: ColonyForgeClient,
     providers: Providers,
     refresh: () => void
 ): void {
     context.subscriptions.push(
-        vscode.commands.registerCommand('hiveforge.showDashboard', (item?: RunItem) => showDashboard(context, client, providers, item)),
-        vscode.commands.registerCommand('hiveforge.startRun', () => startRun(client, refresh)),
-        vscode.commands.registerCommand('hiveforge.viewEvents', (runId: string) => viewEvents(runId, client, providers.events)),
-        vscode.commands.registerCommand('hiveforge.refresh', refresh),
-        vscode.commands.registerCommand('hiveforge.selectRun', (runId: string) => selectRun(runId, client, providers)),
-        vscode.commands.registerCommand('hiveforge.completeRun', (item: RunItem) => completeRun(item, client, refresh)),
-        vscode.commands.registerCommand('hiveforge.abortRun', (item: RunItem) => abortRun(item, client, refresh)),
-        vscode.commands.registerCommand('hiveforge.showEventDetails', (event: HiveEvent) => showEventDetails(event))
+        vscode.commands.registerCommand('colonyforge.showDashboard', (item?: RunItem) => showDashboard(context, client, providers, item)),
+        vscode.commands.registerCommand('colonyforge.startRun', () => startRun(client, refresh)),
+        vscode.commands.registerCommand('colonyforge.viewEvents', (runId: string) => viewEvents(runId, client, providers.events)),
+        vscode.commands.registerCommand('colonyforge.refresh', refresh),
+        vscode.commands.registerCommand('colonyforge.selectRun', (runId: string) => selectRun(runId, client, providers)),
+        vscode.commands.registerCommand('colonyforge.completeRun', (item: RunItem) => completeRun(item, client, refresh)),
+        vscode.commands.registerCommand('colonyforge.abortRun', (item: RunItem) => abortRun(item, client, refresh)),
+        vscode.commands.registerCommand('colonyforge.showEventDetails', (event: HiveEvent) => showEventDetails(event))
     );
 }
 
-function showDashboard(context: vscode.ExtensionContext, client: HiveForgeClient, providers: Providers, item?: RunItem): void {
+function showDashboard(context: vscode.ExtensionContext, client: ColonyForgeClient, providers: Providers, item?: RunItem): void {
     // RunItemから起動された場合、そのRunを選択
     if (item) {
         client.setCurrentRunId(item.run.run_id);
@@ -54,7 +54,7 @@ function showDashboard(context: vscode.ExtensionContext, client: HiveForgeClient
     DashboardPanel.createOrShow(context.extensionUri, client);
 }
 
-async function startRun(client: HiveForgeClient, refresh: () => void): Promise<void> {
+async function startRun(client: ColonyForgeClient, refresh: () => void): Promise<void> {
     const goal = await vscode.window.showInputBox({
         prompt: 'Runの目標を入力してください',
         placeHolder: '例: ユーザー認証機能を実装する',
@@ -71,19 +71,19 @@ async function startRun(client: HiveForgeClient, refresh: () => void): Promise<v
     }
 }
 
-function viewEvents(runId: string, client: HiveForgeClient, eventsProvider: EventsProvider): void {
+function viewEvents(runId: string, client: ColonyForgeClient, eventsProvider: EventsProvider): void {
     client.setCurrentRunId(runId);
     eventsProvider.refresh();
 }
 
-function selectRun(runId: string, client: HiveForgeClient, providers: Providers): void {
+function selectRun(runId: string, client: ColonyForgeClient, providers: Providers): void {
     client.setCurrentRunId(runId);
     providers.tasks.refresh();
     providers.events.refresh();
     providers.requirements.refresh();
 }
 
-async function completeRun(item: RunItem, client: HiveForgeClient, refresh: () => void): Promise<void> {
+async function completeRun(item: RunItem, client: ColonyForgeClient, refresh: () => void): Promise<void> {
     const confirm = await vscode.window.showWarningMessage(
         `Run "${item.run.goal}" を完了しますか？`,
         { modal: true },
@@ -130,7 +130,7 @@ async function completeRun(item: RunItem, client: HiveForgeClient, refresh: () =
     }
 }
 
-async function abortRun(item: RunItem, client: HiveForgeClient, refresh: () => void): Promise<void> {
+async function abortRun(item: RunItem, client: ColonyForgeClient, refresh: () => void): Promise<void> {
     const reason = await vscode.window.showInputBox({
         prompt: '中止理由を入力',
         placeHolder: '例: 仕様変更のため中止',

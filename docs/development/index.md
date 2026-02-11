@@ -1,6 +1,6 @@
 # Development
 
-Resources for contributing to HiveForge development.
+Resources for contributing to ColonyForge development.
 
 | Topic | Description |
 |-------|-------------|

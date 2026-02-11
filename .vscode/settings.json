@@ -1,17 +1,17 @@
 {
     "mcp": {
         "servers": {
-            "hiveforge": {
+            "colonyforge": {
                 "type": "stdio",
                 "command": "python",
                 "args": [
                     "-m",
-                    "hiveforge.cli",
+                    "colonyforge.cli",
                     "mcp"
                 ],
-                "cwd": "/workspace/HiveForge",
+                "cwd": "/workspace/ColonyForge",
                 "env": {
-                    "PYTHONPATH": "/workspace/HiveForge/src"
+                    "PYTHONPATH": "/workspace/ColonyForge/src"
                 }
             }
         }
@@ -28,43 +28,43 @@
     "docker.dockerPath": "C:\\Users\\kiiji\\bin\\docker.exe",
     "containers.containerCommand": "C:\\Users\\kiiji\\bin\\docker.exe",
     "chat.tools.terminal.autoApprove": {
-        "/^cd /workspace/HiveForge/vscode-extension && npm run lint 2>&1 \\| tail -10$/": {
+        "/^cd /workspace/ColonyForge/vscode-extension && npm run lint 2>&1 \\| tail -10$/": {
             "approve": true,
             "matchCommandLine": true
         },
-        "/^cd /workspace/HiveForge/vscode-extension && npm run compile 2>&1 && npm run lint 2>&1$/": {
+        "/^cd /workspace/ColonyForge/vscode-extension && npm run compile 2>&1 && npm run lint 2>&1$/": {
             "approve": true,
             "matchCommandLine": true
         },
-        "/^cd /workspace/HiveForge/vscode-extension && npm run lint 2>&1 \\| tail -5$/": {
+        "/^cd /workspace/ColonyForge/vscode-extension && npm run lint 2>&1 \\| tail -5$/": {
             "approve": true,
             "matchCommandLine": true
         },
-        "/^cd /workspace/HiveForge/vscode-extension && npx tsc -p \\./ --noEmit 2>&1; echo \"EXIT:\\$\\?\"$/": {
+        "/^cd /workspace/ColonyForge/vscode-extension && npx tsc -p \\./ --noEmit 2>&1; echo \"EXIT:\\$\\?\"$/": {
             "approve": true,
             "matchCommandLine": true
         },
-        "/^cd /workspace/HiveForge/vscode-extension && npx eslint src --ext ts 2>&1; echo \"EXIT:\\$\\?\"$/": {
+        "/^cd /workspace/ColonyForge/vscode-extension && npx eslint src --ext ts 2>&1; echo \"EXIT:\\$\\?\"$/": {
             "approve": true,
             "matchCommandLine": true
         },
-        "/^cd /workspace/HiveForge/vscode-extension && npx eslint src/chatHandler\\.ts 2>&1; echo \"LINT_EXIT:\\$\\?\"$/": {
+        "/^cd /workspace/ColonyForge/vscode-extension && npx eslint src/chatHandler\\.ts 2>&1; echo \"LINT_EXIT:\\$\\?\"$/": {
             "approve": true,
             "matchCommandLine": true
         },
-        "/^cd /workspace/HiveForge/vscode-extension && npx eslint src/chatHandler\\.ts 2>&1 \\| wc -l && npx eslint src/chatHandler\\.ts 2>&1 \\| grep -c \"error\\\\\\|warning\" \\|\\| true$/": {
+        "/^cd /workspace/ColonyForge/vscode-extension && npx eslint src/chatHandler\\.ts 2>&1 \\| wc -l && npx eslint src/chatHandler\\.ts 2>&1 \\| grep -c \"error\\\\\\|warning\" \\|\\| true$/": {
             "approve": true,
             "matchCommandLine": true
         },
-        "/^docker inspect hiveforge-dev-ollama 2>/dev/null \\| python3 -c \"\nimport sys, json\nd = json\\.load\\(sys\\.stdin\\)\\[0\\]\nns = d\\.get\\('NetworkSettings', \\{\\}\\)\nprint\\('IPAddress:', ns\\.get\\('IPAddress'\\)\\)\nprint\\('Networks:', json\\.dumps\\(ns\\.get\\('Networks', \\{\\}\\), indent=2\\)\\)\nprint\\('Ports:', json\\.dumps\\(ns\\.get\\('Ports', \\{\\}\\), indent=2\\)\\)\nprint\\('HostConfig\\.NetworkMode:', d\\.get\\('HostConfig', \\{\\}\\)\\.get\\('NetworkMode'\\)\\)\n\"$/": {
+        "/^docker inspect colonyforge-dev-ollama 2>/dev/null \\| python3 -c \"\nimport sys, json\nd = json\\.load\\(sys\\.stdin\\)\\[0\\]\nns = d\\.get\\('NetworkSettings', \\{\\}\\)\nprint\\('IPAddress:', ns\\.get\\('IPAddress'\\)\\)\nprint\\('Networks:', json\\.dumps\\(ns\\.get\\('Networks', \\{\\}\\), indent=2\\)\\)\nprint\\('Ports:', json\\.dumps\\(ns\\.get\\('Ports', \\{\\}\\), indent=2\\)\\)\nprint\\('HostConfig\\.NetworkMode:', d\\.get\\('HostConfig', \\{\\}\\)\\.get\\('NetworkMode'\\)\\)\n\"$/": {
             "approve": true,
             "matchCommandLine": true
         },
-        "/^# 現在のdevcontainerのネットワーク確認\ndocker inspect hiveforge_devcontainer-hiveforge-dev-1 --format '\\{\\{json \\.NetworkSettings\\.Networks\\}\\}' 2>/dev/null \\| python3 -m json\\.tool 2>/dev/null \\| head -20$/": {
+        "/^# 現在のdevcontainerのネットワーク確認\ndocker inspect colonyforge_devcontainer-colonyforge-dev-1 --format '\\{\\{json \\.NetworkSettings\\.Networks\\}\\}' 2>/dev/null \\| python3 -m json\\.tool 2>/dev/null \\| head -20$/": {
             "approve": true,
             "matchCommandLine": true
         },
-        "/^# OllamaコンテナのIPアドレスをdocker execで取得してみる\ndocker exec hiveforge-dev-ollama cat /etc/hosts 2>&1 \\| tail -5\necho \"---\"\n# OllamaコンテナのNetworkModeと現状確認\ndocker inspect hiveforge-dev-ollama 2>/dev/null \\| python3 -c \"\nimport sys, json\nd = json\\.load\\(sys\\.stdin\\)\\[0\\]\nhc = d\\.get\\('HostConfig', \\{\\}\\)\nprint\\('NetworkMode:', hc\\.get\\('NetworkMode'\\)\\)\nprint\\('PortBindings:', json\\.dumps\\(hc\\.get\\('PortBindings', \\{\\}\\), indent=2\\)\\)\nns = d\\.get\\('NetworkSettings', \\{\\}\\)\nprint\\('IPAddress:', ns\\.get\\('IPAddress'\\)\\)\nfor name, info in ns\\.get\\('Networks', \\{\\}\\)\\.items\\(\\):\n    print\\(f'Network: \\{name\\}, IP: \\{info\\.get\\(\\\\\"IPAddress\\\\\"\\)\\}'\\)\n\"$/": {
+        "/^# OllamaコンテナのIPアドレスをdocker execで取得してみる\ndocker exec colonyforge-dev-ollama cat /etc/hosts 2>&1 \\| tail -5\necho \"---\"\n# OllamaコンテナのNetworkModeと現状確認\ndocker inspect colonyforge-dev-ollama 2>/dev/null \\| python3 -c \"\nimport sys, json\nd = json\\.load\\(sys\\.stdin\\)\\[0\\]\nhc = d\\.get\\('HostConfig', \\{\\}\\)\nprint\\('NetworkMode:', hc\\.get\\('NetworkMode'\\)\\)\nprint\\('PortBindings:', json\\.dumps\\(hc\\.get\\('PortBindings', \\{\\}\\), indent=2\\)\\)\nns = d\\.get\\('NetworkSettings', \\{\\}\\)\nprint\\('IPAddress:', ns\\.get\\('IPAddress'\\)\\)\nfor name, info in ns\\.get\\('Networks', \\{\\}\\)\\.items\\(\\):\n    print\\(f'Network: \\{name\\}, IP: \\{info\\.get\\(\\\\\"IPAddress\\\\\"\\)\\}'\\)\n\"$/": {
             "approve": true,
             "matchCommandLine": true
         }

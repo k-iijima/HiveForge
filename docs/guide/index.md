@@ -1,6 +1,6 @@
 # User Guide
 
-Learn how to use HiveForge effectively.
+Learn how to use ColonyForge effectively.
 
 | Topic | Description |
 |-------|-------------|
@@ -8,4 +8,4 @@ Learn how to use HiveForge effectively.
 | [CLI Reference](cli.md) | Command-line interface reference |
 | [Dashboard](dashboard.md) | VS Code extension and Hive Monitor |
 | [Agents](agents.md) | Agent hierarchy and roles |
-| [MCP Tools](mcp-tools.md) | Using HiveForge from GitHub Copilot Chat |
+| [MCP Tools](mcp-tools.md) | Using ColonyForge from GitHub Copilot Chat |

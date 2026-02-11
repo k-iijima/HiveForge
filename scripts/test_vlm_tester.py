@@ -9,14 +9,14 @@ import os
 from pathlib import Path
 
 # Ollama URLを設定（Docker内）
-os.environ["OLLAMA_BASE_URL"] = "http://hiveforge-dev-ollama:11434"
+os.environ["OLLAMA_BASE_URL"] = "http://colonyforge-dev-ollama:11434"
 
 
 async def test_screen_capture():
     """画面キャプチャのテスト"""
     from playwright.async_api import async_playwright
 
-    from hiveforge.vlm_tester import ScreenCapture
+    from colonyforge.vlm_tester import ScreenCapture
 
     print("=" * 60)
     print("1. Playwright + ScreenCapture テスト")
@@ -51,7 +51,7 @@ async def test_screen_capture():
 
 async def test_local_analysis(image_data: bytes):
     """ローカル分析のテスト（OCR/Diff）"""
-    from hiveforge.vlm_tester import AnalysisLevel, DiffAnalyzer, HybridAnalyzer
+    from colonyforge.vlm_tester import AnalysisLevel, DiffAnalyzer, HybridAnalyzer
 
     print("\n" + "=" * 60)
     print("2. ローカル分析テスト（Diff）")
@@ -82,13 +82,13 @@ async def test_local_analysis(image_data: bytes):
 
 async def test_vlm_providers():
     """VLMプロバイダーの確認"""
-    from hiveforge.vlm_tester import AnthropicProvider, MultiProviderVLMClient, OllamaProvider
+    from colonyforge.vlm_tester import AnthropicProvider, MultiProviderVLMClient, OllamaProvider
 
     print("\n" + "=" * 60)
     print("4. VLMプロバイダー状態確認")
     print("=" * 60)
 
-    ollama = OllamaProvider(base_url="http://hiveforge-dev-ollama:11434")
+    ollama = OllamaProvider(base_url="http://colonyforge-dev-ollama:11434")
     print(f"  Ollama available: {ollama.is_available()}")
 
     anthropic = AnthropicProvider()
@@ -101,13 +101,13 @@ async def test_vlm_providers():
 
 async def test_ollama_vlm(image_data: bytes):
     """Ollama VLMでの分析テスト"""
-    from hiveforge.vlm_tester import OllamaProvider
+    from colonyforge.vlm_tester import OllamaProvider
 
     print("\n" + "=" * 60)
     print("5. Ollama VLM 分析テスト")
     print("=" * 60)
 
-    provider = OllamaProvider(base_url="http://hiveforge-dev-ollama:11434")
+    provider = OllamaProvider(base_url="http://colonyforge-dev-ollama:11434")
 
     if not provider.is_available():
         print("⚠ Ollamaが利用できません")
@@ -117,7 +117,7 @@ async def test_ollama_vlm(image_data: bytes):
     import httpx
 
     async with httpx.AsyncClient() as client:
-        response = await client.get("http://hiveforge-dev-ollama:11434/api/tags")
+        response = await client.get("http://colonyforge-dev-ollama:11434/api/tags")
         models = response.json().get("models", [])
         model_names = [m["name"] for m in models]
         print(f"  利用可能なモデル: {model_names}")
@@ -125,7 +125,7 @@ async def test_ollama_vlm(image_data: bytes):
         if not any("llava" in m for m in model_names):
             print("⚠ llavaモデルがありません。ダウンロード中かもしれません。")
             print("  以下のコマンドでダウンロードできます:")
-            print('  curl http://hiveforge-dev-ollama:11434/api/pull -d \'{"name": "llava:7b"}\'')
+            print('  curl http://colonyforge-dev-ollama:11434/api/pull -d \'{"name": "llava:7b"}\'')
             return
 
     print("  VLM分析を実行中...")
@@ -140,7 +140,7 @@ async def test_action_executor():
     """ActionExecutorのテスト"""
     from playwright.async_api import async_playwright
 
-    from hiveforge.vlm_tester import ActionExecutor
+    from colonyforge.vlm_tester import ActionExecutor
 
     print("\n" + "=" * 60)
     print("6. ActionExecutor テスト")

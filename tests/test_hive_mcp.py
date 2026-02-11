@@ -14,14 +14,14 @@ class TestHiveMCPToolDefinitions:
     @pytest.fixture
     def mcp_server(self, tmp_path, monkeypatch):
         """テスト用MCPサーバー"""
-        from hiveforge.mcp_server.server import HiveForgeMCPServer
+        from colonyforge.mcp_server.server import ColonyForgeMCPServer
 
-        with patch("hiveforge.mcp_server.server.get_settings") as mock_settings:
+        with patch("colonyforge.mcp_server.server.get_settings") as mock_settings:
             mock_s = MagicMock()
             mock_s.get_vault_path.return_value = tmp_path / "Vault"
             mock_settings.return_value = mock_s
 
-            server = HiveForgeMCPServer()
+            server = ColonyForgeMCPServer()
             # ハンドラを直接アクセス可能にする
             server._handle_create_hive = server._hive_handlers.handle_create_hive
             server._handle_list_hives = server._hive_handlers.handle_list_hives
@@ -32,7 +32,7 @@ class TestHiveMCPToolDefinitions:
     def test_create_hive_tool_exists(self, mcp_server):
         """create_hiveツールが存在する"""
         # Act
-        from hiveforge.mcp_server.tools import get_tool_definitions
+        from colonyforge.mcp_server.tools import get_tool_definitions
 
         tools = get_tool_definitions()
         tool_names = [t.name for t in tools]
@@ -43,7 +43,7 @@ class TestHiveMCPToolDefinitions:
     def test_list_hives_tool_exists(self, mcp_server):
         """list_hivesツールが存在する"""
         # Act
-        from hiveforge.mcp_server.tools import get_tool_definitions
+        from colonyforge.mcp_server.tools import get_tool_definitions
 
         tools = get_tool_definitions()
         tool_names = [t.name for t in tools]
@@ -54,7 +54,7 @@ class TestHiveMCPToolDefinitions:
     def test_get_hive_tool_exists(self, mcp_server):
         """get_hiveツールが存在する"""
         # Act
-        from hiveforge.mcp_server.tools import get_tool_definitions
+        from colonyforge.mcp_server.tools import get_tool_definitions
 
         tools = get_tool_definitions()
         tool_names = [t.name for t in tools]
@@ -65,7 +65,7 @@ class TestHiveMCPToolDefinitions:
     def test_close_hive_tool_exists(self, mcp_server):
         """close_hiveツールが存在する"""
         # Act
-        from hiveforge.mcp_server.tools import get_tool_definitions
+        from colonyforge.mcp_server.tools import get_tool_definitions
 
         tools = get_tool_definitions()
         tool_names = [t.name for t in tools]
@@ -80,14 +80,14 @@ class TestHiveMCPHandlers:
     @pytest.fixture
     def mcp_server(self, tmp_path, monkeypatch):
         """テスト用MCPサーバー"""
-        from hiveforge.mcp_server.server import HiveForgeMCPServer
+        from colonyforge.mcp_server.server import ColonyForgeMCPServer
 
-        with patch("hiveforge.mcp_server.server.get_settings") as mock_settings:
+        with patch("colonyforge.mcp_server.server.get_settings") as mock_settings:
             mock_s = MagicMock()
             mock_s.get_vault_path.return_value = tmp_path / "Vault"
             mock_settings.return_value = mock_s
 
-            server = HiveForgeMCPServer()
+            server = ColonyForgeMCPServer()
             server._handle_create_hive = server._hive_handlers.handle_create_hive
             server._handle_list_hives = server._hive_handlers.handle_list_hives
             server._handle_get_hive = server._hive_handlers.handle_get_hive

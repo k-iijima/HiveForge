@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from hiveforge.llm.prompt_config import (
+from colonyforge.llm.prompt_config import (
     BeekeeperConfig,
     LLMConfig,
     PromptLoader,
@@ -18,7 +18,7 @@ from hiveforge.llm.prompt_config import (
     QueenBeeConfig,
     WorkerBeeConfig,
 )
-from hiveforge.llm.prompts import (
+from colonyforge.llm.prompts import (
     BEEKEEPER_SYSTEM,
     QUEEN_BEE_SYSTEM,
     WORKER_BEE_SYSTEM,

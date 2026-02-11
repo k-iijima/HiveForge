@@ -7,7 +7,7 @@
  */
 
 import * as vscode from 'vscode';
-import { HiveForgeClient, HiveEvent } from '../client';
+import { ColonyForgeClient, HiveEvent } from '../client';
 
 export class EventItem extends vscode.TreeItem {
     constructor(
@@ -44,7 +44,7 @@ export class EventItem extends vscode.TreeItem {
 
         this.contextValue = 'event';
         this.command = {
-            command: 'hiveforge.showEventDetails',
+            command: 'colonyforge.showEventDetails',
             title: 'Show Event Details',
             arguments: [event],
         };
@@ -61,7 +61,7 @@ export class EventsProvider implements vscode.TreeDataProvider<EventItem> {
     private childrenMap: Map<string, HiveEvent[]> = new Map();
     private treeMode = true; // true: ツリー表示, false: フラット表示
 
-    constructor(private client: HiveForgeClient) { }
+    constructor(private client: ColonyForgeClient) { }
 
     refresh(): void {
         this.cachedEvents = [];
@@ -136,7 +136,7 @@ export class EventsProvider implements vscode.TreeDataProvider<EventItem> {
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             console.error('Failed to get events:', error);
-            vscode.window.showErrorMessage(`HiveForge: イベント一覧の取得に失敗しました: ${message}`);
+            vscode.window.showErrorMessage(`ColonyForge: イベント一覧の取得に失敗しました: ${message}`);
             return [];
         }
     }

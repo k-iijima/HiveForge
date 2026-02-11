@@ -5,7 +5,7 @@
  */
 
 import * as vscode from 'vscode';
-import { HiveForgeClient, HiveEvent } from '../client';
+import { ColonyForgeClient, HiveEvent } from '../client';
 
 type DecisionPayload = {
     key?: string;
@@ -50,7 +50,7 @@ export class DecisionItem extends vscode.TreeItem {
         this.iconPath = new vscode.ThemeIcon('book');
         this.contextValue = 'decision';
         this.command = {
-            command: 'hiveforge.showDecisionDetails',
+            command: 'colonyforge.showDecisionDetails',
             title: 'Show Decision Details',
             arguments: [event],
         };
@@ -66,7 +66,7 @@ export class DecisionsProvider implements vscode.TreeDataProvider<DecisionItem> 
     private fixedRunId: string | null = null;
 
     constructor(
-        private client: HiveForgeClient,
+        private client: ColonyForgeClient,
         decisionsRunId?: string
     ) {
         // 設定で固定Run IDが指定されていれば保持（空文字の場合はnull扱い）
@@ -118,7 +118,7 @@ export class DecisionsProvider implements vscode.TreeDataProvider<DecisionItem> 
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             console.error('Failed to get decisions:', error);
-            vscode.window.showErrorMessage(`HiveForge: Decisionsの取得に失敗しました: ${message}`);
+            vscode.window.showErrorMessage(`ColonyForge: Decisionsの取得に失敗しました: ${message}`);
             return [];
         }
     }

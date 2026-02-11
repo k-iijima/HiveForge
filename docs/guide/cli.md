@@ -1,11 +1,11 @@
 # CLI Reference
 
-HiveForge provides a command-line interface for server management, task execution, and interactive sessions.
+ColonyForge provides a command-line interface for server management, task execution, and interactive sessions.
 
 ## Synopsis
 
 ```
-hiveforge <command> [options]
+colonyforge <command> [options]
 ```
 
 ## Commands
@@ -15,7 +15,7 @@ hiveforge <command> [options]
 Starts the FastAPI REST server.
 
 ```bash
-hiveforge server [--host HOST] [--port PORT] [--reload]
+colonyforge server [--host HOST] [--port PORT] [--reload]
 ```
 
 | Option | Default | Description |
@@ -27,7 +27,7 @@ hiveforge server [--host HOST] [--port PORT] [--reload]
 **Example:**
 
 ```bash
-hiveforge server --port 8080 --reload
+colonyforge server --port 8080 --reload
 ```
 
 After starting, Swagger UI is available at `http://localhost:8000/docs`.
@@ -39,7 +39,7 @@ After starting, Swagger UI is available at `http://localhost:8000/docs`.
 Starts the Model Context Protocol server for GitHub Copilot Chat integration.
 
 ```bash
-hiveforge mcp
+colonyforge mcp
 ```
 
 Communication uses **stdio**. Configure in `.vscode/mcp.json`:
@@ -47,8 +47,8 @@ Communication uses **stdio**. Configure in `.vscode/mcp.json`:
 ```json
 {
   "servers": {
-    "hiveforge": {
-      "command": "hiveforge",
+    "colonyforge": {
+      "command": "colonyforge",
       "args": ["mcp"]
     }
   }
@@ -62,7 +62,7 @@ Communication uses **stdio**. Configure in `.vscode/mcp.json`:
 Creates a new Hive scaffolding.
 
 ```bash
-hiveforge init [--name NAME]
+colonyforge init [--name NAME]
 ```
 
 | Option | Default | Description |
@@ -76,7 +76,7 @@ hiveforge init [--name NAME]
 Displays the current state of a Run.
 
 ```bash
-hiveforge status [--run-id RUN_ID]
+colonyforge status [--run-id RUN_ID]
 ```
 
 | Option | Default | Description |
@@ -90,7 +90,7 @@ hiveforge status [--run-id RUN_ID]
 Runs a task using an LLM agent in a single pass.
 
 ```bash
-hiveforge run "task description" [--agent AGENT]
+colonyforge run "task description" [--agent AGENT]
 ```
 
 | Option | Default | Choices | Description |
@@ -100,7 +100,7 @@ hiveforge run "task description" [--agent AGENT]
 **Example:**
 
 ```bash
-hiveforge run "Create a REST endpoint for user authentication" --agent queen_bee
+colonyforge run "Create a REST endpoint for user authentication" --agent queen_bee
 ```
 
 ---
@@ -110,13 +110,13 @@ hiveforge run "Create a REST endpoint for user authentication" --agent queen_bee
 Sends a message to the Beekeeper agent for interactive dialogue.
 
 ```bash
-hiveforge chat "message"
+colonyforge chat "message"
 ```
 
 **Example:**
 
 ```bash
-hiveforge chat "What is the status of the current project?"
+colonyforge chat "What is the status of the current project?"
 ```
 
 ---
@@ -126,7 +126,7 @@ hiveforge chat "What is the status of the current project?"
 Records a Decision event to the Akashic Record.
 
 ```bash
-hiveforge record-decision \
+colonyforge record-decision \
   --key D5 \
   --title "Choose database engine" \
   --selected "PostgreSQL" \

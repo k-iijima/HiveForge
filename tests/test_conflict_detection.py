@@ -3,7 +3,7 @@
 外部フィードバック対応: Colony間の意見衝突を検出・解決するためのイベント。
 """
 
-from hiveforge.core.events import (
+from colonyforge.core.events import (
     EVENT_TYPE_MAP,
     ConflictDetectedEvent,
     ConflictResolvedEvent,

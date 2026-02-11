@@ -4,9 +4,9 @@ import contextlib
 
 import pytest
 
-from hiveforge.beekeeper.server import BeekeeperMCPServer
-from hiveforge.beekeeper.session import SessionState
-from hiveforge.core import AkashicRecord
+from colonyforge.beekeeper.server import BeekeeperMCPServer
+from colonyforge.beekeeper.session import SessionState
+from colonyforge.core import AkashicRecord
 
 
 @pytest.fixture
@@ -482,7 +482,7 @@ class TestEmergencyStop:
     async def test_emergency_stop_all_closes_queens(self, beekeeper):
         """scope=allの緊急停止で全Queen Beeが閉じられる"""
         # Arrange: Queen Beeを作成
-        from hiveforge.queen_bee.server import QueenBeeMCPServer
+        from colonyforge.queen_bee.server import QueenBeeMCPServer
 
         queen = QueenBeeMCPServer(colony_id="colony-1", ar=beekeeper.ar)
         beekeeper._queens["colony-1"] = queen
@@ -497,7 +497,7 @@ class TestEmergencyStop:
     async def test_emergency_stop_colony_closes_target_only(self, beekeeper):
         """scope=colonyの緊急停止で対象Colonyのみ閉じられる"""
         # Arrange: 2つのQueen Beeを作成
-        from hiveforge.queen_bee.server import QueenBeeMCPServer
+        from colonyforge.queen_bee.server import QueenBeeMCPServer
 
         beekeeper._queens["colony-1"] = QueenBeeMCPServer(colony_id="colony-1", ar=beekeeper.ar)
         beekeeper._queens["colony-2"] = QueenBeeMCPServer(colony_id="colony-2", ar=beekeeper.ar)
@@ -549,7 +549,7 @@ class TestClose:
     async def test_close_releases_queens(self, beekeeper):
         """closeでQueen Beeも解放される"""
         # Arrange: Queen Beeを作成
-        from hiveforge.queen_bee.server import QueenBeeMCPServer
+        from colonyforge.queen_bee.server import QueenBeeMCPServer
 
         queen = QueenBeeMCPServer(colony_id="colony-1", ar=beekeeper.ar)
         beekeeper._queens["colony-1"] = queen
@@ -618,7 +618,7 @@ class TestBeekeeperAgentRunnerPromptContext:
         # Arrange: LLMクライアントをモックで事前設定
         from unittest.mock import AsyncMock, MagicMock
 
-        from hiveforge.llm.client import LLMClient
+        from colonyforge.llm.client import LLMClient
 
         mock_client = MagicMock(spec=LLMClient)
         mock_client.chat = AsyncMock()
@@ -641,8 +641,8 @@ class TestBeekeeperAgentRunnerPromptContext:
         # Arrange
         from unittest.mock import AsyncMock, MagicMock
 
-        from hiveforge.core.activity_bus import AgentRole
-        from hiveforge.llm.client import LLMClient
+        from colonyforge.core.activity_bus import AgentRole
+        from colonyforge.llm.client import LLMClient
 
         mock_client = MagicMock(spec=LLMClient)
         mock_client.chat = AsyncMock()

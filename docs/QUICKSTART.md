@@ -1,4 +1,4 @@
-# HiveForge クイックスタート
+# ColonyForge クイックスタート
 
 > **本書の役割**: 手順書。セットアップから動作確認までの具体的な操作手順を記載。
 > アーキテクチャの詳細は [ARCHITECTURE.md](ARCHITECTURE.md)、設計思想は [コンセプト_v6.md](コンセプト_v6.md) を参照。
@@ -9,8 +9,8 @@ devcontainer内で **F5キー** を押すとAPIサーバーが起動します。
 
 | 構成名 | 説明 |
 |--------|------|
-| **HiveForge API Server** | REST API（デフォルト） |
-| HiveForge MCP Server | MCP Server |
+| **ColonyForge API Server** | REST API（デフォルト） |
+| ColonyForge MCP Server | MCP Server |
 | Run Tests | pytest実行 |
 
 **起動後:** http://localhost:8000/docs でSwagger UI
@@ -143,7 +143,7 @@ curl -X POST http://localhost:8000/colonies/{colony_id}/complete
 
 ## MCP ツール
 
-Copilot Chatで `@hiveforge` を使用（要: VS Code再読み込み）:
+Copilot Chatで `@colonyforge` を使用（要: VS Code再読み込み）:
 
 ### Hive/Colony操作
 
@@ -183,8 +183,8 @@ VS CodeでMCPサーバーをCopilot Chatに登録するには、`.vscode/mcp.jso
 ```json
 {
   "servers": {
-    "hiveforge": {
-      "command": "hiveforge",
+    "colonyforge": {
+      "command": "colonyforge",
       "args": ["mcp"],
       "env": {}
     }
@@ -196,13 +196,13 @@ VS CodeでMCPサーバーをCopilot Chatに登録するには、`.vscode/mcp.jso
 
 1. **ファイル作成**: `.vscode/mcp.json` を上記内容で作成
 2. **VS Code再読み込み**: コマンドパレット → `Developer: Reload Window`
-3. **確認**: Copilot Chatで `@hiveforge` と入力 → ツール一覧が表示される
+3. **確認**: Copilot Chatで `@colonyforge` と入力 → ツール一覧が表示される
 
 #### devcontainer内での設定
 
-devcontainer使用時は上記設定がそのまま利用可能です（`hiveforge` コマンドがパスに含まれるため）。
+devcontainer使用時は上記設定がそのまま利用可能です（`colonyforge` コマンドがパスに含まれるため）。
 
-> **Note:** `@hiveforge`が出ない場合は `Developer: Reload Window` を実行
+> **Note:** `@colonyforge`が出ない場合は `Developer: Reload Window` を実行
 
 ---
 

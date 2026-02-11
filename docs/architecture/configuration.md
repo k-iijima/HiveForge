@@ -1,8 +1,8 @@
 # Configuration
 
-HiveForge is configured via `hiveforge.config.yaml` at the project root.
+ColonyForge is configured via `colonyforge.config.yaml` at the project root.
 
-Environment variable overrides follow the pattern: `HIVEFORGE_<SECTION>__<KEY>` (e.g., `HIVEFORGE_SERVER__PORT=9000`).
+Environment variable overrides follow the pattern: `COLONYFORGE_<SECTION>__<KEY>` (e.g., `COLONYFORGE_SERVER__PORT=9000`).
 
 ## Configuration Sections
 
@@ -71,7 +71,7 @@ llm:
 ```yaml
 auth:
   enabled: false
-  api_key_env: "HIVEFORGE_API_KEY"
+  api_key_env: "COLONYFORGE_API_KEY"
 ```
 
 ### `agents` — Agent Configuration
@@ -168,7 +168,7 @@ Agent prompts are managed via YAML files with a hierarchical lookup:
 
 1. `Vault/hives/{hive_id}/colonies/{colony_id}/` — Colony-specific
 2. `Vault/hives/{hive_id}/` — Hive-wide defaults
-3. `src/hiveforge/prompts/defaults/` — Package defaults
+3. `src/colonyforge/prompts/defaults/` — Package defaults
 4. Hardcoded fallback
 
 File naming conventions:

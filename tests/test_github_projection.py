@@ -10,10 +10,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from hiveforge.core.config import GitHubConfig
-from hiveforge.core.events.base import BaseEvent
-from hiveforge.core.events.types import EventType
-from hiveforge.core.github.projection import GitHubProjection, SyncState
+from colonyforge.core.config import GitHubConfig
+from colonyforge.core.events.base import BaseEvent
+from colonyforge.core.events.types import EventType
+from colonyforge.core.github.projection import GitHubProjection, SyncState
 
 # ---------------------------------------------------------------------------
 # fixtures
@@ -28,7 +28,7 @@ def github_config() -> GitHubConfig:
         owner="test-owner",
         repo="test-repo",
         project_number=1,
-        label_prefix="hiveforge:",
+        label_prefix="colonyforge:",
     )
 
 
@@ -40,7 +40,7 @@ def mock_client() -> MagicMock:
     client.update_issue = AsyncMock(return_value={"number": 42, "state": "open"})
     client.close_issue = AsyncMock(return_value={"number": 42, "state": "closed"})
     client.add_comment = AsyncMock(return_value={"id": 999, "body": "comment"})
-    client.apply_labels = AsyncMock(return_value=[{"name": "hiveforge:run"}])
+    client.apply_labels = AsyncMock(return_value=[{"name": "colonyforge:run"}])
     return client
 
 

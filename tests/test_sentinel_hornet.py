@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from hiveforge.core.events import BaseEvent, EventType
+from colonyforge.core.events import BaseEvent, EventType
 
 # ===========================================================================
 # 前提条件テスト: ColonyState.SUSPENDED + colony.suspended イベント
@@ -26,7 +26,7 @@ class TestColonyStateSuspended:
     def test_colony_state_has_suspended(self):
         """ColonyState enumにSUSPENDED値が存在する"""
         # Arrange
-        from hiveforge.core.ar.projections import ColonyState
+        from colonyforge.core.ar.projections import ColonyState
 
         # Act & Assert
         assert hasattr(ColonyState, "SUSPENDED")
@@ -44,8 +44,8 @@ class TestColonyStateSuspended:
         Sentinel Hornetがアラートを発行した際にColonyがSUSPENDEDになる。
         """
         # Arrange
-        from hiveforge.core.ar.projections import ColonyState
-        from hiveforge.core.state import ColonyStateMachine
+        from colonyforge.core.ar.projections import ColonyState
+        from colonyforge.core.state import ColonyStateMachine
 
         sm = ColonyStateMachine()
         sm.current_state = ColonyState.IN_PROGRESS
@@ -67,9 +67,9 @@ class TestColonyStateSuspended:
         ユーザー承認後にColonyを再開できる。
         """
         # Arrange
-        from hiveforge.core.ar.projections import ColonyState
-        from hiveforge.core.events import ColonyStartedEvent
-        from hiveforge.core.state import ColonyStateMachine
+        from colonyforge.core.ar.projections import ColonyState
+        from colonyforge.core.events import ColonyStartedEvent
+        from colonyforge.core.state import ColonyStateMachine
 
         sm = ColonyStateMachine()
         sm.current_state = ColonyState.SUSPENDED
@@ -88,9 +88,9 @@ class TestColonyStateSuspended:
         一時停止から失敗終了にできる。
         """
         # Arrange
-        from hiveforge.core.ar.projections import ColonyState
-        from hiveforge.core.events import ColonyFailedEvent
-        from hiveforge.core.state import ColonyStateMachine
+        from colonyforge.core.ar.projections import ColonyState
+        from colonyforge.core.events import ColonyFailedEvent
+        from colonyforge.core.state import ColonyStateMachine
 
         sm = ColonyStateMachine()
         sm.current_state = ColonyState.SUSPENDED
@@ -106,8 +106,8 @@ class TestColonyStateSuspended:
     def test_colony_suspended_valid_events(self):
         """SUSPENDED状態から遷移可能なイベント一覧"""
         # Arrange
-        from hiveforge.core.ar.projections import ColonyState
-        from hiveforge.core.state import ColonyStateMachine
+        from colonyforge.core.ar.projections import ColonyState
+        from colonyforge.core.state import ColonyStateMachine
 
         sm = ColonyStateMachine()
         sm.current_state = ColonyState.SUSPENDED
@@ -127,8 +127,8 @@ class TestHiveAggregateColonySuspended:
     def test_apply_colony_suspended(self):
         """colony.suspendedイベントでColonyProjection.state=SUSPENDEDになる"""
         # Arrange
-        from hiveforge.core.ar.hive_projections import HiveAggregate
-        from hiveforge.core.ar.projections import ColonyState
+        from colonyforge.core.ar.hive_projections import HiveAggregate
+        from colonyforge.core.ar.projections import ColonyState
 
         agg = HiveAggregate("hive-1")
 
@@ -168,7 +168,7 @@ class TestHiveAggregateColonySuspended:
     def test_suspended_colony_not_in_active_colonies(self):
         """SUSPENDED Colonyはactive_coloniesに含まれない"""
         # Arrange
-        from hiveforge.core.ar.hive_projections import HiveAggregate
+        from colonyforge.core.ar.hive_projections import HiveAggregate
 
         agg = HiveAggregate("hive-1")
         agg.apply(
@@ -230,7 +230,7 @@ class TestSentinelHornetInit:
     def test_default_thresholds(self):
         """デフォルト閾値で初期化できる"""
         # Arrange & Act
-        from hiveforge.sentinel_hornet.monitor import SentinelHornet
+        from colonyforge.sentinel_hornet.monitor import SentinelHornet
 
         sentinel = SentinelHornet()
 
@@ -242,7 +242,7 @@ class TestSentinelHornetInit:
     def test_custom_thresholds(self):
         """カスタム閾値で初期化できる"""
         # Arrange & Act
-        from hiveforge.sentinel_hornet.monitor import SentinelHornet
+        from colonyforge.sentinel_hornet.monitor import SentinelHornet
 
         sentinel = SentinelHornet(
             max_event_rate=100,
@@ -258,7 +258,7 @@ class TestSentinelHornetInit:
     def test_from_config(self):
         """設定ファイルから閾値を読み込める"""
         # Arrange
-        from hiveforge.sentinel_hornet.monitor import SentinelHornet
+        from colonyforge.sentinel_hornet.monitor import SentinelHornet
 
         config = {
             "max_event_rate": 200,
@@ -288,7 +288,7 @@ class TestLoopDetection:
     def test_no_loop_normal_sequence(self):
         """正常なイベントシーケンスではループ検出しない"""
         # Arrange
-        from hiveforge.sentinel_hornet.monitor import SentinelHornet
+        from colonyforge.sentinel_hornet.monitor import SentinelHornet
 
         sentinel = SentinelHornet(max_loop_count=3)
 
@@ -308,7 +308,7 @@ class TestLoopDetection:
     def test_detect_task_retry_loop(self):
         """タスクの作成→失敗→リトライの繰り返しを検出"""
         # Arrange
-        from hiveforge.sentinel_hornet.monitor import SentinelHornet
+        from colonyforge.sentinel_hornet.monitor import SentinelHornet
 
         sentinel = SentinelHornet(max_loop_count=3)
 
@@ -329,7 +329,7 @@ class TestLoopDetection:
     def test_detect_event_type_cycle(self):
         """同じイベント型パターンの周期的繰り返しを検出"""
         # Arrange
-        from hiveforge.sentinel_hornet.monitor import SentinelHornet
+        from colonyforge.sentinel_hornet.monitor import SentinelHornet
 
         sentinel = SentinelHornet(max_loop_count=3)
 
@@ -358,7 +358,7 @@ class TestRunawayDetection:
     def test_normal_rate_no_alert(self):
         """正常レートではアラートなし"""
         # Arrange
-        from hiveforge.sentinel_hornet.monitor import SentinelHornet
+        from colonyforge.sentinel_hornet.monitor import SentinelHornet
 
         sentinel = SentinelHornet(
             max_event_rate=100,
@@ -386,7 +386,7 @@ class TestRunawayDetection:
     def test_high_rate_triggers_alert(self):
         """高レートでアラート発行"""
         # Arrange
-        from hiveforge.sentinel_hornet.monitor import SentinelHornet
+        from colonyforge.sentinel_hornet.monitor import SentinelHornet
 
         sentinel = SentinelHornet(
             max_event_rate=10,
@@ -414,7 +414,7 @@ class TestRunawayDetection:
     def test_old_events_outside_window_ignored(self):
         """ウィンドウ外の古いイベントはレート計算に含めない"""
         # Arrange
-        from hiveforge.sentinel_hornet.monitor import SentinelHornet
+        from colonyforge.sentinel_hornet.monitor import SentinelHornet
 
         sentinel = SentinelHornet(
             max_event_rate=10,
@@ -459,7 +459,7 @@ class TestCostDetection:
     def test_normal_cost_no_alert(self):
         """正常コストではアラートなし"""
         # Arrange
-        from hiveforge.sentinel_hornet.monitor import SentinelHornet
+        from colonyforge.sentinel_hornet.monitor import SentinelHornet
 
         sentinel = SentinelHornet(max_cost=1000.0)
 
@@ -490,7 +490,7 @@ class TestCostDetection:
     def test_cost_exceeded_triggers_alert(self):
         """コスト超過でアラート発行"""
         # Arrange
-        from hiveforge.sentinel_hornet.monitor import SentinelHornet
+        from colonyforge.sentinel_hornet.monitor import SentinelHornet
 
         sentinel = SentinelHornet(max_cost=1.0)
 
@@ -517,7 +517,7 @@ class TestCostDetection:
     def test_token_count_tracked(self):
         """トークン使用量が累積追跡される"""
         # Arrange
-        from hiveforge.sentinel_hornet.monitor import SentinelHornet
+        from colonyforge.sentinel_hornet.monitor import SentinelHornet
 
         sentinel = SentinelHornet(max_cost=10000.0)
 
@@ -551,7 +551,7 @@ class TestSecurityViolationDetection:
     def test_read_only_no_violation(self):
         """READ_ONLY操作はどのTrustLevelでも違反なし"""
         # Arrange
-        from hiveforge.sentinel_hornet.monitor import SentinelHornet
+        from colonyforge.sentinel_hornet.monitor import SentinelHornet
 
         sentinel = SentinelHornet()
 
@@ -575,7 +575,7 @@ class TestSecurityViolationDetection:
     def test_irreversible_at_low_trust_triggers_alert(self):
         """IRREVERSIBLE操作が低TrustLevelで実行されたら違反"""
         # Arrange
-        from hiveforge.sentinel_hornet.monitor import SentinelHornet
+        from colonyforge.sentinel_hornet.monitor import SentinelHornet
 
         sentinel = SentinelHornet()
 
@@ -601,7 +601,7 @@ class TestSecurityViolationDetection:
     def test_irreversible_with_confirmation_no_violation(self):
         """IRREVERSIBLE操作でもconfirmed=Trueなら違反なし"""
         # Arrange
-        from hiveforge.sentinel_hornet.monitor import SentinelHornet
+        from colonyforge.sentinel_hornet.monitor import SentinelHornet
 
         sentinel = SentinelHornet()
 
@@ -636,7 +636,7 @@ class TestColonySuspensionFlow:
     def test_generate_alert_event(self):
         """アラートからsentinel.alert_raisedイベントを生成"""
         # Arrange
-        from hiveforge.sentinel_hornet.monitor import SentinelAlert, SentinelHornet
+        from colonyforge.sentinel_hornet.monitor import SentinelAlert, SentinelHornet
 
         sentinel = SentinelHornet()
         alert = SentinelAlert(
@@ -659,7 +659,7 @@ class TestColonySuspensionFlow:
     def test_generate_suspension_event(self):
         """アラートからcolony.suspendedイベントを生成"""
         # Arrange
-        from hiveforge.sentinel_hornet.monitor import SentinelAlert, SentinelHornet
+        from colonyforge.sentinel_hornet.monitor import SentinelAlert, SentinelHornet
 
         sentinel = SentinelHornet()
         alert = SentinelAlert(
@@ -681,7 +681,7 @@ class TestColonySuspensionFlow:
     def test_generate_report_event(self):
         """監視レポートイベントを生成"""
         # Arrange
-        from hiveforge.sentinel_hornet.monitor import SentinelHornet
+        from colonyforge.sentinel_hornet.monitor import SentinelHornet
 
         sentinel = SentinelHornet()
 
@@ -709,7 +709,7 @@ class TestSentinelConfig:
     def test_default_config_values(self):
         """SentinelHornetのデフォルト値が妥当"""
         # Arrange & Act
-        from hiveforge.sentinel_hornet.monitor import SentinelHornet
+        from colonyforge.sentinel_hornet.monitor import SentinelHornet
 
         sentinel = SentinelHornet()
 
@@ -722,7 +722,7 @@ class TestSentinelConfig:
     def test_from_config_partial(self):
         """一部の設定のみ上書き、残りはデフォルト"""
         # Arrange
-        from hiveforge.sentinel_hornet.monitor import SentinelHornet
+        from colonyforge.sentinel_hornet.monitor import SentinelHornet
 
         config = {"max_event_rate": 200}
 
@@ -764,7 +764,7 @@ class TestKPIDegradationDetection:
 
     def test_detect_correctness_drop(self):
         """Correctness KPIの急低下をアラートとして検出"""
-        from hiveforge.sentinel_hornet.monitor import SentinelHornet
+        from colonyforge.sentinel_hornet.monitor import SentinelHornet
 
         sentinel = SentinelHornet()
 
@@ -785,7 +785,7 @@ class TestKPIDegradationDetection:
 
     def test_no_alert_stable_kpi(self):
         """KPIが安定している場合はアラートなし"""
-        from hiveforge.sentinel_hornet.monitor import SentinelHornet
+        from colonyforge.sentinel_hornet.monitor import SentinelHornet
 
         sentinel = SentinelHornet()
 
@@ -802,7 +802,7 @@ class TestKPIDegradationDetection:
 
     def test_detect_incident_rate_spike(self):
         """Incident Rateの急上昇を検出"""
-        from hiveforge.sentinel_hornet.monitor import SentinelHornet
+        from colonyforge.sentinel_hornet.monitor import SentinelHornet
 
         sentinel = SentinelHornet()
 
@@ -819,7 +819,7 @@ class TestKPIDegradationDetection:
 
     def test_kpi_degradation_empty_kpi(self):
         """KPIが空の場合はアラートなし"""
-        from hiveforge.sentinel_hornet.monitor import SentinelHornet
+        from colonyforge.sentinel_hornet.monitor import SentinelHornet
 
         sentinel = SentinelHornet()
 
@@ -833,7 +833,7 @@ class TestKPIDegradationDetection:
 
     def test_kpi_degradation_threshold_configurable(self):
         """KPI劣化閾値を設定可能"""
-        from hiveforge.sentinel_hornet.monitor import SentinelHornet
+        from colonyforge.sentinel_hornet.monitor import SentinelHornet
 
         sentinel = SentinelHornet(kpi_drop_threshold=0.5)
 
@@ -855,7 +855,7 @@ class TestRollbackAction:
 
     def test_create_rollback_event(self):
         """ロールバックイベントを生成できる"""
-        from hiveforge.sentinel_hornet.monitor import SentinelAlert, SentinelHornet
+        from colonyforge.sentinel_hornet.monitor import SentinelAlert, SentinelHornet
 
         sentinel = SentinelHornet()
         alert = SentinelAlert(
@@ -879,7 +879,7 @@ class TestRollbackAction:
 
     def test_rollback_event_payload(self):
         """ロールバックイベントのペイロードに必要情報が含まれる"""
-        from hiveforge.sentinel_hornet.monitor import SentinelAlert, SentinelHornet
+        from colonyforge.sentinel_hornet.monitor import SentinelAlert, SentinelHornet
 
         sentinel = SentinelHornet()
         alert = SentinelAlert(
@@ -904,7 +904,7 @@ class TestQuarantineAction:
 
     def test_create_quarantine_event(self):
         """隔離イベントを生成できる"""
-        from hiveforge.sentinel_hornet.monitor import SentinelAlert, SentinelHornet
+        from colonyforge.sentinel_hornet.monitor import SentinelAlert, SentinelHornet
 
         sentinel = SentinelHornet()
         alert = SentinelAlert(
@@ -928,7 +928,7 @@ class TestQuarantineAction:
 
     def test_quarantine_task_scope(self):
         """タスクスコープの隔離"""
-        from hiveforge.sentinel_hornet.monitor import SentinelAlert, SentinelHornet
+        from colonyforge.sentinel_hornet.monitor import SentinelAlert, SentinelHornet
 
         sentinel = SentinelHornet()
         alert = SentinelAlert(
@@ -950,7 +950,7 @@ class TestQuarantineAction:
 
     def test_kpi_degradation_event(self):
         """KPI劣化イベントを生成できる"""
-        from hiveforge.sentinel_hornet.monitor import SentinelAlert, SentinelHornet
+        from colonyforge.sentinel_hornet.monitor import SentinelAlert, SentinelHornet
 
         sentinel = SentinelHornet()
         alert = SentinelAlert(
@@ -973,7 +973,7 @@ class TestExecutionActions:
 
     def test_all_three_actions_available(self):
         """3つの執行アクションが全て利用可能"""
-        from hiveforge.sentinel_hornet.monitor import SentinelAlert, SentinelHornet
+        from colonyforge.sentinel_hornet.monitor import SentinelAlert, SentinelHornet
 
         sentinel = SentinelHornet()
         alert = SentinelAlert(

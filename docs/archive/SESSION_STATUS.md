@@ -2,7 +2,7 @@
 
 ## 概要
 
-HiveForgeプロジェクトのプロンプトYAML統合が完了。各エージェント（Beekeeper, Queen Bee, Worker Bee）が
+ColonyForgeプロジェクトのプロンプトYAML統合が完了。各エージェント（Beekeeper, Queen Bee, Worker Bee）が
 YAML設定ファイルからカスタムプロンプトを読み込めるようになった。
 
 ## 完了した作業
@@ -22,7 +22,7 @@ YAML設定ファイルからカスタムプロンプトを読み込めるよう�
    - Worker Bee: `vault_path` + `worker_id`を渡す
    - テスト10件追加（7件AgentRunner + 3件サーバー）
 
-3. **hiveforge.config.yaml整理**
+3. **colonyforge.config.yaml整理**
    - agentsセクションにプロンプトYAML読み込み優先順位を記載
    - ファイル命名規則と配置例を追加
    - ガバナンス設定とプロンプト設定の役割分担を明確化
@@ -35,30 +35,30 @@ User → Beekeeper → Queen Bee → Worker Bee
       対話窓口     タスク分解    タスク実行
 ```
 
-- **Beekeeper MCP Server** (`src/hiveforge/beekeeper/server.py`)
+- **Beekeeper MCP Server** (`src/colonyforge/beekeeper/server.py`)
   - ユーザーとの対話窓口
   - `delegate_to_queen` でQueen Beeに作業を委譲
   - テスト: 22件
 
-- **Queen Bee MCP Server** (`src/hiveforge/queen_bee/server.py`)
+- **Queen Bee MCP Server** (`src/colonyforge/queen_bee/server.py`)
   - Colonyを統括、タスク分解
   - Worker Beeの`execute_task_with_llm`を呼び出し
   - テスト: 20件
 
-- **Worker Bee MCP Server** (`src/hiveforge/mcp_server/server.py`)
+- **Worker Bee MCP Server** (`src/colonyforge/mcp_server/server.py`)
   - 具体的なタスクを実行
   - LLM統合済み
 
 ### 2. CLIコマンド
 
 ```bash
-hiveforge chat "メッセージ"  # Beekeeperと対話
+colonyforge chat "メッセージ"  # Beekeeperと対話
 ```
 
 ### 3. プロンプトYAMLカスタマイズ（今回実装）
 
 ```
-src/hiveforge/llm/
+src/colonyforge/llm/
 ├── prompt_config.py          # スキーマ + PromptLoader
 ├── prompts.py                # 取得関数
 └── default_prompts/          # パッケージ内デフォルト
@@ -78,7 +78,7 @@ Vault/hives/                  # カスタマイズ配置先
 **読み込み優先順位:**
 1. Vault/hives/{hive_id}/colonies/{colony_id}/ - Colony固有
 2. Vault/hives/{hive_id}/ - Hive全体
-3. src/hiveforge/llm/default_prompts/ - パッケージ内
+3. src/colonyforge/llm/default_prompts/ - パッケージ内
 4. ハードコードデフォルト
 
 ## Git状態
@@ -91,7 +91,7 @@ Vault/hives/                  # カスタマイズ配置先
 
 ```bash
 # エージェント間通信の動作確認（成功）
-hiveforge chat "カレントディレクトリのファイル一覧を表示して"
+colonyforge chat "カレントディレクトリのファイル一覧を表示して"
 # → Beekeeper → Queen Bee → Worker Bee → list_directory → 結果表示
 ```
 
@@ -104,7 +104,7 @@ AgentRunner.run()
       → PromptLoader._find_config_file()
         → 1. Vault/hives/{hive_id}/colonies/{colony_id}/
         → 2. Vault/hives/{hive_id}/
-        → 3. src/hiveforge/llm/default_prompts/
+        → 3. src/colonyforge/llm/default_prompts/
         → 4. ハードコードフォールバック
     → vault_pathなし? → get_system_prompt() (後方互換)
 ```
@@ -117,7 +117,7 @@ AgentRunner.run()
 
 2. **プロンプトYAMLの実運用テスト**
    - 実際のVaultにカスタムプロンプトを配置して動作確認
-   - `hiveforge chat`コマンドでの統合テスト
+   - `colonyforge chat`コマンドでの統合テスト
 
 3. **VS Code拡張連携**
    - プロンプトYAML編集UIの提供
@@ -146,20 +146,20 @@ AgentRunner.run()
    ```
 3. 動作確認:
    ```bash
-   hiveforge chat "テスト"
+   colonyforge chat "テスト"
    ```
 
 ## 関連ファイル
 
 | ファイル | 説明 |
 |---------|------|
-| src/hiveforge/beekeeper/server.py | Beekeeper MCPサーバー |
-| src/hiveforge/queen_bee/server.py | Queen Bee MCPサーバー |
-| src/hiveforge/mcp_server/server.py | Worker Bee MCPサーバー |
-| src/hiveforge/llm/prompt_config.py | プロンプトYAMLスキーマ |
-| src/hiveforge/llm/prompts.py | プロンプト取得関数 |
-| src/hiveforge/cli.py | CLIコマンド（chat含む） |
-| hiveforge.config.yaml | 全体設定 |
+| src/colonyforge/beekeeper/server.py | Beekeeper MCPサーバー |
+| src/colonyforge/queen_bee/server.py | Queen Bee MCPサーバー |
+| src/colonyforge/mcp_server/server.py | Worker Bee MCPサーバー |
+| src/colonyforge/llm/prompt_config.py | プロンプトYAMLスキーマ |
+| src/colonyforge/llm/prompts.py | プロンプト取得関数 |
+| src/colonyforge/cli.py | CLIコマンド（chat含む） |
+| colonyforge.config.yaml | 全体設定 |
 | tests/test_prompt_config.py | プロンプト設定テスト（29件） |
 | tests/test_beekeeper_server.py | Beekeeperテスト（22件） |
 | tests/test_queen_bee_server.py | Queen Beeテスト（20件） |

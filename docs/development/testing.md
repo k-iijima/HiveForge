@@ -2,7 +2,7 @@
 
 ## Test Strategy
 
-HiveForge targets **100% branch coverage** for all core modules.
+ColonyForge targets **100% branch coverage** for all core modules.
 
 > **Coverage is not the goal. Clarifying the preconditions, situations, and behaviors for each path is the goal.**
 
@@ -18,7 +18,7 @@ pytest
 pytest tests/test_events.py -v
 
 # With coverage
-pytest --cov=hiveforge --cov-report=html
+pytest --cov=colonyforge --cov-report=html
 ```
 
 ### E2E Visual Tests
@@ -31,17 +31,17 @@ The following services must be running in the devcontainer:
 
 | Service | Port | Purpose |
 |---------|------|---------|
-| `hiveforge-playwright-mcp` | 8931 | Browser automation |
-| `hiveforge-dev-ollama` | 11434 | VLM image analysis |
-| `hiveforge-code-server` | 8080 | Test target (VS Code) |
+| `colonyforge-playwright-mcp` | 8931 | Browser automation |
+| `colonyforge-dev-ollama` | 11434 | VLM image analysis |
+| `colonyforge-code-server` | 8080 | Test target (VS Code) |
 
 #### Running E2E Tests
 
 ```bash
-PLAYWRIGHT_MCP_URL="http://hiveforge-playwright-mcp:8931" \
-OLLAMA_BASE_URL="http://hiveforge-dev-ollama:11434" \
+PLAYWRIGHT_MCP_URL="http://colonyforge-playwright-mcp:8931" \
+OLLAMA_BASE_URL="http://colonyforge-dev-ollama:11434" \
 VLM_HEADLESS="true" \
-pytest tests/e2e/test_hiveforge_visual.py -v -m e2e
+pytest tests/e2e/test_colonyforge_visual.py -v -m e2e
 ```
 
 Or via VS Code tasks: Command Palette → `Tasks: Run Test Task` → **E2E: ビジュアルテスト (pytest)**

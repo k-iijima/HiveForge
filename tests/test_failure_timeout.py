@@ -3,7 +3,7 @@
 外部フィードバック対応: 共通のエラー分類と失敗理由の標準化。
 """
 
-from hiveforge.core.events import (
+from colonyforge.core.events import (
     EVENT_TYPE_MAP,
     EventType,
     OperationFailedEvent,
@@ -194,7 +194,7 @@ class TestFailureReasonEnum:
     def test_failure_reason_enum_exists(self):
         """FailureReason Enum が存在する"""
         # Arrange & Act
-        from hiveforge.core.events import FailureReason
+        from colonyforge.core.events import FailureReason
 
         # Assert
         assert hasattr(FailureReason, "TIMEOUT")
@@ -208,7 +208,7 @@ class TestFailureReasonEnum:
     def test_failure_reason_values(self):
         """FailureReason の値が正しい"""
         # Arrange & Act
-        from hiveforge.core.events import FailureReason
+        from colonyforge.core.events import FailureReason
 
         # Assert
         assert FailureReason.TIMEOUT.value == "timeout"

@@ -6,14 +6,14 @@ MCP/API双方で同一ストアを使う設計を保証する。
 
 import pytest
 
-from hiveforge.core.intervention.models import (
+from colonyforge.core.intervention.models import (
     EscalationRecord,
     EscalationStatus,
     FeedbackRecord,
     InterventionRecord,
     InterventionType,
 )
-from hiveforge.core.intervention.store import InterventionStore
+from colonyforge.core.intervention.store import InterventionStore
 
 
 @pytest.fixture

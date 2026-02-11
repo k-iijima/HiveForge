@@ -14,12 +14,12 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from hiveforge.beekeeper.server import BeekeeperMCPServer
-from hiveforge.beekeeper.session import SessionState
-from hiveforge.core.ar.storage import AkashicRecord
-from hiveforge.core.events.types import EventType
-from hiveforge.core.models.action_class import TrustLevel
-from hiveforge.queen_bee.server import QueenBeeMCPServer
+from colonyforge.beekeeper.server import BeekeeperMCPServer
+from colonyforge.beekeeper.session import SessionState
+from colonyforge.core.ar.storage import AkashicRecord
+from colonyforge.core.events.types import EventType
+from colonyforge.core.models.action_class import TrustLevel
+from colonyforge.queen_bee.server import QueenBeeMCPServer
 
 
 @pytest.fixture
@@ -44,7 +44,7 @@ def _mock_plan_tasks():
     クラスレベルでパッチする必要がある。
     """
     with patch(
-        "hiveforge.queen_bee.server.QueenBeeMCPServer._plan_tasks",
+        "colonyforge.queen_bee.server.QueenBeeMCPServer._plan_tasks",
         new_callable=AsyncMock,
         side_effect=lambda goal, context=None: [
             {"task_id": "task-001", "goal": goal, "depends_on": []}
@@ -70,7 +70,7 @@ class TestFullChainWithPipeline:
         """
         # Arrange: Worker BeeのLLM実行をモック
         with patch(
-            "hiveforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
+            "colonyforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
             new_callable=AsyncMock,
             return_value={
                 "status": "completed",
@@ -97,7 +97,7 @@ class TestFullChainWithPipeline:
         """Pipeline経由の委譲でPIPELINE_STARTEDイベントがARに記録される"""
         # Arrange
         with patch(
-            "hiveforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
+            "colonyforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
             new_callable=AsyncMock,
             return_value={
                 "status": "completed",
@@ -151,7 +151,7 @@ class TestApprovalFlowE2E:
 
         # Arrange: Worker BeeのLLM実行をモック
         with patch(
-            "hiveforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
+            "colonyforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
             new_callable=AsyncMock,
             return_value={
                 "status": "completed",
@@ -209,7 +209,7 @@ class TestApprovalFlowE2E:
             await beekeeper.handle_approve({"request_id": request_id})
 
         with patch(
-            "hiveforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
+            "colonyforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
             new_callable=AsyncMock,
             return_value={
                 "status": "completed",
@@ -258,7 +258,7 @@ class TestSessionPipelineConsistency:
         beekeeper.current_session.set_busy()  # 手動でBUSY設定
 
         with patch(
-            "hiveforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
+            "colonyforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
             new_callable=AsyncMock,
             return_value={
                 "status": "completed",

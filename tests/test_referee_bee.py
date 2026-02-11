@@ -6,7 +6,7 @@ N案候補を多面的に自動採点し、上位候補のみをGuard Beeに渡�
 
 import pytest
 
-from hiveforge.referee_bee.models import (
+from colonyforge.referee_bee.models import (
     CandidateScore,
     DiffResult,
     RefereeReport,
@@ -192,7 +192,7 @@ class TestDiffResult:
         assert result.diff_details["expected"] == "200 OK"
 
 
-from hiveforge.referee_bee.diff_tester import DiffTester  # noqa: E402
+from colonyforge.referee_bee.diff_tester import DiffTester  # noqa: E402
 
 
 class TestDiffTester:
@@ -274,7 +274,7 @@ class TestDiffTester:
 # ==================== M3-5-c: トーナメント選抜 ====================
 
 
-from hiveforge.referee_bee.tournament import Tournament  # noqa: E402
+from colonyforge.referee_bee.tournament import Tournament  # noqa: E402
 
 
 class TestSelectionResult:
@@ -552,7 +552,7 @@ class TestRefereeReport:
 # ==================== M3-5-e: Guard Bee連携 ====================
 
 
-from hiveforge.referee_bee.reporter import RefereeReporter  # noqa: E402
+from colonyforge.referee_bee.reporter import RefereeReporter  # noqa: E402
 
 
 class TestRefereeReporter:
@@ -668,7 +668,7 @@ class TestRefereeReporter:
 # ==================== M3-5-a: スコアリングエンジン ====================
 
 
-from hiveforge.referee_bee.scoring import ScoringEngine  # noqa: E402
+from colonyforge.referee_bee.scoring import ScoringEngine  # noqa: E402
 
 
 class TestScoringEngine:

@@ -10,8 +10,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from hiveforge.core.config import GitHubConfig
-from hiveforge.core.github.client import GitHubClient, GitHubClientError
+from colonyforge.core.config import GitHubConfig
+from colonyforge.core.github.client import GitHubClient, GitHubClientError
 
 # ---------------------------------------------------------------------------
 # fixtures
@@ -27,7 +27,7 @@ def github_config() -> GitHubConfig:
         repo="test-repo",
         project_number=1,
         base_url="https://api.github.com",
-        label_prefix="hiveforge:",
+        label_prefix="colonyforge:",
     )
 
 
@@ -135,7 +135,7 @@ class TestCreateIssue:
             result = await client.create_issue(
                 title="Run started: 01HTEST",
                 body="Goal: テスト実行",
-                labels=["hiveforge:run"],
+                labels=["colonyforge:run"],
             )
 
         # Assert
@@ -291,8 +291,8 @@ class TestApplyLabels:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = [
-            {"name": "hiveforge:sentinel"},
-            {"name": "hiveforge:run"},
+            {"name": "colonyforge:sentinel"},
+            {"name": "colonyforge:run"},
         ]
         mock_response.raise_for_status = MagicMock()
 
@@ -305,7 +305,7 @@ class TestApplyLabels:
             # Act
             result = await client.apply_labels(
                 issue_number=42,
-                labels=["hiveforge:sentinel"],
+                labels=["colonyforge:sentinel"],
             )
 
         # Assert

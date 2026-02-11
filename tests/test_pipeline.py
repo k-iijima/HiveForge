@@ -11,19 +11,19 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from hiveforge.core.ar.storage import AkashicRecord
-from hiveforge.core.models.action_class import TrustLevel
-from hiveforge.guard_bee.models import (
+from colonyforge.core.ar.storage import AkashicRecord
+from colonyforge.core.models.action_class import TrustLevel
+from colonyforge.guard_bee.models import (
     GuardBeeReport,
     Verdict,
 )
-from hiveforge.queen_bee.approval import ApprovalDecision
-from hiveforge.queen_bee.pipeline import (
+from colonyforge.queen_bee.approval import ApprovalDecision
+from colonyforge.queen_bee.pipeline import (
     ApprovalRequiredError,
     ExecutionPipeline,
     PlanValidationFailedError,
 )
-from hiveforge.queen_bee.planner import PlannedTask, TaskPlan
+from colonyforge.queen_bee.planner import PlannedTask, TaskPlan
 
 # =========================================================================
 # ヘルパー
@@ -412,7 +412,7 @@ class TestRecordEvent:
 
     def test_record_event_stored_in_ar(self, pipeline, ar):
         """_record_event がARにイベントを正しく記録する"""
-        from hiveforge.core.events.types import EventType
+        from colonyforge.core.events.types import EventType
 
         # Act
         pipeline._record_event(
@@ -433,7 +433,7 @@ class TestRecordEvent:
 
     def test_record_multiple_events(self, pipeline, ar):
         """複数イベントが正しい順序で記録される"""
-        from hiveforge.core.events.types import EventType
+        from colonyforge.core.events.types import EventType
 
         # Act
         pipeline._record_event(

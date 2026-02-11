@@ -7,7 +7,7 @@ import { HiveEvent } from '../client';
 
 export function registerDecisionCommands(context: vscode.ExtensionContext): void {
     context.subscriptions.push(
-        vscode.commands.registerCommand('hiveforge.showDecisionDetails', (event: HiveEvent) =>
+        vscode.commands.registerCommand('colonyforge.showDecisionDetails', (event: HiveEvent) =>
             showDecisionDetails(event)
         )
     );

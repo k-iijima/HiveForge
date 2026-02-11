@@ -1,6 +1,6 @@
 # ダッシュボード
 
-HiveForge VS Code拡張機能は、Run、Task、KPIをリアルタイムで監視するダッシュボードを提供します。
+ColonyForge VS Code拡張機能は、Run、Task、KPIをリアルタイムで監視するダッシュボードを提供します。
 
 ## インストール
 
@@ -70,7 +70,7 @@ Honeycombエピソードが記録されている場合、ダッシュボード�
 データはRunの状態変更時に自動更新されます。手動更新：
 
 - Hive Monitorツールバーの更新ボタンをクリック
-- コマンドパレット → **HiveForge: Refresh Dashboard**
+- コマンドパレット → **ColonyForge: Refresh Dashboard**
 
 ## 設定
 
@@ -80,6 +80,6 @@ VS Code設定で変更：
 
 ```json
 {
-  "hiveforge.apiUrl": "http://localhost:8000"
+  "colonyforge.apiUrl": "http://localhost:8000"
 }
 ```

@@ -2,7 +2,7 @@
 
 ## Hierarchical Model
 
-HiveForge organizes work in a 4-level hierarchy:
+ColonyForge organizes work in a 4-level hierarchy:
 
 ```mermaid
 graph TD
@@ -56,7 +56,7 @@ A **Requirement** represents a confirmation request that needs user approval bef
 
 ## Event Sourcing
 
-All state changes in HiveForge are recorded as **immutable events** in the Akashic Record (AR).
+All state changes in ColonyForge are recorded as **immutable events** in the Akashic Record (AR).
 
 ```mermaid
 sequenceDiagram

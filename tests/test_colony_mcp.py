@@ -11,7 +11,7 @@ class TestColonyMCPToolDefinitions:
 
     def test_create_colony_tool_exists(self):
         """create_colonyツールが存在する"""
-        from hiveforge.mcp_server.tools import get_tool_definitions
+        from colonyforge.mcp_server.tools import get_tool_definitions
 
         tools = get_tool_definitions()
         tool_names = [t.name for t in tools]
@@ -19,7 +19,7 @@ class TestColonyMCPToolDefinitions:
 
     def test_list_colonies_tool_exists(self):
         """list_coloniesツールが存在する"""
-        from hiveforge.mcp_server.tools import get_tool_definitions
+        from colonyforge.mcp_server.tools import get_tool_definitions
 
         tools = get_tool_definitions()
         tool_names = [t.name for t in tools]
@@ -27,7 +27,7 @@ class TestColonyMCPToolDefinitions:
 
     def test_start_colony_tool_exists(self):
         """start_colonyツールが存在する"""
-        from hiveforge.mcp_server.tools import get_tool_definitions
+        from colonyforge.mcp_server.tools import get_tool_definitions
 
         tools = get_tool_definitions()
         tool_names = [t.name for t in tools]
@@ -35,7 +35,7 @@ class TestColonyMCPToolDefinitions:
 
     def test_complete_colony_tool_exists(self):
         """complete_colonyツールが存在する"""
-        from hiveforge.mcp_server.tools import get_tool_definitions
+        from colonyforge.mcp_server.tools import get_tool_definitions
 
         tools = get_tool_definitions()
         tool_names = [t.name for t in tools]
@@ -48,9 +48,9 @@ class TestColonyMCPHandlers:
     @pytest.fixture
     def mcp_server(self, tmp_path, monkeypatch):
         """テスト用MCPサーバー"""
-        from hiveforge.mcp_server.server import HiveForgeMCPServer
+        from colonyforge.mcp_server.server import ColonyForgeMCPServer
 
-        server = HiveForgeMCPServer()
+        server = ColonyForgeMCPServer()
         server._handle_create_colony = server._colony_handlers.handle_create_colony
         server._handle_list_colonies = server._colony_handlers.handle_list_colonies
         server._handle_start_colony = server._colony_handlers.handle_start_colony

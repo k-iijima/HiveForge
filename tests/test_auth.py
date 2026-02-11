@@ -16,8 +16,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from hiveforge.api.helpers import clear_active_runs, set_ar
-from hiveforge.api.server import app
+from colonyforge.api.helpers import clear_active_runs, set_ar
+from colonyforge.api.server import app
 
 # --- Fixtures ---
 
@@ -38,7 +38,7 @@ def _make_mock_settings(tmp_path, *, auth_enabled: bool):
     mock_s.get_vault_path.return_value = tmp_path / "Vault"
     mock_s.server.cors.enabled = False
     mock_s.auth.enabled = auth_enabled
-    mock_s.auth.api_key_env = "HIVEFORGE_API_KEY"
+    mock_s.auth.api_key_env = "COLONYFORGE_API_KEY"
     return mock_s
 
 
@@ -48,9 +48,9 @@ def client_auth_disabled(tmp_path, _clean_state):
     mock_s = _make_mock_settings(tmp_path, auth_enabled=False)
 
     with (
-        patch("hiveforge.api.server.get_settings", return_value=mock_s),
-        patch("hiveforge.api.helpers.get_settings", return_value=mock_s),
-        patch("hiveforge.api.auth.get_settings", return_value=mock_s),
+        patch("colonyforge.api.server.get_settings", return_value=mock_s),
+        patch("colonyforge.api.helpers.get_settings", return_value=mock_s),
+        patch("colonyforge.api.auth.get_settings", return_value=mock_s),
         TestClient(app) as client,
     ):
         yield client
@@ -63,10 +63,10 @@ def client_auth_enabled(tmp_path, _clean_state):
     test_api_key = "test-secret-key-12345"
 
     with (
-        patch("hiveforge.api.server.get_settings", return_value=mock_s),
-        patch("hiveforge.api.helpers.get_settings", return_value=mock_s),
-        patch("hiveforge.api.auth.get_settings", return_value=mock_s),
-        patch.dict(os.environ, {"HIVEFORGE_API_KEY": test_api_key}),
+        patch("colonyforge.api.server.get_settings", return_value=mock_s),
+        patch("colonyforge.api.helpers.get_settings", return_value=mock_s),
+        patch("colonyforge.api.auth.get_settings", return_value=mock_s),
+        patch.dict(os.environ, {"COLONYFORGE_API_KEY": test_api_key}),
         TestClient(app) as client,
     ):
         yield client, test_api_key
@@ -77,12 +77,12 @@ def client_auth_enabled_no_key(tmp_path, _clean_state):
     """auth.enabled=true だが環境変数にAPIキーが未設定"""
     mock_s = _make_mock_settings(tmp_path, auth_enabled=True)
     env = os.environ.copy()
-    env.pop("HIVEFORGE_API_KEY", None)
+    env.pop("COLONYFORGE_API_KEY", None)
 
     with (
-        patch("hiveforge.api.server.get_settings", return_value=mock_s),
-        patch("hiveforge.api.helpers.get_settings", return_value=mock_s),
-        patch("hiveforge.api.auth.get_settings", return_value=mock_s),
+        patch("colonyforge.api.server.get_settings", return_value=mock_s),
+        patch("colonyforge.api.helpers.get_settings", return_value=mock_s),
+        patch("colonyforge.api.auth.get_settings", return_value=mock_s),
         patch.dict(os.environ, env, clear=True),
         TestClient(app) as client,
     ):
@@ -250,7 +250,7 @@ class TestAuthMiddlewareUnit:
 
     def test_extract_api_key_from_header(self):
         """X-API-Key ヘッダーからAPIキーを抽出"""
-        from hiveforge.api.auth import extract_api_key
+        from colonyforge.api.auth import extract_api_key
 
         # Arrange
         key = "my-secret"
@@ -263,7 +263,7 @@ class TestAuthMiddlewareUnit:
 
     def test_extract_api_key_from_bearer(self):
         """Authorization: Bearer ヘッダーからAPIキーを抽出"""
-        from hiveforge.api.auth import extract_api_key
+        from colonyforge.api.auth import extract_api_key
 
         # Arrange
         key = "my-secret"
@@ -276,7 +276,7 @@ class TestAuthMiddlewareUnit:
 
     def test_extract_api_key_header_priority(self):
         """X-API-Key と Authorization の両方がある場合、X-API-Key を優先"""
-        from hiveforge.api.auth import extract_api_key
+        from colonyforge.api.auth import extract_api_key
 
         # Arrange
         header_key = "header-key"
@@ -293,7 +293,7 @@ class TestAuthMiddlewareUnit:
 
     def test_extract_api_key_none(self):
         """どちらもない場合は None"""
-        from hiveforge.api.auth import extract_api_key
+        from colonyforge.api.auth import extract_api_key
 
         # Act
         result = extract_api_key(x_api_key=None, authorization=None)
@@ -303,7 +303,7 @@ class TestAuthMiddlewareUnit:
 
     def test_extract_api_key_invalid_bearer_format(self):
         """Bearer 形式でない Authorization ヘッダーは無視"""
-        from hiveforge.api.auth import extract_api_key
+        from colonyforge.api.auth import extract_api_key
 
         # Act
         result = extract_api_key(x_api_key=None, authorization="Basic abc123")

@@ -13,16 +13,16 @@ Playwright MCP → code-server → 実際のVS Code拡張 → 実際のAPIサー
 KPI Dashboardを複数の手法で検証する。
 
 前提条件:
-    - code-server (hiveforge-code-server:8080) + HiveForge拡張インストール済み
-    - Playwright MCP (hiveforge-playwright-mcp:8931) + socat localhost:8080 proxy
-    - HiveForge APIサーバー (http://172.18.0.5:8000)
-    - Ollama (hiveforge-dev-ollama:11434) + llava:7b（VLM/OCR評価用）
+    - code-server (colonyforge-code-server:8080) + ColonyForge拡張インストール済み
+    - Playwright MCP (colonyforge-playwright-mcp:8931) + socat localhost:8080 proxy
+    - ColonyForge APIサーバー (http://172.18.0.5:8000)
+    - Ollama (colonyforge-dev-ollama:11434) + llava:7b（VLM/OCR評価用）
 
 アーキテクチャ:
     Playwright browser (localhost:8080)
-        → socat → code-server (hiveforge-code-server:8080)
+        → socat → code-server (colonyforge-code-server:8080)
             → VS Code拡張 (hiveMonitorPanel.ts)
-                → HiveForge API (/kpi/evaluation)
+                → ColonyForge API (/kpi/evaluation)
                     → 実データでレンダリング
     スクリーンショット → Ollama VLM (llava:7b) → 視覚評価/OCR
 
@@ -46,8 +46,8 @@ pytestmark = [
 
 # code-server URL (Playwright内のsocat経由でlocalhost)
 CODE_SERVER_URL = os.environ.get("CODE_SERVER_URL", "http://localhost:8080")
-CODE_SERVER_PASSWORD = os.environ.get("CODE_SERVER_PASSWORD", "hiveforge")
-PLAYWRIGHT_MCP_URL = os.environ.get("PLAYWRIGHT_MCP_URL", "http://hiveforge-playwright-mcp:8931")
+CODE_SERVER_PASSWORD = os.environ.get("CODE_SERVER_PASSWORD", "colonyforge")
+PLAYWRIGHT_MCP_URL = os.environ.get("PLAYWRIGHT_MCP_URL", "http://colonyforge-playwright-mcp:8931")
 
 
 def _check_playwright_mcp_available() -> bool:
@@ -56,7 +56,7 @@ def _check_playwright_mcp_available() -> bool:
     from urllib.parse import urlparse
 
     parsed = urlparse(PLAYWRIGHT_MCP_URL)
-    host = parsed.hostname or "hiveforge-playwright-mcp"
+    host = parsed.hostname or "colonyforge-playwright-mcp"
     port = parsed.port or 8931
     try:
         sock = socket.create_connection((host, port), timeout=5)
@@ -83,14 +83,14 @@ def event_loop():
 @pytest.fixture(scope="module")
 def mcp_client():
     """PlaywrightMCPClientのモジュールスコープインスタンス"""
-    from hiveforge.vlm_tester.playwright_mcp_client import PlaywrightMCPClient
+    from colonyforge.vlm_tester.playwright_mcp_client import PlaywrightMCPClient
 
     return PlaywrightMCPClient(PLAYWRIGHT_MCP_URL)
 
 
 @pytest.fixture(scope="module")
 def hive_monitor_snapshot(event_loop, mcp_client):
-    """code-serverにログイン→HiveForge→Hive Monitorを開いてスナップショットを取得
+    """code-serverにログイン→ColonyForge→Hive Monitorを開いてスナップショットを取得
 
     モジュールスコープで1回だけ実行し、結果を全テストで共有する。
     """
@@ -111,13 +111,13 @@ def hive_monitor_screenshot(event_loop, mcp_client, hive_monitor_snapshot):
 
 
 async def _open_hive_monitor(client) -> str:
-    """完全なE2Eフロー: login → HiveForge tab → Hive Monitor → snapshot
+    """完全なE2Eフロー: login → ColonyForge tab → Hive Monitor → snapshot
 
     Returns:
         Hive MonitorのiframeコンテンツをPlaywrightアクセシビリティスナップショット
     """
     # Arrange: code-serverにナビゲート（localhost = secure context）
-    folder_url = f"{CODE_SERVER_URL}/?folder=/workspace/HiveForge"
+    folder_url = f"{CODE_SERVER_URL}/?folder=/workspace/ColonyForge"
     await client.navigate(folder_url)
     await asyncio.sleep(8)
     snap = await client.snapshot()
@@ -151,22 +151,22 @@ async def _open_hive_monitor(client) -> str:
 
     snap = await client.snapshot()
 
-    # Act: HiveForge Activity Barタブをクリック
-    hf_match = re.search(r'tab "HiveForge".*?\[ref=(\w+)\]', snap)
+    # Act: ColonyForge Activity Barタブをクリック
+    hf_match = re.search(r'tab "ColonyForge".*?\[ref=(\w+)\]', snap)
     if not hf_match:
         raise AssertionError(
-            f"HiveForge tab not found in Activity Bar. "
+            f"ColonyForge tab not found in Activity Bar. "
             f"Tabs: {[l.strip() for l in snap.split(chr(10)) if 'tab ' in l][:10]}"
         )
     await client._call_tool(
         "browser_click",
-        {"ref": hf_match.group(1), "element": "HiveForge tab"},
+        {"ref": hf_match.group(1), "element": "ColonyForge tab"},
     )
     await asyncio.sleep(3)
 
     # Act: Hive Monitorボタンをクリック
     snap = await client.snapshot()
-    monitor_match = re.search(r'button "HiveForge: Hive Monitorを表示".*?\[ref=(\w+)\]', snap)
+    monitor_match = re.search(r'button "ColonyForge: Hive Monitorを表示".*?\[ref=(\w+)\]', snap)
     if not monitor_match:
         raise AssertionError("Hive Monitorボタンが見つかりません")
     await client._call_tool(
@@ -208,7 +208,7 @@ async def _capture_cropped_screenshot(client) -> bytes:
 
 @requires_playwright_mcp
 class TestHiveMonitorRealRendering:
-    """HiveForge拡張の実際のhiveMonitorPanel.tsがレンダリングした
+    """ColonyForge拡張の実際のhiveMonitorPanel.tsがレンダリングした
     KPI Dashboardを検証するE2Eテスト群。
 
     全テストは同一のスナップショット（hive_monitor_snapshot fixture）を共有し、
@@ -440,13 +440,13 @@ class TestHiveMonitorRealRendering:
 # テストクラス: API → 表示値の整合性検証
 # ============================================================
 
-# HiveForge APIサーバーのURL（devcontainerからアクセス可能）
-HIVEFORGE_API_URL = os.environ.get("HIVEFORGE_API_URL", "http://localhost:8000")
+# ColonyForge APIサーバーのURL（devcontainerからアクセス可能）
+COLONYFORGE_API_URL = os.environ.get("COLONYFORGE_API_URL", "http://localhost:8000")
 
 
 def _fetch_kpi_evaluation() -> dict:
-    """HiveForge APIから /kpi/evaluation レスポンスを取得する"""
-    url = f"{HIVEFORGE_API_URL}/kpi/evaluation"
+    """ColonyForge APIから /kpi/evaluation レスポンスを取得する"""
+    url = f"{COLONYFORGE_API_URL}/kpi/evaluation"
     req = urllib.request.Request(url, headers={"Accept": "application/json"})
     with urllib.request.urlopen(req, timeout=10) as resp:
         return json.loads(resp.read().decode())
@@ -843,9 +843,9 @@ def _check_ollama_available() -> bool:
     import socket
     from urllib.parse import urlparse
 
-    ollama_url = os.environ.get("OLLAMA_BASE_URL", "http://hiveforge-dev-ollama:11434")
+    ollama_url = os.environ.get("OLLAMA_BASE_URL", "http://colonyforge-dev-ollama:11434")
     parsed = urlparse(ollama_url)
-    host = parsed.hostname or "hiveforge-dev-ollama"
+    host = parsed.hostname or "colonyforge-dev-ollama"
     port = parsed.port or 11434
     try:
         sock = socket.create_connection((host, port), timeout=5)
@@ -1105,7 +1105,7 @@ class TestHiveMonitorVLMOCR:
             vlm_evaluate(
                 hive_monitor_screenshot,
                 prompt=(
-                    "This is a screenshot of VS Code with a HiveForge extension. "
+                    "This is a screenshot of VS Code with a ColonyForge extension. "
                     "There should be a title that says 'Hive Monitor' with a bee emoji. "
                     "Can you see the text 'Hive Monitor' anywhere in this image? "
                     "What other text can you read in the main panel?"

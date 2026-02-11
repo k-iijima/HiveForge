@@ -2,10 +2,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "HiveForge API Server",
+            "name": "ColonyForge API Server",
             "type": "debugpy",
             "request": "launch",
-            "module": "hiveforge.cli",
+            "module": "colonyforge.cli",
             "args": [
                 "server",
                 "--reload"
@@ -17,10 +17,10 @@
             }
         },
         {
-            "name": "HiveForge MCP Server",
+            "name": "ColonyForge MCP Server",
             "type": "debugpy",
             "request": "launch",
-            "module": "hiveforge.cli",
+            "module": "colonyforge.cli",
             "args": [
                 "mcp"
             ],
@@ -42,7 +42,7 @@
             "cwd": "${workspaceFolder}"
         },
         {
-            "name": "HiveForge Extension",
+            "name": "ColonyForge Extension",
             "type": "extensionHost",
             "request": "launch",
             "args": [
@@ -59,8 +59,8 @@
         {
             "name": "Full Stack + Extension",
             "configurations": [
-                "HiveForge API Server",
-                "HiveForge Extension"
+                "ColonyForge API Server",
+                "ColonyForge Extension"
             ],
             "presentation": {
                 "order": 1
@@ -69,8 +69,8 @@
         {
             "name": "Full Stack (API + MCP)",
             "configurations": [
-                "HiveForge API Server",
-                "HiveForge MCP Server"
+                "ColonyForge API Server",
+                "ColonyForge MCP Server"
             ],
             "presentation": {
                 "order": 2

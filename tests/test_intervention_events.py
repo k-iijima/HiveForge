@@ -4,7 +4,7 @@ Direct Intervention イベントテスト
 ユーザー直接介入、Queen直訴、Beekeeperフィードバックのイベントテスト。
 """
 
-from hiveforge.core.events import (
+from colonyforge.core.events import (
     BeekeeperFeedbackEvent,
     EscalationType,
     EventType,

@@ -8,8 +8,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from hiveforge.vlm.analyzer import AnalysisResult, LocalVLMAnalyzer
-from hiveforge.vlm.ollama_client import OllamaClient, VLMResponse
+from colonyforge.vlm.analyzer import AnalysisResult, LocalVLMAnalyzer
+from colonyforge.vlm.ollama_client import OllamaClient, VLMResponse
 
 
 class TestOllamaClient:
@@ -697,7 +697,7 @@ class TestAnalyzeWithLocalVLM:
     async def test_analyze_with_local_vlm(self):
         """ワンショット解析関数が動作する"""
         # Arrange
-        from hiveforge.vlm.analyzer import analyze_with_local_vlm
+        from colonyforge.vlm.analyzer import analyze_with_local_vlm
 
         with patch.object(LocalVLMAnalyzer, "analyze") as mock_analyze:
             mock_result = AnalysisResult(

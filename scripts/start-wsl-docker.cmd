@@ -1,9 +1,9 @@
 @echo off
-REM HiveForge - Ubuntu WSL Docker 起動スクリプト
+REM ColonyForge - Ubuntu WSL Docker 起動スクリプト
 REM GPU サポート付きで devcontainer を使用するための準備
 
 echo.
-echo  HiveForge - Ubuntu WSL Docker (GPU)
+echo  ColonyForge - Ubuntu WSL Docker (GPU)
 echo ========================================
 echo.
 

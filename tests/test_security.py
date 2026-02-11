@@ -10,9 +10,9 @@ from pathlib import Path
 
 import pytest
 
-from hiveforge.core.ar.hive_storage import HiveStore
-from hiveforge.core.ar.storage import AkashicRecord, _validate_safe_id
-from hiveforge.core.config import CORSConfig
+from colonyforge.core.ar.hive_storage import HiveStore
+from colonyforge.core.ar.storage import AkashicRecord, _validate_safe_id
+from colonyforge.core.config import CORSConfig
 
 
 class TestValidateSafeId:
@@ -85,7 +85,7 @@ class TestAkashicRecordPathTraversal:
 
     def test_path_traversal_in_append(self, temp_vault):
         """appendでrun_idにパストラバーサルを含む場合はValueError"""
-        from hiveforge.core.events import RunStartedEvent
+        from colonyforge.core.events import RunStartedEvent
 
         ar = AkashicRecord(temp_vault)
         event = RunStartedEvent(run_id="valid-run", payload={"goal": "Test"})
@@ -95,7 +95,7 @@ class TestAkashicRecordPathTraversal:
 
     def test_valid_run_id_works(self, temp_vault):
         """有効なrun_idでは正常に動作する"""
-        from hiveforge.core.events import RunStartedEvent
+        from colonyforge.core.events import RunStartedEvent
 
         ar = AkashicRecord(temp_vault)
         run_id = "valid-run-001"
@@ -128,7 +128,7 @@ class TestToolsSecurity:
     @pytest.mark.asyncio
     async def test_read_file_path_traversal_blocked(self):
         """ファイル読み込みでパストラバーサルがブロックされる"""
-        from hiveforge.llm.tools import read_file_handler, set_workspace_root
+        from colonyforge.llm.tools import read_file_handler, set_workspace_root
 
         # Arrange: ワークスペースを一時ディレクトリに設定
         with tempfile.TemporaryDirectory() as workspace:
@@ -147,7 +147,7 @@ class TestToolsSecurity:
     @pytest.mark.asyncio
     async def test_write_file_path_traversal_blocked(self):
         """ファイル書き込みでパストラバーサルがブロックされる"""
-        from hiveforge.llm.tools import set_workspace_root, write_file_handler
+        from colonyforge.llm.tools import set_workspace_root, write_file_handler
 
         with tempfile.TemporaryDirectory() as workspace:
             set_workspace_root(workspace)
@@ -162,7 +162,7 @@ class TestToolsSecurity:
     @pytest.mark.asyncio
     async def test_list_directory_path_traversal_blocked(self):
         """ディレクトリ一覧でパストラバーサルがブロックされる"""
-        from hiveforge.llm.tools import list_directory_handler, set_workspace_root
+        from colonyforge.llm.tools import list_directory_handler, set_workspace_root
 
         with tempfile.TemporaryDirectory() as workspace:
             set_workspace_root(workspace)
@@ -177,7 +177,7 @@ class TestToolsSecurity:
     @pytest.mark.asyncio
     async def test_read_file_within_workspace_allowed(self):
         """ワークスペース内のファイル読み込みは許可される"""
-        from hiveforge.llm.tools import read_file_handler, set_workspace_root
+        from colonyforge.llm.tools import read_file_handler, set_workspace_root
 
         with tempfile.TemporaryDirectory() as workspace:
             set_workspace_root(workspace)
@@ -198,7 +198,7 @@ class TestToolsSecurity:
     @pytest.mark.asyncio
     async def test_run_command_disallowed_command_blocked(self):
         """許可リストにないコマンドはブロックされる"""
-        from hiveforge.llm.tools import run_command_handler
+        from colonyforge.llm.tools import run_command_handler
 
         result = json.loads(await run_command_handler("rm -rf /"))
 
@@ -208,7 +208,7 @@ class TestToolsSecurity:
     @pytest.mark.asyncio
     async def test_run_command_allowed_command_works(self):
         """許可リストのコマンドは実行される"""
-        from hiveforge.llm.tools import run_command_handler
+        from colonyforge.llm.tools import run_command_handler
 
         result = json.loads(await run_command_handler("ls -la"))
 
@@ -218,7 +218,7 @@ class TestToolsSecurity:
     @pytest.mark.asyncio
     async def test_run_command_empty_rejected(self):
         """空のコマンドは拒否される"""
-        from hiveforge.llm.tools import run_command_handler
+        from colonyforge.llm.tools import run_command_handler
 
         result = json.loads(await run_command_handler(""))
 

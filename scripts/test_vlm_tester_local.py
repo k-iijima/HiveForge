@@ -12,7 +12,7 @@ async def test_screen_capture():
     """画面キャプチャのテスト"""
     from playwright.async_api import async_playwright
 
-    from hiveforge.vlm_tester import ScreenCapture
+    from colonyforge.vlm_tester import ScreenCapture
 
     print("=" * 60)
     print("1. Playwright + ScreenCapture テスト")
@@ -51,7 +51,7 @@ async def test_diff_analysis(image_data: bytes):
 
     from PIL import Image
 
-    from hiveforge.vlm_tester import DiffAnalyzer
+    from colonyforge.vlm_tester import DiffAnalyzer
 
     print("\n" + "=" * 60)
     print("2. Diff分析テスト")
@@ -89,7 +89,7 @@ async def test_diff_analysis(image_data: bytes):
 
 async def test_hybrid_analyzer(image_data: bytes):
     """HybridAnalyzer (LOCAL_ONLY) のテスト"""
-    from hiveforge.vlm_tester import AnalysisLevel, HybridAnalyzer
+    from colonyforge.vlm_tester import AnalysisLevel, HybridAnalyzer
 
     print("\n" + "=" * 60)
     print("3. HybridAnalyzer (LOCAL_ONLY) テスト")
@@ -124,7 +124,7 @@ async def test_action_executor():
     """ActionExecutorのテスト"""
     from playwright.async_api import async_playwright
 
-    from hiveforge.vlm_tester import ActionExecutor, ScreenCapture
+    from colonyforge.vlm_tester import ActionExecutor, ScreenCapture
 
     print("\n" + "=" * 60)
     print("4. ActionExecutor テスト")
@@ -174,7 +174,7 @@ async def test_mcp_server():
     """MCPサーバーの初期化テスト"""
     import tempfile
 
-    from hiveforge.vlm_tester import VLMTesterMCPServer
+    from colonyforge.vlm_tester import VLMTesterMCPServer
 
     print("\n" + "=" * 60)
     print("5. VLMTesterMCPServer 初期化テスト")

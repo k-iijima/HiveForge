@@ -1,15 +1,21 @@
-"""エージェントチェーン E2Eシナリオテスト（LiteLLM → Ollama 実LLM呼び出し）
+"""エージェントチェーン E2Eシナリオテスト（LiteLLM経由 実LLM呼び出し）
 
-LiteLLM経由でOllama (Qwen3 4B) を使用し、実際のLLM推論を含む
+LiteLLM経由でLLMを使用し、実際のLLM推論を含む
 エージェントチェーンシナリオをテストする。
 
-前提条件:
-  - Ollamaコンテナが hiveforge-dev-network 上で稼働
-  - qwen3:4b モデルがpull済み
-  - 環境変数 OLLAMA_BASE_URL が設定済み（デフォルト: http://hiveforge-dev-ollama:11434）
+プロバイダーは環境変数で切替可能:
+  - LLM_PROVIDER: ollama_chat (デフォルト), openai, anthropic 等
+  - LLM_MODEL: モデル名（デフォルト: qwen3:4b）
+  - LLM_API_KEY: APIキー（クラウドプロバイダー用）
+  - LLM_API_BASE: APIベースURL（Ollama等ローカル用）
 
-実行:
+実行例:
+  # Ollama（ローカル）
   pytest tests/e2e/test_agent_chain_llm.py -v -m e2e --timeout=120
+
+  # OpenAI（CI）
+  LLM_PROVIDER=openai LLM_MODEL=gpt-4o-mini LLM_API_KEY=$OPENAI_API_KEY \\
+    pytest tests/e2e/test_agent_chain_llm.py -v -m e2e
 """
 
 from __future__ import annotations
@@ -21,8 +27,8 @@ from pathlib import Path
 
 import pytest
 
-from hiveforge.core import AkashicRecord
-from hiveforge.core.config import LLMConfig
+from colonyforge.core import AkashicRecord
+from colonyforge.core.config import LLMConfig
 
 # ---------------------------------------------------------------------------
 # マーカー: e2e + asyncio
@@ -30,30 +36,48 @@ from hiveforge.core.config import LLMConfig
 pytestmark = [pytest.mark.e2e, pytest.mark.asyncio]
 
 # ---------------------------------------------------------------------------
-# 設定
+# 設定 — 環境変数でプロバイダー切替可能
 # ---------------------------------------------------------------------------
-OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://hiveforge-dev-ollama:11434")
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen3:4b")
+LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "ollama_chat")
+LLM_MODEL = os.environ.get("LLM_MODEL", os.environ.get("OLLAMA_MODEL", "qwen3:4b"))
+LLM_API_BASE = os.environ.get(
+    "LLM_API_BASE", os.environ.get("OLLAMA_BASE_URL", "http://colonyforge-dev-ollama:11434")
+)
+LLM_API_KEY_ENV = os.environ.get("LLM_API_KEY_ENV", "")  # e.g. "OPENAI_API_KEY"
 # LLMの応答待ちタイムアウト（秒）
 LLM_TIMEOUT = int(os.environ.get("LLM_TIMEOUT", "120"))
 
+# ローカルプロバイダー（APIキー不要）
+_LOCAL_PROVIDERS = {"ollama", "ollama_chat"}
 
-def _is_ollama_available() -> bool:
-    """Ollamaサービスに到達可能か判定"""
-    import urllib.request
-
-    try:
-        req = urllib.request.Request(f"{OLLAMA_BASE_URL}/api/tags", method="GET")
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            return resp.status == 200
-    except Exception:
-        return False
+# エージェントループの最大反復回数 — クラウドAPIコスト制御
+# ローカル: 10回（十分な余裕）, CIクラウド: 5回（コスト制限）
+_DEFAULT_MAX_ITERATIONS = 5 if LLM_PROVIDER not in _LOCAL_PROVIDERS else 10
+MAX_AGENT_ITERATIONS = int(os.environ.get("MAX_AGENT_ITERATIONS", str(_DEFAULT_MAX_ITERATIONS)))
 
 
-# Ollama未接続時はスキップ
-ollama_required = pytest.mark.skipif(
-    not _is_ollama_available(),
-    reason=f"Ollama not reachable at {OLLAMA_BASE_URL}",
+def _is_llm_available() -> bool:
+    """LLMプロバイダーに到達可能か判定"""
+    if LLM_PROVIDER in _LOCAL_PROVIDERS:
+        # Ollama: HTTP接続チェック
+        import urllib.request
+
+        try:
+            req = urllib.request.Request(f"{LLM_API_BASE}/api/tags", method="GET")
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                return resp.status == 200
+        except Exception:
+            return False
+    else:
+        # クラウドプロバイダー: APIキーの存在チェック
+        key_env = LLM_API_KEY_ENV or f"{LLM_PROVIDER.upper()}_API_KEY"
+        return bool(os.environ.get(key_env))
+
+
+# LLM未接続時はスキップ
+llm_required = pytest.mark.skipif(
+    not _is_llm_available(),
+    reason=f"LLM provider '{LLM_PROVIDER}' not available",
 )
 
 
@@ -61,21 +85,27 @@ ollama_required = pytest.mark.skipif(
 # フィクスチャ
 # ---------------------------------------------------------------------------
 @pytest.fixture
-def ollama_config() -> LLMConfig:
-    """Ollama接続用LLM設定"""
-    return LLMConfig(
-        provider="ollama_chat",
-        model=OLLAMA_MODEL,
-        api_base=OLLAMA_BASE_URL,
-        max_tokens=2048,
-        temperature=0.2,
-    )
+def llm_config() -> LLMConfig:
+    """LLM接続用設定（環境変数でプロバイダー切替）"""
+    config_kwargs: dict = {
+        "provider": LLM_PROVIDER,
+        "model": LLM_MODEL,
+        "max_tokens": 2048,
+        "temperature": 0.2,
+    }
+    # ローカルプロバイダーの場合のみ api_base を設定
+    if LLM_PROVIDER in _LOCAL_PROVIDERS:
+        config_kwargs["api_base"] = LLM_API_BASE
+    # APIキー環境変数が指定されている場合
+    if LLM_API_KEY_ENV:
+        config_kwargs["api_key_env"] = LLM_API_KEY_ENV
+    return LLMConfig(**config_kwargs)
 
 
 @pytest.fixture
 def temp_vault():
     """テスト用一時Vaultディレクトリ"""
-    vault_path = Path(tempfile.mkdtemp(prefix="hiveforge_e2e_"))
+    vault_path = Path(tempfile.mkdtemp(prefix="colonyforge_e2e_"))
     yield vault_path
     shutil.rmtree(vault_path, ignore_errors=True)
 
@@ -97,21 +127,21 @@ def work_dir(tmp_path: Path) -> Path:
 # ===========================================================================
 # シナリオ 1: LLMClient 単体 — Ollama接続確認
 # ===========================================================================
-@ollama_required
+@llm_required
 class TestLLMClientOllama:
     """LLMClient → Ollama 直接呼び出しテスト"""
 
-    async def test_simple_chat(self, ollama_config: LLMConfig):
+    async def test_simple_chat(self, llm_config: LLMConfig):
         """Arrange: Ollama接続設定
         Act: 簡単な質問を送信
         Assert: テキスト応答が返る
         """
         import asyncio
 
-        from hiveforge.llm.client import LLMClient, Message
+        from colonyforge.llm.client import LLMClient, Message
 
         # Arrange
-        client = LLMClient(config=ollama_config)
+        client = LLMClient(config=llm_config)
         messages = [
             Message(role="user", content="1+1は何ですか？数字だけ答えてください。"),
         ]
@@ -128,17 +158,17 @@ class TestLLMClientOllama:
         assert "2" in response.content
         await client.close()
 
-    async def test_tool_calling(self, ollama_config: LLMConfig):
+    async def test_tool_calling(self, llm_config: LLMConfig):
         """Arrange: ツール定義付きで質問
         Act: ツール呼び出しが必要な質問を送信
         Assert: ツール呼び出しが返る
         """
         import asyncio
 
-        from hiveforge.llm.client import LLMClient, Message
+        from colonyforge.llm.client import LLMClient, Message
 
         # Arrange
-        client = LLMClient(config=ollama_config)
+        client = LLMClient(config=llm_config)
         messages = [
             Message(
                 role="system",
@@ -191,27 +221,27 @@ class TestLLMClientOllama:
 # ===========================================================================
 # シナリオ 2: AgentRunner — ツール実行ループ
 # ===========================================================================
-@ollama_required
+@llm_required
 class TestAgentRunnerOllama:
     """AgentRunner → Ollama ツール実行ループテスト"""
 
-    async def test_agent_runner_with_tools(self, ollama_config: LLMConfig, work_dir: Path):
+    async def test_agent_runner_with_tools(self, llm_config: LLMConfig, work_dir: Path):
         """Arrange: AgentRunner + 基本ツール + 作業ディレクトリ
         Act: ファイル作成を依頼
         Assert: ファイルが作成され、成功が返る
         """
         import asyncio
 
-        from hiveforge.llm.client import LLMClient
-        from hiveforge.llm.runner import AgentContext, AgentRunner
-        from hiveforge.llm.tools import get_basic_tools
+        from colonyforge.llm.client import LLMClient
+        from colonyforge.llm.runner import AgentContext, AgentRunner
+        from colonyforge.llm.tools import get_basic_tools
 
         # Arrange
-        client = LLMClient(config=ollama_config)
+        client = LLMClient(config=llm_config)
         runner = AgentRunner(
             client,
             agent_type="worker_bee",
-            max_iterations=10,
+            max_iterations=MAX_AGENT_ITERATIONS,
         )
         for tool in get_basic_tools():
             runner.register_tool(tool)
@@ -224,7 +254,7 @@ class TestAgentRunnerOllama:
         # Act
         result = await asyncio.wait_for(
             runner.run(
-                f"以下のパスにhello.txtファイルを作成して、中身は 'Hello HiveForge' としてください: {work_dir}/hello.txt",
+                f"以下のパスにhello.txtファイルを作成して、中身は 'Hello ColonyForge' としてください: {work_dir}/hello.txt",
                 context,
             ),
             timeout=LLM_TIMEOUT,
@@ -243,13 +273,13 @@ class TestAgentRunnerOllama:
 # ===========================================================================
 # シナリオ 3: Worker Bee — タスク実行
 # ===========================================================================
-@ollama_required
+@llm_required
 class TestWorkerBeeOllama:
     """Worker Bee → Ollama タスク実行テスト"""
 
     async def test_worker_executes_task(
         self,
-        ollama_config: LLMConfig,
+        llm_config: LLMConfig,
         ar: AkashicRecord,
         work_dir: Path,
     ):
@@ -259,13 +289,13 @@ class TestWorkerBeeOllama:
         """
         import asyncio
 
-        from hiveforge.worker_bee.server import WorkerBeeMCPServer
+        from colonyforge.worker_bee.server import WorkerBeeMCPServer
 
         # Arrange
         worker = WorkerBeeMCPServer(
             worker_id="e2e-worker-1",
             ar=ar,
-            llm_config=ollama_config,
+            llm_config=llm_config,
         )
 
         # Act
@@ -298,13 +328,13 @@ class TestWorkerBeeOllama:
 # ===========================================================================
 # シナリオ 4: Queen Bee → Worker Bee チェーン（タスク分解 + 実行）
 # ===========================================================================
-@ollama_required
+@llm_required
 class TestQueenBeeChainOllama:
     """Queen Bee → Worker Bee フルチェーンテスト"""
 
     async def test_queen_decomposes_and_executes(
         self,
-        ollama_config: LLMConfig,
+        llm_config: LLMConfig,
         ar: AkashicRecord,
         work_dir: Path,
     ):
@@ -314,13 +344,13 @@ class TestQueenBeeChainOllama:
         """
         import asyncio
 
-        from hiveforge.queen_bee.server import QueenBeeMCPServer
+        from colonyforge.queen_bee.server import QueenBeeMCPServer
 
         # Arrange
         queen = QueenBeeMCPServer(
             colony_id="e2e-colony-1",
             ar=ar,
-            llm_config=ollama_config,
+            llm_config=llm_config,
             use_pipeline=False,  # 直接実行（Guard Bee検証なし）
         )
         queen.add_worker("e2e-worker-1")
@@ -330,7 +360,7 @@ class TestQueenBeeChainOllama:
             queen.handle_execute_goal(
                 {
                     "run_id": "e2e-chain-run-001",
-                    "goal": f"次のファイルを作成してください: {work_dir}/project_info.txt (内容: 'ProjectName: HiveForge E2E Test')",
+                    "goal": f"次のファイルを作成してください: {work_dir}/project_info.txt (内容: 'ProjectName: ColonyForge E2E Test')",
                     "context": {"working_directory": str(work_dir)},
                 }
             ),
@@ -358,13 +388,13 @@ class TestQueenBeeChainOllama:
 # ===========================================================================
 # シナリオ 5: Beekeeper → Queen Bee → Worker Bee フルチェーン
 # ===========================================================================
-@ollama_required
+@llm_required
 class TestFullAgentChainOllama:
     """Beekeeper → Queen Bee → Worker Bee 完全チェーンテスト"""
 
     async def test_beekeeper_delegates_to_queen(
         self,
-        ollama_config: LLMConfig,
+        llm_config: LLMConfig,
         ar: AkashicRecord,
         work_dir: Path,
         monkeypatch,
@@ -378,21 +408,21 @@ class TestFullAgentChainOllama:
         """
         import asyncio
 
-        from hiveforge.beekeeper.server import BeekeeperMCPServer
+        from colonyforge.beekeeper.server import BeekeeperMCPServer
 
         # Arrange: グローバル設定をOllamaに差し替え
-        from hiveforge.core.config import HiveConfig, HiveForgeSettings
+        from colonyforge.core.config import HiveConfig, ColonyForgeSettings
 
-        settings = HiveForgeSettings(
+        settings = ColonyForgeSettings(
             hive=HiveConfig(name="e2e-hive", vault_path=str(ar.vault_path)),
-            llm=ollama_config,
+            llm=llm_config,
         )
         monkeypatch.setattr(
-            "hiveforge.core.config.get_settings",
+            "colonyforge.core.config.get_settings",
             lambda: settings,
         )
 
-        beekeeper = BeekeeperMCPServer(ar=ar, llm_config=ollama_config)
+        beekeeper = BeekeeperMCPServer(ar=ar, llm_config=llm_config)
 
         # Act 1: Hive作成
         hive_result = await asyncio.wait_for(

@@ -1,8 +1,8 @@
 # 設定
 
-HiveForgeはプロジェクトルートの `hiveforge.config.yaml` で設定します。
+ColonyForgeはプロジェクトルートの `colonyforge.config.yaml` で設定します。
 
-環境変数による上書きは `HIVEFORGE_<セクション>__<キー>` のパターンに従います（例: `HIVEFORGE_SERVER__PORT=9000`）。
+環境変数による上書きは `COLONYFORGE_<セクション>__<キー>` のパターンに従います（例: `COLONYFORGE_SERVER__PORT=9000`）。
 
 ## 設定セクション
 
@@ -71,7 +71,7 @@ llm:
 ```yaml
 auth:
   enabled: false
-  api_key_env: "HIVEFORGE_API_KEY"
+  api_key_env: "COLONYFORGE_API_KEY"
 ```
 
 ### `agents` — エージェント設定
@@ -168,7 +168,7 @@ logging:
 
 1. `Vault/hives/{hive_id}/colonies/{colony_id}/` — Colony固有
 2. `Vault/hives/{hive_id}/` — Hive全体のデフォルト
-3. `src/hiveforge/prompts/defaults/` — パッケージ内デフォルト
+3. `src/colonyforge/prompts/defaults/` — パッケージ内デフォルト
 4. ハードコードフォールバック
 
 ファイル命名規則：

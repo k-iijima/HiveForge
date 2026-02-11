@@ -1,6 +1,6 @@
 """イベントモデルのテスト
 
-HiveForgeの中核となるイベントモデルをテストする。
+ColonyForgeの中核となるイベントモデルをテストする。
 イベントはイミュータブルで、ULID形式のID、UTC タイムスタンプ、
 JCS正規化によるSHA-256ハッシュを持つ。
 """
@@ -14,7 +14,7 @@ from uuid import UUID
 import pytest
 from pydantic import ValidationError
 
-from hiveforge.core.events import (
+from colonyforge.core.events import (
     DecisionRecordedEvent,
     EventType,
     RunStartedEvent,
@@ -160,7 +160,7 @@ class TestComputeHash:
         """
         from datetime import datetime
 
-        from hiveforge.core.events import _serialize_value
+        from colonyforge.core.events import _serialize_value
 
         # Arrange: datetimeを含むリスト
         dt = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
@@ -182,7 +182,7 @@ class TestComputeHash:
         """
         from pydantic import BaseModel
 
-        from hiveforge.core.events import _serialize_value
+        from colonyforge.core.events import _serialize_value
 
         # Arrange: Pydanticモデルを含むデータ
         class InnerModel(BaseModel):
@@ -204,7 +204,7 @@ class TestComputeHash:
 
         JCS互換のために、順序を決定論的にする必要がある。
         """
-        from hiveforge.core.events import _serialize_value
+        from colonyforge.core.events import _serialize_value
 
         # Arrange: setとfrozensetを含むデータ
         data_set = {3, 1, 2}
@@ -220,7 +220,7 @@ class TestComputeHash:
 
     def test_serialize_tuple(self):
         """tupleがリストにシリアライズされる"""
-        from hiveforge.core.events import _serialize_value
+        from colonyforge.core.events import _serialize_value
 
         # Arrange
         data = (1, "two", 3.0)
@@ -233,7 +233,7 @@ class TestComputeHash:
 
     def test_serialize_bytes(self):
         """bytesが16進文字列にシリアライズされる"""
-        from hiveforge.core.events import _serialize_value
+        from colonyforge.core.events import _serialize_value
 
         # Arrange
         data = b"\xde\xad\xbe\xef"
@@ -524,7 +524,7 @@ class TestHiveEvents:
         # Arrange: なし
 
         # Act: Hive作成イベントを生成
-        from hiveforge.core.events import HiveCreatedEvent
+        from colonyforge.core.events import HiveCreatedEvent
 
         event = HiveCreatedEvent(
             actor="beekeeper",
@@ -542,7 +542,7 @@ class TestHiveEvents:
         # Arrange: なし
 
         # Act: Hive終了イベントを生成
-        from hiveforge.core.events import HiveClosedEvent
+        from colonyforge.core.events import HiveClosedEvent
 
         event = HiveClosedEvent(
             actor="beekeeper",
@@ -563,7 +563,7 @@ class TestHiveEvents:
         }
 
         # Act: パース
-        from hiveforge.core.events import HiveCreatedEvent
+        from colonyforge.core.events import HiveCreatedEvent
 
         event = parse_event(data)
 
@@ -584,7 +584,7 @@ class TestColonyEvents:
         # Arrange: なし
 
         # Act: Colony作成イベントを生成
-        from hiveforge.core.events import ColonyCreatedEvent
+        from colonyforge.core.events import ColonyCreatedEvent
 
         event = ColonyCreatedEvent(
             actor="queen_bee",
@@ -606,7 +606,7 @@ class TestColonyEvents:
         # Arrange: なし
 
         # Act: Colony開始イベントを生成
-        from hiveforge.core.events import ColonyStartedEvent
+        from colonyforge.core.events import ColonyStartedEvent
 
         event = ColonyStartedEvent(
             actor="queen_bee",
@@ -621,7 +621,7 @@ class TestColonyEvents:
         # Arrange: なし
 
         # Act: Colony完了イベントを生成
-        from hiveforge.core.events import ColonyCompletedEvent
+        from colonyforge.core.events import ColonyCompletedEvent
 
         event = ColonyCompletedEvent(
             actor="queen_bee",
@@ -636,7 +636,7 @@ class TestColonyEvents:
         # Arrange: なし
 
         # Act: Colony失敗イベントを生成
-        from hiveforge.core.events import ColonyFailedEvent
+        from colonyforge.core.events import ColonyFailedEvent
 
         event = ColonyFailedEvent(
             actor="queen_bee",
@@ -657,7 +657,7 @@ class TestColonyEvents:
         ]
 
         # Act & Assert: 全てパース可能
-        from hiveforge.core.events import (
+        from colonyforge.core.events import (
             ColonyCompletedEvent,
             ColonyCreatedEvent,
             ColonyFailedEvent,
@@ -806,8 +806,8 @@ class TestEventTypeMapCompleteness:
         ペイロードのスキーマ検証が効かなくなるため、
         全 EventType の専用クラス登録を強制する。
         """
-        from hiveforge.core.events.registry import EVENT_TYPE_MAP
-        from hiveforge.core.events.types import EventType
+        from colonyforge.core.events.registry import EVENT_TYPE_MAP
+        from colonyforge.core.events.types import EventType
 
         # Arrange: 全EventType値を取得
         all_types = set(EventType)
@@ -831,7 +831,7 @@ class TestSerializeValueJcsSafety:
 
     def test_serialize_uuid(self):
         """UUIDが文字列に変換される"""
-        from hiveforge.core.events import _serialize_value
+        from colonyforge.core.events import _serialize_value
 
         # Arrange
         uuid_val = UUID("12345678-1234-5678-1234-567812345678")
@@ -845,7 +845,7 @@ class TestSerializeValueJcsSafety:
 
     def test_serialize_date(self):
         """date（datetimeでない）がISO文字列に変換される"""
-        from hiveforge.core.events import _serialize_value
+        from colonyforge.core.events import _serialize_value
 
         # Arrange
         date_val = date(2026, 2, 8)
@@ -859,7 +859,7 @@ class TestSerializeValueJcsSafety:
 
     def test_serialize_timedelta(self):
         """timedeltaが秒数に変換される"""
-        from hiveforge.core.events import _serialize_value
+        from colonyforge.core.events import _serialize_value
 
         # Arrange
         td = timedelta(hours=1, minutes=30)
@@ -872,7 +872,7 @@ class TestSerializeValueJcsSafety:
 
     def test_serialize_decimal(self):
         """Decimalがfloatに変換される"""
-        from hiveforge.core.events import _serialize_value
+        from colonyforge.core.events import _serialize_value
 
         # Arrange
         dec = Decimal("3.14")
@@ -886,7 +886,7 @@ class TestSerializeValueJcsSafety:
 
     def test_serialize_decimal_infinity_raises(self):
         """Decimal('Infinity')はValueErrorを送出する"""
-        from hiveforge.core.events import _serialize_value
+        from colonyforge.core.events import _serialize_value
 
         # Act & Assert
         with pytest.raises(ValueError, match="JCS非互換"):
@@ -894,16 +894,16 @@ class TestSerializeValueJcsSafety:
 
     def test_serialize_purepath(self):
         """PurePathが文字列に変換される"""
-        from hiveforge.core.events import _serialize_value
+        from colonyforge.core.events import _serialize_value
 
         # Arrange
-        path = PurePosixPath("/workspace/HiveForge/src")
+        path = PurePosixPath("/workspace/ColonyForge/src")
 
         # Act
         result = _serialize_value(path)
 
         # Assert
-        assert result == "/workspace/HiveForge/src"
+        assert result == "/workspace/ColonyForge/src"
         assert isinstance(result, str)
 
     def test_serialize_float_inf_raises(self):
@@ -911,7 +911,7 @@ class TestSerializeValueJcsSafety:
 
         JSON仕様にinfは存在しないため、JCSでの正規化は不可能。
         """
-        from hiveforge.core.events import _serialize_value
+        from colonyforge.core.events import _serialize_value
 
         # Act & Assert
         with pytest.raises(ValueError, match="inf"):
@@ -919,7 +919,7 @@ class TestSerializeValueJcsSafety:
 
     def test_serialize_float_nan_raises(self):
         """float('nan')はValueErrorを送出する"""
-        from hiveforge.core.events import _serialize_value
+        from colonyforge.core.events import _serialize_value
 
         # Act & Assert
         with pytest.raises(ValueError, match="nan"):
@@ -933,7 +933,7 @@ class TestSerializeValueJcsSafety:
         """
         import re
 
-        from hiveforge.core.events import _serialize_value
+        from colonyforge.core.events import _serialize_value
 
         # Act & Assert: 正規表現パターンはサポート外
         with pytest.raises(TypeError, match="JCS互換に変換できない型"):
@@ -941,7 +941,7 @@ class TestSerializeValueJcsSafety:
 
     def test_serialize_custom_object_raises_typeerror(self):
         """カスタムオブジェクトはTypeErrorを送出する"""
-        from hiveforge.core.events import _serialize_value
+        from colonyforge.core.events import _serialize_value
 
         class CustomObj:
             pass
@@ -952,7 +952,7 @@ class TestSerializeValueJcsSafety:
 
     def test_serialize_none_passthrough(self):
         """NoneはそのままJCS互換（null）として通る"""
-        from hiveforge.core.events import _serialize_value
+        from colonyforge.core.events import _serialize_value
 
         # Act
         result = _serialize_value(None)
@@ -962,7 +962,7 @@ class TestSerializeValueJcsSafety:
 
     def test_serialize_finite_float_passthrough(self):
         """有限floatはそのまま通る"""
-        from hiveforge.core.events import _serialize_value
+        from colonyforge.core.events import _serialize_value
 
         # Act
         result = _serialize_value(3.14)
@@ -972,7 +972,7 @@ class TestSerializeValueJcsSafety:
 
     def test_serialize_int_passthrough(self):
         """intはそのまま通る"""
-        from hiveforge.core.events import _serialize_value
+        from colonyforge.core.events import _serialize_value
 
         # Act
         result = _serialize_value(42)
@@ -982,7 +982,7 @@ class TestSerializeValueJcsSafety:
 
     def test_serialize_bool_passthrough(self):
         """boolはそのまま通る（intのサブクラスだが別扱い）"""
-        from hiveforge.core.events import _serialize_value
+        from colonyforge.core.events import _serialize_value
 
         # Act & Assert: boolがintにすり替わらないことを確認
         assert _serialize_value(True) is True

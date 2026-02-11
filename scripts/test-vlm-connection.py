@@ -11,12 +11,12 @@ from pathlib import Path
 # srcをパスに追加
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from hiveforge.vlm import OllamaClient
+from colonyforge.vlm import OllamaClient
 
 
 async def main():
     # デフォルトURL（Dockerネットワーク経由）
-    ollama_url = "http://hiveforge-ollama:11434"
+    ollama_url = "http://colonyforge-ollama:11434"
 
     print(f"🔗 Ollama URL: {ollama_url}")
     print()

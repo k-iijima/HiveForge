@@ -8,9 +8,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from hiveforge.core import AkashicRecord
-from hiveforge.core.state.conference import ConferenceStore
-from hiveforge.mcp_server.handlers.conference import ConferenceHandlers
+from colonyforge.core import AkashicRecord
+from colonyforge.core.state.conference import ConferenceStore
+from colonyforge.mcp_server.handlers.conference import ConferenceHandlers
 
 
 @pytest.fixture

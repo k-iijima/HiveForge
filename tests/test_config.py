@@ -2,9 +2,9 @@
 
 from pathlib import Path
 
-from hiveforge.core.config import (
+from colonyforge.core.config import (
     AgentLLMConfig,
-    HiveForgeSettings,
+    ColonyForgeSettings,
     LLMConfig,
     RateLimitConfig,
     get_settings,
@@ -12,13 +12,13 @@ from hiveforge.core.config import (
 )
 
 
-class TestHiveForgeSettings:
-    """HiveForgeSettingsのテスト"""
+class TestColonyForgeSettings:
+    """ColonyForgeSettingsのテスト"""
 
     def test_default_values(self):
         """デフォルト値が正しく設定される"""
         # Arrange & Act: デフォルト設定を作成
-        settings = HiveForgeSettings()
+        settings = ColonyForgeSettings()
 
         # Assert: デフォルト値が設定されている
         assert settings.governance.max_retries == 3
@@ -29,7 +29,7 @@ class TestHiveForgeSettings:
     def test_from_yaml_with_valid_file(self, tmp_path):
         """有効なYAMLファイルから設定を読み込む"""
         # Arrange: YAMLファイルを作成
-        config_file = tmp_path / "hiveforge.config.yaml"
+        config_file = tmp_path / "colonyforge.config.yaml"
         config_file.write_text("""
 hive:
   name: test-hive
@@ -40,7 +40,7 @@ governance:
 """)
 
         # Act: YAMLから読み込み
-        settings = HiveForgeSettings.from_yaml(config_file)
+        settings = ColonyForgeSettings.from_yaml(config_file)
 
         # Assert: カスタム値が設定されている
         assert settings.hive.name == "test-hive"
@@ -54,7 +54,7 @@ governance:
         nonexistent_path = Path("/nonexistent/config.yaml")
 
         # Act: 読み込み試行
-        settings = HiveForgeSettings.from_yaml(nonexistent_path)
+        settings = ColonyForgeSettings.from_yaml(nonexistent_path)
 
         # Assert: デフォルト値が使用される
         assert settings.governance.max_retries == 3
@@ -66,7 +66,7 @@ governance:
         monkeypatch.chdir(tmp_path)
 
         # Act: Noneで読み込み
-        settings = HiveForgeSettings.from_yaml(None)
+        settings = ColonyForgeSettings.from_yaml(None)
 
         # Assert: デフォルト値が使用される
         assert settings.governance.max_retries == 3
@@ -74,7 +74,7 @@ governance:
     def test_from_yaml_finds_default_config_file(self, tmp_path, monkeypatch):
         """デフォルトパスの設定ファイルを自動検出する"""
         # Arrange: デフォルトパスに設定ファイルを作成
-        config_file = tmp_path / "hiveforge.config.yaml"
+        config_file = tmp_path / "colonyforge.config.yaml"
         config_file.write_text("""
 hive:
   name: auto-detected
@@ -82,15 +82,15 @@ hive:
         monkeypatch.chdir(tmp_path)
 
         # Act: config_path=None で読み込み
-        settings = HiveForgeSettings.from_yaml(None)
+        settings = ColonyForgeSettings.from_yaml(None)
 
         # Assert: 自動検出された設定が使用される
         assert settings.hive.name == "auto-detected"
 
     def test_from_yaml_finds_yml_extension(self, tmp_path, monkeypatch):
-        """hiveforge.config.yml も自動検出する"""
+        """colonyforge.config.yml も自動検出する"""
         # Arrange: .yml 拡張子の設定ファイルを作成
-        config_file = tmp_path / "hiveforge.config.yml"
+        config_file = tmp_path / "colonyforge.config.yml"
         config_file.write_text("""
 hive:
   name: yml-detected
@@ -98,7 +98,7 @@ hive:
         monkeypatch.chdir(tmp_path)
 
         # Act: config_path=None で読み込み
-        settings = HiveForgeSettings.from_yaml(None)
+        settings = ColonyForgeSettings.from_yaml(None)
 
         # Assert: .yml ファイルが検出される
         assert settings.hive.name == "yml-detected"
@@ -110,7 +110,7 @@ class TestGetVaultPath:
     def test_absolute_path_unchanged(self):
         """絶対パスはそのまま返される"""
         # Arrange: 絶対パスを設定
-        settings = HiveForgeSettings.model_validate(
+        settings = ColonyForgeSettings.model_validate(
             {"hive": {"vault_path": "/absolute/vault/path"}}
         )
 
@@ -125,7 +125,7 @@ class TestGetVaultPath:
         """相対パスは現在のディレクトリからの絶対パスに解決される"""
         # Arrange: 相対パスを設定
         monkeypatch.chdir(tmp_path)
-        settings = HiveForgeSettings.model_validate({"hive": {"vault_path": "./relative/vault"}})
+        settings = ColonyForgeSettings.model_validate({"hive": {"vault_path": "./relative/vault"}})
 
         # Act: パスを取得
         vault_path = settings.get_vault_path()
@@ -143,7 +143,7 @@ class TestSettingsSingleton:
         # Arrange: 設定ファイルがない状態にする
         monkeypatch.chdir(tmp_path)
         # シングルトンをリセット
-        import hiveforge.core.config as config_module
+        import colonyforge.core.config as config_module
 
         config_module._settings = None
 
@@ -151,7 +151,7 @@ class TestSettingsSingleton:
         settings = get_settings()
 
         # Assert: インスタンスが返される
-        assert isinstance(settings, HiveForgeSettings)
+        assert isinstance(settings, ColonyForgeSettings)
 
     def test_reload_settings_updates_singleton(self, tmp_path, monkeypatch):
         """reload_settings はシングルトンを更新する"""
@@ -164,7 +164,7 @@ hive:
         monkeypatch.chdir(tmp_path)
 
         # シングルトンをリセット
-        import hiveforge.core.config as config_module
+        import colonyforge.core.config as config_module
 
         config_module._settings = None
 
@@ -184,7 +184,7 @@ class TestAgentsConfig:
 
     def test_default_agents_config(self):
         """デフォルトのエージェント設定"""
-        settings = HiveForgeSettings()
+        settings = ColonyForgeSettings()
 
         assert settings.agents.beekeeper.enabled is True
         assert settings.agents.beekeeper.max_colonies == 10
@@ -207,7 +207,7 @@ agents:
     tool_timeout_seconds: 120
 """)
 
-        settings = HiveForgeSettings.from_yaml(config_file)
+        settings = ColonyForgeSettings.from_yaml(config_file)
 
         assert settings.agents.beekeeper.max_colonies == 20
         assert settings.agents.queen_bee.max_workers_per_colony == 10
@@ -221,7 +221,7 @@ class TestConflictConfig:
 
     def test_default_conflict_config(self):
         """デフォルトの衝突設定"""
-        settings = HiveForgeSettings()
+        settings = ColonyForgeSettings()
 
         assert settings.conflict.detection_enabled is True
         assert settings.conflict.auto_resolve_low_severity is True
@@ -237,7 +237,7 @@ conflict:
   escalation_timeout_minutes: 60
 """)
 
-        settings = HiveForgeSettings.from_yaml(config_file)
+        settings = ColonyForgeSettings.from_yaml(config_file)
 
         assert settings.conflict.detection_enabled is False
         assert settings.conflict.auto_resolve_low_severity is False
@@ -249,7 +249,7 @@ class TestConferenceConfig:
 
     def test_default_conference_config(self):
         """デフォルトのConference設定"""
-        settings = HiveForgeSettings()
+        settings = ColonyForgeSettings()
 
         assert settings.conference.enabled is True
         assert settings.conference.max_participants == 10
@@ -266,7 +266,7 @@ conference:
   quorum_percentage: 75
 """)
 
-        settings = HiveForgeSettings.from_yaml(config_file)
+        settings = ColonyForgeSettings.from_yaml(config_file)
 
         assert settings.conference.max_participants == 20
         assert settings.conference.voting_timeout_minutes == 30
@@ -278,7 +278,7 @@ class TestRateLimitConfig:
 
     def test_default_rate_limit_config(self):
         """デフォルトのレートリミット設定"""
-        settings = HiveForgeSettings()
+        settings = ColonyForgeSettings()
 
         assert settings.llm.rate_limit.requests_per_minute == 60
         assert settings.llm.rate_limit.requests_per_day == 0
@@ -303,7 +303,7 @@ llm:
     retry_after_429: 30
 """)
 
-        settings = HiveForgeSettings.from_yaml(config_file)
+        settings = ColonyForgeSettings.from_yaml(config_file)
 
         assert settings.llm.rate_limit.requests_per_minute == 100
         assert settings.llm.rate_limit.requests_per_day == 10000
@@ -435,7 +435,7 @@ agents:
 """)
 
         # Act: 読み込み
-        settings = HiveForgeSettings.from_yaml(config_file)
+        settings = ColonyForgeSettings.from_yaml(config_file)
 
         # Assert: 各エージェントのLLM設定が正しく読み込まれる
         assert settings.agents.beekeeper.llm is not None
@@ -469,7 +469,7 @@ agents:
       temperature: 0.0
 """)
 
-        settings = HiveForgeSettings.from_yaml(config_file)
+        settings = ColonyForgeSettings.from_yaml(config_file)
 
         # Act: マージ
         worker_llm = settings.agents.worker_bee.llm.merge_with_global(settings.llm)
@@ -483,7 +483,7 @@ agents:
     def test_agent_without_llm_config(self):
         """LLM設定がないエージェントはNone"""
         # Arrange & Act: デフォルト設定
-        settings = HiveForgeSettings()
+        settings = ColonyForgeSettings()
 
         # Assert: 全エージェントのllmがNone
         assert settings.agents.beekeeper.llm is None

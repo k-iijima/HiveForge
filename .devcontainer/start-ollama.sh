@@ -4,7 +4,7 @@
 
 set -e
 
-cd /workspace/HiveForge
+cd /workspace/ColonyForge
 
 # 既存のOllamaが動いているか確認
 if curl -s http://ollama:11434/api/tags &>/dev/null || curl -s http://localhost:11434/api/tags &>/dev/null; then
@@ -15,8 +15,8 @@ fi
 # GPU検出（複数の方法を試行）
 detect_gpu() {
     # 環境変数で明示的に指定されている場合
-    if [ "$HIVEFORGE_GPU" = "nvidia" ]; then
-        echo "  → HIVEFORGE_GPU=nvidia が設定されています"
+    if [ "$COLONYFORGE_GPU" = "nvidia" ]; then
+        echo "  → COLONYFORGE_GPU=nvidia が設定されています"
         return 0
     fi
     
@@ -32,7 +32,7 @@ detect_gpu() {
         return 0
     fi
     
-    echo "  → GPU未検出（HIVEFORGE_GPU=nvidia で強制可能）"
+    echo "  → GPU未検出（COLONYFORGE_GPU=nvidia で強制可能）"
     return 1
 }
 

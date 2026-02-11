@@ -18,8 +18,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from hiveforge.api.helpers import clear_active_runs, set_ar
-from hiveforge.api.server import app
+from colonyforge.api.helpers import clear_active_runs, set_ar
+from colonyforge.api.server import app
 
 # =============================================
 # MCPハンドラー バリデーションテスト
@@ -29,14 +29,14 @@ from hiveforge.api.server import app
 @pytest.fixture
 def mcp_server(tmp_path):
     """テスト用MCPサーバー（Runアクティブ状態）"""
-    from hiveforge.mcp_server.server import HiveForgeMCPServer
+    from colonyforge.mcp_server.server import ColonyForgeMCPServer
 
-    with patch("hiveforge.mcp_server.server.get_settings") as mock_settings:
+    with patch("colonyforge.mcp_server.server.get_settings") as mock_settings:
         mock_s = MagicMock()
         mock_s.get_vault_path.return_value = tmp_path / "Vault"
         mock_settings.return_value = mock_s
 
-        server = HiveForgeMCPServer()
+        server = ColonyForgeMCPServer()
 
         # ハンドラーへのショートカット
         server.run_handler = server._run_handlers
@@ -311,9 +311,9 @@ def api_client(tmp_path):
     mock_s.auth.enabled = False
 
     with (
-        patch("hiveforge.api.server.get_settings", return_value=mock_s),
-        patch("hiveforge.api.helpers.get_settings", return_value=mock_s),
-        patch("hiveforge.api.auth.get_settings", return_value=mock_s),
+        patch("colonyforge.api.server.get_settings", return_value=mock_s),
+        patch("colonyforge.api.helpers.get_settings", return_value=mock_s),
+        patch("colonyforge.api.auth.get_settings", return_value=mock_s),
         TestClient(app) as client,
     ):
         yield client

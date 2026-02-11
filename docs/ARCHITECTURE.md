@@ -1,6 +1,6 @@
-# HiveForge アーキテクチャ設計書
+# ColonyForge アーキテクチャ設計書
 
-このドキュメントでは、HiveForgeの**現在の実装状況**を説明します。
+このドキュメントでは、ColonyForgeの**現在の実装状況**を説明します。
 
 > **ドキュメントの役割分担**
 >
@@ -40,7 +40,7 @@
 
 ### 1.1 基本思想
 
-HiveForgeは「**信頼できる部品を、信頼できる組み合わせ方をして、信頼できるシステムを作る**」という理念に基づいています。
+ColonyForgeは「**信頼できる部品を、信頼できる組み合わせ方をして、信頼できるシステムを作る**」という理念に基づいています。
 
 ### 1.2 コア原則
 
@@ -56,7 +56,7 @@ HiveForgeは「**信頼できる部品を、信頼できる組み合わせ方を
 ┌─────────────────────────────────────────────────────────────┐
 │                         VS Code                              │
 │  ┌──────────────────┐  ┌────────────────────────────────┐   │
-│  │  GitHub Copilot  │  │  HiveForge Extension           │   │
+│  │  GitHub Copilot  │  │  ColonyForge Extension           │   │
 │  │      Chat        │  │  ├─ Hive Monitor (Webview)     │   │
 │  │  （対話・操作）   │  │  ├─ イベントログ (TreeView)    │   │
 │  └────────┬─────────┘  │  └─ ステータスバー             │   │
@@ -65,7 +65,7 @@ HiveForgeは「**信頼できる部品を、信頼できる組み合わせ方を
             │ MCP                         │ HTTP
             ▼                             ▼
 ┌───────────────────────┐    ┌─────────────────────────────┐
-│  HiveForge MCP Server │    │    HiveForge API Server     │
+│  ColonyForge MCP Server │    │    ColonyForge API Server     │
 │  (stdio通信)          │    │    (FastAPI / REST)         │
 └───────────┬───────────┘    └──────────────┬──────────────┘
             │                               │
@@ -169,7 +169,7 @@ HiveForgeは「**信頼できる部品を、信頼できる組み合わせ方を
 ### 2.2 モジュール依存関係
 
 ```
-hiveforge/
+colonyforge/
 ├── core/                  # コアモジュール（他から参照される）
 │   ├── events/           # イベントモデル（M3-6でパッケージ化）
 │   │   ├── base.py           # BaseEvent
@@ -342,7 +342,7 @@ hiveforge/
 
 ### 3.1 概念
 
-HiveForgeはデータ階層とエージェント階層の2軸でプロジェクトを管理します：
+ColonyForgeはデータ階層とエージェント階層の2軸でプロジェクトを管理します：
 
 ```
 【データ階層】                          【エージェント階層】
@@ -778,8 +778,8 @@ class TaskCreatedEvent(BaseEvent):
 ### 9.1 プロジェクト構造
 
 ```
-HiveForge/
-├── src/hiveforge/           # メインパッケージ
+ColonyForge/
+├── src/colonyforge/           # メインパッケージ
 │   ├── __init__.py
 │   ├── cli.py               # CLIエントリポイント
 │   ├── silence.py           # 沈黙検出
@@ -943,8 +943,8 @@ HiveForge/
 │   ├── conftest.py
 │   ├── test_*.py            # 各モジュール対応テスト
 │   └── e2e/                 # E2Eテスト
-│       ├── test_hiveforge_visual.py
-│       ├── test_hiveforge_extension.py
+│       ├── test_colonyforge_visual.py
+│       ├── test_colonyforge_extension.py
 │       └── test_hive_flow.py
 ├── vscode-extension/        # VS Code拡張
 │   ├── package.json
@@ -988,7 +988,7 @@ HiveForge/
 ├── Vault/                   # イベントログ（gitignore）
 ├── AGENTS.md                # AI開発ガイドライン
 ├── pyproject.toml           # Pythonプロジェクト設定
-├── hiveforge.config.yaml    # 実行時設定
+├── colonyforge.config.yaml    # 実行時設定
 ├── docker-compose.yml       # Docker設定
 └── Dockerfile
 ```
@@ -1013,7 +1013,7 @@ Vault/
 
 ## 10. 設定
 
-### 10.1 hiveforge.config.yaml
+### 10.1 colonyforge.config.yaml
 
 ```yaml
 hive:
@@ -1041,7 +1041,7 @@ llm:
 
 auth:
   enabled: false              # API認証（POCでは無効）
-  api_key_env: "HIVEFORGE_API_KEY"
+  api_key_env: "COLONYFORGE_API_KEY"
 
 server:
   host: "0.0.0.0"
@@ -1056,10 +1056,10 @@ logging:
 
 | 変数名 | 説明 | デフォルト |
 |--------|------|------------|
-| `HIVEFORGE_VAULT_PATH` | Vaultディレクトリパス | `./Vault` |
+| `COLONYFORGE_VAULT_PATH` | Vaultディレクトリパス | `./Vault` |
 | `OPENAI_API_KEY` | OpenAI APIキー | - |
 | `ANTHROPIC_API_KEY` | Anthropic APIキー（Anthropic使用時） | - |
-| `HIVEFORGE_API_KEY` | HiveForge API認証キー | - |
+| `COLONYFORGE_API_KEY` | ColonyForge API認証キー | - |
 | `LITELLM_PROXY_KEY` | LiteLLM Proxy認証キー（Proxy使用時） | - |
 
 ---

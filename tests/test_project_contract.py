@@ -6,7 +6,7 @@
 import pytest
 from pydantic import ValidationError
 
-from hiveforge.core.models.project_contract import (
+from colonyforge.core.models.project_contract import (
     DecisionRef,
     ProjectContract,
 )

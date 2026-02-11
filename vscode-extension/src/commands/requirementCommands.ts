@@ -3,7 +3,7 @@
  */
 
 import * as vscode from 'vscode';
-import { HiveForgeClient, Requirement } from '../client';
+import { ColonyForgeClient, Requirement } from '../client';
 import { showRequirementDetailPanel } from '../views/requirementDetailView';
 
 /**
@@ -11,22 +11,22 @@ import { showRequirementDetailPanel } from '../views/requirementDetailView';
  */
 export function registerRequirementCommands(
     context: vscode.ExtensionContext,
-    client: HiveForgeClient,
+    client: ColonyForgeClient,
     refresh: () => void
 ): void {
     context.subscriptions.push(
-        vscode.commands.registerCommand('hiveforge.approveRequirement',
+        vscode.commands.registerCommand('colonyforge.approveRequirement',
             (requirement: Requirement) => approveRequirement(requirement, client, refresh)),
-        vscode.commands.registerCommand('hiveforge.rejectRequirement',
+        vscode.commands.registerCommand('colonyforge.rejectRequirement',
             (requirement: Requirement) => rejectRequirement(requirement, client, refresh)),
-        vscode.commands.registerCommand('hiveforge.showRequirementDetail',
+        vscode.commands.registerCommand('colonyforge.showRequirementDetail',
             (requirement: Requirement) => showRequirementDetailPanel(requirement, client, refresh))
     );
 }
 
 async function approveRequirement(
     requirement: Requirement,
-    client: HiveForgeClient,
+    client: ColonyForgeClient,
     refresh: () => void
 ): Promise<void> {
     const runId = client.getCurrentRunId();
@@ -58,7 +58,7 @@ async function approveRequirement(
 
 async function rejectRequirement(
     requirement: Requirement,
-    client: HiveForgeClient,
+    client: ColonyForgeClient,
     refresh: () => void
 ): Promise<void> {
     const runId = client.getCurrentRunId();

@@ -3,7 +3,7 @@
 外部フィードバック対応: 衝突の優先順位付けのためのcategory/severityを追加。
 """
 
-from hiveforge.core.events import (
+from colonyforge.core.events import (
     ConflictCategory,
     ConflictDetectedEvent,
     ConflictResolvedEvent,

@@ -13,19 +13,19 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from hiveforge.vlm_tester.action_executor import ActionExecutor
-from hiveforge.vlm_tester.hybrid_analyzer import (
+from colonyforge.vlm_tester.action_executor import ActionExecutor
+from colonyforge.vlm_tester.hybrid_analyzer import (
     AnalysisLevel,
     HybridAnalyzer,
 )
-from hiveforge.vlm_tester.local_analyzers import (
+from colonyforge.vlm_tester.local_analyzers import (
     DiffAnalyzer,
     OCRAnalyzer,
 )
-from hiveforge.vlm_tester.screen_capture import ScreenCapture
-from hiveforge.vlm_tester.server import VLMTesterMCPServer
-from hiveforge.vlm_tester.vlm_client import VLMClient
-from hiveforge.vlm_tester.vlm_providers import (
+from colonyforge.vlm_tester.screen_capture import ScreenCapture
+from colonyforge.vlm_tester.server import VLMTesterMCPServer
+from colonyforge.vlm_tester.vlm_client import VLMClient
+from colonyforge.vlm_tester.vlm_providers import (
     AnthropicProvider,
     MultiProviderVLMClient,
     OllamaProvider,

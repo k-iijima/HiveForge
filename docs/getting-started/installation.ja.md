@@ -55,10 +55,10 @@ wsl -d Ubuntu docker run --rm --gpus all nvidia/cuda:12.0.0-base-ubuntu22.04 nvi
 
 ```bash
 # CLIが使えることを確認
-hiveforge --help
+colonyforge --help
 
 # APIサーバーを起動
-hiveforge server
+colonyforge server
 
 # Swagger UIを開く
 # http://localhost:8000/docs

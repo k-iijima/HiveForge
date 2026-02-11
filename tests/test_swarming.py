@@ -10,9 +10,9 @@ from __future__ import annotations
 
 import pytest
 
-from hiveforge.core.swarming.engine import SwarmingEngine
-from hiveforge.core.swarming.models import SwarmingFeatures, TemplateName
-from hiveforge.core.swarming.templates import (
+from colonyforge.core.swarming.engine import SwarmingEngine
+from colonyforge.core.swarming.models import SwarmingFeatures, TemplateName
+from colonyforge.core.swarming.templates import (
     BALANCED_TEMPLATE,
     COLONY_TEMPLATES,
     QUALITY_TEMPLATE,

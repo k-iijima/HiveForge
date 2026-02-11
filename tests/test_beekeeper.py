@@ -1,17 +1,17 @@
 """Beekeeperテスト"""
 
-from hiveforge.beekeeper.handler import BeekeeperHandler
-from hiveforge.beekeeper.projection import (
+from colonyforge.beekeeper.handler import BeekeeperHandler
+from colonyforge.beekeeper.projection import (
     BeekeeperProjection,
     build_beekeeper_projection,
     build_hive_overview,
 )
-from hiveforge.beekeeper.session import (
+from colonyforge.beekeeper.session import (
     BeekeeperSession,
     BeekeeperSessionManager,
     SessionState,
 )
-from hiveforge.core.events import BaseEvent, EventType
+from colonyforge.core.events import BaseEvent, EventType
 
 
 class TestBeekeeperSession:
@@ -413,7 +413,7 @@ class TestBeekeeperHandler:
 
 
 # Escalation テスト
-from hiveforge.beekeeper.escalation import (  # noqa: E402
+from colonyforge.beekeeper.escalation import (  # noqa: E402
     Escalation,
     EscalationManager,
     EscalationSeverity,
@@ -641,7 +641,7 @@ class TestEscalationManager:
 
 
 # Conflict Detection テスト
-from hiveforge.beekeeper.conflict import (  # noqa: E402
+from colonyforge.beekeeper.conflict import (  # noqa: E402
     Conflict,
     ConflictDetector,
     ConflictSeverity,
@@ -923,7 +923,7 @@ class TestConflictDetector:
 
 
 # Conflict Resolver テスト
-from hiveforge.beekeeper.resolver import (  # noqa: E402
+from colonyforge.beekeeper.resolver import (  # noqa: E402
     ConflictResolver,
     MergeRule,
     ResolutionResult,
@@ -1193,7 +1193,7 @@ class TestConflictResolver:
 
 
 # Conference テスト
-from hiveforge.beekeeper.conference import (  # noqa: E402
+from colonyforge.beekeeper.conference import (  # noqa: E402
     ConferenceAgenda,
     ConferenceManager,
     ConferenceSession,

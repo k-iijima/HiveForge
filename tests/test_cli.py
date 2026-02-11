@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from hiveforge.cli import (
+from colonyforge.cli import (
     main,
     run_chat,
     run_init,
@@ -24,7 +24,7 @@ class TestMainFunction:
     def test_no_command_shows_help(self, capsys):
         """コマンドなしでヘルプが表示される"""
         # Arrange
-        with patch.object(sys, "argv", ["hiveforge"]):
+        with patch.object(sys, "argv", ["colonyforge"]):
             # Act & Assert
             with pytest.raises(SystemExit) as excinfo:
                 main()
@@ -33,8 +33,8 @@ class TestMainFunction:
     def test_server_command(self):
         """serverコマンドが正しく処理される"""
         # Arrange
-        with patch.object(sys, "argv", ["hiveforge", "server"]):
-            with patch("hiveforge.cli.run_server") as mock_run_server:
+        with patch.object(sys, "argv", ["colonyforge", "server"]):
+            with patch("colonyforge.cli.run_server") as mock_run_server:
                 # Act
                 main()
 
@@ -48,9 +48,9 @@ class TestMainFunction:
             patch.object(
                 sys,
                 "argv",
-                ["hiveforge", "server", "--host", "127.0.0.1", "--port", "9000", "--reload"],
+                ["colonyforge", "server", "--host", "127.0.0.1", "--port", "9000", "--reload"],
             ),
-            patch("hiveforge.cli.run_server") as mock_run_server,
+            patch("colonyforge.cli.run_server") as mock_run_server,
         ):
             # Act
             main()
@@ -64,8 +64,8 @@ class TestMainFunction:
     def test_mcp_command(self):
         """mcpコマンドが正しく処理される"""
         # Arrange
-        with patch.object(sys, "argv", ["hiveforge", "mcp"]):
-            with patch("hiveforge.cli.run_mcp") as mock_run_mcp:
+        with patch.object(sys, "argv", ["colonyforge", "mcp"]):
+            with patch("colonyforge.cli.run_mcp") as mock_run_mcp:
                 # Act
                 main()
 
@@ -75,8 +75,8 @@ class TestMainFunction:
     def test_init_command(self):
         """initコマンドが正しく処理される"""
         # Arrange
-        with patch.object(sys, "argv", ["hiveforge", "init"]):
-            with patch("hiveforge.cli.run_init") as mock_run_init:
+        with patch.object(sys, "argv", ["colonyforge", "init"]):
+            with patch("colonyforge.cli.run_init") as mock_run_init:
                 # Act
                 main()
 
@@ -86,8 +86,8 @@ class TestMainFunction:
     def test_status_command(self):
         """statusコマンドが正しく処理される"""
         # Arrange
-        with patch.object(sys, "argv", ["hiveforge", "status"]):
-            with patch("hiveforge.cli.run_status") as mock_run_status:
+        with patch.object(sys, "argv", ["colonyforge", "status"]):
+            with patch("colonyforge.cli.run_status") as mock_run_status:
                 # Act
                 main()
 
@@ -102,7 +102,7 @@ class TestMainFunction:
                 sys,
                 "argv",
                 [
-                    "hiveforge",
+                    "colonyforge",
                     "record-decision",
                     "--key",
                     "D5",
@@ -112,7 +112,7 @@ class TestMainFunction:
                     "A",
                 ],
             ),
-            patch("hiveforge.cli.run_record_decision") as mock_run_decision,
+            patch("colonyforge.cli.run_record_decision") as mock_run_decision,
         ):
             # Act
             main()
@@ -135,7 +135,7 @@ class TestRunServer:
 
             # Assert
             mock_uvicorn.assert_called_once_with(
-                "hiveforge.api:app",
+                "colonyforge.api:app",
                 host="0.0.0.0",
                 port=8000,
                 reload=False,
@@ -148,7 +148,7 @@ class TestRunMcp:
     def test_run_mcp_calls_mcp_main(self):
         """MCPサーバーのmain関数が呼ばれる"""
         # Arrange & Act & Assert
-        with patch("hiveforge.mcp_server.main") as mock_mcp_main:
+        with patch("colonyforge.mcp_server.main") as mock_mcp_main:
             run_mcp()
             mock_mcp_main.assert_called_once()
 
@@ -162,7 +162,7 @@ class TestRunInit:
         args = Namespace(name="test-hive")
         monkeypatch.chdir(tmp_path)
 
-        with patch("hiveforge.core.get_settings") as mock_get_settings:
+        with patch("colonyforge.core.get_settings") as mock_get_settings:
             mock_settings = MagicMock()
             mock_settings.get_vault_path.return_value = tmp_path / "Vault"
             mock_settings.hive.name = "test-hive"
@@ -186,12 +186,12 @@ class TestRunStatus:
         args = Namespace(run_id=None)
         monkeypatch.chdir(tmp_path)
 
-        with patch("hiveforge.core.get_settings") as mock_get_settings:
+        with patch("colonyforge.core.get_settings") as mock_get_settings:
             mock_settings = MagicMock()
             mock_settings.get_vault_path.return_value = tmp_path / "Vault"
             mock_get_settings.return_value = mock_settings
 
-            with patch("hiveforge.core.AkashicRecord") as mock_ar_class:
+            with patch("colonyforge.core.AkashicRecord") as mock_ar_class:
                 mock_ar = MagicMock()
                 mock_ar.list_runs.return_value = []
                 mock_ar_class.return_value = mock_ar
@@ -206,7 +206,7 @@ class TestRunStatus:
     def test_run_status_with_run(self, tmp_path, capsys, monkeypatch):
         """Runがある場合の表示"""
         # Arrange
-        from hiveforge.core.ar.projections import (
+        from colonyforge.core.ar.projections import (
             RequirementProjection,
             RequirementState,
             RunProjection,
@@ -235,18 +235,18 @@ class TestRunStatus:
         )
         mock_projection.event_count = 10
 
-        with patch("hiveforge.core.get_settings") as mock_get_settings:
+        with patch("colonyforge.core.get_settings") as mock_get_settings:
             mock_settings = MagicMock()
             mock_settings.get_vault_path.return_value = tmp_path / "Vault"
             mock_get_settings.return_value = mock_settings
 
-            with patch("hiveforge.core.AkashicRecord") as mock_ar_class:
+            with patch("colonyforge.core.AkashicRecord") as mock_ar_class:
                 mock_ar = MagicMock()
                 mock_ar.list_runs.return_value = ["run-001"]
                 mock_ar.replay.return_value = iter([MagicMock()])
                 mock_ar_class.return_value = mock_ar
 
-                with patch("hiveforge.core.build_run_projection") as mock_build:
+                with patch("colonyforge.core.build_run_projection") as mock_build:
                     mock_build.return_value = mock_projection
 
                     # Act
@@ -268,12 +268,12 @@ class TestRunStatus:
         args = Namespace(run_id="run-empty")
         monkeypatch.chdir(tmp_path)
 
-        with patch("hiveforge.core.get_settings") as mock_get_settings:
+        with patch("colonyforge.core.get_settings") as mock_get_settings:
             mock_settings = MagicMock()
             mock_settings.get_vault_path.return_value = tmp_path / "Vault"
             mock_get_settings.return_value = mock_settings
 
-            with patch("hiveforge.core.AkashicRecord") as mock_ar_class:
+            with patch("colonyforge.core.AkashicRecord") as mock_ar_class:
                 mock_ar = MagicMock()
                 mock_ar.list_runs.return_value = ["run-empty"]
                 mock_ar.replay.return_value = iter([])  # 空のイベント
@@ -289,7 +289,7 @@ class TestRunStatus:
     def test_run_status_with_specific_run_id(self, tmp_path, capsys, monkeypatch):
         """特定のrun_idを指定した場合"""
         # Arrange
-        from hiveforge.core.ar.projections import RunProjection, RunState
+        from colonyforge.core.ar.projections import RunProjection, RunState
 
         args = Namespace(run_id="specific-run")
         monkeypatch.chdir(tmp_path)
@@ -301,18 +301,18 @@ class TestRunStatus:
         )
         mock_projection.event_count = 5
 
-        with patch("hiveforge.core.get_settings") as mock_get_settings:
+        with patch("colonyforge.core.get_settings") as mock_get_settings:
             mock_settings = MagicMock()
             mock_settings.get_vault_path.return_value = tmp_path / "Vault"
             mock_get_settings.return_value = mock_settings
 
-            with patch("hiveforge.core.AkashicRecord") as mock_ar_class:
+            with patch("colonyforge.core.AkashicRecord") as mock_ar_class:
                 mock_ar = MagicMock()
                 mock_ar.list_runs.return_value = ["run-001", "specific-run"]
                 mock_ar.replay.return_value = iter([MagicMock()])
                 mock_ar_class.return_value = mock_ar
 
-                with patch("hiveforge.core.build_run_projection") as mock_build:
+                with patch("colonyforge.core.build_run_projection") as mock_build:
                     mock_build.return_value = mock_projection
 
                     # Act
@@ -342,12 +342,12 @@ class TestRunRecordDecision:
         )
         monkeypatch.chdir(tmp_path)
 
-        with patch("hiveforge.core.get_settings") as mock_get_settings:
+        with patch("colonyforge.core.get_settings") as mock_get_settings:
             mock_settings = MagicMock()
             mock_settings.get_vault_path.return_value = tmp_path / "Vault"
             mock_get_settings.return_value = mock_settings
 
-            with patch("hiveforge.core.AkashicRecord") as mock_ar_class:
+            with patch("colonyforge.core.AkashicRecord") as mock_ar_class:
                 mock_ar = MagicMock()
                 mock_ar.list_runs.return_value = []
                 mock_ar_class.return_value = mock_ar
@@ -379,12 +379,12 @@ class TestRunRecordDecision:
         )
         monkeypatch.chdir(tmp_path)
 
-        with patch("hiveforge.core.get_settings") as mock_get_settings:
+        with patch("colonyforge.core.get_settings") as mock_get_settings:
             mock_settings = MagicMock()
             mock_settings.get_vault_path.return_value = tmp_path / "Vault"
             mock_get_settings.return_value = mock_settings
 
-            with patch("hiveforge.core.AkashicRecord") as mock_ar_class:
+            with patch("colonyforge.core.AkashicRecord") as mock_ar_class:
                 mock_ar = MagicMock()
                 mock_ar.list_runs.return_value = ["meta-decisions"]
                 mock_ar_class.return_value = mock_ar
@@ -409,7 +409,7 @@ class TestMainEntryPoint:
         import sys
 
         result = subprocess.run(
-            [sys.executable, "-c", "import hiveforge.cli; hiveforge.cli.main()"],
+            [sys.executable, "-c", "import colonyforge.cli; colonyforge.cli.main()"],
             capture_output=True,
             text=True,
         )
@@ -435,9 +435,9 @@ class TestRunChat:
         mock_beekeeper.close = AsyncMock()
 
         with (
-            patch("hiveforge.core.get_settings") as mock_get_settings,
-            patch("hiveforge.core.AkashicRecord"),
-            patch("hiveforge.beekeeper.BeekeeperMCPServer", return_value=mock_beekeeper),
+            patch("colonyforge.core.get_settings") as mock_get_settings,
+            patch("colonyforge.core.AkashicRecord"),
+            patch("colonyforge.beekeeper.BeekeeperMCPServer", return_value=mock_beekeeper),
         ):
             mock_settings = MagicMock()
             mock_settings.get_vault_path.return_value = MagicMock()
@@ -466,9 +466,9 @@ class TestRunChat:
         mock_beekeeper.close = AsyncMock()
 
         with (
-            patch("hiveforge.core.get_settings") as mock_get_settings,
-            patch("hiveforge.core.AkashicRecord"),
-            patch("hiveforge.beekeeper.BeekeeperMCPServer", return_value=mock_beekeeper),
+            patch("colonyforge.core.get_settings") as mock_get_settings,
+            patch("colonyforge.core.AkashicRecord"),
+            patch("colonyforge.beekeeper.BeekeeperMCPServer", return_value=mock_beekeeper),
         ):
             mock_settings = MagicMock()
             mock_settings.get_vault_path.return_value = MagicMock()
@@ -491,9 +491,9 @@ class TestRunChat:
         mock_beekeeper.close = AsyncMock()
 
         with (
-            patch("hiveforge.core.get_settings") as mock_get_settings,
-            patch("hiveforge.core.AkashicRecord"),
-            patch("hiveforge.beekeeper.BeekeeperMCPServer", return_value=mock_beekeeper),
+            patch("colonyforge.core.get_settings") as mock_get_settings,
+            patch("colonyforge.core.AkashicRecord"),
+            patch("colonyforge.beekeeper.BeekeeperMCPServer", return_value=mock_beekeeper),
         ):
             mock_settings = MagicMock()
             mock_settings.get_vault_path.return_value = MagicMock()
@@ -509,8 +509,8 @@ class TestRunChat:
     def test_chat_command_dispatched(self):
         """chatコマンドがrun_chatに正しくディスパッチされる"""
         # Arrange
-        with patch.object(sys, "argv", ["hiveforge", "chat", "hello"]):
-            with patch("hiveforge.cli.run_chat") as mock_run_chat:
+        with patch.object(sys, "argv", ["colonyforge", "chat", "hello"]):
+            with patch("colonyforge.cli.run_chat") as mock_run_chat:
                 # Act
                 main()
 
@@ -541,9 +541,9 @@ class TestRunTask:
         mock_client.close = AsyncMock()
 
         with (
-            patch("hiveforge.llm.client.LLMClient", return_value=mock_client),
-            patch("hiveforge.llm.runner.AgentRunner", return_value=mock_runner),
-            patch("hiveforge.llm.tools.get_basic_tools", return_value=[]),
+            patch("colonyforge.llm.client.LLMClient", return_value=mock_client),
+            patch("colonyforge.llm.runner.AgentRunner", return_value=mock_runner),
+            patch("colonyforge.llm.tools.get_basic_tools", return_value=[]),
         ):
             # Act
             run_task(args)
@@ -572,9 +572,9 @@ class TestRunTask:
         mock_client.close = AsyncMock()
 
         with (
-            patch("hiveforge.llm.client.LLMClient", return_value=mock_client),
-            patch("hiveforge.llm.runner.AgentRunner", return_value=mock_runner),
-            patch("hiveforge.llm.tools.get_basic_tools", return_value=[]),
+            patch("colonyforge.llm.client.LLMClient", return_value=mock_client),
+            patch("colonyforge.llm.runner.AgentRunner", return_value=mock_runner),
+            patch("colonyforge.llm.tools.get_basic_tools", return_value=[]),
         ):
             # Act
             run_task(args)
@@ -586,8 +586,8 @@ class TestRunTask:
     def test_run_command_dispatched(self):
         """runコマンドがrun_taskに正しくディスパッチされる"""
         # Arrange
-        with patch.object(sys, "argv", ["hiveforge", "run", "テストタスク"]):
-            with patch("hiveforge.cli.run_task") as mock_run_task:
+        with patch.object(sys, "argv", ["colonyforge", "run", "テストタスク"]):
+            with patch("colonyforge.cli.run_task") as mock_run_task:
                 # Act
                 main()
 

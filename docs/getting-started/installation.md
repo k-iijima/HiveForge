@@ -55,10 +55,10 @@ Or use the provided script:
 
 ```bash
 # Check CLI is available
-hiveforge --help
+colonyforge --help
 
 # Start the API server
-hiveforge server
+colonyforge server
 
 # Open Swagger UI
 # http://localhost:8000/docs

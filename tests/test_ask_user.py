@@ -16,10 +16,10 @@ import asyncio
 
 import pytest
 
-from hiveforge.beekeeper.server import BeekeeperMCPServer
-from hiveforge.beekeeper.session import SessionState
-from hiveforge.core.ar.storage import AkashicRecord
-from hiveforge.core.events.types import EventType
+from colonyforge.beekeeper.server import BeekeeperMCPServer
+from colonyforge.beekeeper.session import SessionState
+from colonyforge.core.ar.storage import AkashicRecord
+from colonyforge.core.events.types import EventType
 
 
 @pytest.fixture

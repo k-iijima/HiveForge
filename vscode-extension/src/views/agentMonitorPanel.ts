@@ -7,7 +7,7 @@
  */
 
 import * as vscode from 'vscode';
-import { HiveForgeClient, ActivityEvent, ActivityHierarchy } from '../client';
+import { ColonyForgeClient, ActivityEvent, ActivityHierarchy } from '../client';
 
 export class AgentMonitorPanel {
     public static currentPanel: AgentMonitorPanel | undefined;
@@ -18,7 +18,7 @@ export class AgentMonitorPanel {
 
     private constructor(
         panel: vscode.WebviewPanel,
-        private client: HiveForgeClient,
+        private client: ColonyForgeClient,
     ) {
         this._panel = panel;
         this._update();
@@ -49,7 +49,7 @@ export class AgentMonitorPanel {
         );
     }
 
-    public static createOrShow(extensionUri: vscode.Uri, client: HiveForgeClient): void {
+    public static createOrShow(extensionUri: vscode.Uri, client: ColonyForgeClient): void {
         const column = vscode.window.activeTextEditor
             ? vscode.window.activeTextEditor.viewColumn
             : undefined;
@@ -61,7 +61,7 @@ export class AgentMonitorPanel {
         }
 
         const panel = vscode.window.createWebviewPanel(
-            'hiveforgeAgentMonitor',
+            'colonyforgeAgentMonitor',
             'Agent Monitor',
             column || vscode.ViewColumn.One,
             {
@@ -428,7 +428,7 @@ export class AgentMonitorPanel {
 <body>
     <h2 class="error">接続エラー</h2>
     <p>${this._escape(message)}</p>
-    <p class="hint">HiveForge APIサーバーが起動しているか確認してください</p>
+    <p class="hint">ColonyForge APIサーバーが起動しているか確認してください</p>
 </body>
 </html>`;
     }

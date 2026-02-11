@@ -3,7 +3,7 @@
 外部フィードバック対応: conference_idを中心としたイベント束ね。
 """
 
-from hiveforge.core.events import (
+from colonyforge.core.events import (
     ConferenceEndedEvent,
     ConferenceStartedEvent,
     EventType,

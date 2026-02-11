@@ -1,10 +1,14 @@
-# HiveForge
+# ColonyForge
 
-[![CI](https://github.com/k-iijima/HiveForge/actions/workflows/ci.yml/badge.svg)](https://github.com/k-iijima/HiveForge/actions/workflows/ci.yml)
+[![CI](https://github.com/k-iijima/ColonyForge/actions/workflows/ci.yml/badge.svg)](https://github.com/k-iijima/ColonyForge/actions/workflows/ci.yml)
 
 > マルチエージェント協調開発システム
 
-HiveForgeは、LLMを活用した自律型ソフトウェア開発支援システムです。複数の専門エージェント（Beekeeper, Queen Bee, Worker Bee, Sentinel Hornet, Guard Bee, Forager Bee, Referee Bee）が協調し、VS Code + GitHub Copilot Chat と連携してソフトウェア開発を支援します。
+> **Note:** 本プロジェクトは **HiveForge** から **ColonyForge** にリネームされました（2025-02）。
+> パッケージ名・CLI コマンド・import パス等はすべて `colonyforge` に統一されています。
+> 過去の `hiveforge` との後方互換性は維持していません。
+
+ColonyForgeは、LLMを活用した自律型ソフトウェア開発支援システムです。複数の専門エージェント（Beekeeper, Queen Bee, Worker Bee, Sentinel Hornet, Guard Bee, Forager Bee, Referee Bee）が協調し、VS Code + GitHub Copilot Chat と連携してソフトウェア開発を支援します。
 
 ## 特徴
 
@@ -95,7 +99,7 @@ Worker × N案生成 → Forager探索拡張 → Referee多面的採点 → Guar
 
 ```bash
 # VS Codeでリポジトリを開く
-code hiveforge
+code colonyforge
 
 # コマンドパレット > "Dev Containers: Reopen in Container"
 ```
@@ -108,8 +112,8 @@ GPUの有無は自動検出：
 
 ```bash
 # リポジトリをクローン
-git clone https://github.com/your-org/hiveforge.git
-cd hiveforge
+git clone https://github.com/your-org/colonyforge.git
+cd colonyforge
 
 # 仮想環境を作成・有効化
 python -m venv .venv
@@ -119,10 +123,10 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 
 # Vaultディレクトリを初期化
-hiveforge init
+colonyforge init
 
 # サーバーを起動
-hiveforge serve
+colonyforge serve
 ```
 
 ### VS Code MCP設定
@@ -132,8 +136,8 @@ hiveforge serve
 ```json
 {
   "servers": {
-    "hiveforge": {
-      "command": "hiveforge",
+    "colonyforge": {
+      "command": "colonyforge",
       "args": ["mcp"],
       "env": {}
     }
@@ -144,15 +148,15 @@ hiveforge serve
 ### Copilot Chatで使用
 
 ```
-@hiveforge システムの状態を教えて
-@hiveforge 新しいHiveを作成: ECサイト開発
-@hiveforge UI/UX Colonyを作成
+@colonyforge システムの状態を教えて
+@colonyforge 新しいHiveを作成: ECサイト開発
+@colonyforge UI/UX Colonyを作成
 ```
 
 ## プロジェクト構造
 
 ```
-src/hiveforge/
+src/colonyforge/
 ├── core/              # コア基盤（イベント、AR、状態機械）
 │   ├── events/        #   95 EventType (パッケージ化済)
 │   ├── models/        #   ドメインモデル (ActionClass等)
@@ -217,7 +221,7 @@ pytest tests/ --ignore=tests/e2e -v
 pytest tests/e2e/ -v -m e2e
 
 # カバレッジ
-pytest --cov=hiveforge --cov-report=html
+pytest --cov=colonyforge --cov-report=html
 ```
 
 ## ライセンス

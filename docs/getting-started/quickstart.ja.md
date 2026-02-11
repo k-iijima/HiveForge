@@ -1,13 +1,13 @@
 # クイックスタート
 
-HiveForgeを起動し、最初のワークフローを5分で完了しましょう。
+ColonyForgeを起動し、最初のワークフローを5分で完了しましょう。
 
 ## 1. APIサーバーの起動
 
 VS Codeで**F5**キーを押す（devcontainer内）、または：
 
 ```bash
-hiveforge server
+colonyforge server
 ```
 
 Swagger UIを開く：[http://localhost:8000/docs](http://localhost:8000/docs)
@@ -19,7 +19,7 @@ Hiveはプロジェクトを表す最上位の組織単位です。
 ```bash
 curl -X POST http://localhost:8000/hives \
   -H "Content-Type: application/json" \
-  -d '{"name": "My Project", "description": "最初のHiveForgeプロジェクト"}'
+  -d '{"name": "My Project", "description": "最初のColonyForgeプロジェクト"}'
 ```
 
 ## 3. Colonyの作成
@@ -70,7 +70,7 @@ curl -X POST http://localhost:8000/runs/{run_id}/complete
 
 ## 7. VS Codeで表示
 
-HiveForge拡張機能をインストールすると以下が表示されます：
+ColonyForge拡張機能をインストールすると以下が表示されます：
 
 - **Hive Monitor** — KPIゲージ付きWebviewダッシュボード
 - **イベントログ** — 全イベントのTreeView表示
@@ -83,8 +83,8 @@ HiveForge拡張機能をインストールすると以下が表示されます�
 ```json
 {
   "servers": {
-    "hiveforge": {
-      "command": "hiveforge",
+    "colonyforge": {
+      "command": "colonyforge",
       "args": ["mcp"],
       "env": {}
     }
@@ -92,7 +92,7 @@ HiveForge拡張機能をインストールすると以下が表示されます�
 }
 ```
 
-Copilot Chatで `@hiveforge` を入力してHiveForgeを直接操作できます。
+Copilot Chatで `@colonyforge` を入力してColonyForgeを直接操作できます。
 
 ## 次のステップ
 

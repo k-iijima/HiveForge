@@ -1,4 +1,4 @@
-# HiveForge Docker Image
+# ColonyForge Docker Image
 FROM python:3.12-slim
 
 WORKDIR /app
@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
 # ソースコードとメタデータをコピー
 COPY pyproject.toml README.md ./
 COPY src/ ./src/
-COPY hiveforge.config.yaml ./
+COPY colonyforge.config.yaml ./
 
 # パッケージをインストール
 RUN pip install --no-cache-dir -e .
@@ -19,9 +19,9 @@ RUN pip install --no-cache-dir -e .
 RUN mkdir -p /app/Vault
 
 # 非rootユーザーで実行
-RUN useradd -m -u 1000 hiveforge && chown -R hiveforge:hiveforge /app
-USER hiveforge
+RUN useradd -m -u 1000 colonyforge && chown -R colonyforge:colonyforge /app
+USER colonyforge
 
 EXPOSE 8000
 
-CMD ["hiveforge", "server"]
+CMD ["colonyforge", "server"]

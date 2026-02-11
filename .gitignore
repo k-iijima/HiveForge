@@ -40,7 +40,7 @@ vscode-extension/out/
 .env.local
 *.local.yaml
 
-# HiveForge Vault (イベントログ)
+# ColonyForge Vault (イベントログ)
 # 注意: 本番環境ではバックアップを取ること
 Vault/
 
