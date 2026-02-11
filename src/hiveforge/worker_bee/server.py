@@ -337,6 +337,7 @@ class WorkerBeeMCPServer:
                 vault_path=str(self.ar.vault_path),
                 worker_name=self.worker_id,
                 agent_info=agent_info,
+                require_tool_use=True,
             )
 
             # 基本ツールを登録

@@ -484,9 +484,7 @@ class TestRunResult:
 
 # =============================================================================
 # AgentRunnerプロンプトYAML統合テスト
-# =============================================================================
-
-
+# ======================================================================
 class TestAgentRunnerPromptIntegration:
     """AgentRunnerがYAMLプロンプト設定を使用するテスト"""
 
@@ -703,9 +701,7 @@ class TestAgentRunnerPromptIntegration:
         assert system_msg.content == custom_prompt
 
 
-# ==================== LLMClient テスト ====================
-
-
+# ==================== LLMClient テスト =============
 def _make_mock_model_response(
     content="Hello!",
     tool_calls=None,
@@ -1342,9 +1338,7 @@ class TestLLMClient:
         assert result.tool_calls[0].arguments == {"path": "test.txt"}
 
 
-# ==================== run_command_handler テスト ====================
-
-
+# ==================== run_command_handler テスト =============
 class TestRunCommandHandler:
     """run_command_handlerのテスト"""
 
@@ -1392,3 +1386,216 @@ class TestRunCommandHandler:
         assert "ディレクトリではありません" in result["error"]
 
         set_workspace_root(Path.cwd())
+# =============================================================================
+# AgentRunner ツール呼び出し必須モード (require_tool_use)
+# ======================================================================
+class TestAgentRunnerRequireToolUse:
+    """require_tool_use=True 時のツール呼び出し必須モードのテスト"""
+
+    @pytest.fixture
+    def mock_client(self):
+        """モックLLMクライアント"""
+        client = MagicMock(spec=LLMClient)
+        client.chat = AsyncMock()
+        client.close = AsyncMock()
+        return client
+
+    @pytest.mark.asyncio
+    async def test_require_tool_use_retries_when_no_tool_call(self, mock_client, tmp_path):
+        """require_tool_use=True でツール未使用の応答が返った場合、
+        再試行プロンプトを送り、LLMにツール呼び出しを促す
+
+        1回目: テキストのみ応答 → 再試行
+        2回目: ツール呼び出し → 成功
+        """
+        # Arrange: 1回目テキストのみ、2回目ツール呼び出し、3回目最終応答
+        test_file = tmp_path / "test.txt"
+        test_file.write_text("Hello!")
+
+        mock_client.chat.side_effect = [
+            LLMResponse(
+                content="コマンドを実行します",
+                tool_calls=[],
+                finish_reason="stop",
+            ),
+            LLMResponse(
+                content=None,
+                tool_calls=[
+                    ToolCall(id="tc-1", name="read_file", arguments={"path": str(test_file)})
+                ],
+                finish_reason="tool_calls",
+            ),
+            LLMResponse(
+                content="ファイルの内容は Hello! です",
+                tool_calls=[],
+                finish_reason="stop",
+            ),
+        ]
+
+        runner = AgentRunner(mock_client, require_tool_use=True)
+        runner.register_tool(READ_FILE_TOOL)
+
+        # Act
+        result = await runner.run("ファイルを読んで")
+
+        # Assert: 再試行後にツールが使われ成功
+        assert result.success is True
+        assert result.tool_calls_made == 1
+        assert mock_client.chat.call_count == 3  # 初回 + 再試行 + 最終
+
+    @pytest.mark.asyncio
+    async def test_require_tool_use_fails_after_max_retries(self, mock_client):
+        """require_tool_use=True で再試行回数を超えてもツール未使用なら失敗
+
+        LLMが何度もテキストのみ応答を返す場合、再試行上限後に失敗する。
+        """
+        # Arrange: 常にテキストのみ応答
+        mock_client.chat.return_value = LLMResponse(
+            content="やりました（嘘）",
+            tool_calls=[],
+            finish_reason="stop",
+        )
+
+        runner = AgentRunner(
+            mock_client,
+            require_tool_use=True,
+            tool_use_retries=2,
+        )
+        runner.register_tool(READ_FILE_TOOL)
+
+        # Act
+        result = await runner.run("コマンドを実行して")
+
+        # Assert: 失敗し、エラーメッセージにツール未使用が記録される
+        assert result.success is False
+        assert result.tool_calls_made == 0
+        assert "ツール" in result.error
+
+    @pytest.mark.asyncio
+    async def test_require_tool_use_false_allows_text_only(self, mock_client):
+        """require_tool_use=False (デフォルト) ではテキスト応答で正常終了
+
+        従来の動作が壊れないことを確認。
+        """
+        # Arrange
+        mock_client.chat.return_value = LLMResponse(
+            content="了解しました",
+            tool_calls=[],
+            finish_reason="stop",
+        )
+
+        runner = AgentRunner(mock_client, require_tool_use=False)
+        runner.register_tool(READ_FILE_TOOL)
+
+        # Act
+        result = await runner.run("hello")
+
+        # Assert: 従来通り成功
+        assert result.success is True
+        assert result.output == "了解しました"
+        assert result.tool_calls_made == 0
+
+    @pytest.mark.asyncio
+    async def test_require_tool_use_succeeds_on_first_try(self, mock_client, tmp_path):
+        """require_tool_use=True でも初回からツールが使われれば通常通り成功
+
+        再試行ロジックが不要に発火しないことを確認。
+        """
+        # Arrange
+        test_file = tmp_path / "test.txt"
+        test_file.write_text("content")
+
+        mock_client.chat.side_effect = [
+            LLMResponse(
+                content=None,
+                tool_calls=[
+                    ToolCall(id="tc-1", name="read_file", arguments={"path": str(test_file)})
+                ],
+                finish_reason="tool_calls",
+            ),
+            LLMResponse(
+                content="完了",
+                tool_calls=[],
+                finish_reason="stop",
+            ),
+        ]
+
+        runner = AgentRunner(mock_client, require_tool_use=True)
+        runner.register_tool(READ_FILE_TOOL)
+
+        # Act
+        result = await runner.run("ファイルを読んで")
+
+        # Assert
+        assert result.success is True
+        assert result.tool_calls_made == 1
+        assert mock_client.chat.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_require_tool_use_no_tools_registered_skips_retry(self, mock_client):
+        """ツール未登録時はrequire_tool_use=Trueでも再試行しない
+
+        ツールがそもそも存在しない場合、再試行しても無意味なのでスキップ。
+        """
+        # Arrange
+        mock_client.chat.return_value = LLMResponse(
+            content="ツールがないので回答します",
+            tool_calls=[],
+            finish_reason="stop",
+        )
+
+        runner = AgentRunner(mock_client, require_tool_use=True)
+        # ツール未登録
+
+        # Act
+        result = await runner.run("何かして")
+
+        # Assert: ツールなしなので通常終了
+        assert result.success is True
+        assert mock_client.chat.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_retry_prompt_is_sent_to_llm(self, mock_client, tmp_path):
+        """再試行時に「ツールを使え」という指示メッセージがLLMに渡される
+
+        再試行プロンプトの内容を検証。
+        """
+        # Arrange
+        test_file = tmp_path / "test.txt"
+        test_file.write_text("data")
+
+        mock_client.chat.side_effect = [
+            LLMResponse(
+                content="テキスト応答",
+                tool_calls=[],
+                finish_reason="stop",
+            ),
+            LLMResponse(
+                content=None,
+                tool_calls=[
+                    ToolCall(id="tc-1", name="read_file", arguments={"path": str(test_file)})
+                ],
+                finish_reason="tool_calls",
+            ),
+            LLMResponse(
+                content="Done",
+                tool_calls=[],
+                finish_reason="stop",
+            ),
+        ]
+
+        runner = AgentRunner(mock_client, require_tool_use=True)
+        runner.register_tool(READ_FILE_TOOL)
+
+        # Act
+        await runner.run("ファイルを読んで")
+
+        # Assert: 2回目のchat呼び出しのメッセージに再試行指示が含まれる
+        second_call_messages = mock_client.chat.call_args_list[1][1]["messages"]
+        # 末尾のメッセージに再試行プロンプトがある
+        retry_messages = [
+            m for m in second_call_messages if m.role == "user" and "ツール" in m.content
+        ]
+        assert len(retry_messages) >= 1, (
+            f"再試行プロンプトが見つからない: {[(m.role, m.content[:50]) for m in second_call_messages]}"
+        )

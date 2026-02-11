@@ -251,9 +251,13 @@ class QueenBeeMCPServer:
             if not tasks_raw:
                 tasks_raw = [{"task_id": str(generate_event_id()), "goal": goal}]
 
-            # TaskPlan を構築
+            # TaskPlan を構築（depends_on を復元）
             planned_tasks = [
-                PlannedTask(task_id=t.get("task_id", str(generate_event_id())), goal=t["goal"])
+                PlannedTask(
+                    task_id=t.get("task_id", str(generate_event_id())),
+                    goal=t["goal"],
+                    depends_on=t.get("depends_on", []),
+                )
                 for t in tasks_raw
             ]
             plan = TaskPlan(tasks=planned_tasks, reasoning=f"Goal: {goal}")
@@ -425,31 +429,56 @@ class QueenBeeMCPServer:
     async def _execute_direct(
         self, run_id: str, goal: str, context: dict[str, Any]
     ) -> dict[str, Any]:
-        """従来の直接実行パス（Pipeline なし）"""
+        """直接実行パス（Pipeline なし）
+
+        ColonyOrchestrator を使い、依存関係に基づく並列実行と
+        TaskContext によるコンテキスト伝搬を行う。
+        """
+        from .orchestrator import ColonyOrchestrator
+        from .planner import PlannedTask, TaskPlan
+        from .result import ColonyResultBuilder
+
         try:
-            # LLMでタスク分解（または単純なタスクとしてそのまま実行）
-            tasks = await self._plan_tasks(goal, context)
+            # LLMでタスク分解
+            tasks_raw = await self._plan_tasks(goal, context)
 
-            if not tasks:
-                # タスク分解できなかった場合、目標をそのまま1タスクとして実行
-                tasks = [{"task_id": generate_event_id(), "goal": goal}]
+            if not tasks_raw:
+                tasks_raw = [{"task_id": str(generate_event_id()), "goal": goal, "depends_on": []}]
 
-            results = []
-            for task in tasks:
-                result = await self._execute_task(
-                    task_id=task.get("task_id", generate_event_id()),
-                    run_id=run_id,
-                    goal=task.get("goal", goal),
-                    context=context,
+            # TaskPlan を構築（depends_on を保持）
+            planned_tasks = [
+                PlannedTask(
+                    task_id=t.get("task_id", str(generate_event_id())),
+                    goal=t["goal"],
+                    depends_on=t.get("depends_on", []),
                 )
-                results.append(result)
+                for t in tasks_raw
+            ]
+            plan = TaskPlan(tasks=planned_tasks, reasoning=f"Goal: {goal}")
 
-            # 全タスクの結果を集約
-            success_count = sum(1 for r in results if r.get("status") == "completed")
-            total = len(results)
+            # ColonyOrchestrator で依存関係順に並列実行
+            orchestrator = ColonyOrchestrator()
 
-            if success_count == total:
-                # RunCompletedイベント
+            async def execute_fn(task_id: str, task_goal: str, context_data: Any) -> dict[str, Any]:
+                return await self._execute_task(
+                    task_id=task_id,
+                    run_id=run_id,
+                    goal=task_goal,
+                    context=context_data or context,
+                )
+
+            task_ctx = await orchestrator.execute_plan(
+                plan=plan,
+                execute_fn=execute_fn,
+                original_goal=goal,
+                run_id=run_id,
+            )
+
+            # TaskContext → ColonyResult に変換
+            colony_result = ColonyResultBuilder.build(task_ctx, self.colony_id)
+
+            # Run完了/失敗イベントを記録
+            if colony_result.failed_count == 0:
                 run_completed = RunCompletedEvent(
                     id=generate_event_id(),
                     run_id=run_id,
@@ -457,13 +486,12 @@ class QueenBeeMCPServer:
                     payload={
                         "colony_id": self.colony_id,
                         "goal": goal,
-                        "tasks_completed": success_count,
-                        "tasks_total": total,
+                        "tasks_completed": colony_result.completed_count,
+                        "tasks_total": colony_result.total_tasks,
                     },
                 )
                 self.ar.append(run_completed, run_id)
             else:
-                # RunFailedイベント（一部失敗）
                 run_failed = RunFailedEvent(
                     id=generate_event_id(),
                     run_id=run_id,
@@ -471,26 +499,25 @@ class QueenBeeMCPServer:
                     payload={
                         "colony_id": self.colony_id,
                         "goal": goal,
-                        "tasks_completed": success_count,
-                        "tasks_total": total,
+                        "tasks_completed": colony_result.completed_count,
+                        "tasks_total": colony_result.total_tasks,
                         "reason": "Some tasks failed",
                     },
                 )
                 self.ar.append(run_failed, run_id)
 
             return {
-                "status": "completed" if success_count == total else "partial",
+                "status": "completed" if colony_result.failed_count == 0 else "partial",
                 "run_id": run_id,
                 "goal": goal,
-                "tasks_total": total,
-                "tasks_completed": success_count,
-                "results": results,
+                "tasks_total": colony_result.total_tasks,
+                "tasks_completed": colony_result.completed_count,
+                "results": colony_result.task_results,
             }
 
         except Exception as e:
             logger.exception(f"目標実行エラー: {e}")
 
-            # RunFailedイベント
             run_failed = RunFailedEvent(
                 id=generate_event_id(),
                 run_id=run_id,
@@ -594,17 +621,28 @@ class QueenBeeMCPServer:
     # -------------------------------------------------------------------------
 
     async def _plan_tasks(self, goal: str, context: dict[str, Any]) -> list[dict[str, Any]]:
-        """LLMを使ってタスクを分解"""
+        """LLMを使ってタスクを分解
+
+        Returns:
+            タスク辞書リスト。各辞書は task_id, goal, depends_on を含む。
+        """
         from hiveforge.queen_bee.planner import TaskPlanner
 
         try:
             client = await self._get_llm_client()
             planner = TaskPlanner(client)
             plan = await planner.plan(goal, context)
-            return [{"task_id": task.task_id, "goal": task.goal} for task in plan.tasks]
+            return [
+                {
+                    "task_id": task.task_id,
+                    "goal": task.goal,
+                    "depends_on": list(task.depends_on),
+                }
+                for task in plan.tasks
+            ]
         except Exception:
             logger.warning("タスク分解に失敗、単一タスクにフォールバック", exc_info=True)
-            return [{"task_id": str(generate_event_id()), "goal": goal}]
+            return [{"task_id": str(generate_event_id()), "goal": goal, "depends_on": []}]
 
     async def _execute_task(
         self,

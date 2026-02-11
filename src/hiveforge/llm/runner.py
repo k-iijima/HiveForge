@@ -65,6 +65,13 @@ class AgentRunner:
     LLM呼び出し → ツール実行 → 結果返却のループを管理。
     """
 
+    # ツール使用再試行時にLLMへ送るプロンプト
+    TOOL_USE_RETRY_PROMPT = (
+        "あなたの応答にはツール呼び出しが含まれていませんでした。"
+        "このタスクでは必ず利用可能なツール（run_command, write_file, read_file等）を"
+        "使って実行してください。テキストで説明するのではなく、実際にツールを呼び出してください。"
+    )
+
     def __init__(
         self,
         client: LLMClient,
@@ -75,6 +82,8 @@ class AgentRunner:
         colony_id: str = "0",
         worker_name: str = "default",
         agent_info: AgentInfo | None = None,
+        require_tool_use: bool = False,
+        tool_use_retries: int = 3,
     ):
         """初期化
 
@@ -87,6 +96,8 @@ class AgentRunner:
             colony_id: Colony ID
             worker_name: Worker Beeの名前
             agent_info: ActivityBus用エージェント情報（None=イベント発行しない）
+            require_tool_use: Trueの場合、ツール呼び出しなしの応答を再試行する
+            tool_use_retries: ツール使用再試行の最大回数
         """
         self.client = client
         self.agent_type = agent_type
@@ -96,6 +107,8 @@ class AgentRunner:
         self.colony_id = colony_id
         self.worker_name = worker_name
         self.agent_info = agent_info
+        self.require_tool_use = require_tool_use
+        self.tool_use_retries = tool_use_retries
         self.tools: dict[str, ToolDefinition] = {}
 
     def register_tool(self, tool: ToolDefinition) -> None:
@@ -170,6 +183,14 @@ class AgentRunner:
         tool_definitions = self.get_tool_definitions() if self.tools else None
         tool_calls_made = 0
 
+        # require_tool_use 時は tool_choice="required" で LLM にツール呼び出しを強制
+        if tool_definitions and self.require_tool_use:
+            initial_tool_choice = "required"
+        elif tool_definitions:
+            initial_tool_choice = "auto"
+        else:
+            initial_tool_choice = None
+
         for iteration in range(self.max_iterations):
             logger.debug(f"反復 {iteration + 1}/{self.max_iterations}")
 
@@ -181,10 +202,16 @@ class AgentRunner:
                     {"message_count": len(messages)},
                 )
 
+                # ツールを1回以上使った後は auto に戻す
+                if tool_calls_made > 0:
+                    current_tool_choice = "auto" if tool_definitions else None
+                else:
+                    current_tool_choice = initial_tool_choice
+
                 response = await self.client.chat(
                     messages=messages,
                     tools=tool_definitions,
-                    tool_choice="auto" if tool_definitions else None,
+                    tool_choice=current_tool_choice,
                 )
 
                 # LLMレスポンスイベント発行
@@ -228,7 +255,40 @@ class AgentRunner:
                     # 次の反復へ
                     continue
 
-                # ツール呼び出しがない = 完了
+                # ツール呼び出しがない場合
+                # require_tool_use かつ ツール登録済み かつ まだ1回もツールを使っていない
+                if self.require_tool_use and self.tools and tool_calls_made == 0:
+                    # 再試行カウント管理
+                    if not hasattr(self, "_tool_use_retries_left"):
+                        self._tool_use_retries_left = self.tool_use_retries
+
+                    if self._tool_use_retries_left > 0:
+                        self._tool_use_retries_left -= 1
+                        logger.warning(
+                            "ツール呼び出しなしの応答を検出、再試行します "
+                            f"(残り{self._tool_use_retries_left}回)"
+                        )
+                        # 再試行プロンプトを追加して次の反復へ
+                        messages.append(Message(role="assistant", content=response.content))
+                        messages.append(Message(role="user", content=self.TOOL_USE_RETRY_PROMPT))
+                        continue
+                    else:
+                        # 再試行回数を使い切った
+                        logger.error(
+                            "ツール呼び出し必須モードで再試行回数超過: "
+                            "LLMがツールを呼び出しませんでした"
+                        )
+                        return RunResult(
+                            success=False,
+                            output=response.content or "",
+                            tool_calls_made=tool_calls_made,
+                            error=(
+                                "ツール呼び出し必須モードで再試行回数を超過しました。"
+                                "LLMがツールを使用せずテキスト応答のみを返しました。"
+                            ),
+                        )
+
+                # 通常完了
                 return RunResult(
                     success=True,
                     output=response.content or "",

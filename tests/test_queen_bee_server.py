@@ -415,3 +415,179 @@ class TestQueenBeeAgentRunnerPromptContext:
         assert runner.agent_info is not None
         assert runner.agent_info.role == AgentRole.QUEEN_BEE
         assert runner.agent_info.colony_id == queen_bee.colony_id
+
+
+# =========================================================================
+# _plan_tasks が depends_on を保持するテスト
+# =========================================================================
+
+
+class TestPlanTasksDependsOn:
+    """_plan_tasks() が depends_on を保持することを検証する"""
+
+    @pytest.mark.asyncio
+    async def test_plan_tasks_preserves_depends_on(self, queen_bee):
+        """_plan_tasks()が各タスクのdepends_onを保持する
+
+        LLMがdepends_on付きのタスク分解を返した場合、
+        _plan_tasks()の戻り値にdepends_onが含まれることを確認。
+        """
+        from unittest.mock import AsyncMock, MagicMock
+
+        from hiveforge.llm.client import LLMClient, LLMResponse
+
+        # Arrange: LLMが依存関係付きのタスクを返すようモック
+        mock_client = MagicMock(spec=LLMClient)
+        import json
+
+        response_content = json.dumps(
+            {
+                "tasks": [
+                    {"id": "task-1", "goal": "DB設計"},
+                    {"id": "task-2", "goal": "API実装", "depends_on": ["task-1"]},
+                    {"id": "task-3", "goal": "テスト", "depends_on": ["task-1", "task-2"]},
+                ],
+                "reasoning": "依存関係テスト",
+            }
+        )
+        mock_response = MagicMock()
+        mock_response.content = response_content
+        mock_client.chat = AsyncMock(return_value=mock_response)
+        queen_bee._llm_client = mock_client
+
+        # Act
+        tasks = await queen_bee._plan_tasks("ECサイト構築", {})
+
+        # Assert: depends_on が保持されている
+        assert len(tasks) == 3
+        assert tasks[0]["depends_on"] == []
+        assert tasks[1]["depends_on"] == ["task-1"]
+        assert tasks[2]["depends_on"] == ["task-1", "task-2"]
+
+    @pytest.mark.asyncio
+    async def test_plan_tasks_fallback_includes_depends_on(self, queen_bee):
+        """LLM失敗時のフォールバックでもdepends_onが含まれる
+
+        単一タスクへのフォールバックでも空のdepends_onが返ること。
+        """
+        from unittest.mock import AsyncMock, MagicMock
+
+        from hiveforge.llm.client import LLMClient
+
+        # Arrange: LLM呼び出しが失敗
+        mock_client = MagicMock(spec=LLMClient)
+        mock_client.chat = AsyncMock(side_effect=RuntimeError("API error"))
+        queen_bee._llm_client = mock_client
+
+        # Act
+        tasks = await queen_bee._plan_tasks("テスト目標", {})
+
+        # Assert: フォールバックでもdepends_onが存在
+        assert len(tasks) == 1
+        assert tasks[0]["depends_on"] == []
+
+
+# =========================================================================
+# _execute_direct が ColonyOrchestrator を使うテスト
+# =========================================================================
+
+
+class TestExecuteDirectOrchestrator:
+    """_execute_direct がオーケストレータで並列実行することを検証する"""
+
+    @pytest.mark.asyncio
+    async def test_execute_direct_uses_orchestrator_for_parallel(self, queen_bee):
+        """Directパスが依存関係なしタスクを並列実行する
+
+        2つの独立タスクがオーケストレータ経由で実行され、
+        ColonyResult形式の結果が返ることを確認する。
+        """
+        from unittest.mock import AsyncMock, MagicMock
+
+        from hiveforge.llm.client import LLMClient
+
+        # Arrange: 2つの独立タスクを返す
+        queen_bee.add_worker("worker-1")
+        queen_bee.add_worker("worker-2")
+
+        queen_bee._plan_tasks = AsyncMock(
+            return_value=[
+                {"task_id": "t1", "goal": "ファイルA作成", "depends_on": []},
+                {"task_id": "t2", "goal": "ファイルB作成", "depends_on": []},
+            ]
+        )
+        queen_bee._execute_task = AsyncMock(return_value={"status": "completed", "result": "ok"})
+
+        # Act
+        result = await queen_bee._execute_direct("run-1", "2ファイル作成", {})
+
+        # Assert: 2タスクとも完了
+        assert result["status"] == "completed"
+        assert result["tasks_total"] == 2
+        assert result["tasks_completed"] == 2
+
+    @pytest.mark.asyncio
+    async def test_execute_direct_respects_dependencies(self, queen_bee):
+        """Directパスが依存関係を尊重して実行する
+
+        task-2がtask-1に依存する場合、task-1の完了後にtask-2が実行される。
+        task-1が失敗するとtask-2はスキップされる。
+        """
+        from unittest.mock import AsyncMock
+
+        # Arrange: task-1が失敗する設定
+        queen_bee.add_worker("worker-1")
+
+        queen_bee._plan_tasks = AsyncMock(
+            return_value=[
+                {"task_id": "t1", "goal": "基盤構築", "depends_on": []},
+                {"task_id": "t2", "goal": "機能実装", "depends_on": ["t1"]},
+            ]
+        )
+        queen_bee._execute_task = AsyncMock(return_value={"status": "failed", "reason": "エラー"})
+
+        # Act
+        result = await queen_bee._execute_direct("run-1", "段階的構築", {})
+
+        # Assert: 1タスクが失敗し1タスクがスキップ、全体はpartial
+        assert result["status"] == "partial"
+        assert result["tasks_total"] == 2
+        # スキップされたタスクも記録される
+        assert len(result["results"]) == 2
+
+    @pytest.mark.asyncio
+    async def test_execute_direct_propagates_context(self, queen_bee):
+        """Directパスで先行タスクの結果が後続に伝搬する
+
+        task-1の出力が、task-2のコンテキストに含まれることを確認。
+        """
+        from unittest.mock import AsyncMock
+
+        # Arrange
+        queen_bee.add_worker("worker-1")
+
+        queen_bee._plan_tasks = AsyncMock(
+            return_value=[
+                {"task_id": "t1", "goal": "設計書作成", "depends_on": []},
+                {"task_id": "t2", "goal": "実装", "depends_on": ["t1"]},
+            ]
+        )
+
+        call_contexts = []
+
+        async def capture_execute(task_id, run_id, goal, context, worker=None):
+            call_contexts.append({"task_id": task_id, "context": context})
+            return {"status": "completed", "result": f"{task_id}完了"}
+
+        queen_bee._execute_task = capture_execute
+
+        # Act
+        result = await queen_bee._execute_direct("run-1", "設計→実装", {})
+
+        # Assert: 2番目のタスクにはpredecessor_resultsが含まれる
+        assert result["status"] == "completed"
+        assert len(call_contexts) == 2
+        # t2のcontextに先行タスクの結果が含まれる
+        t2_ctx = call_contexts[1]["context"]
+        assert t2_ctx is not None
+        assert "predecessor_results" in t2_ctx

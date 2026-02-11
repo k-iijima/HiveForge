@@ -617,3 +617,41 @@ class TestParseResponseIdMapping:
 
         # Assert
         assert plan.tasks[0].task_id == "real-id"
+
+
+# =========================================================================
+# タスク分解プロンプトの分解方針テスト
+# =========================================================================
+
+
+class TestTaskDecompositionPromptPolicy:
+    """TASK_DECOMPOSITION_SYSTEM に分解方針ルールが含まれていることを検証する"""
+
+    def test_prompt_includes_fastest_completion_policy(self):
+        """プロンプトに最速完了方針（並列化の促進）が含まれる
+
+        タスクを可能な限り並列実行できるよう分解する指示が
+        プロンプトに存在することを確認する。
+        """
+        # Assert
+        assert "最速完了" in TASK_DECOMPOSITION_SYSTEM
+        assert "並列" in TASK_DECOMPOSITION_SYSTEM
+
+    def test_prompt_includes_conflict_avoidance_policy(self):
+        """プロンプトに作業競合回避方針が含まれる
+
+        同一リソースへの同時アクセスを避けるよう分解する指示が
+        プロンプトに存在することを確認する。
+        """
+        # Assert
+        assert "競合" in TASK_DECOMPOSITION_SYSTEM
+        assert "ファイル" in TASK_DECOMPOSITION_SYSTEM or "リソース" in TASK_DECOMPOSITION_SYSTEM
+
+    def test_prompt_includes_granularity_policy(self):
+        """プロンプトに粒度適正化方針が含まれる
+
+        Worker Beeが1回のループで完了できる単位に分解する指示が
+        プロンプトに存在することを確認する。
+        """
+        # Assert
+        assert "粒度" in TASK_DECOMPOSITION_SYSTEM
