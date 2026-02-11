@@ -73,13 +73,14 @@ services:
     volumes:
       # 名前付きボリュームを使用（Windowsパス問題を回避）
       - hiveforge-workspace:/workspace/HiveForge
-    command: ["--bind-addr", "0.0.0.0:8080", "--auth", "password", "/workspace/HiveForge"]
     restart: unless-stopped
     networks:
       - hiveforge-dev-net
 
   # Playwright MCP Server（ローカルDockerfile使用）
   # ローカルにPlaywrightをインストールせずにMCP経由でブラウザ操作可能
+  # socat で localhost:8080 → code-server:8080 をフォワード
+  # → ブラウザがlocalhostアクセス → secure context → ServiceWorker動作
   playwright-mcp:
     build:
       context: .
@@ -89,7 +90,14 @@ services:
       - "8931:8931"
     tmpfs:
       - /tmp/playwright-output:mode=1777
-    command: ["--port", "8931", "--host", "0.0.0.0", "--allowed-hosts", "*"]
+    environment:
+      - PLAYWRIGHT_MCP_NO_SANDBOX=true
+      - PLAYWRIGHT_MCP_VIEWPORT_SIZE=1920x1080
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        socat TCP-LISTEN:8080,fork,reuseaddr TCP:hiveforge-code-server:8080 &
+        exec npx @playwright/mcp@latest --port 8931 --host 0.0.0.0 --no-sandbox --browser chromium --viewport-size=1920x1080 --allowed-hosts '*'
     restart: unless-stopped
     networks:
       hiveforge-dev-net:

@@ -2,16 +2,17 @@
 # Based on: https://github.com/microsoft/playwright-mcp
 FROM node:22-slim
 
-# Install dependencies for Playwright
+# Install dependencies for Playwright + socat for localhost proxy
 RUN apt-get update && apt-get install -y \
     curl \
+    socat \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Playwright MCP globally
-RUN npm install -g @anthropic-ai/mcp-playwright@latest || npm install -g @anthropic-ai/playwright-mcp@latest || npm install -g @playwright/mcp@latest
-
-# Install Playwright browsers
-RUN npx playwright install chromium --with-deps
+# Install Playwright MCP and its bundled browser
+# Note: We run npx first to cache the MCP package, then install its bundled browser  
+# to avoid revision mismatch between Dockerfile-installed and runtime-used versions.
+RUN npx @playwright/mcp@latest --version && \
+    /root/.npm/_npx/*/node_modules/.bin/playwright install chromium --with-deps
 
 # Create output directory
 RUN mkdir -p /tmp/playwright-output && chmod 1777 /tmp/playwright-output

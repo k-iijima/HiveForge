@@ -77,7 +77,16 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     // Chat Participant (@hiveforge) を登録
-    registerChatParticipant(context, client);
+    // Note: vscode.chat API may not be available in all environments (e.g., code-server)
+    try {
+        if (typeof vscode.chat !== 'undefined' && typeof vscode.chat.createChatParticipant === 'function') {
+            registerChatParticipant(context, client);
+        } else {
+            console.log('HiveForge: Chat API not available, skipping chat participant registration');
+        }
+    } catch (e) {
+        console.warn('HiveForge: Failed to register chat participant:', e);
+    }
 
     // 自動更新を設定
     setupAutoRefresh(config);
