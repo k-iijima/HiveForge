@@ -370,6 +370,8 @@ npm run lint
 
 ## 作業フロー
 
+### TDDサイクル（コーディング単位）
+
 1. テストを書く（RED）
 2. テストが失敗することを確認
 3. 最小限の実装を書く（GREEN）
@@ -377,3 +379,75 @@ npm run lint
 5. リファクタリング（REFACTOR）
 6. コミット
 7. 次のテストへ
+
+### 機能開発フロー（全体）
+
+```
+1. ブランチ作成     develop から feat/ ブランチを切る
+2. TDDサイクル      RED → GREEN → REFACTOR を繰り返す
+3. 細かいコミット    論理単位ごとにコミット（壊れた状態をコミットしない）
+4. rebase           develop の最新を取り込み（git rebase develop）
+5. テスト全通過確認  pytest tests --ignore=tests/e2e -q
+6. PR 作成          develop へ PR を出す
+7. CI ゲート通過     guard-l1 / guard-l2 / forager-regression / sentinel-safety
+8. マージ           rebase マージ（個人ブランチ）or merge（共有ブランチ）
+9. ブランチ削除      マージ後にローカル・リモートブランチを削除
+```
+
+#### 手順例
+
+```bash
+# 1. develop から機能ブランチを作成
+git checkout develop
+git pull origin develop
+git checkout -b feat/ec-site/api/42-user-auth
+
+# 2-3. TDDサイクル → コミット（繰り返し）
+pytest tests/test_auth.py -v        # RED: テスト失敗を確認
+# ... 実装 ...
+pytest tests/test_auth.py -v        # GREEN: テスト通過
+git add -A && git commit -m "feat: ユーザー認証エンドポイント追加"
+
+# 4. develop の最新を取り込み
+git fetch origin
+git rebase origin/develop
+
+# 5. 全テスト通過確認
+pytest tests --ignore=tests/e2e -q
+
+# 6. プッシュ → PR
+git push -u origin feat/ec-site/api/42-user-auth
+gh pr create --base develop --title "feat: ユーザー認証" --body "..."
+
+# 7-8. CI通過後にマージ
+gh pr merge --rebase
+
+# 9. ブランチ削除
+git checkout develop && git pull
+git branch -d feat/ec-site/api/42-user-auth
+```
+
+#### リリースフロー
+
+```
+develop → master: merge --no-ff（リリース境界を明示）
+```
+
+```bash
+git checkout master
+git merge --no-ff develop -m "release: v0.2.0"
+git tag v0.2.0
+git push origin master --tags
+```
+
+#### Hotfix フロー
+
+```bash
+git checkout -b hotfix/critical-bug master
+# ... 修正 + テスト ...
+git checkout master && git merge --no-ff hotfix/critical-bug
+git checkout develop && git merge --no-ff hotfix/critical-bug
+git branch -d hotfix/critical-bug
+```
+
+詳細は **[docs/GIT_WORKFLOW.md](docs/GIT_WORKFLOW.md)** を参照。
