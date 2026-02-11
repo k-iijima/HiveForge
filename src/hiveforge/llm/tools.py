@@ -92,8 +92,9 @@ async def read_file_handler(path: str) -> str:
     except ValueError as e:
         logger.warning("Path traversal attempt blocked: %s", path)
         return json.dumps({"error": str(e)})
-    except Exception as e:
-        return json.dumps({"error": str(e)})
+    except OSError as e:
+        logger.exception("File read error: %s", path)
+        return json.dumps({"error": f"{type(e).__name__}: {e}"})
 
 
 async def write_file_handler(path: str, content: str) -> str:
@@ -106,8 +107,9 @@ async def write_file_handler(path: str, content: str) -> str:
     except ValueError as e:
         logger.warning("Path traversal attempt blocked: %s", path)
         return json.dumps({"error": str(e)})
-    except Exception as e:
-        return json.dumps({"error": str(e)})
+    except OSError as e:
+        logger.exception("File write error: %s", path)
+        return json.dumps({"error": f"{type(e).__name__}: {e}"})
 
 
 async def list_directory_handler(path: str = ".") -> str:
@@ -134,8 +136,9 @@ async def list_directory_handler(path: str = ".") -> str:
     except ValueError as e:
         logger.warning("Path traversal attempt blocked: %s", path)
         return json.dumps({"error": str(e)})
-    except Exception as e:
-        return json.dumps({"error": str(e)})
+    except OSError as e:
+        logger.exception("Directory list error: %s", path)
+        return json.dumps({"error": f"{type(e).__name__}: {e}"})
 
 
 async def run_command_handler(command: str) -> str:
@@ -176,8 +179,9 @@ async def run_command_handler(command: str) -> str:
                 "stderr": stderr.decode("utf-8", errors="replace"),
             }
         )
-    except Exception as e:
-        return json.dumps({"error": str(e)})
+    except (ValueError, OSError) as e:
+        logger.exception("Command execution error: %s", command)
+        return json.dumps({"error": f"{type(e).__name__}: {e}"})
 
 
 # ツール定義

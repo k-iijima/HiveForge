@@ -194,120 +194,105 @@ class AgentRunner:
         for iteration in range(self.max_iterations):
             logger.debug(f"反復 {iteration + 1}/{self.max_iterations}")
 
-            try:
-                # LLM呼び出し - リクエストイベント発行
-                await self._emit_activity(
-                    ActivityType.LLM_REQUEST,
-                    f"LLMリクエスト (反復 {iteration + 1})",
-                    {"message_count": len(messages)},
+            # LLM呼び出し - リクエストイベント発行
+            await self._emit_activity(
+                ActivityType.LLM_REQUEST,
+                f"LLMリクエスト (反復 {iteration + 1})",
+                {"message_count": len(messages)},
+            )
+
+            # ツールを1回以上使った後は auto に戻す
+            if tool_calls_made > 0:
+                current_tool_choice = "auto" if tool_definitions else None
+            else:
+                current_tool_choice = initial_tool_choice
+
+            response = await self.client.chat(
+                messages=messages,
+                tools=tool_definitions,
+                tool_choice=current_tool_choice,
+            )
+
+            # LLMレスポンスイベント発行
+            content_summary = (response.content or "")[:100]
+            tool_count = len(response.tool_calls) if response.tool_calls else 0
+            await self._emit_activity(
+                ActivityType.LLM_RESPONSE,
+                content_summary if content_summary else f"ツール呼び出し {tool_count}件",
+                {
+                    "has_tool_calls": response.has_tool_calls,
+                    "tool_count": tool_count,
+                    "finish_reason": response.finish_reason,
+                },
+            )
+
+            # ツール呼び出しがある場合
+            if response.has_tool_calls:
+                # アシスタントメッセージを追加
+                messages.append(
+                    Message(
+                        role="assistant",
+                        content=response.content,
+                        tool_calls=response.tool_calls,
+                    )
                 )
 
-                # ツールを1回以上使った後は auto に戻す
-                if tool_calls_made > 0:
-                    current_tool_choice = "auto" if tool_definitions else None
-                else:
-                    current_tool_choice = initial_tool_choice
+                # 各ツールを実行
+                for tool_call in response.tool_calls:
+                    tool_result = await self._execute_tool(tool_call, context)
+                    tool_calls_made += 1
 
-                response = await self.client.chat(
-                    messages=messages,
-                    tools=tool_definitions,
-                    tool_choice=current_tool_choice,
-                )
-
-                # LLMレスポンスイベント発行
-                content_summary = (response.content or "")[:100]
-                tool_count = len(response.tool_calls) if response.tool_calls else 0
-                await self._emit_activity(
-                    ActivityType.LLM_RESPONSE,
-                    content_summary if content_summary else f"ツール呼び出し {tool_count}件",
-                    {
-                        "has_tool_calls": response.has_tool_calls,
-                        "tool_count": tool_count,
-                        "finish_reason": response.finish_reason,
-                    },
-                )
-
-                # ツール呼び出しがある場合
-                if response.has_tool_calls:
-                    # アシスタントメッセージを追加
+                    # ツール結果をメッセージに追加
                     messages.append(
                         Message(
-                            role="assistant",
-                            content=response.content,
-                            tool_calls=response.tool_calls,
+                            role="tool",
+                            content=tool_result,
+                            tool_call_id=tool_call.id,
                         )
                     )
 
-                    # 各ツールを実行
-                    for tool_call in response.tool_calls:
-                        tool_result = await self._execute_tool(tool_call, context)
-                        tool_calls_made += 1
+                # 次の反復へ
+                continue
 
-                        # ツール結果をメッセージに追加
-                        messages.append(
-                            Message(
-                                role="tool",
-                                content=tool_result,
-                                tool_call_id=tool_call.id,
-                            )
-                        )
+            # ツール呼び出しがない場合
+            # require_tool_use かつ ツール登録済み かつ まだ1回もツールを使っていない
+            if self.require_tool_use and self.tools and tool_calls_made == 0:
+                # 再試行カウント管理
+                if not hasattr(self, "_tool_use_retries_left"):
+                    self._tool_use_retries_left = self.tool_use_retries
 
-                    # 次の反復へ
+                if self._tool_use_retries_left > 0:
+                    self._tool_use_retries_left -= 1
+                    logger.warning(
+                        "ツール呼び出しなしの応答を検出、再試行します "
+                        f"(残り{self._tool_use_retries_left}回)"
+                    )
+                    # 再試行プロンプトを追加して次の反復へ
+                    messages.append(Message(role="assistant", content=response.content))
+                    messages.append(Message(role="user", content=self.TOOL_USE_RETRY_PROMPT))
                     continue
+                else:
+                    # 再試行回数を使い切った
+                    logger.error(
+                        "ツール呼び出し必須モードで再試行回数超過: "
+                        "LLMがツールを呼び出しませんでした"
+                    )
+                    return RunResult(
+                        success=False,
+                        output=response.content or "",
+                        tool_calls_made=tool_calls_made,
+                        error=(
+                            "ツール呼び出し必須モードで再試行回数を超過しました。"
+                            "LLMがツールを使用せずテキスト応答のみを返しました。"
+                        ),
+                    )
 
-                # ツール呼び出しがない場合
-                # require_tool_use かつ ツール登録済み かつ まだ1回もツールを使っていない
-                if self.require_tool_use and self.tools and tool_calls_made == 0:
-                    # 再試行カウント管理
-                    if not hasattr(self, "_tool_use_retries_left"):
-                        self._tool_use_retries_left = self.tool_use_retries
-
-                    if self._tool_use_retries_left > 0:
-                        self._tool_use_retries_left -= 1
-                        logger.warning(
-                            "ツール呼び出しなしの応答を検出、再試行します "
-                            f"(残り{self._tool_use_retries_left}回)"
-                        )
-                        # 再試行プロンプトを追加して次の反復へ
-                        messages.append(Message(role="assistant", content=response.content))
-                        messages.append(Message(role="user", content=self.TOOL_USE_RETRY_PROMPT))
-                        continue
-                    else:
-                        # 再試行回数を使い切った
-                        logger.error(
-                            "ツール呼び出し必須モードで再試行回数超過: "
-                            "LLMがツールを呼び出しませんでした"
-                        )
-                        return RunResult(
-                            success=False,
-                            output=response.content or "",
-                            tool_calls_made=tool_calls_made,
-                            error=(
-                                "ツール呼び出し必須モードで再試行回数を超過しました。"
-                                "LLMがツールを使用せずテキスト応答のみを返しました。"
-                            ),
-                        )
-
-                # 通常完了
-                return RunResult(
-                    success=True,
-                    output=response.content or "",
-                    tool_calls_made=tool_calls_made,
-                )
-
-            except Exception as e:
-                logger.exception(f"エージェント実行エラー: {e}")
-                await self._emit_activity(
-                    ActivityType.AGENT_ERROR,
-                    str(e),
-                    {"error_type": type(e).__name__},
-                )
-                return RunResult(
-                    success=False,
-                    output="",
-                    tool_calls_made=tool_calls_made,
-                    error=str(e),
-                )
+            # 通常完了
+            return RunResult(
+                success=True,
+                output=response.content or "",
+                tool_calls_made=tool_calls_made,
+            )
 
         # 最大反復回数に達した
         return RunResult(
@@ -367,4 +352,6 @@ class AgentRunner:
                 {"tool_name": tool_call.name, "error": str(e)},
             )
 
-            return json.dumps({"error": str(e)})
+            # ツール実行エラーはLLMにエラー結果として返す
+            # （ツールハンドラのエラーはLLMがリカバリできるようエラー情報を返す）
+            return json.dumps({"error": f"{type(e).__name__}: {e}"})

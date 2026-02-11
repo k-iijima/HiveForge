@@ -79,11 +79,11 @@ class GitHubHandlers(BaseHandler):
                     "total_synced": len(projection.sync_state.synced_event_ids),
                 },
             }
-        except GitHubClientError as exc:
-            return {"error": str(exc)}
+        except GitHubClientError:
+            raise
         except Exception as exc:
             logger.exception("Failed to sync run %s to GitHub", run_id)
-            return {"error": f"Sync failed: {exc}"}
+            raise RuntimeError(f"GitHub sync failed for run {run_id}") from exc
 
     async def handle_get_github_sync_status(self, args: dict[str, Any]) -> dict[str, Any]:
         """GitHub同期状態を取得する"""

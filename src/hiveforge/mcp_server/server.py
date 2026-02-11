@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from typing import Any
 
 from mcp.server import InitializationOptions, Server
@@ -37,6 +38,8 @@ from .handlers import (
     TaskHandlers,
 )
 from .tools import get_tool_definitions
+
+logger = logging.getLogger(__name__)
 
 
 class HiveForgeMCPServer:
@@ -120,7 +123,11 @@ class HiveForgeMCPServer:
                     ]
                 )
             except Exception as e:
-                return CallToolResult(content=[TextContent(type="text", text=f"Error: {str(e)}")])
+                logger.exception("MCP tool execution error: %s", name)
+                return CallToolResult(
+                    content=[TextContent(type="text", text=f"Error: {type(e).__name__}: {e}")],
+                    isError=True,
+                )
 
     async def _dispatch_tool(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         """ツール名に応じてハンドラーにディスパッチ"""

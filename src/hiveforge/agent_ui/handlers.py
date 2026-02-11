@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import logging
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -19,6 +20,8 @@ from hiveforge.vlm_tester.local_analyzers import DiffAnalyzer
 
 if TYPE_CHECKING:
     from .session import BrowserSession
+
+logger = logging.getLogger(__name__)
 
 
 class AgentUIHandlers:
@@ -309,7 +312,7 @@ class AgentUIHandlers:
                     }
                 )
             except Exception:
-                pass
+                logger.warning("Failed to parse capture metadata: %s", f.name)
 
         return [TextContent(type="text", text=json.dumps(captures, indent=2, ensure_ascii=False))]
 

@@ -5,10 +5,13 @@ Ollama VLMクライアント
 """
 
 import base64
+import logging
 from pathlib import Path
 
 import httpx
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 
 class VLMResponse(BaseModel):
@@ -47,7 +50,9 @@ class OllamaClient:
             async with httpx.AsyncClient(timeout=5) as client:
                 response = await client.get(f"{self.base_url}/api/tags")
                 return response.status_code == 200
-        except Exception:
+        except httpx.HTTPError as e:
+            # ネットワーク接続失敗は「利用不可」として返す（安全側フォールバック）
+            logger.debug("Ollama is not available: %s", e)
             return False
 
     async def list_models(self) -> list[str]:
@@ -58,8 +63,9 @@ class OllamaClient:
                 response.raise_for_status()
                 data = response.json()
                 return [m["name"] for m in data.get("models", [])]
-        except Exception:
-            return []
+        except httpx.HTTPError as e:
+            logger.warning("Failed to list Ollama models: %s", e)
+            raise
 
     async def pull_model(self, model: str | None = None) -> bool:
         """モデルをダウンロード"""
@@ -71,8 +77,9 @@ class OllamaClient:
                     json={"name": model, "stream": False},
                 )
                 return response.status_code == 200
-        except Exception:
-            return False
+        except httpx.HTTPError as e:
+            logger.error("Failed to pull Ollama model %s: %s", model, e)
+            raise
 
     async def analyze_image(
         self,

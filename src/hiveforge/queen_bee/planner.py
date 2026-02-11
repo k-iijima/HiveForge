@@ -151,23 +151,17 @@ class TaskPlanner:
     async def plan(self, goal: str, context: dict[str, Any] | None = None) -> TaskPlan:
         """ゴールをタスクに分解する
 
-        LLMでタスク分解を試み、失敗した場合は目標をそのまま
-        1タスクとして返すフォールバックを行う。
+        LLMでタスク分解を行い、結果を TaskPlan として返す。
+        LLM呼び出しやレスポンスパースに失敗した場合は例外を伝搬する。
+
+        Raises:
+            RuntimeError: LLM呼び出しに失敗した場合
+            json.JSONDecodeError: LLMレスポンスが不正なJSONの場合
+            ValidationError: レスポンスがスキーマに適合しない場合
         """
         messages = self._build_messages(goal, context or {})
-        try:
-            response = await self._client.chat(messages)
-            return self._parse_response(response.content)
-        except Exception:
-            logger.error(
-                "LLMタスク分解に失敗、単一タスクにフォールバック: goal=%s",
-                goal,
-                exc_info=True,
-            )
-            return TaskPlan(
-                tasks=[PlannedTask(goal=goal)],
-                reasoning="LLMタスク分解に失敗したため、目標をそのまま1タスクとして実行",
-            )
+        response = await self._client.chat(messages)
+        return self._parse_response(response.content)
 
     def _build_messages(self, goal: str, context: dict[str, Any]) -> list[Message]:
         """LLM用メッセージを構築"""

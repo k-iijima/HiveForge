@@ -628,21 +628,17 @@ class QueenBeeMCPServer:
         """
         from hiveforge.queen_bee.planner import TaskPlanner
 
-        try:
-            client = await self._get_llm_client()
-            planner = TaskPlanner(client)
-            plan = await planner.plan(goal, context)
-            return [
-                {
-                    "task_id": task.task_id,
-                    "goal": task.goal,
-                    "depends_on": list(task.depends_on),
-                }
-                for task in plan.tasks
-            ]
-        except Exception:
-            logger.warning("タスク分解に失敗、単一タスクにフォールバック", exc_info=True)
-            return [{"task_id": str(generate_event_id()), "goal": goal, "depends_on": []}]
+        client = await self._get_llm_client()
+        planner = TaskPlanner(client)
+        plan = await planner.plan(goal, context)
+        return [
+            {
+                "task_id": task.task_id,
+                "goal": task.goal,
+                "depends_on": list(task.depends_on),
+            }
+            for task in plan.tasks
+        ]
 
     async def _execute_task(
         self,
