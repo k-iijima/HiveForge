@@ -183,6 +183,7 @@ hiveforge/
 │   │   ├── pipeline.py       # Pipelineイベント
 │   │   ├── sentinel.py       # Sentinel Hornetイベント
 │   │   ├── waggle.py         # Waggle Danceイベント
+│   │   ├── github.py         # GitHub Projectionイベント
 │   │   └── registry.py       # イベントレジストリ
 │   ├── config.py         # 設定管理
 │   ├── activity_bus.py   # Activity Bus
@@ -219,6 +220,7 @@ hiveforge/
 │       └── projection.py     # SyncState、イベント→Issue投影
 ├── api/                   # REST API（coreに依存）
 │   ├── server.py         # FastAPIアプリ
+│   ├── auth.py           # 認証ミドルウェア（X-API-Key / Bearer）
 │   ├── dependencies.py   # 依存性注入（AppState）
 │   ├── helpers.py        # 後方互換エクスポート
 │   ├── models.py         # APIモデル
@@ -230,7 +232,9 @@ hiveforge/
 │       ├── hives.py      # Hive CRUD
 │       ├── colonies.py   # Colony CRUD
 │       ├── activity.py   # Activity API
+│       ├── beekeeper.py  # Beekeeper API
 │       ├── conferences.py # Conference API
+│       ├── guard_bee.py  # Guard Bee API
 │       ├── interventions.py # Intervention API
 │       └── system.py     # ヘルスチェック等
 ├── mcp_server/            # MCP Server（coreに依存）

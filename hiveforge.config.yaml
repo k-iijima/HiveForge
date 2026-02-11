@@ -106,7 +106,7 @@ logging:
 # 読み込み優先順位:
 #   1. Vault/hives/{hive_id}/colonies/{colony_id}/ - Colony固有
 #   2. Vault/hives/{hive_id}/                      - Hive全体のデフォルト
-#   3. src/hiveforge/llm/default_prompts/          - パッケージ内デフォルト
+#   3. src/hiveforge/prompts/defaults/             - パッケージ内デフォルト
 #   4. ハードコードフォールバック
 #
 # ファイル命名規則:

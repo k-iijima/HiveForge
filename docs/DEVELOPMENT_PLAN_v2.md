@@ -624,9 +624,9 @@ Colony ベースの並列開発を安全かつ効率的に回すための Git �
 
 | 項目 | 内容 |
 |------|------|
-| ブランチモデル | `main` / `develop` / `feat/<hive>/<colony>/<ticket>-<slug>` / `fix/…` / `hotfix/…` / `exp/…` |
+| ブランチモデル | `master` / `develop` / `feat/<hive>/<colony>/<ticket>-<slug>` / `fix/…` / `hotfix/…` / `exp/…` |
 | Worktree | Colony 単位で `git worktree add`、上限 3 |
-| Rebase/Merge | 個人→rebase、共有→merge、develop→main は `merge --no-ff` |
+| Rebase/Merge | 個人→rebase、共有→merge、develop→master は `merge --no-ff` |
 | PR ゲート | `guard-l1`（Lint/Unit）、`guard-l2`（設計整合）、`forager-regression`、`sentinel-safety` |
 | GitHub Projection | AR イベント → GitHub Issue 同期（コード変更は PR、タスク進捗は Issue） |
 

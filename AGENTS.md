@@ -71,7 +71,7 @@ def test_event_hash_excludes_hash_field():
 
 | ブランチ | 用途 | 寿命 |
 |---------|------|------|
-| `main` | リリース専用（保護） | 永続 |
+| `master` | リリース専用（保護） | 永続 |
 | `develop` | 統合トランク | 永続 |
 | `feat/<hive>/<colony>/<ticket>-<slug>` | Colony 作業 | **短命**（1〜3日） |
 | `fix/…`, `hotfix/…` | 障害対応 | 短命 |
@@ -89,7 +89,7 @@ git worktree add ../wt-api -b feat/ec-site/api/123-login develop
 
 - **個人ブランチ** → `develop`: rebase（線形履歴）
 - **共有ブランチ** → `develop`: merge（履歴保護）
-- `develop` → `main`: merge --no-ff（リリース境界明示）
+- `develop` → `master`: merge --no-ff（リリース境界明示）
 
 #### PR ゲート（必須チェック）
 

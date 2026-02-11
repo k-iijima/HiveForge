@@ -69,12 +69,15 @@ class TestGitHubClientInit:
         assert client.repo == "test-repo"
         assert client.token == mock_token
 
-    def test_init_without_token_raises(self, github_config: GitHubConfig) -> None:
+    def test_init_without_token_raises(
+        self, github_config: GitHubConfig, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """トークン環境変数が未設定の場合 GitHubClientError を送出
 
         セキュリティ上、トークンなしでのAPI呼び出しは許可しない。
         """
-        # Arrange: GITHUB_TOKEN 未設定
+        # Arrange: GITHUB_TOKEN を明示的に削除して未設定状態を保証
+        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
 
         # Act & Assert
         with pytest.raises(GitHubClientError, match="token"):
