@@ -434,7 +434,7 @@ class TestPlanTasksDependsOn:
         """
         from unittest.mock import AsyncMock, MagicMock
 
-        from hiveforge.llm.client import LLMClient, LLMResponse
+        from hiveforge.llm.client import LLMClient
 
         # Arrange: LLMが依存関係付きのタスクを返すようモック
         mock_client = MagicMock(spec=LLMClient)
@@ -502,9 +502,7 @@ class TestExecuteDirectOrchestrator:
         2つの独立タスクがオーケストレータ経由で実行され、
         ColonyResult形式の結果が返ることを確認する。
         """
-        from unittest.mock import AsyncMock, MagicMock
-
-        from hiveforge.llm.client import LLMClient
+        from unittest.mock import AsyncMock
 
         # Arrange: 2つの独立タスクを返す
         queen_bee.add_worker("worker-1")
