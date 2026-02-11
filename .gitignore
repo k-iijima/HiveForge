@@ -66,3 +66,4 @@ tests/e2e/test_captures_e2e/
 tests/e2e/*.html
 agent_captures/
 test_captures/
+site/

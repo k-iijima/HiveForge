@@ -1,0 +1,152 @@
+site_name: HiveForge Documentation
+site_url: https://k-iijima.github.io/HiveForge/
+site_description: HiveForge - Multi-Agent Collaborative Development System
+site_author: HiveForge Team
+repo_url: https://github.com/k-iijima/HiveForge
+repo_name: k-iijima/HiveForge
+
+copyright: Copyright &copy; 2024-2026 HiveForge Team
+
+theme:
+  name: material
+  language: en
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.indexes
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: amber
+      accent: deep orange
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: amber
+      accent: deep orange
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  icon:
+    repo: fontawesome/brands/github
+    logo: material/beehive-outline
+
+plugins:
+  - search
+  - i18n:
+      docs_structure: suffix
+      languages:
+        - locale: en
+          default: true
+          name: English
+          build: true
+        - locale: ja
+          name: 日本語
+          build: true
+          nav_translations:
+            Home: ホーム
+            Getting Started: はじめに
+            User Guide: ユーザーガイド
+            Concepts: コンセプト
+            CLI Reference: CLIリファレンス
+            Dashboard: ダッシュボード
+            Agents: エージェント
+            MCP Tools: MCPツール
+            Architecture: アーキテクチャ
+            Reference: リファレンス
+            API Reference: APIリファレンス
+            Event Types: イベント型
+            Configuration: 設定
+            Development: 開発
+            Development Guide: 開発ガイド
+            Git Workflow: Gitワークフロー
+            Testing: テスト
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_category_heading: true
+            members_order: source
+            merge_init_into_class: true
+            show_if_no_docstring: false
+            heading_level: 3
+  - mermaid2
+  - section-index
+  - literate-nav:
+      nav_file: SUMMARY.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - tables
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+  - def_list
+  - footnotes
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/k-iijima/HiveForge
+
+nav:
+  - Home:
+    - index.md
+  - Getting Started:
+    - getting-started/index.md
+    - getting-started/installation.md
+    - getting-started/quickstart.md
+  - User Guide:
+    - guide/index.md
+    - Concepts: guide/concepts.md
+    - CLI Reference: guide/cli.md
+    - Dashboard: guide/dashboard.md
+    - Agents: guide/agents.md
+    - MCP Tools: guide/mcp-tools.md
+  - Architecture:
+    - architecture/index.md
+    - Event Types: architecture/events.md
+    - Configuration: architecture/configuration.md
+  - Reference:
+    - reference/index.md
+    - API Reference: reference/api.md
+  - Development:
+    - development/index.md
+    - Development Guide: development/contributing.md
+    - Git Workflow: development/git-workflow.md
+    - Testing: development/testing.md

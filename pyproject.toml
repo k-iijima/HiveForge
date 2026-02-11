@@ -53,6 +53,17 @@ dev = [
 
 vlm = ["anthropic>=0.18.0", "playwright>=1.41.0", "pyautogui>=0.9.54"]
 
+docs = [
+    "mkdocs>=1.6.0",
+    "mkdocs-material>=9.5.0",
+    "mkdocstrings[python]>=0.27.0",
+    "mkdocs-static-i18n>=1.2.0",
+    "mkdocs-mermaid2-plugin>=1.1.0",
+    "mkdocs-gen-files>=0.5.0",
+    "mkdocs-literate-nav>=0.6.0",
+    "mkdocs-section-index>=0.3.0",
+]
+
 [project.scripts]
 hiveforge = "hiveforge.cli:main"
 hiveforge-vlm = "hiveforge.vlm_tester.server:main"
