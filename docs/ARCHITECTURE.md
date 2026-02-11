@@ -636,6 +636,22 @@ class TaskProjection:
 | GET | `/runs/{run_id}/events` | イベント一覧取得 |
 | GET | `/runs/{run_id}/events/{event_id}/lineage` | 因果リンク取得 |
 
+#### KPI Dashboard (M5-4)
+
+| Method | Path | 説明 |
+|--------|------|------|
+| GET | `/kpi/scores` | 基本KPIスコア（5指標） |
+| GET | `/kpi/summary` | KPI + Outcome/FailureClass内訳 |
+| GET | `/kpi/collaboration` | 協調品質メトリクス |
+| GET | `/kpi/gate-accuracy` | ゲート精度メトリクス |
+| GET | `/kpi/evaluation` | 包括的評価サマリー |
+| GET | `/kpi/colonies` | KPIデータ保有Colony一覧 |
+
+**評価フレームワーク** (AgentBench / MoA / AgentVerse 参照):
+- **Task Performance**: correctness, repeatability, lead_time, incident_rate, recurrence_rate
+- **Collaboration Quality**: rework_rate, escalation_ratio, n_proposal_yield, cost_per_task, overhead
+- **Gate Accuracy**: guard_pass/conditional/fail_rate, sentinel_detection/false_alarm_rate
+
 ### 5.2 MCP ツール一覧
 
 | ツール | 説明 | パラメータ |
@@ -829,6 +845,7 @@ HiveForge/
 │   │       ├── activity.py      # Activity API
 │   │       ├── conferences.py   # Conference API
 │   │       ├── interventions.py # Intervention API
+│   │       ├── kpi.py           # KPI Dashboard API (M5-4)
 │   │       └── system.py
 │   ├── mcp_server/          # MCP Server
 │   │   ├── server.py

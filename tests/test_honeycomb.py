@@ -1841,3 +1841,531 @@ class TestKPICalculatorIncidentRateWithSentinel:
 
         # Assert: 2/4 = 0.5 (後方互換)
         assert scores.incident_rate == 0.5
+
+
+# =========================================================================
+# CollaborationMetrics / GateAccuracyMetrics / EvaluationSummary のテスト
+# =========================================================================
+
+
+class TestCollaborationMetrics:
+    """協調品質メトリクスのテスト
+
+    MoA (Wang et al., 2024) の協調効率メトリクスを参考に、
+    HiveForge固有のRework Rate, Escalation Ratio, N案歩留まり等を検証。
+    """
+
+    @pytest.fixture
+    def store(self, tmp_path):
+        """テスト用HoneycombStore"""
+        return HoneycombStore(tmp_path)
+
+    @pytest.fixture
+    def calc(self, store):
+        """テスト用KPICalculator"""
+        return KPICalculator(store)
+
+    def _add_episode(
+        self,
+        store: HoneycombStore,
+        episode_id: str,
+        outcome: Outcome = Outcome.SUCCESS,
+        colony_id: str = "colony-1",
+        token_count: int = 0,
+        sentinel_count: int = 0,
+    ) -> Episode:
+        """テスト用エピソード追加"""
+        ep = Episode(
+            episode_id=episode_id,
+            run_id=f"run-{episode_id}",
+            colony_id=colony_id,
+            outcome=outcome,
+            token_count=token_count,
+            sentinel_intervention_count=sentinel_count,
+        )
+        store.append(ep)
+        return ep
+
+    def test_rework_rate_basic(self, calc):
+        """Guard Bee差戻し率: 差戻し2回/検証5回 = 0.4"""
+        # Act
+        collab = calc.calculate_collaboration(
+            guard_reject_count=2,
+            guard_total_count=5,
+        )
+
+        # Assert
+        assert collab.rework_rate is not None
+        assert abs(collab.rework_rate - 0.4) < 0.001
+
+    def test_rework_rate_zero_reviews(self, calc):
+        """検証0回の場合、rework_rateはNone"""
+        # Act
+        collab = calc.calculate_collaboration(guard_reject_count=0, guard_total_count=0)
+
+        # Assert
+        assert collab.rework_rate is None
+
+    def test_escalation_ratio(self, calc):
+        """エスカレーション率: 3回/10回 = 0.3"""
+        # Act
+        collab = calc.calculate_collaboration(escalation_count=3, decision_count=10)
+
+        # Assert
+        assert collab.escalation_ratio is not None
+        assert abs(collab.escalation_ratio - 0.3) < 0.001
+
+    def test_escalation_ratio_no_decisions(self, calc):
+        """意思決定0回の場合、escalation_ratioはNone"""
+        # Act
+        collab = calc.calculate_collaboration(escalation_count=0, decision_count=0)
+
+        # Assert
+        assert collab.escalation_ratio is None
+
+    def test_n_proposal_yield(self, calc):
+        """N案歩留まり: 選抜2/候補8 = 0.25"""
+        # Act
+        collab = calc.calculate_collaboration(
+            referee_selected_count=2,
+            referee_candidate_count=8,
+        )
+
+        # Assert
+        assert collab.n_proposal_yield is not None
+        assert abs(collab.n_proposal_yield - 0.25) < 0.001
+
+    def test_n_proposal_yield_no_candidates(self, calc):
+        """候補0件の場合、n_proposal_yieldはNone"""
+        # Act
+        collab = calc.calculate_collaboration(
+            referee_selected_count=0,
+            referee_candidate_count=0,
+        )
+
+        # Assert
+        assert collab.n_proposal_yield is None
+
+    def test_cost_per_task_tokens(self, calc, store):
+        """タスク当たり平均トークン消費"""
+        # Arrange
+        self._add_episode(store, "ep-1", token_count=1000)
+        self._add_episode(store, "ep-2", token_count=2000)
+        self._add_episode(store, "ep-3", token_count=3000)
+
+        # Act
+        collab = calc.calculate_collaboration()
+
+        # Assert: (1000+2000+3000)/3 = 2000
+        assert collab.cost_per_task_tokens is not None
+        assert abs(collab.cost_per_task_tokens - 2000.0) < 0.1
+
+    def test_cost_per_task_no_tokens(self, calc, store):
+        """トークン消費なしの場合、cost_per_taskはNone"""
+        # Arrange
+        self._add_episode(store, "ep-1", token_count=0)
+
+        # Act
+        collab = calc.calculate_collaboration()
+
+        # Assert
+        assert collab.cost_per_task_tokens is None
+
+    def test_collaboration_overhead(self, calc, store):
+        """協調オーバーヘッド: 失敗+Sentinel介入 / 全EP
+
+        失敗1件 + Sentinel介入(成功だがSentinel介入あり)1件 / 4件全体 = 0.5
+        """
+        # Arrange
+        self._add_episode(store, "ep-1", Outcome.SUCCESS)
+        self._add_episode(store, "ep-2", Outcome.FAILURE)
+        self._add_episode(store, "ep-3", Outcome.SUCCESS, sentinel_count=1)
+        self._add_episode(store, "ep-4", Outcome.SUCCESS)
+
+        # Act
+        collab = calc.calculate_collaboration()
+
+        # Assert: ep-2(failure) + ep-3(sentinel) = 2/4 = 0.5
+        assert collab.collaboration_overhead is not None
+        assert abs(collab.collaboration_overhead - 0.5) < 0.001
+
+    def test_collaboration_empty(self, calc):
+        """エピソードなしの場合、Episodeベースのメトリクスはすべてnone"""
+        # Act
+        collab = calc.calculate_collaboration()
+
+        # Assert
+        assert collab.cost_per_task_tokens is None
+        assert collab.collaboration_overhead is None
+
+    def test_collaboration_by_colony(self, calc, store):
+        """Colony単位でも協調品質を算出可能"""
+        # Arrange
+        self._add_episode(store, "ep-1", Outcome.SUCCESS, colony_id="a", token_count=100)
+        self._add_episode(store, "ep-2", Outcome.FAILURE, colony_id="b", token_count=500)
+
+        # Act
+        collab_a = calc.calculate_collaboration(colony_id="a")
+        collab_b = calc.calculate_collaboration(colony_id="b")
+
+        # Assert
+        assert collab_a.cost_per_task_tokens is not None
+        assert abs(collab_a.cost_per_task_tokens - 100.0) < 0.1
+        assert collab_b.cost_per_task_tokens is not None
+        assert abs(collab_b.cost_per_task_tokens - 500.0) < 0.1
+
+
+class TestGateAccuracyMetrics:
+    """ゲート精度メトリクスのテスト
+
+    AgentBench (Liu et al., ICLR 2024) の失敗分類を参考に、
+    Guard Bee / Sentinel Hornet の精度を検証。
+    """
+
+    @pytest.fixture
+    def store(self, tmp_path):
+        """テスト用HoneycombStore"""
+        return HoneycombStore(tmp_path)
+
+    @pytest.fixture
+    def calc(self, store):
+        """テスト用KPICalculator"""
+        return KPICalculator(store)
+
+    def test_guard_pass_rate(self, calc):
+        """Guard Bee合格率: PASS 7 / 全10 = 0.7"""
+        # Act
+        gate = calc.calculate_gate_accuracy(
+            guard_pass_count=7,
+            guard_conditional_count=2,
+            guard_fail_count=1,
+        )
+
+        # Assert
+        assert gate.guard_pass_rate is not None
+        assert abs(gate.guard_pass_rate - 0.7) < 0.001
+
+    def test_guard_conditional_pass_rate(self, calc):
+        """Guard Bee条件付き合格率"""
+        # Act
+        gate = calc.calculate_gate_accuracy(
+            guard_pass_count=7,
+            guard_conditional_count=2,
+            guard_fail_count=1,
+        )
+
+        # Assert
+        assert gate.guard_conditional_pass_rate is not None
+        assert abs(gate.guard_conditional_pass_rate - 0.2) < 0.001
+
+    def test_guard_fail_rate(self, calc):
+        """Guard Bee不合格率"""
+        # Act
+        gate = calc.calculate_gate_accuracy(
+            guard_pass_count=7,
+            guard_conditional_count=2,
+            guard_fail_count=1,
+        )
+
+        # Assert
+        assert gate.guard_fail_rate is not None
+        assert abs(gate.guard_fail_rate - 0.1) < 0.001
+
+    def test_guard_rates_sum_to_one(self, calc):
+        """Guard Bee合計率は1.0になる"""
+        # Act
+        gate = calc.calculate_gate_accuracy(
+            guard_pass_count=5,
+            guard_conditional_count=3,
+            guard_fail_count=2,
+        )
+
+        # Assert
+        total = (
+            (gate.guard_pass_rate or 0)
+            + (gate.guard_conditional_pass_rate or 0)
+            + (gate.guard_fail_rate or 0)
+        )
+        assert abs(total - 1.0) < 0.001
+
+    def test_guard_no_reviews(self, calc):
+        """検証0件の場合、全レートがNone"""
+        # Act
+        gate = calc.calculate_gate_accuracy()
+
+        # Assert
+        assert gate.guard_pass_rate is None
+        assert gate.guard_conditional_pass_rate is None
+        assert gate.guard_fail_rate is None
+
+    def test_sentinel_detection_rate(self, calc):
+        """Sentinel検知率: alert 3回 / 監視期間50 = 0.06"""
+        # Act
+        gate = calc.calculate_gate_accuracy(
+            sentinel_alert_count=3,
+            total_monitoring_periods=50,
+        )
+
+        # Assert
+        assert gate.sentinel_detection_rate is not None
+        assert abs(gate.sentinel_detection_rate - 0.06) < 0.001
+
+    def test_sentinel_false_alarm_rate(self, calc):
+        """Sentinel偽アラーム率: 誤検知1回 / 全alert 5回 = 0.2"""
+        # Act
+        gate = calc.calculate_gate_accuracy(
+            sentinel_alert_count=5,
+            sentinel_false_alarm_count=1,
+        )
+
+        # Assert
+        assert gate.sentinel_false_alarm_rate is not None
+        assert abs(gate.sentinel_false_alarm_rate - 0.2) < 0.001
+
+    def test_sentinel_no_alerts(self, calc):
+        """alert 0回の場合、false_alarm_rateはNone"""
+        # Act
+        gate = calc.calculate_gate_accuracy(
+            sentinel_alert_count=0,
+            sentinel_false_alarm_count=0,
+        )
+
+        # Assert
+        assert gate.sentinel_false_alarm_rate is None
+
+    def test_sentinel_no_monitoring(self, calc):
+        """監視期間0の場合、detection_rateはNone"""
+        # Act
+        gate = calc.calculate_gate_accuracy(total_monitoring_periods=0)
+
+        # Assert
+        assert gate.sentinel_detection_rate is None
+
+
+class TestEvaluationSummary:
+    """包括的評価サマリーのテスト
+
+    基本KPI + 協調メトリクス + ゲート精度の統合を検証。
+    """
+
+    @pytest.fixture
+    def store(self, tmp_path):
+        """テスト用HoneycombStore"""
+        return HoneycombStore(tmp_path)
+
+    @pytest.fixture
+    def calc(self, store):
+        """テスト用KPICalculator"""
+        return KPICalculator(store)
+
+    def _add_episode(
+        self,
+        store: HoneycombStore,
+        episode_id: str,
+        outcome: Outcome = Outcome.SUCCESS,
+        colony_id: str = "colony-1",
+        token_count: int = 1000,
+        duration: float = 100.0,
+        failure_class: FailureClass | None = None,
+    ) -> None:
+        ep = Episode(
+            episode_id=episode_id,
+            run_id=f"run-{episode_id}",
+            colony_id=colony_id,
+            outcome=outcome,
+            token_count=token_count,
+            duration_seconds=duration,
+            failure_class=failure_class,
+        )
+        store.append(ep)
+
+    def test_evaluation_summary_basic(self, calc, store):
+        """包括的評価サマリーが全セクションを含む
+
+        基本KPI, 協調メトリクス, ゲート精度, outcome/failure_class内訳を検証。
+        """
+        # Arrange
+        self._add_episode(store, "ep-1", Outcome.SUCCESS, colony_id="col-a")
+        self._add_episode(
+            store, "ep-2", Outcome.FAILURE, colony_id="col-b", failure_class=FailureClass.TIMEOUT
+        )
+        self._add_episode(store, "ep-3", Outcome.SUCCESS, colony_id="col-a")
+
+        # Act
+        summary = calc.calculate_evaluation(
+            guard_pass_count=5,
+            guard_conditional_count=2,
+            guard_fail_count=1,
+            guard_reject_count=1,
+            guard_total_count=8,
+            escalation_count=1,
+            decision_count=10,
+            referee_selected_count=2,
+            referee_candidate_count=6,
+            sentinel_alert_count=3,
+            sentinel_false_alarm_count=1,
+            total_monitoring_periods=100,
+        )
+
+        # Assert: 構造が正しい
+        assert summary.total_episodes == 3
+        assert summary.colony_count == 2
+
+        # 基本KPI
+        assert summary.kpi.correctness is not None
+        assert abs(summary.kpi.correctness - 2 / 3) < 0.01
+
+        # 協調メトリクス
+        assert summary.collaboration.rework_rate is not None
+        assert abs(summary.collaboration.rework_rate - 1 / 8) < 0.01
+        assert summary.collaboration.escalation_ratio is not None
+        assert abs(summary.collaboration.escalation_ratio - 0.1) < 0.01
+        assert summary.collaboration.n_proposal_yield is not None
+        assert abs(summary.collaboration.n_proposal_yield - 2 / 6) < 0.01
+
+        # ゲート精度
+        assert summary.gate_accuracy.guard_pass_rate is not None
+        assert abs(summary.gate_accuracy.guard_pass_rate - 5 / 8) < 0.01
+        assert summary.gate_accuracy.sentinel_detection_rate is not None
+        assert abs(summary.gate_accuracy.sentinel_detection_rate - 0.03) < 0.01
+
+        # 内訳
+        assert summary.outcomes["success"] == 2
+        assert summary.outcomes["failure"] == 1
+        assert summary.failure_classes["timeout"] == 1
+
+    def test_evaluation_summary_empty(self, calc):
+        """エピソードなしの場合でも安全に返却"""
+        # Act
+        summary = calc.calculate_evaluation()
+
+        # Assert
+        assert summary.total_episodes == 0
+        assert summary.kpi.correctness is None
+        assert summary.collaboration.rework_rate is None
+        assert summary.gate_accuracy.guard_pass_rate is None
+        assert summary.outcomes == {}
+        assert summary.failure_classes == {}
+
+    def test_evaluation_summary_by_colony(self, calc, store):
+        """Colony単位でも包括的評価サマリーを取得可能"""
+        # Arrange
+        self._add_episode(store, "ep-1", Outcome.SUCCESS, colony_id="col-a")
+        self._add_episode(store, "ep-2", Outcome.FAILURE, colony_id="col-b")
+
+        # Act
+        summary_a = calc.calculate_evaluation(colony_id="col-a")
+        summary_b = calc.calculate_evaluation(colony_id="col-b")
+
+        # Assert
+        assert summary_a.total_episodes == 1
+        assert summary_a.kpi.correctness == 1.0
+        assert summary_b.total_episodes == 1
+        assert summary_b.kpi.correctness == 0.0
+
+    def test_evaluation_serialization(self, calc, store):
+        """EvaluationSummaryがJSON直列化可能"""
+        # Arrange
+        self._add_episode(store, "ep-1", Outcome.SUCCESS)
+
+        # Act
+        summary = calc.calculate_evaluation(guard_pass_count=1, guard_total_count=1)
+        data = summary.model_dump(mode="json")
+
+        # Assert
+        assert isinstance(data, dict)
+        assert "kpi" in data
+        assert "collaboration" in data
+        assert "gate_accuracy" in data
+        assert data["total_episodes"] == 1
+
+
+class TestCollaborationMetricsModel:
+    """CollaborationMetrics Pydanticモデルのテスト"""
+
+    def test_default_values(self):
+        """デフォルト値はすべてNone"""
+        from hiveforge.core.honeycomb.models import CollaborationMetrics
+
+        # Act
+        metrics = CollaborationMetrics()
+
+        # Assert
+        assert metrics.rework_rate is None
+        assert metrics.escalation_ratio is None
+        assert metrics.n_proposal_yield is None
+        assert metrics.cost_per_task_tokens is None
+        assert metrics.collaboration_overhead is None
+
+    def test_frozen(self):
+        """CollaborationMetricsはイミュータブル"""
+        from hiveforge.core.honeycomb.models import CollaborationMetrics
+
+        # Arrange
+        metrics = CollaborationMetrics(rework_rate=0.5)
+
+        # Act & Assert
+        with pytest.raises(Exception):
+            metrics.rework_rate = 0.8  # type: ignore[misc]
+
+    def test_validation_bounds(self):
+        """値の範囲バリデーション"""
+        from hiveforge.core.honeycomb.models import CollaborationMetrics
+
+        # Act & Assert: rework_rate > 1.0 は不正
+        with pytest.raises(Exception):
+            CollaborationMetrics(rework_rate=1.5)
+
+
+class TestGateAccuracyMetricsModel:
+    """GateAccuracyMetrics Pydanticモデルのテスト"""
+
+    def test_default_values(self):
+        """デフォルト値はすべてNone"""
+        from hiveforge.core.honeycomb.models import GateAccuracyMetrics
+
+        # Act
+        metrics = GateAccuracyMetrics()
+
+        # Assert
+        assert metrics.guard_pass_rate is None
+        assert metrics.sentinel_detection_rate is None
+
+    def test_frozen(self):
+        """GateAccuracyMetricsはイミュータブル"""
+        from hiveforge.core.honeycomb.models import GateAccuracyMetrics
+
+        # Arrange
+        metrics = GateAccuracyMetrics(guard_pass_rate=0.9)
+
+        # Act & Assert
+        with pytest.raises(Exception):
+            metrics.guard_pass_rate = 0.5  # type: ignore[misc]
+
+
+class TestEvaluationSummaryModel:
+    """EvaluationSummary Pydanticモデルのテスト"""
+
+    def test_default_values(self):
+        """デフォルト値が正しい"""
+        from hiveforge.core.honeycomb.models import EvaluationSummary
+
+        # Act
+        summary = EvaluationSummary()
+
+        # Assert
+        assert summary.total_episodes == 0
+        assert summary.colony_count == 0
+        assert summary.outcomes == {}
+        assert summary.failure_classes == {}
+
+    def test_frozen(self):
+        """EvaluationSummaryはイミュータブル"""
+        from hiveforge.core.honeycomb.models import EvaluationSummary
+
+        # Arrange
+        summary = EvaluationSummary(total_episodes=5)
+
+        # Act & Assert
+        with pytest.raises(Exception):
+            summary.total_episodes = 10  # type: ignore[misc]

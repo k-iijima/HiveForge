@@ -369,6 +369,33 @@ export class HiveForgeClient {
         );
         return response.data;
     }
+
+    // KPI Dashboard API
+    async getKPIScores(colonyId?: string): Promise<{ kpi: KPIScores }> {
+        const response = await this.client.get<{ kpi: KPIScores }>('/kpi/scores', {
+            params: colonyId ? { colony_id: colonyId } : {},
+        });
+        return response.data;
+    }
+
+    async getKPISummary(colonyId?: string): Promise<KPISummary> {
+        const response = await this.client.get<KPISummary>('/kpi/summary', {
+            params: colonyId ? { colony_id: colonyId } : {},
+        });
+        return response.data;
+    }
+
+    async getEvaluation(colonyId?: string): Promise<EvaluationSummary> {
+        const response = await this.client.get<EvaluationSummary>('/kpi/evaluation', {
+            params: colonyId ? { colony_id: colonyId } : {},
+        });
+        return response.data;
+    }
+
+    async getKPIColonies(): Promise<ColonyListResponse> {
+        const response = await this.client.get<ColonyListResponse>('/kpi/colonies');
+        return response.data;
+    }
 }
 
 export interface BeekeeperResponse {
@@ -377,4 +404,51 @@ export interface BeekeeperResponse {
     response?: string;
     error?: string;
     actions_taken?: number;
+}
+
+// KPI Dashboard 型定義
+export interface KPIScores {
+    correctness: number | null;
+    repeatability: number | null;
+    lead_time_seconds: number | null;
+    incident_rate: number | null;
+    recurrence_rate: number | null;
+}
+
+export interface CollaborationMetrics {
+    rework_rate: number | null;
+    escalation_ratio: number | null;
+    n_proposal_yield: number | null;
+    cost_per_task_tokens: number | null;
+    collaboration_overhead: number | null;
+}
+
+export interface GateAccuracyMetrics {
+    guard_pass_rate: number | null;
+    guard_conditional_pass_rate: number | null;
+    guard_fail_rate: number | null;
+    sentinel_detection_rate: number | null;
+    sentinel_false_alarm_rate: number | null;
+}
+
+export interface EvaluationSummary {
+    kpi: KPIScores;
+    collaboration: CollaborationMetrics;
+    gate_accuracy: GateAccuracyMetrics;
+    outcomes: Record<string, number>;
+    failure_classes: Record<string, number>;
+    total_episodes: number;
+    colony_count: number;
+}
+
+export interface KPISummary {
+    kpi: KPIScores;
+    outcomes: Record<string, number>;
+    failure_classes: Record<string, number>;
+    total_episodes: number;
+}
+
+export interface ColonyListResponse {
+    colonies: string[];
+    count: number;
 }

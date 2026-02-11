@@ -5,14 +5,25 @@ HiveForgeは実行エピソードをHoneycombに蓄積し、経験から学習�
 """
 
 from .kpi import KPICalculator
-from .models import Episode, FailureClass, KPIScores, Outcome
+from .models import (
+    CollaborationMetrics,
+    Episode,
+    EvaluationSummary,
+    FailureClass,
+    GateAccuracyMetrics,
+    KPIScores,
+    Outcome,
+)
 from .recorder import EpisodeRecorder
 from .store import HoneycombStore
 
 __all__ = [
+    "CollaborationMetrics",
     "Episode",
     "EpisodeRecorder",
+    "EvaluationSummary",
     "FailureClass",
+    "GateAccuracyMetrics",
     "HoneycombStore",
     "KPICalculator",
     "KPIScores",

@@ -15,7 +15,7 @@
  */
 
 import * as vscode from 'vscode';
-import { HiveForgeClient, ActivityHierarchy, ActivityEvent, AgentInfo } from '../client';
+import { HiveForgeClient, ActivityHierarchy, ActivityEvent, AgentInfo, EvaluationSummary } from '../client';
 
 // 拡張したHive/Colony情報
 interface HiveInfo {
@@ -136,10 +136,20 @@ export class HiveMonitorPanel {
                 this.client.getRecentActivity(30),
             ]);
             const hives = this._transformHierarchy(hierarchy, events);
+
+            // KPIデータ取得（失敗しても表示は継続）
+            let evaluation: EvaluationSummary | null = null;
+            try {
+                evaluation = await this.client.getEvaluation();
+            } catch {
+                // KPI APIが未実装・接続不可でもモニターは動作する
+            }
+
             this._panel.webview.postMessage({
                 command: 'updateData',
                 hives,
                 recentEvents: events.slice(0, 10),
+                evaluation,
             });
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
@@ -211,6 +221,7 @@ export class HiveMonitorPanel {
             <div>接続中...</div>
         </div>
     </div>
+    <div class="kpi-dashboard" id="kpiDashboard" style="display:none"></div>
     <div class="activity-ticker" id="activityTicker"></div>
     <div id="errorOverlay" class="error-overlay" style="display:none"></div>
 
@@ -427,6 +438,90 @@ export class HiveMonitorPanel {
             document.getElementById('errorOverlay').style.display = 'none';
         }
 
+        /** KPIダッシュボード描画 */
+        function renderKPI(ev) {
+            const el = document.getElementById('kpiDashboard');
+            if (!ev) { el.style.display = 'none'; return; }
+            el.style.display = 'block';
+
+            const kpi = ev.kpi || {};
+            const collab = ev.collaboration || {};
+            const gate = ev.gate_accuracy || {};
+
+            function pct(v) { return v != null ? (v * 100).toFixed(1) + '%' : '—'; }
+            function num(v, u) { return v != null ? v.toFixed(1) + (u || '') : '—'; }
+            function gaugeColor(v, invert) {
+                if (v == null) return '#9e9e9e';
+                if (invert) v = 1 - v;
+                if (v >= 0.8) return '#4caf50';
+                if (v >= 0.5) return '#ff9800';
+                return '#f44336';
+            }
+            function gauge(label, value, unit, invert) {
+                const display = unit === '%' ? pct(value) : num(value, unit);
+                const color = gaugeColor(value, invert);
+                const pctVal = value != null ? Math.min(value * 100, 100) : 0;
+                return '<div class="kpi-gauge">'
+                    + '<div class="kpi-gauge-bar" style="width:' + pctVal + '%;background:' + color + '"></div>'
+                    + '<div class="kpi-gauge-content">'
+                    + '<span class="kpi-gauge-label">' + label + '</span>'
+                    + '<span class="kpi-gauge-value" style="color:' + color + '">' + display + '</span>'
+                    + '</div></div>';
+            }
+
+            let h = '<div class="kpi-header">'
+                + '<h2>📊 KPI Dashboard</h2>'
+                + '<span class="kpi-meta">' + ev.total_episodes + ' episodes / ' + ev.colony_count + ' colonies</span>'
+                + '</div>';
+
+            // 基本KPI
+            h += '<div class="kpi-section">';
+            h += '<h3>Task Performance</h3>';
+            h += '<div class="kpi-grid">';
+            h += gauge('Correctness', kpi.correctness, '%', false);
+            h += gauge('Repeatability', kpi.repeatability, '%', false);
+            h += gauge('Lead Time', kpi.lead_time_seconds, 's', true);
+            h += gauge('Incident Rate', kpi.incident_rate, '%', true);
+            h += gauge('Recurrence', kpi.recurrence_rate, '%', true);
+            h += '</div></div>';
+
+            // 協調メトリクス
+            h += '<div class="kpi-section">';
+            h += '<h3>Collaboration Quality</h3>';
+            h += '<div class="kpi-grid">';
+            h += gauge('Rework Rate', collab.rework_rate, '%', true);
+            h += gauge('Escalation', collab.escalation_ratio, '%', true);
+            h += gauge('N-Proposal Yield', collab.n_proposal_yield, '%', false);
+            h += gauge('Cost/Task', collab.cost_per_task_tokens, ' tok', true);
+            h += gauge('Overhead', collab.collaboration_overhead, '%', true);
+            h += '</div></div>';
+
+            // ゲート精度
+            h += '<div class="kpi-section">';
+            h += '<h3>Gate Accuracy</h3>';
+            h += '<div class="kpi-grid">';
+            h += gauge('Guard PASS', gate.guard_pass_rate, '%', false);
+            h += gauge('Guard COND', gate.guard_conditional_pass_rate, '%', false);
+            h += gauge('Guard FAIL', gate.guard_fail_rate, '%', true);
+            h += gauge('Sentinel Det.', gate.sentinel_detection_rate, '%', false);
+            h += gauge('False Alarm', gate.sentinel_false_alarm_rate, '%', true);
+            h += '</div></div>';
+
+            // Outcome内訳
+            if (ev.outcomes && Object.keys(ev.outcomes).length > 0) {
+                h += '<div class="kpi-section">';
+                h += '<h3>Outcomes</h3>';
+                h += '<div class="kpi-breakdown">';
+                for (const [k, v] of Object.entries(ev.outcomes)) {
+                    const cls = k === 'success' ? 'success' : (k === 'failure' ? 'failure' : 'other');
+                    h += '<span class="kpi-tag ' + cls + '">' + k + ': ' + v + '</span>';
+                }
+                h += '</div></div>';
+            }
+
+            el.innerHTML = h;
+        }
+
         // メッセージ受信
         window.addEventListener('message', ev => {
             const msg = ev.data;
@@ -436,6 +531,7 @@ export class HiveMonitorPanel {
                     renderTree(msg.hives);
                     renderStats(msg.hives);
                     renderTicker(msg.recentEvents);
+                    if (msg.evaluation) { renderKPI(msg.evaluation); }
                     break;
                 case 'showError':
                     showError(msg.message);
@@ -766,6 +862,88 @@ export class HiveMonitorPanel {
             }
             .error-box h2 { color: var(--vscode-errorForeground); margin-bottom: 8px; }
             .error-box .hint { color: var(--vscode-descriptionForeground); margin-top: 12px; font-size: 12px; }
+
+            /* KPI Dashboard */
+            .kpi-dashboard {
+                flex-shrink: 0;
+                border-top: 1px solid var(--vscode-widget-border);
+                background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+                padding: 12px 16px;
+                max-height: 320px;
+                overflow-y: auto;
+            }
+            .kpi-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 10px;
+            }
+            .kpi-header h2 { font-size: 13px; font-weight: 600; }
+            .kpi-meta {
+                font-size: 11px;
+                color: var(--vscode-descriptionForeground);
+            }
+            .kpi-section { margin-bottom: 10px; }
+            .kpi-section h3 {
+                font-size: 11px;
+                font-weight: 600;
+                color: var(--vscode-descriptionForeground);
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                margin-bottom: 6px;
+            }
+            .kpi-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+                gap: 6px;
+            }
+            .kpi-gauge {
+                position: relative;
+                background: var(--vscode-input-background);
+                border-radius: 4px;
+                overflow: hidden;
+                height: 28px;
+            }
+            .kpi-gauge-bar {
+                position: absolute;
+                top: 0; left: 0; bottom: 0;
+                opacity: 0.2;
+                transition: width 0.5s ease;
+            }
+            .kpi-gauge-content {
+                position: relative;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 0 8px;
+                height: 100%;
+                font-size: 11px;
+            }
+            .kpi-gauge-label {
+                color: var(--vscode-foreground);
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            .kpi-gauge-value {
+                font-weight: 700;
+                font-family: var(--vscode-editor-font-family);
+                white-space: nowrap;
+            }
+            .kpi-breakdown {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 6px;
+            }
+            .kpi-tag {
+                padding: 2px 8px;
+                border-radius: 10px;
+                font-size: 10px;
+                font-weight: 600;
+            }
+            .kpi-tag.success { background: rgba(76,175,80,0.2); color: #4caf50; }
+            .kpi-tag.failure { background: rgba(244,67,54,0.2); color: #f44336; }
+            .kpi-tag.other { background: rgba(158,158,158,0.2); color: #9e9e9e; }
         `;
     }
 

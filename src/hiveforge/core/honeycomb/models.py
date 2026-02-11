@@ -43,7 +43,7 @@ class FailureClass(StrEnum):
 class KPIScores(BaseModel):
     """KPI計測値
 
-    5つのKPI指標のスコアを保持する。
+    5つの基本KPI指標のスコアを保持する。
     各スコアは0.0〜1.0または計測値（秒数、トークン数）。
     """
 
@@ -77,6 +77,115 @@ class KPIScores(BaseModel):
         ge=0.0,
         le=1.0,
     )
+
+
+class CollaborationMetrics(BaseModel):
+    """協調品質メトリクス
+
+    エージェント間の協調効率を計測する。
+    Honeycomb Episode + ARイベントから算出。
+
+    参考: Mixture-of-Agents (Wang et al., 2024), AgentVerse (Chen et al., 2023)
+    """
+
+    model_config = ConfigDict(strict=True, frozen=True)
+
+    rework_rate: float | None = Field(
+        default=None,
+        description="再作業率: Guard Bee差戻し後の再作業割合",
+        ge=0.0,
+        le=1.0,
+    )
+    escalation_ratio: float | None = Field(
+        default=None,
+        description="エスカレーション率: Queen Bee→Beekeeper委譲の割合",
+        ge=0.0,
+        le=1.0,
+    )
+    n_proposal_yield: float | None = Field(
+        default=None,
+        description="N案歩留まり: Referee Bee選抜 / 生成候補",
+        ge=0.0,
+        le=1.0,
+    )
+    cost_per_task_tokens: float | None = Field(
+        default=None,
+        description="タスク当り平均トークン消費",
+        ge=0.0,
+    )
+    collaboration_overhead: float | None = Field(
+        default=None,
+        description="協調オーバーヘッド: Sentinel介入を含む全失敗/リワーク比率",
+        ge=0.0,
+    )
+
+
+class GateAccuracyMetrics(BaseModel):
+    """ゲート精度メトリクス
+
+    Guard Bee / Forager Bee / Sentinel Hornet の判定精度。
+    False Accept Rate (FAR) / False Reject Rate (FRR) で評価。
+
+    参考: AgentBench (Liu et al., ICLR 2024) の失敗分類
+    """
+
+    model_config = ConfigDict(strict=True, frozen=True)
+
+    guard_pass_rate: float | None = Field(
+        default=None,
+        description="Guard Bee合格率: PASS / 全検証",
+        ge=0.0,
+        le=1.0,
+    )
+    guard_conditional_pass_rate: float | None = Field(
+        default=None,
+        description="Guard Bee条件付合格率: CONDITIONAL_PASS / 全検証",
+        ge=0.0,
+        le=1.0,
+    )
+    guard_fail_rate: float | None = Field(
+        default=None,
+        description="Guard Bee不合格率: FAIL / 全検証",
+        ge=0.0,
+        le=1.0,
+    )
+    sentinel_detection_rate: float | None = Field(
+        default=None,
+        description="Sentinel検知率: alert発出 / 全イベント期間",
+        ge=0.0,
+    )
+    sentinel_false_alarm_rate: float | None = Field(
+        default=None,
+        description="Sentinel偽アラーム率: 誤検知 / 全alert",
+        ge=0.0,
+        le=1.0,
+    )
+
+
+class EvaluationSummary(BaseModel):
+    """包括的評価サマリー
+
+    基本KPI + 協調メトリクス + ゲート精度を統合。
+    KPIダッシュボードの表示データモデル。
+    """
+
+    model_config = ConfigDict(strict=True, frozen=True)
+
+    total_episodes: int = Field(default=0, description="総エピソード数", ge=0)
+    colony_count: int = Field(default=0, description="Colony数", ge=0)
+
+    kpi: KPIScores = Field(default_factory=KPIScores, description="基本KPI")
+    collaboration: CollaborationMetrics = Field(
+        default_factory=CollaborationMetrics,
+        description="協調品質メトリクス",
+    )
+    gate_accuracy: GateAccuracyMetrics = Field(
+        default_factory=GateAccuracyMetrics,
+        description="ゲート精度メトリクス",
+    )
+
+    outcomes: dict[str, int] = Field(default_factory=dict, description="Outcome別件数")
+    failure_classes: dict[str, int] = Field(default_factory=dict, description="FailureClass別件数")
 
 
 class Episode(BaseModel):

@@ -23,6 +23,7 @@ from .routes import (
     hive_colonies_router,
     hives_router,
     interventions_router,
+    kpi_router,
     requirements_router,
     runs_router,
     system_router,
@@ -91,4 +92,5 @@ app.include_router(tasks_router)
 app.include_router(requirements_router)
 app.include_router(events_router)
 app.include_router(guard_bee_router)
+app.include_router(kpi_router)
 app.include_router(beekeeper_router)

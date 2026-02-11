@@ -12,6 +12,7 @@ from .events import router as events_router
 from .guard_bee import router as guard_bee_router
 from .hives import router as hives_router
 from .interventions import router as interventions_router
+from .kpi import router as kpi_router
 from .requirements import router as requirements_router
 from .runs import router as runs_router
 from .system import router as system_router
@@ -26,6 +27,7 @@ __all__ = [
     "hive_colonies_router",
     "conferences_router",
     "interventions_router",
+    "kpi_router",
     "runs_router",
     "tasks_router",
     "requirements_router",
