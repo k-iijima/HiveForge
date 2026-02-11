@@ -98,20 +98,74 @@ git worktree add ../wt-api -b feat/ec-site/api/123-login develop
 - `forager-regression`: 回帰テスト
 - `sentinel-safety`: 安全性チェック
 
-### 3. イミュータブル設計
+### 3. フォールバック禁止（Fail-Fast原則）
+
+> **暗黙のフォールバックは問題の発見を遅らせ、意図しない動作を引き起こす。早期にエラーで検出できる方がはるかに安全である。**
+
+- **フォールバック動作は原則として導入しない**: エラーが発生したら速やかに `raise` する
+- **`except Exception` の広いキャッチは禁止**: キャッチする例外は具体的な型に限定する
+- **エラーを握りつぶさない**: `except: pass` や `contextlib.suppress(Exception)` は使わない
+- **エラー情報を文字列に変換して返さない**: `return {"error": str(e)}` ではなく例外を伝搬させる
+- **ログだけ出して続行しない**: `logger.error(...)` の後に代替値を返すパターンは避ける
+
+#### 許容されるフォールバック
+
+以下のケースのみ、フォールバック動作を **コメントで理由を明記した上で** 許容する：
+
+1. **安全側へのフォールバック**: 未知のツールを `DANGEROUS` 扱い、未知のエージェントを `UNTRUSTED` 扱いにする等
+2. **例外のラッピング**: ドメイン固有例外への変換後に `raise`（`raise DomainError(...) from exc`）
+3. **非同期キャンセル**: `asyncio.CancelledError` の標準的な抑制
+4. **ユーザー向け境界**: FastAPI の HTTP エラーハンドラ等、外部インタフェースの最端レイヤーでのみ
+
+#### 禁止パターンと代替
+
+```python
+# ❌ 禁止: 暗黙のフォールバック
+try:
+    plan = await planner.plan(goal)
+except Exception:
+    logger.error("LLMタスク分解に失敗")
+    plan = TaskPlan(tasks=[PlannedTask(goal=goal)])  # 黙って1タスクに縮退
+
+# ✅ 推奨: 早期エラー
+plan = await planner.plan(goal)  # 例外はそのまま伝搬
+
+# ❌ 禁止: エラーを文字列化して返す
+try:
+    result = execute_tool(args)
+except Exception as e:
+    return json.dumps({"error": str(e)})
+
+# ✅ 推奨: 適切な例外を投げる
+try:
+    result = execute_tool(args)
+except PermissionError as e:
+    raise ToolExecutionError(f"権限不足: {e}") from e
+# その他の例外はキャッチしない → 呼び出し元に伝搬
+
+# ❌ 禁止: ログなしの握りつぶし
+except Exception:
+    pass
+
+# ❌ 禁止: 広いキャッチで代替値
+except Exception:
+    return False
+```
+
+### 4. イミュータブル設計
 
 - **イベントは不変**: 一度作成されたイベントは変更されない
 - **状態は投影で再構築**: イベントから常に状態を再現可能
 - **副作用の分離**: 純粋関数とI/Oを明確に分離
 
-### 4. 信頼できる部品
+### 5. 信頼できる部品
 
 - **Pydantic**: 型安全なデータモデル
 - **ULID**: 時間順序付きユニークID
 - **JCS (RFC 8785)**: 決定論的JSONシリアライズ
 - **SHA-256**: 暗号学的ハッシュによるイベントチェーン
 
-### 5. Pydanticによる厳格なスキーマ定義
+### 6. Pydanticによる厳格なスキーマ定義
 
 - **厳格な型検証**: `strict=True`でランタイム型チェックを強制
 - **OpenAPI仕様の自動生成**: FastAPIと連携してAPI仕様書を自動出力
@@ -129,7 +183,7 @@ class TaskCreatedEvent(BaseModel):
     title: str = Field(..., min_length=1, max_length=200, description="タスクのタイトル")
 ```
 
-### 6. ファイル分割の原則
+### 7. ファイル分割の原則
 
 - **1ファイル200行以下を目安**: 超える場合は分割を検討
 - **1ファイル1責務**: 関連する機能をまとめつつ、肥大化を防ぐ
