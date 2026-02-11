@@ -12,6 +12,7 @@ import pytest
 from hiveforge.core.config import GitHubConfig
 from hiveforge.core.events.base import BaseEvent
 from hiveforge.core.events.types import EventType
+from hiveforge.core.github.client import GitHubClientError
 from hiveforge.mcp_server.handlers.github import GitHubHandlers
 
 # ---------------------------------------------------------------------------
@@ -137,7 +138,7 @@ class TestSyncRunToGitHub:
 
     @pytest.mark.asyncio
     async def test_sync_github_disabled(self, handler: GitHubHandlers) -> None:
-        """GitHub Projection が無効の場合エラーを返すこと"""
+        """GitHub Projection が無効の場合 GitHubClientError が伝搬すること"""
         # Arrange: _projection を None にして _get_projection でエラー発生
         handler._projection = None
 
@@ -146,12 +147,9 @@ class TestSyncRunToGitHub:
             "_get_github_config",
             return_value=GitHubConfig(enabled=False),
         ):
-            # Act
-            result = await handler.handle_sync_run_to_github({"run_id": "01HTEST"})
-
-        # Assert
-        assert "error" in result
-        assert "not enabled" in result["error"]
+            # Act & Assert: GitHubClientError がそのまま伝搬
+            with pytest.raises(GitHubClientError, match="not enabled"):
+                await handler.handle_sync_run_to_github({"run_id": "01HTEST"})
 
 
 # ---------------------------------------------------------------------------

@@ -18,6 +18,19 @@ from hiveforge.core.models.action_class import TrustLevel
 from hiveforge.queen_bee.server import QueenBeeMCPServer
 
 
+@pytest.fixture(autouse=True)
+def _mock_plan_tasks():
+    """_plan_tasksをモックし、LLM依存を排除する"""
+    with patch(
+        "hiveforge.queen_bee.server.QueenBeeMCPServer._plan_tasks",
+        new_callable=AsyncMock,
+        side_effect=lambda goal, context=None: [
+            {"task_id": "task-001", "goal": goal, "depends_on": []}
+        ],
+    ):
+        yield
+
+
 @pytest.fixture
 def ar(tmp_path):
     """テスト用AkashicRecord"""

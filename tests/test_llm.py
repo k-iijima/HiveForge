@@ -1386,6 +1386,8 @@ class TestRunCommandHandler:
         assert "ディレクトリではありません" in result["error"]
 
         set_workspace_root(Path.cwd())
+
+
 # =============================================================================
 # AgentRunner ツール呼び出し必須モード (require_tool_use)
 # ======================================================================

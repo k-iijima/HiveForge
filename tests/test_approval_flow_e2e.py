@@ -36,6 +36,23 @@ def beekeeper(ar):
     return bk
 
 
+@pytest.fixture(autouse=True)
+def _mock_plan_tasks():
+    """_plan_tasksをモックし、LLM依存を排除する
+
+    _delegate_to_queen_with_pipelineはQueenBeeMCPServerを内部で新規作成するため、
+    クラスレベルでパッチする必要がある。
+    """
+    with patch(
+        "hiveforge.queen_bee.server.QueenBeeMCPServer._plan_tasks",
+        new_callable=AsyncMock,
+        side_effect=lambda goal, context=None: [
+            {"task_id": "task-001", "goal": goal, "depends_on": []}
+        ],
+    ):
+        yield
+
+
 # =========================================================================
 # Beekeeper → Queen Bee(Pipeline) フルチェーン
 # =========================================================================

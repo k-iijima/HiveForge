@@ -35,8 +35,16 @@ def beekeeper(ar):
 
 @pytest.fixture
 def queen_bee(ar):
-    """テスト用Queen Bee"""
-    return QueenBeeMCPServer(colony_id="colony-1", ar=ar)
+    """テスト用Queen Bee
+
+    _plan_tasksをモックし、LLM呼び出しなしで単一タスクを返す。
+    """
+    qb = QueenBeeMCPServer(colony_id="colony-1", ar=ar)
+    # LLM不要: _plan_tasksが直接タスクリストを返す
+    qb._plan_tasks = AsyncMock(  # type: ignore[method-assign]
+        side_effect=lambda goal, context: [{"task_id": "task-001", "goal": goal, "depends_on": []}]
+    )
+    return qb
 
 
 # =========================================================================
@@ -332,6 +340,22 @@ class TestQueenBeeLifecycleEvents:
 
 class TestFullChainIntegration:
     """Beekeeper → Queen Bee → Worker Bee のフルチェーン統合テスト"""
+
+    @pytest.fixture(autouse=True)
+    def _mock_plan_tasks(self):
+        """_plan_tasksをモックし、LLM依存を排除する
+
+        _delegate_to_queenはQueenBeeMCPServerを内部で新規作成するため、
+        クラスレベルでパッチする必要がある。
+        """
+        with patch(
+            "hiveforge.queen_bee.server.QueenBeeMCPServer._plan_tasks",
+            new_callable=AsyncMock,
+            side_effect=lambda goal, context=None: [
+                {"task_id": "task-001", "goal": goal, "depends_on": []}
+            ],
+        ):
+            yield
 
     @pytest.mark.asyncio
     async def test_delegate_to_queen_creates_queen_and_executes(self, beekeeper, ar):
@@ -694,10 +718,19 @@ class TestBeekeeperSwarmingIntegration:
         )
         colony_id = colony_result["colony_id"]
 
-        with patch(
-            "hiveforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
-            new_callable=AsyncMock,
-            return_value={"status": "completed", "result": "ok", "llm_output": "done"},
+        with (
+            patch(
+                "hiveforge.queen_bee.server.QueenBeeMCPServer._plan_tasks",
+                new_callable=AsyncMock,
+                side_effect=lambda goal, context=None: [
+                    {"task_id": "task-001", "goal": goal, "depends_on": []}
+                ],
+            ),
+            patch(
+                "hiveforge.worker_bee.server.WorkerBeeMCPServer.execute_task_with_llm",
+                new_callable=AsyncMock,
+                return_value={"status": "completed", "result": "ok", "llm_output": "done"},
+            ),
         ):
             # Act: Swarming特徴量付きでタスク委譲
             result = await beekeeper._delegate_to_queen(

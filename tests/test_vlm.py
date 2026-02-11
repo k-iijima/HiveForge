@@ -5,6 +5,7 @@
 import base64
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 
 from hiveforge.vlm.analyzer import AnalysisResult, LocalVLMAnalyzer
@@ -37,11 +38,11 @@ class TestOllamaClient:
 
     @pytest.mark.asyncio
     async def test_is_available_failure(self, client):
-        """Ollamaが利用不可な場合Falseを返す"""
+        """Ollamaが利用不可な場合Falseを返す（安全側フォールバック）"""
         # Arrange
         with patch("httpx.AsyncClient") as mock_client:
             mock_client.return_value.__aenter__.return_value.get = AsyncMock(
-                side_effect=Exception("Connection refused")
+                side_effect=httpx.ConnectError("Connection refused")
             )
 
             # Act
@@ -243,19 +244,17 @@ class TestOllamaClientExtended:
             assert result == []
 
     @pytest.mark.asyncio
-    async def test_list_models_exception(self, client):
-        """例外発生時空のリストを返す"""
+    async def test_list_models_exception_raises(self, client):
+        """ネットワークエラー時に例外がそのまま伝搬される"""
         # Arrange
         with patch("httpx.AsyncClient") as mock_client:
             mock_client.return_value.__aenter__.return_value.get = AsyncMock(
-                side_effect=Exception("Network error")
+                side_effect=httpx.ConnectError("Network error")
             )
 
-            # Act
-            result = await client.list_models()
-
-            # Assert
-            assert result == []
+            # Act & Assert: httpx.HTTPError が伝搬
+            with pytest.raises(httpx.HTTPError):
+                await client.list_models()
 
     @pytest.mark.asyncio
     async def test_pull_model_success(self, client):
@@ -292,19 +291,17 @@ class TestOllamaClientExtended:
             assert result is False
 
     @pytest.mark.asyncio
-    async def test_pull_model_exception(self, client):
-        """モデルダウンロード例外"""
+    async def test_pull_model_exception_raises(self, client):
+        """モデルダウンロード時のネットワークエラーが伝搬される"""
         # Arrange
         with patch("httpx.AsyncClient") as mock_client:
             mock_client.return_value.__aenter__.return_value.post = AsyncMock(
-                side_effect=Exception("Timeout")
+                side_effect=httpx.ConnectError("Timeout")
             )
 
-            # Act
-            result = await client.pull_model()
-
-            # Assert
-            assert result is False
+            # Act & Assert: httpx.HTTPError が伝搬
+            with pytest.raises(httpx.HTTPError):
+                await client.pull_model()
 
     @pytest.mark.asyncio
     async def test_pull_model_custom_name(self, client):

@@ -190,7 +190,16 @@ class TestHandlePlanTasks:
 
     @pytest.mark.asyncio
     async def test_plan_tasks_returns_single_task(self, queen_bee):
-        """タスク分解（現時点では単一タスクを返す）"""
+        """タスク分解（LLMモック経由で単一タスクを返す）"""
+        from unittest.mock import AsyncMock
+
+        # Arrange: _plan_tasksをモック
+        queen_bee._plan_tasks = AsyncMock(
+            side_effect=lambda goal, context=None: [
+                {"task_id": "task-001", "goal": goal, "depends_on": []}
+            ]
+        )
+
         # Act
         result = await queen_bee.handle_plan_tasks(
             {
@@ -434,7 +443,7 @@ class TestPlanTasksDependsOn:
         """
         from unittest.mock import AsyncMock, MagicMock
 
-        from hiveforge.llm.client import LLMClient
+        from hiveforge.llm.client import LLMClient, LLMResponse
 
         # Arrange: LLMが依存関係付きのタスクを返すようモック
         mock_client = MagicMock(spec=LLMClient)
@@ -465,10 +474,10 @@ class TestPlanTasksDependsOn:
         assert tasks[2]["depends_on"] == ["task-1", "task-2"]
 
     @pytest.mark.asyncio
-    async def test_plan_tasks_fallback_includes_depends_on(self, queen_bee):
-        """LLM失敗時のフォールバックでもdepends_onが含まれる
+    async def test_plan_tasks_llm_failure_raises(self, queen_bee):
+        """LLM失敗時に例外がそのまま伝搬される
 
-        単一タスクへのフォールバックでも空のdepends_onが返ること。
+        Fail-Fast原則に従い、フォールバックせず例外を伝搬する。
         """
         from unittest.mock import AsyncMock, MagicMock
 
@@ -479,12 +488,9 @@ class TestPlanTasksDependsOn:
         mock_client.chat = AsyncMock(side_effect=RuntimeError("API error"))
         queen_bee._llm_client = mock_client
 
-        # Act
-        tasks = await queen_bee._plan_tasks("テスト目標", {})
-
-        # Assert: フォールバックでもdepends_onが存在
-        assert len(tasks) == 1
-        assert tasks[0]["depends_on"] == []
+        # Act & Assert: RuntimeErrorがそのまま伝搬
+        with pytest.raises(RuntimeError, match="API error"):
+            await queen_bee._plan_tasks("テスト目標", {})
 
 
 # =========================================================================
@@ -502,7 +508,9 @@ class TestExecuteDirectOrchestrator:
         2つの独立タスクがオーケストレータ経由で実行され、
         ColonyResult形式の結果が返ることを確認する。
         """
-        from unittest.mock import AsyncMock
+        from unittest.mock import AsyncMock, MagicMock
+
+        from hiveforge.llm.client import LLMClient
 
         # Arrange: 2つの独立タスクを返す
         queen_bee.add_worker("worker-1")

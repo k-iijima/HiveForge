@@ -276,22 +276,17 @@ class TestAgentRunnerActivityEmission:
         assert len(collected_events) == 0
 
     @pytest.mark.asyncio
-    async def test_llm_error_emits_agent_error(
+    async def test_llm_error_propagates_exception(
         self, mock_client, agent_info, collected_events, event_collector
     ):
-        """LLMエラー時にAGENT_ERRORイベントを発行する"""
+        """LLMエラー時に例外がそのまま伝搬する（フォールバックしない）"""
         # Arrange
         mock_client.chat.side_effect = RuntimeError("LLM connection failed")
         runner = AgentRunner(mock_client, agent_info=agent_info)
 
-        # Act
-        result = await runner.run("Say hello")
-
-        # Assert
-        assert result.success is False
-        error_events = [e for e in collected_events if e.activity_type == ActivityType.AGENT_ERROR]
-        assert len(error_events) == 1
-        assert "LLM connection failed" in error_events[0].summary
+        # Act & Assert: 例外が伝搬する
+        with pytest.raises(RuntimeError, match="LLM connection failed"):
+            await runner.run("Say hello")
 
     @pytest.mark.asyncio
     async def test_multiple_tool_calls_emit_multiple_events(

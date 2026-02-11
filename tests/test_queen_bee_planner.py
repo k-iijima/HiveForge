@@ -309,33 +309,26 @@ class TestTaskPlannerPlan:
         mock_client.chat.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_plan_llm_failure_fallback(self, planner, mock_client):
-        """LLM呼び出しが失敗した場合、単一タスクにフォールバック"""
+    async def test_plan_llm_failure_raises(self, planner, mock_client):
+        """LLM呼び出しが失敗した場合、例外がそのまま伝搬される"""
         # Arrange
         mock_client.chat = AsyncMock(side_effect=RuntimeError("API error"))
 
-        # Act
-        plan = await planner.plan("テスト目標")
-
-        # Assert
-        assert len(plan.tasks) == 1
-        assert plan.tasks[0].goal == "テスト目標"
-        assert "失敗" in plan.reasoning
+        # Act & Assert: RuntimeErrorがそのまま伝搬
+        with pytest.raises(RuntimeError, match="API error"):
+            await planner.plan("テスト目標")
 
     @pytest.mark.asyncio
-    async def test_plan_invalid_response_fallback(self, planner, mock_client):
-        """LLMが不正なJSONを返した場合、単一タスクにフォールバック"""
+    async def test_plan_invalid_response_raises(self, planner, mock_client):
+        """LLMが不正なJSONを返した場合、例外がそのまま伝搬される"""
         # Arrange
         mock_response = MagicMock()
         mock_response.content = "これはJSONじゃないよ"
         mock_client.chat = AsyncMock(return_value=mock_response)
 
-        # Act
-        plan = await planner.plan("テスト目標")
-
-        # Assert
-        assert len(plan.tasks) == 1
-        assert plan.tasks[0].goal == "テスト目標"
+        # Act & Assert: JSONパースエラーが伝搬
+        with pytest.raises(Exception):
+            await planner.plan("テスト目標")
 
     @pytest.mark.asyncio
     async def test_plan_passes_context(self, planner, mock_client):
@@ -357,23 +350,20 @@ class TestTaskPlannerPlan:
         assert "Python" in user_msg
 
     @pytest.mark.asyncio
-    async def test_plan_empty_tasks_fallback(self, planner, mock_client):
-        """LLMが空タスクリストを返した場合、バリデーションエラーでフォールバック
+    async def test_plan_empty_tasks_raises(self, planner, mock_client):
+        """LLMが空タスクリストを返した場合、バリデーションエラーが伝搬される
 
         TaskPlan の min_length=1 制約により空リストは拒否され、
-        plan() の例外ハンドラが単一タスクにフォールバックする。
+        ValidationErrorがそのまま伝搬する。
         """
         # Arrange
         mock_response = MagicMock()
         mock_response.content = json.dumps({"tasks": []})
         mock_client.chat = AsyncMock(return_value=mock_response)
 
-        # Act
-        plan = await planner.plan("テスト目標")
-
-        # Assert
-        assert len(plan.tasks) == 1
-        assert plan.tasks[0].goal == "テスト目標"
+        # Act & Assert: ValidationErrorが伝搬
+        with pytest.raises(Exception):
+            await planner.plan("テスト目標")
 
     @pytest.mark.asyncio
     async def test_plan_none_context(self, planner, mock_client):
