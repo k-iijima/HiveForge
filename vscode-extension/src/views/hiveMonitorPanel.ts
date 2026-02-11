@@ -457,10 +457,11 @@ export class HiveMonitorPanel {
                 if (v >= 0.5) return '#ff9800';
                 return '#f44336';
             }
-            function gauge(label, value, unit, invert) {
+            function gauge(label, value, unit, invert, max) {
                 const display = unit === '%' ? pct(value) : num(value, unit);
-                const color = gaugeColor(value, invert);
-                const pctVal = value != null ? Math.min(value * 100, 100) : 0;
+                const norm = (max && value != null) ? Math.min(value / max, 1.0) : value;
+                const color = gaugeColor(norm, invert);
+                const pctVal = norm != null ? Math.min(norm * 100, 100) : 0;
                 return '<div class="kpi-gauge">'
                     + '<div class="kpi-gauge-bar" style="width:' + pctVal + '%;background:' + color + '"></div>'
                     + '<div class="kpi-gauge-content">'
@@ -480,7 +481,7 @@ export class HiveMonitorPanel {
             h += '<div class="kpi-grid">';
             h += gauge('Correctness', kpi.correctness, '%', false);
             h += gauge('Repeatability', kpi.repeatability, '%', false);
-            h += gauge('Lead Time', kpi.lead_time_seconds, 's', true);
+            h += gauge('Lead Time', kpi.lead_time_seconds, 's', true, 300);
             h += gauge('Incident Rate', kpi.incident_rate, '%', true);
             h += gauge('Recurrence', kpi.recurrence_rate, '%', true);
             h += '</div></div>';
@@ -492,7 +493,7 @@ export class HiveMonitorPanel {
             h += gauge('Rework Rate', collab.rework_rate, '%', true);
             h += gauge('Escalation', collab.escalation_ratio, '%', true);
             h += gauge('N-Proposal Yield', collab.n_proposal_yield, '%', false);
-            h += gauge('Cost/Task', collab.cost_per_task_tokens, ' tok', true);
+            h += gauge('Cost/Task', collab.cost_per_task_tokens, ' tok', true, 5000);
             h += gauge('Overhead', collab.collaboration_overhead, '%', true);
             h += '</div></div>';
 
