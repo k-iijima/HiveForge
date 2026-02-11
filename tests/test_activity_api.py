@@ -291,7 +291,12 @@ class TestActivityStream:
         from colonyforge.api.routes.activity import stream_events
 
         # Arrange: wait_forが即座にTimeoutErrorを発生させるようにする
-        with patch.object(asyncio, "wait_for", side_effect=TimeoutError):
+        # 渡されたコルーチンを適切に閉じてからTimeoutErrorを発生させる
+        async def mock_wait_for(coro, *, timeout=None):
+            coro.close()
+            raise TimeoutError
+
+        with patch.object(asyncio, "wait_for", side_effect=mock_wait_for):
             response = await stream_events()
             gen = response.body_iterator
 

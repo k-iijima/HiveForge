@@ -943,17 +943,19 @@ class TestWorkerProcessManager:
     @pytest.mark.asyncio
     async def test_start_worker_with_command_failure(self):
         """コマンド起動失敗時はCRASHED状態になる"""
-        from unittest.mock import AsyncMock, patch
+        from unittest.mock import patch
 
         # Arrange
         manager = WorkerProcessManager()
         crashed_workers = []
         manager.set_callbacks(on_crashed=lambda w: crashed_workers.append(w))
 
+        async def _raise_fnf(*args, **kwargs):
+            raise FileNotFoundError("not found")
+
         with patch(
             "asyncio.create_subprocess_exec",
-            new_callable=AsyncMock,
-            side_effect=FileNotFoundError("not found"),
+            new=_raise_fnf,
         ):
             # Act
             worker = await manager.start_worker(
@@ -979,11 +981,14 @@ class TestWorkerProcessManager:
         mock_process.terminate = MagicMock()
         mock_process.wait = AsyncMock()
 
+        async def _await_coro(coro, *args, **kwargs):
+            return await coro
+
         with (
             patch(
                 "asyncio.create_subprocess_exec", new_callable=AsyncMock, return_value=mock_process
             ),
-            patch("asyncio.wait_for", new_callable=AsyncMock),
+            patch("asyncio.wait_for", new=_await_coro),
         ):
             worker = await manager.start_worker(
                 worker_id="worker-1", colony_id="colony-1", command=["echo", "hi"]
@@ -1008,11 +1013,15 @@ class TestWorkerProcessManager:
         mock_process.kill = MagicMock()
         mock_process.wait = AsyncMock()
 
+        async def _await_coro(coro, *args, **kwargs):
+            """渡されたコルーチンを適切にawaitして返す"""
+            return await coro
+
         with (
             patch(
                 "asyncio.create_subprocess_exec", new_callable=AsyncMock, return_value=mock_process
             ),
-            patch("asyncio.wait_for", new_callable=AsyncMock),
+            patch("asyncio.wait_for", new=_await_coro),
         ):
             worker = await manager.start_worker(
                 worker_id="worker-1", colony_id="colony-1", command=["echo", "hi"]
@@ -1438,10 +1447,15 @@ class TestWorkerProcessManagerCoverageGaps:
             )
 
         # asyncio.wait_for がTimeoutErrorを起こす
+        # AsyncMock(side_effect=...) は内部コルーチンが未awaitになるため
+        # plain async function でラップする
+        async def _raise_timeout(coro, *args, **kwargs):
+            coro.close()  # 渡されたコルーチンを適切に閉じる
+            raise TimeoutError
+
         with patch(
             "asyncio.wait_for",
-            new_callable=AsyncMock,
-            side_effect=TimeoutError,
+            new=_raise_timeout,
         ):
             # Act
             result = await manager.stop_worker(worker.process_id, force=False)
@@ -1455,15 +1469,17 @@ class TestWorkerProcessManagerCoverageGaps:
     @pytest.mark.asyncio
     async def test_start_worker_crash_without_callback(self):
         """コマンド起動失敗時、on_crashed未設定でもCRASHED（L124->126）"""
-        from unittest.mock import AsyncMock, patch
+        from unittest.mock import patch
 
         # Arrange: コールバック未設定
         manager = WorkerProcessManager()
 
+        async def _raise_os_error(*args, **kwargs):
+            raise OSError("permission denied")
+
         with patch(
             "asyncio.create_subprocess_exec",
-            new_callable=AsyncMock,
-            side_effect=OSError("permission denied"),
+            new=_raise_os_error,
         ):
             # Act
             worker = await manager.start_worker(
