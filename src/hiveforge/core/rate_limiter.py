@@ -23,18 +23,23 @@ class RateLimitStrategy(StrEnum):
 class RateLimitConfig:
     """レート制限設定
 
+    Default values are calibrated for OpenAI GPT-4-class models.
+    Override via ``hiveforge.config.yaml`` ``llm.rate_limit`` section
+    or by constructing a custom ``RateLimitConfig``.
+
     Attributes:
-        requests_per_minute: 1分あたりの最大リクエスト数
-        requests_per_day: 1日あたりの最大リクエスト数（0=無制限）
-        tokens_per_minute: 1分あたりの最大トークン数（LLM用）
-        max_concurrent: 最大同時リクエスト数
-        retry_after_429: 429エラー時のデフォルト待機秒数
-        burst_limit: バースト許容数（トークンバケットの最大容量）
+        requests_per_minute: Max requests per minute.
+        requests_per_day: Max requests per day (0 = unlimited).
+        tokens_per_minute: Max tokens per minute.
+            Default 90 000 targets GPT-4 Tier-1.
+        max_concurrent: Max concurrent in-flight requests.
+        retry_after_429: Default back-off seconds on HTTP 429.
+        burst_limit: Token-bucket burst capacity.
     """
 
     requests_per_minute: int = 60
-    requests_per_day: int = 0  # 0 = 無制限
-    tokens_per_minute: int = 90000  # GPT-4デフォルト
+    requests_per_day: int = 0  # 0 = unlimited
+    tokens_per_minute: int = 90_000  # GPT-4 Tier-1 default; override per model/provider
     max_concurrent: int = 10
     retry_after_429: float = 60.0
     burst_limit: int = 10
@@ -291,10 +296,11 @@ def get_openai_rate_limit(model: str) -> RateLimitConfig:
             tokens_per_minute=90000,
             max_concurrent=20,
         )
-    # デフォルト（保守的）
+    # Default for unknown models — intentionally conservative.
+    # Safe-side fallback: see AGENTS.md §3 (permitted case 1).
     return RateLimitConfig(
         requests_per_minute=60,
-        tokens_per_minute=10000,
+        tokens_per_minute=10_000,
         max_concurrent=5,
     )
 

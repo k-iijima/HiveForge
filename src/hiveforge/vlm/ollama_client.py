@@ -6,6 +6,7 @@ Ollama VLMクライアント
 
 import base64
 import logging
+import re
 from pathlib import Path
 
 import httpx
@@ -83,6 +84,54 @@ class OllamaClient:
             logger.error("Failed to pull Ollama model %s: %s", model, e)
             raise
 
+    # Regex to detect plausible base64-encoded data.
+    # Matches strings whose characters are all valid base64 alphabet
+    # with optional trailing padding.  Minimum 4 chars (one base64 block).
+    _BASE64_RE = re.compile(r"^[A-Za-z0-9+/]{4,}={0,2}$")
+
+    @staticmethod
+    def _resolve_image_to_base64(image: bytes | str | Path) -> str:
+        """Convert *image* to a base64-encoded string.
+
+        Resolution order:
+        1. ``Path`` object → read file, base64-encode.
+        2. ``str`` that points to an existing file → same as above.
+        3. ``bytes`` → base64-encode.
+        4. ``str`` that looks like valid base64 → use as-is.
+        5. Otherwise → ``ValueError`` (instead of silently assuming base64).
+
+        Raises:
+            ValueError: When a ``str`` is provided that is neither
+                an existing file path nor valid base64 data.
+        """
+        if isinstance(image, Path):
+            with open(image, "rb") as f:
+                return base64.b64encode(f.read()).decode()
+
+        if isinstance(image, str):
+            # Try as file path first — must be a non-empty string
+            # pointing to an existing *file* (not directory).
+            if image:
+                p = Path(image)
+                if p.is_file():
+                    with open(p, "rb") as f:
+                        return base64.b64encode(f.read()).decode()
+
+            # Validate base64 — strip whitespace, then quick pattern check
+            stripped = image.strip()
+            if OllamaClient._BASE64_RE.match(stripped):
+                return stripped
+
+            raise ValueError(
+                f"String argument is neither an existing file path "
+                f"nor valid base64 data (first 40 chars: {image[:40]!r})"
+            )
+
+        if isinstance(image, bytes):
+            return base64.b64encode(image).decode()
+
+        raise TypeError(f"Expected bytes, str, or Path; got {type(image).__name__}")
+
     async def analyze_image(
         self,
         image: bytes | str | Path,
@@ -102,14 +151,7 @@ class OllamaClient:
         model = model or self.model
 
         # 画像をbase64に変換
-        if isinstance(image, Path) or (isinstance(image, str) and Path(image).exists()):
-            with open(image, "rb") as f:
-                image_b64 = base64.b64encode(f.read()).decode()
-        elif isinstance(image, bytes):
-            image_b64 = base64.b64encode(image).decode()
-        else:
-            # すでにbase64文字列と仮定
-            image_b64 = image
+        image_b64 = self._resolve_image_to_base64(image)
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(

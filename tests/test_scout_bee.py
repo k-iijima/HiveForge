@@ -6,8 +6,16 @@ Honeycombの過去エピソードから類似タスクを検索し、
 
 from __future__ import annotations
 
+import pytest
+
 from hiveforge.core.honeycomb.models import Episode, Outcome
-from hiveforge.scout_bee.matcher import EpisodeMatcher, SimilarEpisode
+from hiveforge.scout_bee.matcher import (
+    FEATURE_DEFAULT,
+    FEATURE_MAX,
+    FEATURE_MIN,
+    EpisodeMatcher,
+    SimilarEpisode,
+)
 from hiveforge.scout_bee.models import (
     OptimizationProposal,
     ScoutReport,
@@ -542,3 +550,49 @@ class TestScoutBee:
         # Assert
         assert "類似エピソード3件" in reason
         assert "推薦" in reason
+
+
+# ==================== H-01/H-02: Feature constant tests ====================
+
+
+class TestFeatureConstants:
+    """H-01/H-02: 特徴量レンジとデフォルト値が定数として定義されている"""
+
+    def test_feature_range_consistent(self):
+        """FEATURE_MIN < FEATURE_MAX であること"""
+        assert FEATURE_MIN < FEATURE_MAX
+
+    def test_feature_default_is_midpoint(self):
+        """FEATURE_DEFAULT が MIN と MAX の中間値であること"""
+        expected = (FEATURE_MIN + FEATURE_MAX) / 2.0
+        assert expected == FEATURE_DEFAULT
+
+    def test_similarity_uses_constants_not_hardcoded(self):
+        """類似度計算がハードコードされた値ではなく定数を使用していること
+
+        FEATURE_MIN=1, FEATURE_MAX=5 の場合、全キーが最大差のとき
+        距離は最大距離と一致し similarity=0 になる。
+        """
+        # Arrange
+        matcher = EpisodeMatcher()
+        target = dict.fromkeys(("complexity", "risk", "urgency"), FEATURE_MIN)
+        candidate = dict.fromkeys(("complexity", "risk", "urgency"), FEATURE_MAX)
+
+        # Act
+        sim = matcher._compute_similarity(target, candidate)
+
+        # Assert: 最大距離 → similarity ≈ 0
+        assert sim == pytest.approx(0.0, abs=1e-9)
+
+    def test_missing_key_uses_feature_default(self):
+        """欠損キーに FEATURE_DEFAULT が適用されること"""
+        # Arrange
+        matcher = EpisodeMatcher()
+        target = {"complexity": FEATURE_DEFAULT}  # risk, urgency 欠損
+        candidate = {"complexity": FEATURE_DEFAULT}  # risk, urgency 欠損
+
+        # Act
+        sim = matcher._compute_similarity(target, candidate)
+
+        # Assert: 全キー同値 → similarity = 1.0
+        assert sim == pytest.approx(1.0)

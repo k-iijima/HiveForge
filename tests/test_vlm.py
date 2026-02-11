@@ -218,6 +218,70 @@ class TestVLMResponse:
         assert response.total_duration_ms == 0
 
 
+class TestResolveImageToBase64:
+    """H-07: _resolve_image_to_base64 validates input properly"""
+
+    def test_path_object(self, tmp_path):
+        """Path object is read and base64-encoded"""
+        # Arrange
+        img = tmp_path / "img.png"
+        img.write_bytes(b"PNG_DATA")
+
+        # Act
+        result = OllamaClient._resolve_image_to_base64(img)
+
+        # Assert
+        assert result == base64.b64encode(b"PNG_DATA").decode()
+
+    def test_string_file_path(self, tmp_path):
+        """String pointing to existing file is read and encoded"""
+        # Arrange
+        img = tmp_path / "img.png"
+        img.write_bytes(b"PNG_DATA_2")
+
+        # Act
+        result = OllamaClient._resolve_image_to_base64(str(img))
+
+        # Assert
+        assert result == base64.b64encode(b"PNG_DATA_2").decode()
+
+    def test_bytes_input(self):
+        """Raw bytes are base64-encoded"""
+        # Arrange
+        raw = b"raw image bytes"
+
+        # Act
+        result = OllamaClient._resolve_image_to_base64(raw)
+
+        # Assert
+        assert result == base64.b64encode(raw).decode()
+
+    def test_valid_base64_string(self):
+        """Valid base64 string (non-file) is accepted as-is"""
+        # Arrange
+        image_b64 = base64.b64encode(b"fake image data for test").decode()
+
+        # Act
+        result = OllamaClient._resolve_image_to_base64(image_b64)
+
+        # Assert
+        assert result == image_b64
+
+    def test_invalid_string_raises_value_error(self):
+        """Non-file, non-base64 string raises ValueError"""
+        # Arrange
+        garbage = "not_a_file_and_not_base64!!!"
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="neither an existing file path"):
+            OllamaClient._resolve_image_to_base64(garbage)
+
+    def test_empty_string_raises_value_error(self):
+        """Empty string raises ValueError"""
+        with pytest.raises(ValueError, match="neither an existing file path"):
+            OllamaClient._resolve_image_to_base64("")
+
+
 class TestOllamaClientExtended:
     """OllamaClient 拡張テスト"""
 

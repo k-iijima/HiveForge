@@ -12,6 +12,16 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from hiveforge.core.honeycomb.models import Episode
 
+# ─── Configurable constants ────────────────────────────────
+# Feature values are assumed to fall in [FEATURE_MIN, FEATURE_MAX].
+# Adjust these if your SwarmingFeatures schema uses a different range.
+FEATURE_MIN: float = 1.0
+FEATURE_MAX: float = 5.0
+
+# When a feature key is absent from a target or candidate vector,
+# this midpoint value is substituted (cold-start / incomplete data).
+FEATURE_DEFAULT: float = (FEATURE_MIN + FEATURE_MAX) / 2.0  # 3.0
+
 
 class SimilarEpisode(BaseModel):
     """類似エピソード検索結果"""
@@ -51,7 +61,8 @@ class EpisodeMatcher:
     ) -> float:
         """ユークリッド距離ベースの類似度を計算
 
-        全キーの値範囲を1〜5と仮定し、最大距離で正規化する。
+        全キーの値範囲を [FEATURE_MIN, FEATURE_MAX] として
+        最大距離で正規化する。
 
         Args:
             target: 検索対象の特徴量
@@ -62,13 +73,14 @@ class EpisodeMatcher:
         """
         squared_sum = 0.0
         for key in self.feature_keys:
-            t_val = target.get(key, 3.0)  # デフォルト3.0（中央値）
-            c_val = candidate.get(key, 3.0)
+            t_val = target.get(key, FEATURE_DEFAULT)
+            c_val = candidate.get(key, FEATURE_DEFAULT)
             squared_sum += (t_val - c_val) ** 2
 
         distance = math.sqrt(squared_sum)
-        # 最大距離: sqrt(n * (5-1)^2) = sqrt(n * 16) = 4 * sqrt(n)
-        max_distance = 4.0 * math.sqrt(len(self.feature_keys))
+        # 最大距離: sqrt(n * (max - min)^2)
+        feature_span = FEATURE_MAX - FEATURE_MIN
+        max_distance = feature_span * math.sqrt(len(self.feature_keys))
 
         if max_distance == 0:
             return 1.0

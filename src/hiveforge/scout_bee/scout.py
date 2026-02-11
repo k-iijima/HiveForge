@@ -12,7 +12,10 @@ from .analyzer import TemplateAnalyzer
 from .matcher import EpisodeMatcher
 from .models import OptimizationProposal, ScoutReport, ScoutVerdict
 
-# コールドスタート時のデフォルトテンプレート
+# Cold-start default template.
+# When Honeycomb has insufficient data (< min_episodes) to make a
+# data-driven recommendation, this safe-default template is returned.
+# Intentional safe-side fallback — see AGENTS.md §3 (permitted case 1).
 _DEFAULT_TEMPLATE = "balanced"
 
 

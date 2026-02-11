@@ -548,24 +548,11 @@ M1〜M4完了。M2全サブタスク完了（M2-0〜M2-4）。M5一部着手済�
 
 ---
 
-## 8. 技術的負債一覧（2026-02-08 精査）
+## 8. 技術的負債一覧（2026-02-11 精査）
 
 > **残存負債のみ**を表示。解消済み項目は折りたたみ内に移動。
 
 ### 8.1 残存負債
-
-#### ハードコード・仮定（意図的 — 必要時にconfig化）
-
-| # | ファイル | 箇所 | 現状 | 意図 |
-|---|---------|------|------|------|
-| H-01 | `scout_bee/matcher.py:54` | 特徴量レンジ | 1〜5 固定仮定 | Swarming特徴量の実態に合わせて変更可能 |
-| H-02 | `scout_bee/matcher.py:65` | 欠損特徴量 | デフォルト3.0（中間値） | コールドスタート時の安全策 |
-| H-03 | `scout_bee/scout.py:15-16` | デフォルトテンプレート | `_DEFAULT_TEMPLATE = "balanced"` | コールドスタート時のフォールバック |
-| H-04 | `core/rate_limiter.py:37` | トークン上限 | `tokens_per_minute: int = 90000` (GPT-4想定) | 他モデルではconfigで上書き可能 |
-| H-05 | `core/rate_limiter.py:273-278` | 不明モデル | 保守的デフォルト (RPM=20, TPM=40000) | 安全側に倒す設計 |
-| H-06 | `core/models/action_class.py:80` | 不明ツール | `REVERSIBLE` として分類 | 安全側に倒す設計 |
-| H-07 | `vlm/ollama_client.py:102` | 画像入力 | 文字列はbase64と仮定 | ファイルパス等の区別なし |
-| H-08 | `llm/prompts.py:20-100` | システムプロンプト | YAML未設定時のインラインフォールバック | `default_prompts/`の設定で上書き可能 |
 
 #### 暫定ロジック（残存）
 
@@ -584,6 +571,19 @@ M1〜M4完了。M2全サブタスク完了（M2-0〜M2-4）。M5一部着手済�
 
 <details>
 <summary>解消済み項目一覧（クリックで展開）</summary>
+
+#### ハードコード・仮定 — 全件解消 (H-01〜H-08)
+
+| # | 箇所 | 解消内容 |
+|---|------|---------|
+| H-01 | `scout_bee/matcher.py` 特徴量レンジ | `FEATURE_MIN`/`FEATURE_MAX` 定数に抽出、docstring明記 |
+| H-02 | `scout_bee/matcher.py` 欠損特徴量 | `FEATURE_DEFAULT` 定数に抽出（中間値自動計算） |
+| H-03 | `scout_bee/scout.py` デフォルトテンプレート | AGENTS.md §3 準拠のコメント明記 |
+| H-04 | `core/rate_limiter.py` トークン上限 | docstring にGPT-4 Tier-1根拠を明記、config上書き方法を文書化 |
+| H-05 | `core/rate_limiter.py` 不明モデルデフォルト | AGENTS.md §3 safe-side fallback コメント追加 |
+| H-06 | `core/models/action_class.py` 不明ツール | AGENTS.md §3 safe-side fallback コメント追加 |
+| H-07 | `vlm/ollama_client.py` 画像入力 | `_resolve_image_to_base64()` に明示的バリデーション追加、不正入力で `ValueError` |
+| H-08 | `llm/prompts.py` システムプロンプト | `hiveforge.prompts/` パッケージに集約・英語化 |
 
 #### クリティカルスタブ — 全件解消
 

@@ -77,7 +77,11 @@ def classify_action(tool_name: str, params: dict[str, Any]) -> ActionClass:
     elif tool_name in _IRREVERSIBLE_TOOLS:
         return ActionClass.IRREVERSIBLE
     else:
-        # 未知のツールは REVERSIBLE（安全側に倒す）
+        # Unknown tool → REVERSIBLE (safe-side fallback).
+        # Treating unknowns as REVERSIBLE rather than READ_ONLY protects
+        # against accidental unguarded execution.  If a truly dangerous
+        # tool is missed, the confirmation matrix still requires approval
+        # at Trust Level ≤ 1.  See AGENTS.md §3 (permitted case 1).
         return ActionClass.REVERSIBLE
 
 
