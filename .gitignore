@@ -44,10 +44,11 @@ vscode-extension/out/
 # 注意: 本番環境ではバックアップを取ること
 Vault/
 
-# Test coverage
+# Test coverage / reports
 .coverage
 htmlcov/
 .pytest_cache/
+test_results/
 
 # mypy
 .mypy_cache/

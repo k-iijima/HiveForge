@@ -58,6 +58,14 @@ jobs:
             -v --tb=short \
             --timeout=60
 
+      - name: Upload E2E report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report-l1
+          path: test_results/e2e_report/
+          retention-days: 30
+
   # =================================================================
   # L2: LLM エージェントチェーンテスト
   # =================================================================
@@ -104,6 +112,14 @@ jobs:
         run: |
           echo "::warning::LLM E2E tests failed — this may be due to non-deterministic LLM responses. Review test output."
 
+      - name: Upload E2E report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report-l2
+          path: test_results/e2e_report/
+          retention-days: 30
+
   # =================================================================
   # L3: VLM ビジュアルテスト（Playwright MCP + Anthropic Vision）
   # =================================================================
@@ -144,3 +160,161 @@ jobs:
         if: failure()
         run: |
           echo "::warning::VLM E2E tests failed — this may be due to non-deterministic VLM responses or Playwright MCP issues."
+
+      - name: Upload E2E report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report-l3
+          path: test_results/e2e_report/
+          retention-days: 30
+
+  # =================================================================
+  # レポート集約 → GitHub Pages デプロイ
+  # =================================================================
+  deploy-report:
+    name: "Deploy E2E Report"
+    runs-on: ubuntu-latest
+    needs: [e2e-api, e2e-llm, e2e-vlm]
+    if: always()
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}e2e/
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all E2E reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: e2e-report-*
+          path: _artifacts
+
+      - name: Merge reports
+        run: |
+          mkdir -p _site/e2e/captures
+
+          # 各レイヤーのキャプチャを統合
+          for dir in _artifacts/e2e-report-*/captures; do
+            if [ -d "$dir" ]; then
+              cp -f "$dir"/* _site/e2e/captures/ 2>/dev/null || true
+            fi
+          done
+
+          # 最も多くのテスト結果を含むレポートを使用し、他をマージ
+          python3 - <<'PYEOF'
+          import json, glob, os
+          from pathlib import Path
+          from datetime import datetime, timezone
+
+          all_tests = {}
+          for f in sorted(glob.glob("_artifacts/e2e-report-*/results.json")):
+              data = json.loads(Path(f).read_text())
+              for t in data.get("tests", []):
+                  all_tests[t["nodeid"]] = t
+
+          results = list(all_tests.values())
+          if not results:
+              print("No test results found")
+              exit(0)
+
+          # index.html を再生成
+          now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+          passed = sum(1 for r in results if r["outcome"] == "passed")
+          failed = sum(1 for r in results if r["outcome"] == "failed")
+          skipped = sum(1 for r in results if r["outcome"] == "skipped")
+          total = len(results)
+
+          def esc(t):
+              return t.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+
+          groups = {}
+          for r in results:
+              parts = r["nodeid"].split("::")
+              gk = parts[1] if len(parts) > 1 else parts[0]
+              groups.setdefault(gk, []).append(r)
+
+          rows = ""
+          for gn, tests in groups.items():
+              rows += f'<tr class="group-header"><td colspan="4">{esc(gn)}</td></tr>\n'
+              for t in tests:
+                  icon = {"passed":"✅","failed":"❌","skipped":"⏭️"}.get(t["outcome"],"❓")
+                  desc = t.get("doc") or t["name"]
+                  caps = ""
+                  if t.get("captures"):
+                      caps = '<div class="captures">' + "".join(
+                          f'<a href="captures/{c}" target="_blank"><img src="captures/{c}" loading="lazy"/></a>'
+                          for c in t["captures"]
+                      ) + '</div>'
+                  err = ""
+                  if t.get("error") and t["outcome"] == "failed":
+                      err = f'<div class="error-msg">{esc(t["error"])}</div>'
+                  rows += (
+                      f'<tr class="test-row {t["outcome"]}">'
+                      f'<td class="status">{icon}</td>'
+                      f'<td class="test-name">{esc(desc)}{err}</td>'
+                      f'<td class="duration">{t["duration"]}s</td>'
+                      f'<td>{caps}</td></tr>\n'
+                  )
+
+          html = f"""<!DOCTYPE html>
+          <html lang="ja"><head><meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width,initial-scale=1.0">
+          <title>ColonyForge E2E Test Report</title>
+          <style>
+          :root{{--bg:#0d1117;--surface:#161b22;--border:#30363d;--text:#e6edf3;--text-dim:#8b949e;--green:#3fb950;--red:#f85149;--yellow:#d29922;--blue:#58a6ff}}
+          *{{margin:0;padding:0;box-sizing:border-box}}
+          body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.5;padding:24px}}
+          .container{{max-width:1200px;margin:0 auto}}h1{{font-size:24px;margin-bottom:8px}}
+          .meta{{color:var(--text-dim);font-size:13px;margin-bottom:20px}}
+          .summary{{display:flex;gap:16px;margin-bottom:24px;flex-wrap:wrap}}
+          .summary-card{{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 20px;text-align:center;min-width:100px}}
+          .summary-card .count{{font-size:28px;font-weight:700}}.summary-card .label{{font-size:12px;color:var(--text-dim);text-transform:uppercase}}
+          .count.passed{{color:var(--green)}}.count.failed{{color:var(--red)}}.count.skipped{{color:var(--yellow)}}.count.total{{color:var(--blue)}}
+          table{{width:100%;border-collapse:collapse;background:var(--surface);border-radius:8px;overflow:hidden;border:1px solid var(--border)}}
+          .group-header td{{background:#1c2128;font-weight:600;font-size:13px;padding:8px 12px;color:var(--blue);border-bottom:1px solid var(--border)}}
+          .test-row td{{padding:8px 12px;border-bottom:1px solid var(--border);vertical-align:top;font-size:13px}}
+          .test-row:hover{{background:#1c2128}}.test-row.passed .status{{color:var(--green)}}.test-row.failed .status{{color:var(--red)}}.test-row.skipped .status{{color:var(--yellow)}}
+          .status{{width:30px;text-align:center;font-size:16px}}.test-name{{max-width:500px}}.duration{{width:60px;text-align:right;color:var(--text-dim);font-family:monospace}}
+          .error-msg{{margin-top:4px;padding:4px 8px;font-size:11px;background:rgba(248,81,73,0.1);border-left:3px solid var(--red);color:var(--red);border-radius:2px;font-family:monospace;white-space:pre-wrap;word-break:break-all;max-height:80px;overflow:auto}}
+          .captures{{display:flex;gap:6px;flex-wrap:wrap}}.captures img{{width:120px;height:80px;object-fit:cover;border-radius:4px;border:1px solid var(--border);cursor:pointer;transition:transform .2s}}.captures img:hover{{transform:scale(1.5);z-index:10;position:relative}}
+          .filter-bar{{display:flex;gap:8px;margin-bottom:16px}}.filter-btn{{padding:4px 12px;border-radius:16px;border:1px solid var(--border);background:var(--surface);color:var(--text-dim);cursor:pointer;font-size:12px}}.filter-btn.active{{border-color:var(--blue);color:var(--blue)}}.filter-btn:hover{{border-color:var(--text-dim)}}
+          </style></head><body><div class="container">
+          <h1>ColonyForge E2E Test Report</h1><div class="meta">Generated: {now}</div>
+          <div class="summary">
+            <div class="summary-card"><div class="count total">{total}</div><div class="label">Total</div></div>
+            <div class="summary-card"><div class="count passed">{passed}</div><div class="label">Passed</div></div>
+            <div class="summary-card"><div class="count failed">{failed}</div><div class="label">Failed</div></div>
+            <div class="summary-card"><div class="count skipped">{skipped}</div><div class="label">Skipped</div></div>
+          </div>
+          <div class="filter-bar">
+            <button class="filter-btn active" onclick="filterTests('all')">All</button>
+            <button class="filter-btn" onclick="filterTests('passed')">✅ Passed</button>
+            <button class="filter-btn" onclick="filterTests('failed')">❌ Failed</button>
+            <button class="filter-btn" onclick="filterTests('skipped')">⏭️ Skipped</button>
+          </div>
+          <table><thead><tr><th style="width:30px"></th><th>Test</th><th style="width:60px">Time</th><th>Captures</th></tr></thead>
+          <tbody>{rows}</tbody></table></div>
+          <script>
+          function filterTests(s){{document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));event.target.classList.add('active');document.querySelectorAll('.test-row').forEach(r=>{{r.style.display=(s==='all'||r.classList.contains(s))?'':'none'}});document.querySelectorAll('.group-header').forEach(h=>{{let n=[];let s=h.nextElementSibling;while(s&&!s.classList.contains('group-header')){{if(s.classList.contains('test-row'))n.push(s);s=s.nextElementSibling}}h.style.display=n.some(r=>r.style.display!=='none')?'':'none'}})}}
+          </script></body></html>"""
+
+          Path("_site/e2e/index.html").write_text(html, encoding="utf-8")
+          print(f"Report: {total} tests ({passed} passed, {failed} failed, {skipped} skipped)")
+          PYEOF
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4

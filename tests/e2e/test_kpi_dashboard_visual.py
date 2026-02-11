@@ -6,12 +6,12 @@ Playwright MCPを使用して、KPIダッシュボードのUI要素を検証す�
   2. VLM画像分析 — VLMモデル（llava等）が利用可能な場合のみ実行
 
 前提条件:
-    - Playwright MCPサーバー (hiveforge-playwright-mcp:8931)
-    - （VLMテスト用）Ollama VLMサーバー (hiveforge-dev-ollama:11434) + llavaモデル
+    - Playwright MCPサーバー (colonyforge-playwright-mcp:8931)
+    - （VLMテスト用）Ollama VLMサーバー (colonyforge-dev-ollama:11434) + llavaモデル
 
 実行方法:
-    PLAYWRIGHT_MCP_URL="http://hiveforge-playwright-mcp:8931" \\
-    OLLAMA_BASE_URL="http://hiveforge-dev-ollama:11434" \\
+    PLAYWRIGHT_MCP_URL="http://colonyforge-playwright-mcp:8931" \\
+    OLLAMA_BASE_URL="http://colonyforge-dev-ollama:11434" \\
     VLM_HEADLESS="true" \\
     pytest tests/e2e/test_kpi_dashboard_visual.py -v -m e2e
 """
