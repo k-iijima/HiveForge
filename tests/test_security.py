@@ -152,9 +152,7 @@ class TestToolsSecurity:
         with tempfile.TemporaryDirectory() as workspace:
             set_workspace_root(workspace)
 
-            result = json.loads(
-                await write_file_handler("/tmp/evil-file.txt", "malicious content")
-            )
+            result = json.loads(await write_file_handler("/tmp/evil-file.txt", "malicious content"))
 
             assert "error" in result
             assert "outside workspace" in result["error"]

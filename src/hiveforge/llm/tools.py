@@ -20,11 +20,26 @@ logger = logging.getLogger(__name__)
 _workspace_root: Path | None = None
 
 # コマンド実行の許可リスト
-ALLOWED_COMMANDS = frozenset({
-    "ls", "cat", "head", "tail", "wc", "find", "grep",
-    "git", "python", "pip", "npm", "node",
-    "ruff", "mypy", "pytest", "black",
-})
+ALLOWED_COMMANDS = frozenset(
+    {
+        "ls",
+        "cat",
+        "head",
+        "tail",
+        "wc",
+        "find",
+        "grep",
+        "git",
+        "python",
+        "pip",
+        "npm",
+        "node",
+        "ruff",
+        "mypy",
+        "pytest",
+        "black",
+    }
+)
 
 
 def set_workspace_root(path: Path | str) -> None:
@@ -61,9 +76,7 @@ def _validate_path_within_workspace(file_path: Path) -> Path:
     workspace = get_workspace_root()
     resolved = file_path.resolve()
     if not resolved.is_relative_to(workspace):
-        raise ValueError(
-            f"Access denied: path '{file_path}' is outside workspace '{workspace}'"
-        )
+        raise ValueError(f"Access denied: path '{file_path}' is outside workspace '{workspace}'")
     return resolved
 
 
@@ -142,10 +155,12 @@ async def run_command_handler(command: str) -> str:
         base_command = Path(args[0]).name
         if base_command not in ALLOWED_COMMANDS:
             logger.warning("Blocked disallowed command: %s", base_command)
-            return json.dumps({
-                "error": f"Command '{base_command}' is not allowed. "
-                f"Allowed commands: {sorted(ALLOWED_COMMANDS)}"
-            })
+            return json.dumps(
+                {
+                    "error": f"Command '{base_command}' is not allowed. "
+                    f"Allowed commands: {sorted(ALLOWED_COMMANDS)}"
+                }
+            )
 
         process = await asyncio.create_subprocess_exec(
             *args,
