@@ -5,6 +5,10 @@ M3-1 完了条件:
 - Run/Task完了時にEpisodeがHoneycombに自動記録される
 - 失敗時にFailureClassが分類される
 - 5つのKPIが算出可能
+
+M5-4 追加:
+- KPI表示フォーマットの整合性 (TestKPIDisplayFormatConsistency)
+- KPIが改善サイクルの指標として機能することの証明 (TestKPIImprovementCycle)
 """
 
 from __future__ import annotations
@@ -2569,3 +2573,528 @@ class TestKPIDisplayFormatConsistency:
                 f"{label}: value={value}, invert={invert}, max={max_val}, "
                 f"norm={norm}, expected={expected_color}, actual={actual_color}"
             )
+
+
+# =========================================================================
+# KPI 改善サイクル証明テスト
+# =========================================================================
+
+
+class TestKPIImprovementCycle:
+    """KPIが改善サイクルの指標として機能することを証明する大局的テスト
+
+    KPIは単なる数値表示ではなく、以下のPDCAループを駆動する仕組みである::
+
+        Plan → Do → Check (KPI計測) → Act (改善) → Check (KPI変化)
+
+    このテストクラスでは、エピソード蓄積に伴うKPIの変化パターンを
+    シナリオベースで検証し、KPIが改善活動のフィードバックとして
+    信頼できることを証明する。
+
+    証明する性質:
+        1. 感度: 状態変化に対してKPIが適切に応答する
+        2. 方向性: 改善はKPIの良化、悪化はKPIの劣化として現れる
+        3. 比較可能性: Colony間で同一基準で比較できる
+        4. 識別力: 異なる問題が異なるKPIに反映される
+        5. 収束性: 改善を継続するとKPIが目標値に近づく
+    """
+
+    @pytest.fixture
+    def store(self, tmp_path):
+        return HoneycombStore(tmp_path)
+
+    @pytest.fixture
+    def calc(self, store):
+        return KPICalculator(store)
+
+    def _add(
+        self,
+        store: HoneycombStore,
+        episode_id: str,
+        outcome: Outcome = Outcome.SUCCESS,
+        colony_id: str = "colony-1",
+        duration: float = 100.0,
+        token_count: int = 1000,
+        failure_class: FailureClass | None = None,
+        template: str = "balanced",
+        sentinel_count: int = 0,
+    ) -> None:
+        ep = Episode(
+            episode_id=episode_id,
+            run_id=f"run-{episode_id}",
+            colony_id=colony_id,
+            outcome=outcome,
+            duration_seconds=duration,
+            token_count=token_count,
+            failure_class=failure_class,
+            template_used=template,
+            sentinel_intervention_count=sentinel_count,
+        )
+        store.append(ep)
+
+    # ------------------------------------------------------------------
+    # 1. 感度: KPIは状態変化に応答する
+    # ------------------------------------------------------------------
+
+    def test_correctness_degrades_on_failure_injection(self, calc, store):
+        """失敗エピソードの発生でcorrectnessが即座に劣化すること
+
+        改善サイクルの前提: 問題が発生したことをKPIが検知できなければ
+        改善の起点がない。
+        障害1件の追加でcorrectnessが測定可能な幅で低下する。
+        """
+        # Arrange: 全成功の初期状態
+        for i in range(5):
+            self._add(store, f"ep-{i}", Outcome.SUCCESS)
+        baseline = calc.calculate_all()
+        assert baseline.correctness == 1.0
+
+        # Act: 1件の失敗を注入
+        self._add(store, "ep-fail", Outcome.FAILURE)
+        after_failure = calc.calculate_all()
+
+        # Assert: correctnessが低下（1.0 → 5/6 ≈ 0.833）
+        assert after_failure.correctness is not None
+        assert after_failure.correctness < baseline.correctness
+        assert abs(after_failure.correctness - 5 / 6) < 0.01
+
+    def test_incident_rate_rises_on_sentinel_intervention(self, calc, store):
+        """Sentinel介入でincident_rateが上昇すること
+
+        成功していてもSentinel介入があればインシデントとしてカウントされ、
+        問題の潜在的兆候を見逃さない。
+        """
+        # Arrange: Sentinel介入なしの成功
+        for i in range(4):
+            self._add(store, f"ep-{i}", Outcome.SUCCESS)
+        baseline = calc.calculate_all()
+        assert baseline.incident_rate == 0.0
+
+        # Act: 成功だがSentinel介入があったエピソード
+        self._add(store, "ep-sentinel", Outcome.SUCCESS, sentinel_count=2)
+        after = calc.calculate_all()
+
+        # Assert: incident_rateが上昇（0 → 1/5 = 0.2）
+        assert after.incident_rate is not None
+        assert after.incident_rate > baseline.incident_rate
+        assert abs(after.incident_rate - 0.2) < 0.01
+
+    def test_lead_time_reflects_speed_change(self, calc, store):
+        """所要時間の変化がlead_timeに反映されること
+
+        プロセス改善で所要時間が短縮された場合、lead_timeが低下する。
+        """
+        # Arrange: 遅い初期状態
+        for i in range(3):
+            self._add(store, f"ep-slow-{i}", duration=300.0)
+        baseline = calc.calculate_all()
+        assert baseline.lead_time_seconds == 300.0
+
+        # Act: 高速なエピソードが追加される（改善後）
+        for i in range(3):
+            self._add(store, f"ep-fast-{i}", duration=60.0)
+        improved = calc.calculate_all()
+
+        # Assert: lead_timeが低下（300 → 180平均）
+        assert improved.lead_time_seconds is not None
+        assert improved.lead_time_seconds < baseline.lead_time_seconds
+        assert abs(improved.lead_time_seconds - 180.0) < 0.01
+
+    # ------------------------------------------------------------------
+    # 2. 方向性: 改善→KPI良化、悪化→KPI劣化
+    # ------------------------------------------------------------------
+
+    def test_fixing_failures_improves_correctness(self, calc, store):
+        """失敗を修正して成功に変えるとcorrectnessが改善すること
+
+        改善サイクルの核心: 失敗を検知(Check)→修正(Act)→再測定(Check)で
+        KPIが改善方向に動くことを確認する。
+        """
+        # Arrange: 失敗が多い初期スプリント (correctness=0.4)
+        for i in range(4):
+            self._add(store, f"sprint1-s-{i}", Outcome.SUCCESS)
+        for i in range(6):
+            self._add(
+                store,
+                f"sprint1-f-{i}",
+                Outcome.FAILURE,
+                failure_class=FailureClass.IMPLEMENTATION_ERROR,
+            )
+        sprint1 = calc.calculate_all()
+
+        # Act: 問題を特定し改善した次スプリント (成功8/失敗2 を追加)
+        for i in range(8):
+            self._add(store, f"sprint2-s-{i}", Outcome.SUCCESS)
+        for i in range(2):
+            self._add(
+                store,
+                f"sprint2-f-{i}",
+                Outcome.FAILURE,
+                failure_class=FailureClass.IMPLEMENTATION_ERROR,
+            )
+        sprint2 = calc.calculate_all()
+
+        # Assert: correctnessが改善方向に動いている
+        assert sprint1.correctness is not None
+        assert sprint2.correctness is not None
+        assert sprint2.correctness > sprint1.correctness
+        # 0.4 → 12/20 = 0.6
+        assert abs(sprint1.correctness - 0.4) < 0.01
+        assert abs(sprint2.correctness - 0.6) < 0.01
+
+    def test_recurrence_rate_drops_when_root_cause_fixed(self, calc, store):
+        """根本原因修正後にrecurrence_rateが低下すること
+
+        同じ種類の失敗が繰り返されるのが再発。
+        根本原因を修正すれば再発が止まり、recurrence_rateが低下する。
+        """
+        # Arrange: 同じ失敗分類が繰り返し発生（TIMEOUT再発）
+        self._add(store, "ep-1", Outcome.FAILURE, failure_class=FailureClass.TIMEOUT)
+        self._add(store, "ep-2", Outcome.FAILURE, failure_class=FailureClass.TIMEOUT)
+        self._add(store, "ep-3", Outcome.FAILURE, failure_class=FailureClass.TIMEOUT)
+        before_fix = calc.calculate_all()
+
+        # Act: 根本原因修正 → 以降TIMEOUTは発生せず新種のみ単発
+        self._add(store, "ep-4", Outcome.SUCCESS)
+        self._add(store, "ep-5", Outcome.SUCCESS)
+        self._add(store, "ep-6", Outcome.FAILURE, failure_class=FailureClass.ENVIRONMENT_ERROR)
+        after_fix = calc.calculate_all()
+
+        # Assert: 再発率が低下（2/3 → 2/4 = 0.5）
+        assert before_fix.recurrence_rate is not None
+        assert after_fix.recurrence_rate is not None
+        assert after_fix.recurrence_rate < before_fix.recurrence_rate
+
+    # ------------------------------------------------------------------
+    # 3. 比較可能性: Colony間で同一基準で比較
+    # ------------------------------------------------------------------
+
+    def test_colony_comparison_identifies_weak_colony(self, calc, store):
+        """Colony間のKPI比較で弱いColonyを特定できること
+
+        改善サイクルでは「どこを改善するか」の特定が重要。
+        Colony単位のKPI比較で問題のあるColonyを識別できる。
+        """
+        # Arrange: 優秀なColony-A と 問題のあるColony-B
+        for i in range(5):
+            self._add(
+                store,
+                f"a-{i}",
+                Outcome.SUCCESS,
+                colony_id="colony-a",
+                duration=60.0,
+                token_count=500,
+            )
+        for i in range(5):
+            outcome = Outcome.SUCCESS if i < 2 else Outcome.FAILURE
+            fc = None if i < 2 else FailureClass.IMPLEMENTATION_ERROR
+            self._add(
+                store,
+                f"b-{i}",
+                outcome,
+                colony_id="colony-b",
+                duration=300.0,
+                token_count=3000,
+                failure_class=fc,
+            )
+
+        # Act
+        kpi_a = calc.calculate_all(colony_id="colony-a")
+        kpi_b = calc.calculate_all(colony_id="colony-b")
+
+        # Assert: Colony-Bが全指標で劣っている → 改善対象として特定可能
+        assert kpi_a.correctness is not None and kpi_b.correctness is not None
+        assert kpi_a.correctness > kpi_b.correctness  # 1.0 vs 0.4
+        assert kpi_a.lead_time_seconds is not None and kpi_b.lead_time_seconds is not None
+        assert kpi_a.lead_time_seconds < kpi_b.lead_time_seconds  # 60 vs 300
+        assert kpi_a.incident_rate is not None and kpi_b.incident_rate is not None
+        assert kpi_a.incident_rate < kpi_b.incident_rate  # 0 vs 0.6
+
+    def test_colony_kpi_independent_of_other_colonies(self, calc, store):
+        """Colony-AのKPIがColony-Bの品質劣化に影響されないこと
+
+        Colony間の独立性が保証されなければ、正確なボトルネック特定ができない。
+        """
+        # Arrange: Colony-Aに成功、Colony-Bに大量の失敗
+        for i in range(3):
+            self._add(store, f"a-{i}", Outcome.SUCCESS, colony_id="colony-a")
+        for i in range(10):
+            self._add(store, f"b-{i}", Outcome.FAILURE, colony_id="colony-b")
+
+        # Act
+        kpi_a = calc.calculate_all(colony_id="colony-a")
+        kpi_global = calc.calculate_all()  # 全体
+
+        # Assert: Colony-AのKPIはColony-Bに引きずられない
+        assert kpi_a.correctness == 1.0
+        assert kpi_global.correctness is not None
+        assert kpi_global.correctness < kpi_a.correctness  # 全体は低い
+
+    # ------------------------------------------------------------------
+    # 4. 識別力: 異なる問題が異なるKPIに反映される
+    # ------------------------------------------------------------------
+
+    def test_quality_problem_vs_speed_problem_distinct_signals(self, calc, store):
+        """品質問題と速度問題が異なるKPIに分離して反映されること
+
+        correctnessが低い → 品質問題（コードの修正が必要）
+        lead_timeが高い → 速度問題（プロセスの改善が必要）
+        両者は独立した問題であり、異なるKPIで識別できる。
+        """
+        # Arrange: 品質は完璧だが非常に遅い
+        for i in range(5):
+            self._add(store, f"slow-{i}", Outcome.SUCCESS, duration=600.0)
+        slow_but_correct = calc.calculate_all()
+
+        store_fast = HoneycombStore(store.base_path.parent / "fast")
+        calc_fast = KPICalculator(store_fast)
+
+        # 高速だが品質が低い
+        for i in range(5):
+            outcome = Outcome.SUCCESS if i < 1 else Outcome.FAILURE
+            fc = None if i < 1 else FailureClass.IMPLEMENTATION_ERROR
+            self._add(store_fast, f"fast-{i}", outcome, duration=10.0, failure_class=fc)
+        fast_but_buggy = calc_fast.calculate_all()
+
+        # Assert: 品質と速度が異なるKPIに独立して反映
+        assert slow_but_correct.correctness == 1.0  # 品質OK
+        assert slow_but_correct.lead_time_seconds == 600.0  # 速度NG
+
+        assert fast_but_buggy.correctness == 0.2  # 品質NG
+        assert fast_but_buggy.lead_time_seconds == 10.0  # 速度OK
+
+    def test_failure_classification_enables_targeted_improvement(self, calc, store):
+        """FailureClass内訳が的を絞った改善を可能にすること
+
+        「correctnessが低い」だけではどう直せばいいか分からない。
+        FailureClassの内訳を見ることで改善アクションを特定できる。
+        """
+        # Arrange: 様々な原因で失敗
+        self._add(store, "ep-1", Outcome.FAILURE, failure_class=FailureClass.TIMEOUT)
+        self._add(store, "ep-2", Outcome.FAILURE, failure_class=FailureClass.TIMEOUT)
+        self._add(store, "ep-3", Outcome.FAILURE, failure_class=FailureClass.TIMEOUT)
+        self._add(store, "ep-4", Outcome.FAILURE, failure_class=FailureClass.IMPLEMENTATION_ERROR)
+        self._add(store, "ep-5", Outcome.SUCCESS)
+
+        # Act
+        summary = calc.calculate_summary()
+
+        # Assert: TIMEOUTが最頻 → タイムアウト対策が最優先改善アクション
+        fc = summary["failure_classes"]
+        assert fc["timeout"] == 3
+        assert fc["implementation_error"] == 1
+        assert fc["timeout"] > fc["implementation_error"]
+        # correctnessは0.2（5中1成功）→ 改善の必要性が数値で明確
+        assert abs(summary["kpi"]["correctness"] - 0.2) < 0.01
+
+    # ------------------------------------------------------------------
+    # 5. 収束性: 改善を継続するとKPIが目標値に近づく
+    # ------------------------------------------------------------------
+
+    def test_sustained_improvement_converges_to_target(self, calc, store):
+        """継続的な改善によりKPIが目標値に収束すること
+
+        PDCA: スプリントごとに失敗率を改善し、correctnessが
+        目標の0.9に近づいていくことを検証する。
+        3スプリント分のトレンドで改善傾向を証明する。
+        """
+        # Arrange/Act: 3スプリント分のデータを投入
+        sprint_results = []
+
+        # Sprint 1: 品質が低い (60% 成功)
+        for i in range(6):
+            self._add(store, f"s1-s-{i}", Outcome.SUCCESS)
+        for i in range(4):
+            self._add(
+                store, f"s1-f-{i}", Outcome.FAILURE, failure_class=FailureClass.IMPLEMENTATION_ERROR
+            )
+        sprint_results.append(calc.calculate_all())
+
+        # Sprint 2: 改善 (80% 成功)
+        for i in range(8):
+            self._add(store, f"s2-s-{i}", Outcome.SUCCESS)
+        for i in range(2):
+            self._add(
+                store, f"s2-f-{i}", Outcome.FAILURE, failure_class=FailureClass.IMPLEMENTATION_ERROR
+            )
+        sprint_results.append(calc.calculate_all())
+
+        # Sprint 3: さらに改善 (90% 成功)
+        for i in range(9):
+            self._add(store, f"s3-s-{i}", Outcome.SUCCESS)
+        for i in range(1):
+            self._add(
+                store, f"s3-f-{i}", Outcome.FAILURE, failure_class=FailureClass.IMPLEMENTATION_ERROR
+            )
+        sprint_results.append(calc.calculate_all())
+
+        # Assert: 各スプリントでcorrectnessが単調増加
+        for i in range(len(sprint_results) - 1):
+            curr = sprint_results[i].correctness
+            next_ = sprint_results[i + 1].correctness
+            assert curr is not None and next_ is not None
+            assert next_ > curr, (
+                f"Sprint {i + 1}→{i + 2}: correctnessが改善していない ({curr:.3f} → {next_:.3f})"
+            )
+
+        # Assert: 最終スプリント時点で目標(0.9)に到達方向
+        final = sprint_results[-1].correctness
+        assert final is not None
+        assert final >= 0.75, f"3スプリント後のcorrectnessが0.75未満: {final:.3f}"
+
+    def test_multi_kpi_simultaneous_improvement(self, calc, store):
+        """複数KPIの同時改善が追跡可能なこと
+
+        実運用では品質・速度・安定性を同時に改善したい。
+        個々のKPIが独立してトレンドを持ち、総合的な改善判断が可能。
+        """
+        # Arrange: Phase 1 — 品質悪・速度遅・インシデント多
+        for i in range(5):
+            self._add(
+                store,
+                f"p1-{i}",
+                Outcome.FAILURE if i < 3 else Outcome.SUCCESS,
+                duration=400.0,
+                failure_class=FailureClass.TIMEOUT if i < 3 else None,
+                sentinel_count=1 if i < 2 else 0,
+            )
+        phase1 = calc.calculate_all()
+
+        # Act: Phase 2 — 全面的な改善
+        for i in range(10):
+            self._add(store, f"p2-{i}", Outcome.SUCCESS, duration=80.0, sentinel_count=0)
+        phase2 = calc.calculate_all()
+
+        # Assert: 3つのKPIが全て改善
+        assert phase2.correctness > phase1.correctness  # 品質改善
+        assert phase2.lead_time_seconds < phase1.lead_time_seconds  # 速度改善
+        assert phase2.incident_rate < phase1.incident_rate  # 安定性改善
+
+    # ------------------------------------------------------------------
+    # 6. 境界: 空→最初の1件、改善の天井
+    # ------------------------------------------------------------------
+
+    def test_first_episode_establishes_baseline(self, calc, store):
+        """最初のエピソードでKPIベースラインが確立されること
+
+        データなし(None) → 最初の1件 → 測定可能な値が生成される。
+        改善サイクルの前提として「初回計測可能」であることは必須。
+        """
+        # Arrange: 空状態
+        empty = calc.calculate_all()
+        assert empty.correctness is None
+        assert empty.lead_time_seconds is None
+
+        # Act: 最初のエピソード
+        self._add(store, "first", Outcome.SUCCESS, duration=120.0)
+        first = calc.calculate_all()
+
+        # Assert: ベースラインが確立
+        assert first.correctness == 1.0
+        assert first.lead_time_seconds == 120.0
+        assert first.incident_rate == 0.0
+
+    def test_perfect_kpi_is_achievable_and_stable(self, calc, store):
+        """完璧なKPI(全指標最良)が達成可能で安定すること
+
+        改善の天井: すべて成功・低レイテンシ・インシデントゼロが
+        KPIに正しく反映され、追加の成功で悪化しない。
+        """
+        # Arrange: 完璧な10エピソード
+        for i in range(10):
+            self._add(store, f"perfect-{i}", Outcome.SUCCESS, duration=30.0, sentinel_count=0)
+        perfect = calc.calculate_all()
+
+        assert perfect.correctness == 1.0
+        assert perfect.incident_rate == 0.0
+        assert perfect.recurrence_rate == 0.0
+        assert perfect.lead_time_seconds == 30.0
+
+        # Act: さらに成功を追加 — KPIが悪化しないこと
+        for i in range(5):
+            self._add(store, f"more-{i}", Outcome.SUCCESS, duration=30.0, sentinel_count=0)
+        still_perfect = calc.calculate_all()
+
+        assert still_perfect.correctness == 1.0
+        assert still_perfect.incident_rate == 0.0
+
+    # ------------------------------------------------------------------
+    # 7. EvaluationSummary: ダッシュボードデータとしての改善サイクル
+    # ------------------------------------------------------------------
+
+    def test_evaluation_summary_reflects_improvement_across_sprints(self, calc, store):
+        """EvaluationSummaryが改善の前後で変化し、ダッシュボードに改善を反映すること
+
+        KPIダッシュボードは改善サイクルの「Check」フェーズの道具。
+        EvaluationSummaryのフィールドが改善前後で適切に変化する。
+        """
+        # Arrange: Sprint 1 — 問題多め
+        for i in range(3):
+            self._add(store, f"s1-ok-{i}", Outcome.SUCCESS, duration=200.0, token_count=2000)
+        for i in range(7):
+            self._add(
+                store,
+                f"s1-ng-{i}",
+                Outcome.FAILURE,
+                duration=300.0,
+                token_count=3000,
+                failure_class=FailureClass.TIMEOUT,
+            )
+
+        before = calc.calculate_evaluation(
+            guard_reject_count=5,
+            guard_total_count=10,
+        )
+
+        # Act: Sprint 2 — 改善後のエピソードを追加
+        for i in range(9):
+            self._add(store, f"s2-ok-{i}", Outcome.SUCCESS, duration=80.0, token_count=800)
+        for i in range(1):
+            self._add(
+                store,
+                f"s2-ng-{i}",
+                Outcome.FAILURE,
+                duration=100.0,
+                token_count=1000,
+                failure_class=FailureClass.ENVIRONMENT_ERROR,
+            )
+
+        after = calc.calculate_evaluation(
+            guard_reject_count=6,
+            guard_total_count=20,
+        )
+
+        # Assert: 改善がサマリーに反映
+        assert after.kpi.correctness > before.kpi.correctness
+        assert after.kpi.lead_time_seconds < before.kpi.lead_time_seconds
+        assert after.total_episodes > before.total_episodes
+        assert after.outcomes["success"] > before.outcomes["success"]
+        # 協調品質: rework_rate改善 (50% → 30%)
+        assert after.collaboration.rework_rate < before.collaboration.rework_rate
+
+    def test_failure_class_trend_visible_in_summary(self, calc, store):
+        """EvaluationSummaryのfailure_classes内訳で失敗トレンドが読み取れること
+
+        改善前: TIMEOUT多発
+        改善後: TIMEOUT解消、新種の単発のみ
+        failure_classesの変化から「TIMEOUT対策が効いた」と判断できる。
+        """
+        # Arrange: TIMEOUT多発
+        for i in range(3):
+            self._add(store, f"timeout-{i}", Outcome.FAILURE, failure_class=FailureClass.TIMEOUT)
+        self._add(store, "ok-1", Outcome.SUCCESS)
+
+        before = calc.calculate_evaluation()
+        assert before.failure_classes.get("timeout", 0) == 3
+
+        # Act: TIMEOUT対策後 — 新しいエピソードではTIMEOUT発生なし
+        for i in range(6):
+            self._add(store, f"post-fix-{i}", Outcome.SUCCESS)
+        self._add(store, "new-fail", Outcome.FAILURE, failure_class=FailureClass.ENVIRONMENT_ERROR)
+
+        after = calc.calculate_evaluation()
+
+        # Assert: TIMEOUT件数は変わらず、新種が追加、全体correctnessは改善
+        assert after.failure_classes["timeout"] == 3  # 過去のTIMEOUTは消えない
+        assert after.failure_classes.get("environment_error", 0) == 1  # 新種
+        assert after.kpi.correctness > before.kpi.correctness
