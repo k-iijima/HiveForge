@@ -3,10 +3,11 @@
 Playwright MCP → code-server → 実際のVS Code拡張 → 実際のAPIサーバー
 の完全なE2Eフローでダッシュボードのレンダリングを検証する。
 
-3層の検証:
+4層の検証:
     1. アクセシビリティスナップショット: DOM構造・テキスト要素の存在確認
-    2. VLM視覚評価: スクリーンショットからUI構造・色・レイアウトを評価
-    3. VLM-OCR評価: 描画されたテキストが画像として読めるか検証
+    2. API→表示値整合性: APIレスポンスの値が正しくフォーマットされ表示されているか
+    3. VLM視覚評価: スクリーンショットからUI構造・色・レイアウトを評価
+    4. VLM-OCR評価: 描画されたテキストが画像として読めるか検証
 
 テスト対象をモックせず、実際のhiveMonitorPanel.tsがレンダリングした
 KPI Dashboardを複数の手法で検証する。
@@ -30,8 +31,10 @@ KPI Dashboardを複数の手法で検証する。
 """
 
 import asyncio
+import json
 import os
 import re
+import urllib.request
 
 import pytest
 
@@ -434,6 +437,403 @@ class TestHiveMonitorRealRendering:
 
 
 # ============================================================
+# テストクラス: API → 表示値の整合性検証
+# ============================================================
+
+# HiveForge APIサーバーのURL（devcontainerからアクセス可能）
+HIVEFORGE_API_URL = os.environ.get("HIVEFORGE_API_URL", "http://localhost:8000")
+
+
+def _fetch_kpi_evaluation() -> dict:
+    """HiveForge APIから /kpi/evaluation レスポンスを取得する"""
+    url = f"{HIVEFORGE_API_URL}/kpi/evaluation"
+    req = urllib.request.Request(url, headers={"Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        return json.loads(resp.read().decode())
+
+
+def _pct(v: float | None) -> str:
+    """hiveMonitorPanel.ts の pct() と同一のフォーマット変換
+
+    JS: function pct(v) { return v != null ? (v * 100).toFixed(1) + '%' : '—'; }
+    """
+    if v is None:
+        return "—"
+    return f"{v * 100:.1f}%"
+
+
+def _num(v: float | None, unit: str = "") -> str:
+    """hiveMonitorPanel.ts の num() と同一のフォーマット変換
+
+    JS: function num(v, u) { return v != null ? v.toFixed(1) + (u || '') : '—'; }
+    """
+    if v is None:
+        return "—"
+    return f"{v:.1f}{unit}"
+
+
+@requires_playwright_mcp
+class TestHiveMonitorValueConsistency:
+    """API→表示値の整合性を検証するE2Eテスト群。
+
+    実際の /kpi/evaluation APIレスポンスを取得し、
+    hiveMonitorPanel.ts の pct()/num() 変換ルールを適用した期待値が
+    アクセシビリティスナップショット内に正しく表示されているか検証する。
+
+    これにより「数字が何か表示されている」ではなく
+    「正しい数字が表示されている」ことを保証する。
+    """
+
+    @pytest.fixture(scope="class")
+    def api_data(self):
+        """APIレスポンスのキャッシュ（クラスで1回だけ取得）"""
+        return _fetch_kpi_evaluation()
+
+    # --- メタ情報 ---
+
+    def test_episode_count_matches_api(self, hive_monitor_snapshot, api_data):
+        """episodes数がAPIレスポンスの total_episodes と一致すること
+
+        hiveMonitorPanel.ts:
+            ev.total_episodes + ' episodes / ' + ev.colony_count + ' colonies'
+
+        API値がそのまま文字列として画面に表示されるため、完全一致を検証する。
+        """
+        # Arrange: APIから取得した期待値
+        expected_episodes = api_data["total_episodes"]
+        expected_colonies = api_data["colony_count"]
+        expected_text = f"{expected_episodes} episodes / {expected_colonies} colonies"
+
+        # Act: スナップショットを検索
+        snap = hive_monitor_snapshot
+
+        # Assert: 完全一致
+        assert expected_text in snap, (
+            f"episodes/coloniesカウントがAPIと不一致: expected '{expected_text}' in snapshot"
+        )
+
+    # --- Task Performance メトリクス値の正確性 ---
+
+    def test_correctness_value_matches_api(self, hive_monitor_snapshot, api_data):
+        """Correctnessの表示値がAPI値 × 100 のパーセンテージと一致すること
+
+        API: kpi.correctness = 0.8
+        JS: pct(0.8) = (0.8 * 100).toFixed(1) + '%' = '80.0%'
+        """
+        # Arrange
+        api_value = api_data["kpi"]["correctness"]
+        expected_display = _pct(api_value)
+
+        # Act
+        snap = hive_monitor_snapshot
+        idx = snap.index("Correctness")
+        nearby = snap[idx : idx + 300]
+
+        # Assert: API値から算出した期待値が表示されている
+        assert expected_display in nearby, (
+            f"Correctness表示値がAPIと不一致: "
+            f"API={api_value}, expected='{expected_display}', "
+            f"nearby='{nearby[:150]}'"
+        )
+
+    def test_repeatability_value_matches_api(self, hive_monitor_snapshot, api_data):
+        """Repeatabilityの表示値がAPI値と一致すること
+
+        API: kpi.repeatability = 0.0
+        JS: pct(0.0) = '0.0%'
+        """
+        # Arrange
+        api_value = api_data["kpi"]["repeatability"]
+        expected_display = _pct(api_value)
+
+        # Act
+        snap = hive_monitor_snapshot
+        idx = snap.index("Repeatability")
+        nearby = snap[idx : idx + 300]
+
+        # Assert
+        assert expected_display in nearby, (
+            f"Repeatability表示値がAPIと不一致: "
+            f"API={api_value}, expected='{expected_display}', "
+            f"nearby='{nearby[:150]}'"
+        )
+
+    def test_lead_time_value_matches_api(self, hive_monitor_snapshot, api_data):
+        """Lead Timeの表示値がAPI値の num() フォーマットと一致すること
+
+        API: kpi.lead_time_seconds = 121.59
+        JS: num(121.59, 's') = 121.59.toFixed(1) + 's' = '121.6s'
+        """
+        # Arrange
+        api_value = api_data["kpi"]["lead_time_seconds"]
+        expected_display = _num(api_value, "s")
+
+        # Act
+        snap = hive_monitor_snapshot
+        idx = snap.index("Lead Time")
+        nearby = snap[idx : idx + 300]
+
+        # Assert
+        assert expected_display in nearby, (
+            f"Lead Time表示値がAPIと不一致: "
+            f"API={api_value}, expected='{expected_display}', "
+            f"nearby='{nearby[:150]}'"
+        )
+
+    def test_incident_rate_value_matches_api(self, hive_monitor_snapshot, api_data):
+        """Incident Rateの表示値がAPI値と一致すること
+
+        API: kpi.incident_rate = 0.3
+        JS: pct(0.3) = '30.0%'
+        """
+        # Arrange
+        api_value = api_data["kpi"]["incident_rate"]
+        expected_display = _pct(api_value)
+
+        # Act
+        snap = hive_monitor_snapshot
+        idx = snap.index("Incident Rate")
+        nearby = snap[idx : idx + 300]
+
+        # Assert
+        assert expected_display in nearby, (
+            f"Incident Rate表示値がAPIと不一致: "
+            f"API={api_value}, expected='{expected_display}', "
+            f"nearby='{nearby[:150]}'"
+        )
+
+    def test_recurrence_value_matches_api(self, hive_monitor_snapshot, api_data):
+        """Recurrenceの表示値がAPI値と一致すること
+
+        API: kpi.recurrence_rate = 0.0
+        JS: pct(0.0) = '0.0%'
+        """
+        # Arrange
+        api_value = api_data["kpi"]["recurrence_rate"]
+        expected_display = _pct(api_value)
+
+        # Act
+        snap = hive_monitor_snapshot
+        idx = snap.index("Recurrence")
+        nearby = snap[idx : idx + 300]
+
+        # Assert
+        assert expected_display in nearby, (
+            f"Recurrence表示値がAPIと不一致: "
+            f"API={api_value}, expected='{expected_display}', "
+            f"nearby='{nearby[:150]}'"
+        )
+
+    # --- Collaboration Quality メトリクス値の正確性 ---
+
+    def test_cost_per_task_value_matches_api(self, hive_monitor_snapshot, api_data):
+        """Cost/Taskの表示値がAPI値と一致すること
+
+        API: collaboration.cost_per_task_tokens = 1405.0
+        JS: num(1405.0, ' tok') = '1405.0 tok'
+        """
+        # Arrange
+        api_value = api_data["collaboration"]["cost_per_task_tokens"]
+        expected_display = _num(api_value, " tok")
+
+        # Act
+        snap = hive_monitor_snapshot
+        idx = snap.index("Cost/Task")
+        nearby = snap[idx : idx + 300]
+
+        # Assert
+        assert expected_display in nearby, (
+            f"Cost/Task表示値がAPIと不一致: "
+            f"API={api_value}, expected='{expected_display}', "
+            f"nearby='{nearby[:150]}'"
+        )
+
+    def test_overhead_value_matches_api(self, hive_monitor_snapshot, api_data):
+        """Overheadの表示値がAPI値と一致すること
+
+        API: collaboration.collaboration_overhead = 0.3
+        JS: pct(0.3) = '30.0%'
+        """
+        # Arrange
+        api_value = api_data["collaboration"]["collaboration_overhead"]
+        expected_display = _pct(api_value)
+
+        # Act
+        snap = hive_monitor_snapshot
+        idx = snap.index("Overhead")
+        nearby = snap[idx : idx + 300]
+
+        # Assert
+        assert expected_display in nearby, (
+            f"Overhead表示値がAPIと不一致: "
+            f"API={api_value}, expected='{expected_display}', "
+            f"nearby='{nearby[:150]}'"
+        )
+
+    # --- null値の "—"（emダッシュ）表示検証 ---
+
+    def test_null_rework_rate_shows_em_dash(self, hive_monitor_snapshot, api_data):
+        """null値のRework Rateが "—"（emダッシュ）で表示されること
+
+        API: collaboration.rework_rate = null
+        JS: pct(null) = '—'
+
+        nullの暗黙表示は最も見落としやすいバグの1つ。
+        "null", "NaN", "undefined", "" (空) ではなく "—" であることを検証する。
+        """
+        # Arrange
+        api_value = api_data["collaboration"]["rework_rate"]
+        assert api_value is None, f"テスト前提: rework_rateがnullであること (actual={api_value})"
+
+        # Act
+        snap = hive_monitor_snapshot
+        idx = snap.index("Rework Rate")
+        nearby = snap[idx : idx + 300]
+
+        # Assert: emダッシュ "—" が表示されている
+        assert "—" in nearby, (
+            f"Rework Rate(null)が '—' ではなく他の値で表示されています: nearby='{nearby[:150]}'"
+        )
+        # Assert: "null", "NaN", "undefined" が表示されていないこと
+        for bad_value in ["null", "NaN", "undefined"]:
+            assert bad_value not in nearby, (
+                f"Rework Rateに不正な値 '{bad_value}' が表示されています"
+            )
+
+    def test_null_escalation_shows_em_dash(self, hive_monitor_snapshot, api_data):
+        """null値のEscalationが "—" で表示されること"""
+        # Arrange
+        api_value = api_data["collaboration"]["escalation_ratio"]
+        assert api_value is None, f"テスト前提: escalation_ratioがnull (actual={api_value})"
+
+        # Act
+        snap = hive_monitor_snapshot
+        idx = snap.index("Escalation")
+        nearby = snap[idx : idx + 300]
+
+        # Assert
+        assert "—" in nearby, (
+            f"Escalation(null)が '—' ではなく他の値で表示されています: nearby='{nearby[:150]}'"
+        )
+
+    def test_null_n_proposal_yield_shows_em_dash(self, hive_monitor_snapshot, api_data):
+        """null値のN-Proposal Yieldが "—" で表示されること"""
+        # Arrange
+        api_value = api_data["collaboration"]["n_proposal_yield"]
+        assert api_value is None, f"テスト前提: n_proposal_yieldがnull (actual={api_value})"
+
+        # Act
+        snap = hive_monitor_snapshot
+        idx = snap.index("N-Proposal Yield")
+        nearby = snap[idx : idx + 300]
+
+        # Assert
+        assert "—" in nearby, (
+            f"N-Proposal Yield(null)が '—' ではなく他の値で表示されています: "
+            f"nearby='{nearby[:150]}'"
+        )
+
+    def test_null_gate_accuracy_shows_em_dashes(self, hive_monitor_snapshot, api_data):
+        """Gate Accuracy全メトリクスがnullの場合、全て "—" で表示されること
+
+        API: gate_accuracy の全フィールドが null
+        全5メトリクスが "—" 表示であることを一括検証する。
+        """
+        # Arrange: 全Gate Accuracyフィールドがnullであること
+        gate = api_data["gate_accuracy"]
+        null_fields = [k for k, v in gate.items() if v is None]
+        assert len(null_fields) == 5, (
+            f"テスト前提: gate_accuracyが全nullであること (non-null: "
+            f"{[k for k, v in gate.items() if v is not None]})"
+        )
+
+        # Act
+        snap = hive_monitor_snapshot
+
+        # Assert: Gate Accuracyセクション内に "—" が存在する
+        gate_labels = ["Guard PASS", "Guard COND", "Guard FAIL", "Sentinel Det.", "False Alarm"]
+        for label in gate_labels:
+            if label in snap:
+                idx = snap.index(label)
+                nearby = snap[idx : idx + 300]
+                assert "—" in nearby, (
+                    f"{label}(null)が '—' ではなく他の値で表示されています: nearby='{nearby[:100]}'"
+                )
+
+    # --- Outcome内訳の正確性 ---
+
+    def test_outcomes_match_api(self, hive_monitor_snapshot, api_data):
+        """Outcome内訳（success/failure件数）がAPIと一致すること
+
+        API: outcomes = {"success": 8, "failure": 2}
+        JS: '<span class="kpi-tag success">success: 8</span>'
+        """
+        # Arrange
+        outcomes = api_data.get("outcomes", {})
+
+        # Act
+        snap = hive_monitor_snapshot
+
+        # Assert: 各outcomeのラベルと件数が表示されている
+        for outcome_name, count in outcomes.items():
+            expected_text = f"{outcome_name}: {count}"
+            assert expected_text in snap, (
+                f"Outcome '{expected_text}' がスナップショットに見つかりません"
+            )
+
+    # --- フォーマット整合性の統合テスト ---
+
+    def test_all_non_null_kpi_values_formatted_correctly(self, hive_monitor_snapshot, api_data):
+        """全non-null KPI値がhiveMonitorPanel.tsのフォーマットルールに従うこと
+
+        pct(v): v != null → (v*100).toFixed(1) + '%'
+        num(v, u): v != null → v.toFixed(1) + u
+
+        全KPIメトリクスを一括で検証する統合テスト。
+        """
+        # Arrange: 各メトリクスの期待値マップ
+        expectations = []
+
+        kpi = api_data["kpi"]
+        for label, key, fmt in [
+            ("Correctness", "correctness", "pct"),
+            ("Repeatability", "repeatability", "pct"),
+            ("Incident Rate", "incident_rate", "pct"),
+            ("Recurrence", "recurrence_rate", "pct"),
+        ]:
+            v = kpi.get(key)
+            if v is not None:
+                expectations.append((label, _pct(v)))
+
+        if kpi.get("lead_time_seconds") is not None:
+            expectations.append(("Lead Time", _num(kpi["lead_time_seconds"], "s")))
+
+        collab = api_data["collaboration"]
+        if collab.get("cost_per_task_tokens") is not None:
+            expectations.append(("Cost/Task", _num(collab["cost_per_task_tokens"], " tok")))
+        if collab.get("collaboration_overhead") is not None:
+            expectations.append(("Overhead", _pct(collab["collaboration_overhead"])))
+
+        # Act
+        snap = hive_monitor_snapshot
+
+        # Assert: 全期待値が見つかる
+        mismatches = []
+        for label, expected_value in expectations:
+            if label not in snap:
+                mismatches.append(f"{label}: ラベルが見つからない")
+                continue
+            idx = snap.index(label)
+            nearby = snap[idx : idx + 300]
+            if expected_value not in nearby:
+                mismatches.append(f"{label}: expected='{expected_value}', nearby='{nearby[:100]}'")
+
+        assert not mismatches, f"API→表示値の不一致が{len(mismatches)}件:\n" + "\n".join(
+            f"  - {m}" for m in mismatches
+        )
+
+
+# ============================================================
 # テストクラス: VLM視覚評価（スクリーンショット画像ベース）
 # ============================================================
 
@@ -597,6 +997,84 @@ class TestHiveMonitorVLMVisualEval:
             )
         )
         assert result.success, f"VLMがダークテーマを認識できませんでした:\n{result}"
+
+    def test_vlm_gauge_color_green_for_high_correctness(self, event_loop, hive_monitor_screenshot):
+        """VLMがCorrectnessゲージで緑色を認識できること
+
+        API: correctness=0.8 → gaugeColor(0.8, false): v>=0.8 → #4caf50 (green)
+        高いCorrectnessは緑色で表示されるはず。
+        """
+        from tests.e2e.vlm_visual_evaluator import vlm_evaluate
+
+        result = event_loop.run_until_complete(
+            vlm_evaluate(
+                hive_monitor_screenshot,
+                prompt=(
+                    "Look at the gauge bar next to 'Correctness' in this dashboard. "
+                    "What color is the bar? Is it green, orange/yellow, or red? "
+                    "Also look at the color of the percentage value text."
+                ),
+                expected_keywords=["green"],
+                min_keywords=1,
+                retries=3,
+            )
+        )
+        assert result.success, f"VLMがCorrectness(0.8)の緑ゲージを認識できませんでした:\n{result}"
+
+    def test_vlm_gauge_color_red_for_low_repeatability(self, event_loop, hive_monitor_screenshot):
+        """VLMがRepeatabilityゲージで赤色を認識できること
+
+        API: repeatability=0.0 → gaugeColor(0.0, false): v<0.5 → #f44336 (red)
+        低いRepeatabilityは赤色で表示されるはず。
+        """
+        from tests.e2e.vlm_visual_evaluator import vlm_evaluate
+
+        result = event_loop.run_until_complete(
+            vlm_evaluate(
+                hive_monitor_screenshot,
+                prompt=(
+                    "Look at the gauge bar next to 'Repeatability' in this dashboard. "
+                    "What color is the bar or the value text? "
+                    "Is it green, orange/yellow, or red? "
+                    "The value should be 0.0% and likely shown in red."
+                ),
+                expected_keywords=["red"],
+                min_keywords=1,
+                retries=3,
+            )
+        )
+        assert result.success, f"VLMがRepeatability(0.0)の赤ゲージを認識できませんでした:\n{result}"
+
+    def test_vlm_gauge_multiple_colors_present(self, event_loop, hive_monitor_screenshot):
+        """VLMがダッシュボード内の複数色（緑・橙・赤）を認識できること
+
+        gaugeColor計算により:
+        - correctness=0.8: 緑 (#4caf50)
+        - lead_time norm=0.405 inverted=0.595: 橙 (#ff9800)
+        - repeatability=0.0: 赤 (#f44336)
+        少なくとも2色以上が使い分けられていることを検証する。
+        """
+        from tests.e2e.vlm_visual_evaluator import vlm_evaluate
+
+        result = event_loop.run_until_complete(
+            vlm_evaluate(
+                hive_monitor_screenshot,
+                prompt=(
+                    "This KPI dashboard uses color-coded gauge bars to indicate status: "
+                    "green for good (>=80%), orange/yellow for medium (50-79%), "
+                    "and red for poor (<50%). "
+                    "How many different colors of gauge bars or metric values "
+                    "can you see in this dashboard? "
+                    "List each color you observe (green, orange, red, gray, etc)."
+                ),
+                expected_keywords=["green", "orange", "red", "gray"],
+                min_keywords=2,
+                retries=3,
+            )
+        )
+        assert result.success, (
+            f"VLMがゲージの色分けを認識できませんでした (found: {result.keywords_found}):\n{result}"
+        )
 
 
 # ============================================================
@@ -780,3 +1258,66 @@ class TestHiveMonitorVLMOCR:
             f"メトリクスラベルの可読性が不十分です "
             f"(found {len(result.keywords_found)}/{len(all_labels)}):\n{result}"
         )
+
+    def test_ocr_correctness_exact_value(self, event_loop, hive_monitor_screenshot):
+        """OCR: Correctnessの正確な値 "80.0%" が画像から読み取れること
+
+        アクセシビリティスナップショットではDOMに値があるが、
+        VLM-OCRで実際に "80.0%" がレンダリング画像として見えるかを確認する。
+        DOM値と画面表示のズレ（CSS/フォント問題）を検出する。
+        """
+        from tests.e2e.vlm_visual_evaluator import vlm_evaluate
+
+        result = event_loop.run_until_complete(
+            vlm_evaluate(
+                hive_monitor_screenshot,
+                prompt=(
+                    "Read the exact percentage value shown next to 'Correctness'. "
+                    "What is the exact number? Is it 80.0%? "
+                    "Please report the precise value you see."
+                ),
+                expected_keywords=["80"],
+                min_keywords=1,
+                retries=3,
+            )
+        )
+        assert result.success, f"OCRでCorrectness値 '80.0%' が読み取れませんでした:\n{result}"
+
+    def test_ocr_lead_time_exact_value(self, event_loop, hive_monitor_screenshot):
+        """OCR: Lead Timeの正確な値 "121.6s" が画像から読み取れること"""
+        from tests.e2e.vlm_visual_evaluator import vlm_evaluate
+
+        result = event_loop.run_until_complete(
+            vlm_evaluate(
+                hive_monitor_screenshot,
+                prompt=(
+                    "Read the exact time value shown next to 'Lead Time'. "
+                    "What is the exact number with its unit? Is it 121.6s? "
+                    "Please report the precise value you see."
+                ),
+                expected_keywords=["121"],
+                min_keywords=1,
+                retries=3,
+            )
+        )
+        assert result.success, f"OCRでLead Time値 '121.6s' が読み取れませんでした:\n{result}"
+
+    def test_ocr_outcome_counts(self, event_loop, hive_monitor_screenshot):
+        """OCR: Outcome件数 "success: 8" と "failure: 2" が画像から読めること"""
+        from tests.e2e.vlm_visual_evaluator import vlm_evaluate
+
+        result = event_loop.run_until_complete(
+            vlm_evaluate(
+                hive_monitor_screenshot,
+                prompt=(
+                    "In the Outcomes section of this dashboard, "
+                    "read the exact counts for success and failure. "
+                    "What numbers are shown for 'success' and 'failure'? "
+                    "For example, is it 'success: 8' and 'failure: 2'?"
+                ),
+                expected_keywords=["success", "8", "failure", "2"],
+                min_keywords=2,
+                retries=3,
+            )
+        )
+        assert result.success, f"OCRでOutcome件数が読み取れませんでした:\n{result}"

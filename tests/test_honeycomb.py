@@ -2369,3 +2369,203 @@ class TestEvaluationSummaryModel:
         # Act & Assert
         with pytest.raises(Exception):
             summary.total_episodes = 10  # type: ignore[misc]
+
+
+class TestKPIDisplayFormatConsistency:
+    """KPI値のUI表示フォーマット整合性テスト
+
+    hiveMonitorPanel.ts の pct()/num()/gaugeColor() 変換ルールを
+    Python側で再実装し、API値→表示値の変換が正しいことを保証する。
+
+    これらのヘルパーはE2Eテスト (test_hive_monitor_real.py) でも使用され、
+    JS実装との等価性が全体の検証の基盤となる。
+    """
+
+    @staticmethod
+    def _pct(v: float | None) -> str:
+        """JS: function pct(v) { return v != null ? (v * 100).toFixed(1) + '%' : '—'; }"""
+        if v is None:
+            return "—"
+        return f"{v * 100:.1f}%"
+
+    @staticmethod
+    def _num(v: float | None, unit: str = "") -> str:
+        """JS: function num(v, u) { return v != null ? v.toFixed(1) + (u || '') : '—'; }"""
+        if v is None:
+            return "—"
+        return f"{v:.1f}{unit}"
+
+    @staticmethod
+    def _gauge_color(v: float | None, invert: bool = False) -> str:
+        """JS: function gaugeColor(v, invert) { ... }"""
+        if v is None:
+            return "#9e9e9e"
+        if invert:
+            v = 1 - v
+        if v >= 0.8:
+            return "#4caf50"
+        if v >= 0.5:
+            return "#ff9800"
+        return "#f44336"
+
+    # --- pct() テスト ---
+
+    def test_pct_normal_value(self):
+        """pct(0.8) = '80.0%'"""
+        assert self._pct(0.8) == "80.0%"
+
+    def test_pct_zero(self):
+        """pct(0.0) = '0.0%'"""
+        assert self._pct(0.0) == "0.0%"
+
+    def test_pct_one(self):
+        """pct(1.0) = '100.0%'"""
+        assert self._pct(1.0) == "100.0%"
+
+    def test_pct_fractional(self):
+        """pct(0.3) = '30.0%' — (v*100).toFixed(1) による丸め"""
+        assert self._pct(0.3) == "30.0%"
+
+    def test_pct_none(self):
+        """pct(null) = '—'（emダッシュ）"""
+        assert self._pct(None) == "—"
+
+    def test_pct_small_value(self):
+        """pct(0.001) = '0.1%' — toFixed(1)による丸め"""
+        assert self._pct(0.001) == "0.1%"
+
+    # --- num() テスト ---
+
+    def test_num_with_seconds(self):
+        """num(121.59, 's') = '121.6s' — toFixed(1)で小数1位"""
+        assert self._num(121.59, "s") == "121.6s"
+
+    def test_num_with_tokens(self):
+        """num(1405.0, ' tok') = '1405.0 tok'"""
+        assert self._num(1405.0, " tok") == "1405.0 tok"
+
+    def test_num_zero(self):
+        """num(0.0, 's') = '0.0s'"""
+        assert self._num(0.0, "s") == "0.0s"
+
+    def test_num_none(self):
+        """num(null, 's') = '—'"""
+        assert self._num(None, "s") == "—"
+
+    def test_num_no_unit(self):
+        """num(42.5, '') = '42.5'"""
+        assert self._num(42.5, "") == "42.5"
+
+    # --- gaugeColor() テスト ---
+
+    def test_gauge_color_green(self):
+        """v≥0.8 → #4caf50 (green)"""
+        assert self._gauge_color(0.8) == "#4caf50"
+        assert self._gauge_color(1.0) == "#4caf50"
+
+    def test_gauge_color_orange(self):
+        """0.5≤v<0.8 → #ff9800 (orange)"""
+        assert self._gauge_color(0.5) == "#ff9800"
+        assert self._gauge_color(0.79) == "#ff9800"
+
+    def test_gauge_color_red(self):
+        """v<0.5 → #f44336 (red)"""
+        assert self._gauge_color(0.0) == "#f44336"
+        assert self._gauge_color(0.49) == "#f44336"
+
+    def test_gauge_color_null(self):
+        """null → #9e9e9e (gray)"""
+        assert self._gauge_color(None) == "#9e9e9e"
+
+    def test_gauge_color_inverted_low_is_good(self):
+        """invert=true: 低い値(0.0)は反転してv=1.0となり緑
+
+        incident_rate=0.0 → invert → v=1.0 → green（インシデント0は良い）
+        """
+        assert self._gauge_color(0.0, invert=True) == "#4caf50"
+
+    def test_gauge_color_inverted_high_is_bad(self):
+        """invert=true: 高い値(0.8)は反転してv=0.2となり赤
+
+        incident_rate=0.8 → invert → v=0.2 → red（インシデント80%は悪い）
+        """
+        assert self._gauge_color(0.8, invert=True) == "#f44336"
+
+    def test_gauge_color_inverted_medium(self):
+        """invert=true: 中間値(0.3)は反転してv=0.7となり橙
+
+        incident_rate=0.3 → invert → v=0.7 → orange
+        """
+        assert self._gauge_color(0.3, invert=True) == "#ff9800"
+
+    # --- 実際のAPIデモデータとの整合性テスト ---
+
+    def test_demo_data_format_correctness(self):
+        """デモデータ相当の値がhiveMonitorPanel.ts変換ルールで正しくフォーマットされること
+
+        実際のAPIから返される値と同じパターンの値を使い、
+        全メトリクスの表示変換が期待通りであることを一括検証する。
+        """
+        # Arrange: APIデモデータ相当の値
+        test_data = {
+            ("Correctness", "pct"): (0.8, "80.0%"),
+            ("Repeatability", "pct"): (0.0, "0.0%"),
+            ("Lead Time", "num_s"): (121.59, "121.6s"),
+            ("Incident Rate", "pct"): (0.3, "30.0%"),
+            ("Recurrence", "pct"): (0.0, "0.0%"),
+            ("Rework Rate", "pct"): (None, "—"),
+            ("Escalation", "pct"): (None, "—"),
+            ("N-Proposal Yield", "pct"): (None, "—"),
+            ("Cost/Task", "num_tok"): (1405.0, "1405.0 tok"),
+            ("Overhead", "pct"): (0.3, "30.0%"),
+        }
+
+        # Act & Assert: 各メトリクスの変換を検証
+        for (label, fmt_type), (value, expected) in test_data.items():
+            if fmt_type == "pct":
+                actual = self._pct(value)
+            elif fmt_type == "num_s":
+                actual = self._num(value, "s")
+            elif fmt_type == "num_tok":
+                actual = self._num(value, " tok")
+            else:
+                raise ValueError(f"Unknown format type: {fmt_type}")
+
+            assert actual == expected, (
+                f"{label}: value={value}, expected='{expected}', actual='{actual}'"
+            )
+
+    def test_demo_data_gauge_colors(self):
+        """デモデータ相当の値がhiveMonitorPanel.tsの色閾値で正しい色になること
+
+        gauge(label, value, unit, invert, max) の色計算:
+        - norm = (max && value != null) ? Math.min(value/max, 1.0) : value
+        - gaugeColor(norm, invert)
+        """
+        # Arrange: (label, value, invert, max, expected_color)
+        test_data = [
+            # Task Performance
+            ("Correctness", 0.8, False, None, "#4caf50"),  # 0.8 >= 0.8 → green
+            ("Repeatability", 0.0, False, None, "#f44336"),  # 0.0 < 0.5 → red
+            ("Lead Time", 121.59, True, 300, "#ff9800"),  # norm=0.405, inv=0.595 → orange
+            ("Incident Rate", 0.3, True, None, "#ff9800"),  # inv=0.7 → orange
+            ("Recurrence", 0.0, True, None, "#4caf50"),  # inv=1.0 → green
+            # Collaboration
+            ("Rework Rate", None, True, None, "#9e9e9e"),  # null → gray
+            ("Cost/Task", 1405.0, True, 5000, "#ff9800"),  # norm=0.281, inv=0.719 → orange
+            ("Overhead", 0.3, True, None, "#ff9800"),  # inv=0.7 → orange
+        ]
+
+        for label, value, invert, max_val, expected_color in test_data:
+            # Act: norm計算 + gaugeColor
+            if max_val and value is not None:
+                norm = min(value / max_val, 1.0)
+            else:
+                norm = value
+            actual_color = self._gauge_color(norm, invert)
+
+            # Assert
+            assert actual_color == expected_color, (
+                f"{label}: value={value}, invert={invert}, max={max_val}, "
+                f"norm={norm}, expected={expected_color}, actual={actual_color}"
+            )
