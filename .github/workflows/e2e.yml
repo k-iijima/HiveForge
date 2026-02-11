@@ -11,9 +11,9 @@
 # 3 層構成:
 #   L1: API フローテスト（外部依存なし、FastAPI TestClient のみ）
 #   L2: LLM エージェントチェーンテスト（OpenAI API, 最大~30呼出）
-#   L3: VLM ビジュアルテスト（Anthropic Claude Vision）※将来対応
+#   L3: VLM ビジュアルテスト（Anthropic Claude Vision + Playwright MCP）
 #
-# コスト目安: ~$0.05-0.10/実行, ~$2-4/月（週5マージ想定）
+# コスト目安: ~$0.10-0.20/実行, ~$4-8/月（週5マージ想定）
 
 name: E2E Tests
 
@@ -105,38 +105,42 @@ jobs:
           echo "::warning::LLM E2E tests failed — this may be due to non-deterministic LLM responses. Review test output."
 
   # =================================================================
-  # L3: VLM ビジュアルテスト（将来対応 — Playwright MCP + Anthropic Vision）
+  # L3: VLM ビジュアルテスト（Playwright MCP + Anthropic Vision）
   # =================================================================
-  # 現時点では Playwright MCP + code-server のセットアップが
-  # GitHub Actions では重いため、コメントアウト。
-  # docker-compose での統合が整った段階で有効化する。
-  #
-  # e2e-vlm:
-  #   name: "E2E L3: VLM Visual"
-  #   runs-on: ubuntu-latest
-  #   timeout-minutes: 20
-  #   needs: [e2e-api]
-  #   continue-on-error: true
-  #
-  #   services:
-  #     playwright-mcp:
-  #       image: ghcr.io/anthropics/playwright-mcp:latest
-  #       ports:
-  #         - 8931:8931
-  #
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-python@v5
-  #       with:
-  #         python-version: ${{ env.PYTHON_VERSION }}
-  #         cache: "pip"
-  #     - run: pip install -e ".[dev]"
-  #     - name: Run L3 E2E tests (VLM visual)
-  #       env:
-  #         VLM_PROVIDER: "anthropic"
-  #         ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-  #         PLAYWRIGHT_MCP_URL: "http://localhost:8931"
-  #       run: |
-  #         pytest tests/e2e/test_kpi_dashboard_visual.py \
-  #           -v --tb=short -m e2e \
-  #           --timeout=180
+  e2e-vlm:
+    name: "E2E L3: VLM Visual"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [e2e-api]
+    # VLM テストは非決定的なので失敗しても全体を止めない
+    continue-on-error: true
+
+    services:
+      playwright-mcp:
+        image: ghcr.io/anthropics/playwright-mcp:latest
+        ports:
+          - 8931:8931
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: Run L3 E2E tests (VLM visual)
+        env:
+          VLM_PROVIDER: "anthropic"
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PLAYWRIGHT_MCP_URL: "http://localhost:8931"
+        run: |
+          pytest tests/e2e/test_kpi_dashboard_visual.py \
+            -v --tb=short -m e2e \
+            --timeout=180
+      - name: Annotate on VLM test failure
+        if: failure()
+        run: |
+          echo "::warning::VLM E2E tests failed — this may be due to non-deterministic VLM responses or Playwright MCP issues."
