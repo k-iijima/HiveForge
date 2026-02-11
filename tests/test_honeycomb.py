@@ -1856,7 +1856,7 @@ class TestCollaborationMetrics:
     """協調品質メトリクスのテスト
 
     MoA (Wang et al., 2024) の協調効率メトリクスを参考に、
-    ColonyForge固有のRework Rate, Escalation Ratio, N案歩留まり等を検証。
+    HiveForge固有のRework Rate, Escalation Ratio, N案歩留まり等を検証。
     """
 
     @pytest.fixture
@@ -2562,10 +2562,7 @@ class TestKPIDisplayFormatConsistency:
 
         for label, value, invert, max_val, expected_color in test_data:
             # Act: norm計算 + gaugeColor
-            if max_val and value is not None:
-                norm = min(value / max_val, 1.0)
-            else:
-                norm = value
+            norm = min(value / max_val, 1.0) if max_val and value is not None else value
             actual_color = self._gauge_color(norm, invert)
 
             # Assert

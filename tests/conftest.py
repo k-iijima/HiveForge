@@ -19,7 +19,7 @@ def temp_vault():
 @pytest.fixture
 def mock_settings(temp_vault, monkeypatch):
     """テスト用の設定"""
-    from colonyforge.core.config import HiveConfig, ColonyForgeSettings
+    from colonyforge.core.config import ColonyForgeSettings, HiveConfig
 
     settings = ColonyForgeSettings(hive=HiveConfig(name="test-hive", vault_path=str(temp_vault)))
 

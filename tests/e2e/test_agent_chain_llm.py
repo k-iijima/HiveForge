@@ -411,7 +411,7 @@ class TestFullAgentChainOllama:
         from colonyforge.beekeeper.server import BeekeeperMCPServer
 
         # Arrange: グローバル設定をOllamaに差し替え
-        from colonyforge.core.config import HiveConfig, ColonyForgeSettings
+        from colonyforge.core.config import ColonyForgeSettings, HiveConfig
 
         settings = ColonyForgeSettings(
             hive=HiveConfig(name="e2e-hive", vault_path=str(ar.vault_path)),

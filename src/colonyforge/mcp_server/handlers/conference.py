@@ -21,7 +21,9 @@ if TYPE_CHECKING:
 class ConferenceHandlers(BaseHandler):
     """Conference関連のMCPハンドラー"""
 
-    def __init__(self, server: ColonyForgeMCPServer, conference_store: ConferenceStore | None = None):
+    def __init__(
+        self, server: ColonyForgeMCPServer, conference_store: ConferenceStore | None = None
+    ):
         """初期化
 
         Args:

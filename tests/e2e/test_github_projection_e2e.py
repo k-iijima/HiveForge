@@ -268,7 +268,7 @@ class TestGitHubProjectionE2E:
         """エージェントチェーンがリポジトリ作成→アプリ開発→pushし、
         GitHub Projectionが Issue で進捗を追跡する"""
         from colonyforge.beekeeper.server import BeekeeperMCPServer
-        from colonyforge.core.config import HiveConfig, ColonyForgeSettings
+        from colonyforge.core.config import ColonyForgeSettings, HiveConfig
 
         # ---------------------------------------------------------------
         # Arrange

@@ -7,13 +7,10 @@ HTMLレポートを生成する。
 生成先: test_results/e2e_report/index.html
 """
 
-import base64
 import json
 import shutil
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-
-import pytest
 
 # レポート出力先
 REPORT_DIR = Path(__file__).parent.parent.parent / "test_results" / "e2e_report"
@@ -82,7 +79,7 @@ def pytest_sessionfinish(session, exitstatus):
 def _generate_json_report(results: list, path: Path):
     """JSON形式の結果ファイルを出力"""
     report = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "total": len(results),
         "passed": sum(1 for r in results if r["outcome"] == "passed"),
         "failed": sum(1 for r in results if r["outcome"] == "failed"),
@@ -94,7 +91,7 @@ def _generate_json_report(results: list, path: Path):
 
 def _generate_html_report(results: list, path: Path):
     """E2Eテスト結果のHTMLレポートを生成"""
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
     passed = sum(1 for r in results if r["outcome"] == "passed")
     failed = sum(1 for r in results if r["outcome"] == "failed")
     skipped = sum(1 for r in results if r["outcome"] == "skipped")
