@@ -301,13 +301,19 @@ hiveforge/
 │   ├── models.py         # WaggleDanceSchema等
 │   ├── validator.py      # Pydanticスキーマ検証
 │   └── recorder.py       # ARイベント記録
+├── prompts/               # プロンプト集約パッケージ（英語化済み）
+│   ├── __init__.py       # 公開API（全定数・クラス再エクスポート）
+│   ├── agents.py         # エージェント別システムプロンプト
+│   ├── task_decomposition.py # タスク分解プロンプト
+│   ├── vlm.py            # VLMプロンプト + フォーマットヘルパー
+│   ├── loader.py         # PromptLoader, PromptTemplate, *Config
+│   └── defaults/         # デフォルトプロンプトYAML
 ├── llm/                   # LLM統合（coreに依存、LiteLLM SDK経由）
 │   ├── client.py         # LLMクライアント（LiteLLM acompletion）
 │   ├── runner.py         # AgentRunner
 │   ├── tools.py          # LLMツール
-│   ├── prompts.py        # プロンプト取得
-│   ├── prompt_config.py  # プロンプト設定スキーマ
-│   └── default_prompts/  # デフォルトプロンプトYAML
+│   ├── prompts.py        # 後方互換re-exportシム（→ prompts.agents）
+│   └── prompt_config.py  # 後方互換re-exportシム（→ prompts.loader）
 ├── agent_ui/              # Agent UI MCPサーバー
 │   ├── server.py         # サーバー本体
 │   ├── session.py        # ブラウザセッション管理
@@ -882,13 +888,19 @@ HiveForge/
 │   │   ├── models.py        # WaggleDanceSchema等
 │   │   ├── validator.py     # Pydanticスキーマ検証
 │   │   └── recorder.py      # ARイベント記録
+│   ├── prompts/             # プロンプト集約パッケージ（英語化済み）
+│   │   ├── __init__.py      # 公開API（全定数・クラス再エクスポート）
+│   │   ├── agents.py        # エージェント別システムプロンプト
+│   │   ├── task_decomposition.py # タスク分解プロンプト
+│   │   ├── vlm.py           # VLMプロンプト + フォーマットヘルパー
+│   │   ├── loader.py        # PromptLoader, PromptTemplate, *Config
+│   │   └── defaults/        # デフォルトプロンプトYAML
 │   ├── llm/                 # LLM統合（LiteLLM SDK経由）
 │   │   ├── client.py        # LLMクライアント（LiteLLM acompletion）
 │   │   ├── runner.py        # AgentRunner
 │   │   ├── tools.py         # LLMツール
-│   │   ├── prompts.py       # プロンプト取得
-│   │   ├── prompt_config.py # プロンプト設定スキーマ
-│   │   └── default_prompts/ # デフォルトプロンプトYAML
+│   │   ├── prompts.py       # 後方互換re-exportシム（→ prompts.agents）
+│   │   └── prompt_config.py # 後方互換re-exportシム（→ prompts.loader）
 │   ├── agent_ui/            # Agent UI MCPサーバー
 │   │   ├── server.py        # サーバー本体
 │   │   ├── session.py       # ブラウザセッション管理

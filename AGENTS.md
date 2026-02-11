@@ -266,7 +266,14 @@ src/hiveforge/
 ├── referee_bee/    # Referee Bee（N案採点・生存選抜）
 ├── scout_bee/      # Scout Bee（編成最適化）
 ├── waggle_dance/   # Waggle Dance（I/O構造化検証）
-├── llm/            # LLM統合（AgentRunner, プロンプト管理）
+├── prompts/        # プロンプト集約パッケージ（英語化済み）
+│   ├── agents.py         # エージェント別システムプロンプト
+│   ├── task_decomposition.py # タスク分解プロンプト
+│   ├── vlm.py            # VLMプロンプト
+│   ├── loader.py         # PromptLoader, *Config
+│   └── defaults/         # デフォルトプロンプトYAML
+├── llm/            # LLM統合（AgentRunner, LLMクライアント）
+│                   # ※ prompts.py / prompt_config.py は後方互換re-exportシム
 ├── agent_ui/       # Agent UI MCPサーバー
 ├── vlm/            # VLM（画像解析）
 ├── vlm_tester/     # VLM Tester（E2Eテスト支援）

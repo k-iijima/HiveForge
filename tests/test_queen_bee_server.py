@@ -510,7 +510,6 @@ class TestExecuteDirectOrchestrator:
         """
         from unittest.mock import AsyncMock
 
-
         # Arrange: 2つの独立タスクを返す
         queen_bee.add_worker("worker-1")
         queen_bee.add_worker("worker-2")

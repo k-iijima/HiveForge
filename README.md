@@ -102,7 +102,7 @@ code hiveforge
 
 GPUの有無は自動検出：
 - **GPU搭載**: NVIDIA GPU対応のOllamaが自動起動、VLM機能が利用可能
-- **GPUなし**: CPU版Ollamaにフォールバック
+- **GPUなし**: CPU版Ollamaで動作（VLM機能は低速）
 
 ### ローカルインストール
 
@@ -155,10 +155,13 @@ hiveforge serve
 src/hiveforge/
 ├── core/              # コア基盤（イベント、AR、状態機械）
 │   ├── events/        #   95 EventType (パッケージ化済)
+│   ├── models/        #   ドメインモデル (ActionClass等)
 │   ├── ar/            #   Akashic Record (JSONL永続化)
 │   ├── state/         #   5状態機械
 │   ├── honeycomb/     #   実行履歴・学習基盤 (M3-1)
-│   └── swarming/      #   Swarming Protocol (M3-2)
+│   ├── swarming/      #   Swarming Protocol (M3-2)
+│   ├── intervention/  #   介入・エスカレーション永続化
+│   └── github/        #   GitHub Projection (PR/Issue同期)
 ├── api/               # REST API (FastAPI)
 ├── mcp_server/        # MCP Server
 ├── beekeeper/         # Beekeeper層
@@ -170,7 +173,8 @@ src/hiveforge/
 ├── referee_bee/       # Referee Bee（多面的採点・選抜, M3-5）
 ├── scout_bee/         # Scout Bee（編成最適化, M3-8）
 ├── waggle_dance/      # Waggle Dance（I/O検証, M3-7）
-├── llm/               # LLM統合（AgentRunner, プロンプト管理）
+├── prompts/           # プロンプト集約パッケージ（英語化済み）
+├── llm/               # LLM統合（AgentRunner, LLMクライアント）
 ├── agent_ui/          # Agent UI MCPサーバー
 ├── vlm/               # VLM（画像解析）
 ├── vlm_tester/        # E2Eテスト支援
