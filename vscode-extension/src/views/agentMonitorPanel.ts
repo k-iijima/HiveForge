@@ -1,6 +1,6 @@
 /**
  * Agent Monitor Webview Panel
- * 
+ *
  * Hive → Colony → Queen Bee → Worker Bee のやり取りを可視化。
  * 左ペイン: エージェント階層ツリー（アクティブ/アイドル表示）
  * 右ペイン: アクティビティログ（LLM/MCP/メッセージのリアルタイム表示）

@@ -1,6 +1,6 @@
 /**
  * Dashboard Webview Panel
- * 
+ *
  * 選択中のRunの概要情報を表示するダッシュボード
  */
 

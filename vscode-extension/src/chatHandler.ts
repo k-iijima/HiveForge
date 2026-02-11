@@ -1,6 +1,6 @@
 /**
  * ColonyForge Chat Participant Handler
- * 
+ *
  * @colonyforge メンション経由でBeekeeperに直結する。
  * ユーザーのメッセージをMCPサーバー(Beekeeper)のsend_messageツールに転送し、
  * 応答をCopilot Chatのストリームに流す。

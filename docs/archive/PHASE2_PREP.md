@@ -77,7 +77,7 @@ Phase 1が完了し、Phase 2（Worker Bee本格導入）に向けた準備を�
 | C: 外部サービス | Worker BeeをAPIサーバー化 | スケーラブル | 複雑性増加 |
 | D: MCPサブプロセス | MCPサーバーとして起動 | 既存基盤活用 | MCP制約 |
 
-**推奨**: D (MCPサブプロセス) 
+**推奨**: D (MCPサブプロセス)
 - 既存のMCP Server基盤を再利用
 - Copilotとの連携が自然
 - stdio/SSE両対応可能

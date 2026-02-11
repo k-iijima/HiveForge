@@ -487,7 +487,7 @@ Queen Bee ──assign──▶ Worker Bee ──execute──▶ Run
 ```python
 class BaseEvent(BaseModel):
     model_config = {"frozen": True}  # イミュータブル
-    
+
     id: str                    # ULID形式のイベントID
     type: EventType            # イベント種別
     timestamp: datetime        # 発生時刻（UTC）
@@ -498,7 +498,7 @@ class BaseEvent(BaseModel):
     payload: dict[str, Any]    # イベントペイロード
     prev_hash: str | None      # 前イベントのハッシュ（チェーン用）
     parents: list[str]         # 親イベントのID（因果リンク用）
-    
+
     @computed_field
     def hash(self) -> str:     # JCS正規化 + SHA-256
         ...

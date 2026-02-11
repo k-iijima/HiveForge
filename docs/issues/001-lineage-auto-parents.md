@@ -64,7 +64,7 @@ def _get_task_created_event_id(self, run_id: str, task_id: str) -> str | None:
 async def _handle_create_task(self, args: dict[str, Any]) -> dict[str, Any]:
     # ...
     run_started_id = self._get_run_started_event_id(self._current_run_id)
-    
+
     event = TaskCreatedEvent(
         run_id=self._current_run_id,
         task_id=task_id,

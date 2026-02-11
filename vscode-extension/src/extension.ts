@@ -1,6 +1,6 @@
 /**
  * ColonyForge VS Code Extension
- * 
+ *
  * エントリポイント - 初期化と設定管理のみを担当
  */
 

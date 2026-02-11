@@ -1,6 +1,6 @@
 /**
  * vscode モジュールのテストシム
- * 
+ *
  * VS Code拡張テスト実行時に `require('vscode')` を
  * vscode-mock.ts のモックに差し替える。
  * mocha --require out/test/vscode-shim.js で使用する。

@@ -1,12 +1,12 @@
 /**
  * Hive Monitor Webview Panel
- * 
+ *
  * Beekeeperが管理する複数のHive/Colonyの分布をツリーグラフ状に可視化。
  * - Beekeeper（外部統括者）が最上部
  * - 複数のHive（プロジェクト）が分岐
  * - 各Hive内にColony群（専門領域）
  * - 各Colony内にQueen Bee + Worker Bee群
- * 
+ *
  * リアルタイム更新:
  * - postMessage による差分更新（フリッカーなし）
  * - エージェントの活動タイプ別アニメーション（LLM, MCP呼出等）

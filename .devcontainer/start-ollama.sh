@@ -19,19 +19,19 @@ detect_gpu() {
         echo "  → COLONYFORGE_GPU=nvidia が設定されています"
         return 0
     fi
-    
+
     # nvidia-smi が利用可能かチェック（Ubuntu WSL Docker の場合）
     if docker run --rm --gpus all nvidia/cuda:12.0.0-base-ubuntu22.04 true &>/dev/null 2>&1; then
         echo "  → docker --gpus オプションが利用可能"
         return 0
     fi
-    
+
     # docker info で nvidia ランタイムを確認
     if docker info 2>/dev/null | grep -qi "nvidia"; then
         echo "  → docker info で nvidia ランタイムを検出"
         return 0
     fi
-    
+
     echo "  → GPU未検出（COLONYFORGE_GPU=nvidia で強制可能）"
     return 1
 }

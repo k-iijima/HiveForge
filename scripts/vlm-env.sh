@@ -22,13 +22,13 @@ detect_gpu() {
         echo "nvidia"
         return 0
     fi
-    
+
     # Docker内からホストのGPUをチェック
     if $DOCKER_CMD run --rm --gpus all nvidia/cuda:12.0-base nvidia-smi &>/dev/null 2>&1; then
         echo "nvidia"
         return 0
     fi
-    
+
     echo "cpu"
     return 0
 }
@@ -56,12 +56,12 @@ case "$ACTION" in
     setup)
         echo "📦 VLM環境をセットアップ中..."
         $COMPOSE_CMD -f $COMPOSE_FILE up -d
-        
+
         echo ""
         echo "🦙 LLaVAモデルをダウンロード中（初回のみ数分かかります）..."
         sleep 5
         $DOCKER_CMD exec colonyforge-ollama ollama pull llava:7b
-        
+
         echo ""
         echo "✅ セットアップ完了!"
         echo ""
@@ -74,7 +74,7 @@ case "$ACTION" in
         echo "  analyzer = LocalVLMAnalyzer()"
         echo "  result = await analyzer.analyze('screenshot.png')"
         ;;
-        
+
     start)
         echo "🚀 VLM環境を起動中..."
         $COMPOSE_CMD -f $COMPOSE_FILE up -d
@@ -83,21 +83,21 @@ case "$ACTION" in
         echo "  code-server: http://localhost:8080"
         echo "  Ollama API:  http://localhost:11434"
         ;;
-        
+
     stop)
         echo "🛑 VLM環境を停止中..."
         $COMPOSE_CMD -f $COMPOSE_FILE down
         echo "✅ 停止完了"
         ;;
-        
+
     status)
         echo "📊 コンテナ状態:"
         $DOCKER_CMD ps --filter "name=colonyforge-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-        
+
         echo ""
         echo "🦙 Ollamaモデル:"
         $DOCKER_CMD exec colonyforge-ollama ollama list 2>/dev/null || echo "  (Ollamaが起動していません)"
-        
+
         echo ""
         echo "🎮 GPU状態:"
         if [ "$GPU_TYPE" = "nvidia" ]; then
@@ -106,7 +106,7 @@ case "$ACTION" in
             echo "  CPUモードで動作中"
         fi
         ;;
-        
+
     test)
         echo "🧪 VLM解析テストを実行中..."
         python -c "
@@ -115,23 +115,23 @@ from colonyforge.vlm import LocalVLMAnalyzer
 
 async def test():
     analyzer = LocalVLMAnalyzer()
-    
+
     # 接続確認
     if not await analyzer.is_ready():
         print('❌ VLM環境が準備できていません')
         print('   ./scripts/vlm-env.sh setup を実行してください')
         return
-    
+
     print('✅ VLM環境OK')
     print(f'   Model: {analyzer.client.model}')
-    
+
     # サンプル解析（テスト用の小さい画像を生成）
     from PIL import Image
     import io
     img = Image.new('RGB', (100, 100), color='blue')
     buf = io.BytesIO()
     img.save(buf, format='PNG')
-    
+
     print('📸 テスト画像を解析中...')
     result = await analyzer.analyze(buf.getvalue(), 'What color is this image?')
     print(f'✅ 解析完了 ({result.duration_ms}ms)')
@@ -140,22 +140,22 @@ async def test():
 asyncio.run(test())
 "
         ;;
-        
+
     logs)
         $COMPOSE_CMD -f $COMPOSE_FILE logs -f
         ;;
-        
+
     shell)
         echo "🐚 Ollamaコンテナに接続中..."
         $DOCKER_CMD exec -it colonyforge-ollama bash
         ;;
-        
+
     clean)
         echo "🧹 環境をクリーンアップ中..."
         $COMPOSE_CMD -f $COMPOSE_FILE down -v
         echo "✅ クリーンアップ完了"
         ;;
-        
+
     help|*)
         echo ""
         echo "使い方: $0 <command>"

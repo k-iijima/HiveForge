@@ -1,0 +1,37 @@
+# pre-commit hooks — コミット前に自動で lint/format チェック
+#
+# セットアップ:
+#   pip install pre-commit
+#   pre-commit install
+#
+# 手動実行:
+#   pre-commit run --all-files
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.0
+    hooks:
+      # Linter: ruff check --fix
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        exclude: ^scripts/
+      # Formatter: ruff format
+      - id: ruff-format
+        exclude: ^scripts/
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      # 一般的なファイル品質チェック
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+        exclude: ^scripts/
+      - id: end-of-file-fixer
+        exclude: ^scripts/
+      - id: check-yaml
+        args: [--unsafe]  # mkdocs.yml の Python タグ対応
+      - id: check-json
+        exclude: (tsconfig\.json|\.vscode/|\.devcontainer/)
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=500]

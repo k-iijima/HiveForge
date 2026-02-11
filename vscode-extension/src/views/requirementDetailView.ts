@@ -74,9 +74,9 @@ function buildHtml(requirement: Requirement): string {
     <h1>確認要請</h1>
     <p class="id">ID: ${escapeHtml(requirement.id)}</p>
     <p><span class="state">${stateLabel}</span></p>
-    
+
     <div class="description">${escapeHtml(requirement.description)}</div>
-    
+
     ${optionsHtml}
     ${resolutionHtml}
     ${actionSection}
@@ -172,10 +172,10 @@ function getStyles(stateColor: string): string {
         h3 { margin-top: 20px; margin-bottom: 10px; color: var(--vscode-foreground); }
         .id { font-family: monospace; font-size: 0.9em; color: var(--vscode-descriptionForeground); }
         .state { display: inline-block; padding: 4px 12px; border-radius: 4px; background-color: ${stateColor}; color: white; font-weight: bold; }
-        .description { 
-            margin: 20px 0; 
-            padding: 15px; 
-            background-color: var(--vscode-textBlockQuote-background); 
+        .description {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: var(--vscode-textBlockQuote-background);
             border-left: 4px solid var(--vscode-textBlockQuote-border);
             white-space: pre-wrap;
             font-size: 1.1em;
@@ -274,35 +274,35 @@ function getStyles(stateColor: string): string {
 function getScript(): string {
     return `
         const vscode = acquireVsCodeApi();
-        
+
         function getSelectedOption() {
             const selected = document.querySelector('input[name="selectedOption"]:checked');
             return selected ? selected.value : null;
         }
-        
+
         function getComment() {
             const textarea = document.getElementById('comment');
             return textarea ? textarea.value.trim() : '';
         }
-        
+
         function setProcessing(isProcessing) {
             const buttons = document.querySelectorAll('button');
             buttons.forEach(btn => btn.disabled = isProcessing);
             document.getElementById('processing').style.display = isProcessing ? 'block' : 'none';
         }
-        
+
         function approve() {
             setProcessing(true);
-            vscode.postMessage({ 
+            vscode.postMessage({
                 command: 'approve',
                 selectedOption: getSelectedOption(),
                 comment: getComment()
             });
         }
-        
+
         function reject() {
             setProcessing(true);
-            vscode.postMessage({ 
+            vscode.postMessage({
                 command: 'reject',
                 comment: getComment()
             });

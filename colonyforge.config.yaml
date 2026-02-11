@@ -1,7 +1,7 @@
 # =============================================================================
 # ColonyForge 設定ファイル
 # =============================================================================
-# 
+#
 # このファイルはColonyForgeの動作を制御します。
 # 環境変数で上書き可能: COLONYFORGE_<セクション>__<キー> (例: COLONYFORGE_SERVER__PORT=9000)
 #
@@ -43,7 +43,7 @@ llm:
   # api_base: ""                  # カスタムAPIエンドポイント（Ollama, LiteLLM Proxy等）
   # num_retries: 3                # LiteLLMリトライ回数（429/5xx時）
   # fallback_models: []           # フォールバック先モデル（例: ["anthropic/claude-3-haiku-20240307"]）
-  
+
   # レートリミット設定
   rate_limit:
     requests_per_minute: 60       # 1分あたりの最大リクエスト数
@@ -150,7 +150,7 @@ agents:
   queen_bee:
     enabled: true                     # Queen Beeを有効にするか
     max_workers_per_colony: 5         # Colony当たり最大Worker数
-    task_assignment_strategy: "round_robin"  
+    task_assignment_strategy: "round_robin"
     # タスク割り当て戦略:
     #   round_robin    - 順番に割り当て
     #   priority       - 優先度ベース

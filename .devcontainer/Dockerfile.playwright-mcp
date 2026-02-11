@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Playwright MCP and its bundled browser
-# Note: We run npx first to cache the MCP package, then install its bundled browser  
+# Note: We run npx first to cache the MCP package, then install its bundled browser
 # to avoid revision mismatch between Dockerfile-installed and runtime-used versions.
 RUN npx @playwright/mcp@latest --version && \
     /root/.npm/_npx/*/node_modules/.bin/playwright install chromium --with-deps

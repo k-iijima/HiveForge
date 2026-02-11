@@ -8,7 +8,7 @@
 
 作成日: 2026-02-01
 ステータス: **Reviewed**（レビュー完了）
-フィードバック対応: 
+フィードバック対応:
   - 2026-02-01: Decision Protocol, Project Contract, Action Class, Conflict Detection 追加
   - 2026-02-01: Conference エンティティ化, Decision scope/owner, Conflict category/severity, Policy Gate, UnknownEvent前方互換
 
@@ -358,11 +358,11 @@ class ColonyState(Enum):
 ```python
 class EventType(Enum):
     # ... v4の既存イベント ...
-    
+
     # Hive関連（v5追加）
     HIVE_CREATED = "hive.created"
     HIVE_CLOSED = "hive.closed"
-    
+
     # Colony関連（v5追加）
     COLONY_CREATED = "colony.created"
     COLONY_ACTIVATED = "colony.activated"    # 実装では COLONY_STARTED = "colony.started"
@@ -370,40 +370,40 @@ class EventType(Enum):
     COLONY_FAILED = "colony.failed"
     COLONY_SUSPENDED = "colony.suspended"
     # COLONY_RESUMED は未実装。SUSPENDED→IN_PROGRESS遷移には COLONY_STARTED を再利用
-    
+
     # エージェント間通信（v5追加、M2で実装予定）
     OPINION_REQUESTED = "agent.opinion_requested"
     OPINION_RESPONDED = "agent.opinion_responded"
-    
+
     # Worker Bee関連（v5追加）
     WORKER_ASSIGNED = "worker.assigned"
     WORKER_RELEASED = "worker.released"      # 実装ではworker.started/progress/completed/failedに細分化
-    
+
     # 直接介入・エスカレーション（v5追加）
     # 実装では intervention.* 名前空間に統一:
     #   intervention.user_direct / intervention.queen_escalation / intervention.beekeeper_feedback
     USER_DIRECT_INTERVENTION = "user.direct_intervention"
     QUEEN_ESCALATION = "queen.escalation"
     BEEKEEPER_FEEDBACK = "beekeeper.feedback"
-    
+
     # Decision Protocol（意思決定ライフサイクル、v5.1追加）
     PROPOSAL_CREATED = "decision.proposal.created"         # 提案作成
     DECISION_RECORDED = "decision.recorded"                # 決定記録
     DECISION_APPLIED = "decision.applied"                  # 決定適用
     DECISION_SUPERSEDED = "decision.superseded"            # 決定上書き
-    
+
     # Conference（会議ライフサイクル、v5.1追加）
     CONFERENCE_STARTED = "conference.started"              # 会議開始
     CONFERENCE_ENDED = "conference.ended"                  # 会議終了
-    
+
     # Conflict Detection（衝突検出、v5.1追加）
     CONFLICT_DETECTED = "conflict.detected"                # Colony間意見衝突検出
     CONFLICT_RESOLVED = "conflict.resolved"                # 衝突解決
-    
+
     # Standard Failure/Timeout（標準失敗、v5.1追加）
     OPERATION_TIMEOUT = "operation.timeout"                # タイムアウト
     OPERATION_FAILED = "operation.failed"                  # 操作失敗
-    
+
     # Sentinel Hornet（Hive内監視、v5.3追加）
     SENTINEL_ALERT_RAISED = "sentinel.alert_raised"        # 異常検出アラート
     SENTINEL_REPORT = "sentinel.report"                    # Beekeeperへの報告
@@ -549,27 +549,27 @@ class TaskCreatedEvent(BaseEvent):
     "decision_id": "decision-001",       # ULID
     "hive_id": "01HWXY...",              # 必須
     "conference_id": "01HXYZ...",        # 任意（会議外でも決定可能）
-    
+
     # 適用範囲（どこに効くか）
     "scope": "colony",                   # "hive" | "colony" | "run" | "task"
     "scope_id": "api-colony",            # scope対象のID
-    
+
     # 所有者（誰が記録したか）
     "recorded_by": "user",               # "user" | "beekeeper" | "queen:{colony_id}"
-    
+
     # 上書き履歴（何を上書きしたか）
     "supersedes_decision_id": null,      # 上書き元の決定ID（初回はnull）
-    
+
     # 影響分析
     "impact": {
         "affected_colonies": ["api-colony", "data-colony"],
         "estimated_effort_hours": 8,
         "risk_level": "low",             # "low" | "medium" | "high"
     },
-    
+
     # ロールバック計画
     "rollback_plan": "Git revert commit abc123",  # 任意
-    
+
     # 決定内容
     "proposal_id": "proposal-001",       # 対応する提案ID
     "choice": "Stripe決済を採用",
@@ -608,21 +608,21 @@ class ConflictSeverity(str, Enum):
 {
     "conflict_id": "conflict-001",       # ULID
     "conference_id": "01HXYZ...",        # 任意（会議中の衝突の場合）
-    
+
     # 分類（v5.2追加）
     "category": "priority",              # ConflictCategory
     "severity": "high",                  # ConflictSeverity
-    
+
     # 関係者
     "parties": ["ui-colony", "api-colony"],  # 衝突しているColony
     "topic": "認証方式の選定",
-    
+
     # 証跡
     "evidence_event_ids": [              # 衝突の根拠となるイベントID
         "event-001",
         "event-002",
     ],
-    
+
     # 意見
     "opinions": [
         {
@@ -636,7 +636,7 @@ class ConflictSeverity(str, Enum):
             "rationale": "実装がシンプル",
         },
     ],
-    
+
     # 解決案（Beekeeper/Queenが提案）
     "suggested_resolutions": [
         "両方サポート（OAuth2.0 + パスワード）",
@@ -1118,7 +1118,7 @@ def policy_gate(
 ) -> PolicyDecision:
     """
     中央集権的なアクション判定。
-    
+
     戻り値:
         - ALLOW: 即座に実行可能
         - REQUIRE_APPROVAL: Requirementを作成して承認待ち
@@ -1149,7 +1149,7 @@ async def create_task(run_id: str, request: CreateTaskRequest, state: AppState):
         scope="run",
         scope_id=run_id,
     )
-    
+
     if decision == PolicyDecision.DENY:
         raise HTTPException(403, "Action denied by policy")
     elif decision == PolicyDecision.REQUIRE_APPROVAL:
@@ -1169,13 +1169,13 @@ Policy Gateの振る舞いは設定ファイルでカスタマイズ可能：
 policy:
   # Trust Level 3 でも IRREVERSIBLE は確認必須にするか
   level3_irreversible_requires_approval: true
-  
+
   # スコープ別ポリシー（将来拡張用）
   scope_policies:
     # スコープごとにデフォルト動作をオーバーライド
     # colony:
     #   default_trust_level: 2
-  
+
   # コンテキスト別ポリシー（将来拡張用。ツール名・パラメータに基づく判定）
   # context_policies:
   #   run_sql:
@@ -1203,7 +1203,7 @@ policy:
 ```python
 class UnknownEvent(BaseEvent):
     """未知のイベントタイプを保持するフォールバッククラス
-    
+
     - 新しいイベントタイプを古いバイナリで読んでも落ちない
     - original_type に元のtype文字列を保持
     - typeはEventType.UNKNOWNではなく、文字列として保持（Enumに追加不要）
@@ -1213,14 +1213,14 @@ class UnknownEvent(BaseEvent):
 
 def parse_event(data: dict[str, Any] | str) -> BaseEvent:
     """イベントデータをパースして適切なイベントクラスに変換
-    
+
     未知のイベントタイプはUnknownEventとして返す（例外にしない）。
     """
     if isinstance(data, str):
         data = json.loads(data)
-    
+
     type_str = data.get("type", "")
-    
+
     try:
         event_type = EventType(type_str)
         event_class = EVENT_TYPE_MAP.get(event_type, BaseEvent)
@@ -1469,13 +1469,13 @@ class ContractLockEvent(BaseEvent):
 ```
 1. Beekeeperが「今日の契約スナップショット」を発行（DailyContractSnapshotEvent）
    → 「今日はここ固定、ここは変更可」を明示
-   
+
 2. 各Queenが「今日やるスライスとリスク」を報告
    → 競合する場合はこの時点で調整
-   
+
 3. Workerが実装を進め、PR/差分/テスト/契約影響(Yes/No)を報告
    → 契約影響Yesの場合はBeekeeper確認待ち
-   
+
 4. Beekeeperが衝突解決しDecisionを記録
    → 翌日の契約スナップショットに反映
 ```

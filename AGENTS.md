@@ -33,18 +33,18 @@
 ```python
 def test_event_hash_excludes_hash_field():
     """hashフィールド自体はハッシュ計算から除外される
-    
+
     hashフィールドを含むデータと含まないデータで同じハッシュが得られることを確認。
     これにより、イベントのハッシュ値をイベント自体に含めても循環参照を避けられる。
     """
     # Arrange: hashフィールドの有無が異なる2つのデータを用意
     data_without_hash = {"type": "test", "value": 1}
     data_with_hash = {"type": "test", "value": 1, "hash": "ignored"}
-    
+
     # Act: 両方のハッシュを計算
     hash_without = compute_hash(data_without_hash)
     hash_with = compute_hash(data_with_hash)
-    
+
     # Assert: hashフィールドの有無に関わらず同じハッシュになる
     assert hash_without == hash_with
 ```
@@ -178,7 +178,7 @@ from pydantic import BaseModel, Field, ConfigDict
 class TaskCreatedEvent(BaseModel):
     """タスク作成イベント - OpenAPI仕様に出力される"""
     model_config = ConfigDict(strict=True, frozen=True)
-    
+
     task_id: str = Field(..., description="タスクの一意識別子", examples=["task-001"])
     title: str = Field(..., min_length=1, max_length=200, description="タスクのタイトル")
 ```

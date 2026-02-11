@@ -1,6 +1,6 @@
 /**
  * Events TreeView Provider
- * 
+ *
  * イベントログを因果リンク（parents）に基づいてツリー表示する。
  * - ルートノード: parentsがない（または空の）イベント
  * - 子ノード: parentsでそのイベントを参照しているイベント
