@@ -9,10 +9,16 @@ Playwright MCPでキャプチャしたスクリーンショットをOllama VLM (
 
 VLMの非決定論的な応答に対応するため、キーワードマッチングと複数回リトライで
 テストの安定性を確保する。
+
+画像品質改善:
+    フル画面スクリーンショット(1920x1080等)の中でKPIダッシュボードは小さいため、
+    エディタパネル領域をクロップしてからVLMに渡す。
+    crop_to_editor_panel() でVS Codeのレイアウトを自動検出しクロップする。
 """
 
 from __future__ import annotations
 
+import io
 import logging
 import os
 from dataclasses import dataclass, field
@@ -40,6 +46,120 @@ def _check_ollama_available() -> bool:
 
 
 OLLAMA_AVAILABLE = _check_ollama_available()
+
+
+# ============================================================
+# エディタパネル領域のクロップ
+# ============================================================
+
+
+async def detect_editor_bounds(mcp_client) -> tuple[int, int, int, int] | None:
+    """Playwright JS評価でVS Codeのエディタ領域のBounding Boxを検出する
+
+    code-serverのDOM構造を利用してエディタパネルの座標を取得。
+    取得できない場合はNoneを返す。
+
+    Returns:
+        (x, y, width, height) or None
+    """
+    js_code = (
+        "() => {"
+        "  const selectors = ["
+        "    '.editor-group-container',"
+        "    '.part.editor',"
+        "    '.split-view-view .view-container',"
+        "    '.editor-container',"
+        "  ];"
+        "  for (const sel of selectors) {"
+        "    const el = document.querySelector(sel);"
+        "    if (el) {"
+        "      const r = el.getBoundingClientRect();"
+        "      if (r.width > 100 && r.height > 100) {"
+        "        return JSON.stringify({"
+        "          x: Math.round(r.x),"
+        "          y: Math.round(r.y),"
+        "          w: Math.round(r.width),"
+        "          h: Math.round(r.height)"
+        "        });"
+        "      }"
+        "    }"
+        "  }"
+        "  return 'null';"
+        "}"
+    )
+    try:
+        result = await mcp_client._call_tool("browser_evaluate", {"function": js_code})
+        import json
+
+        for item in result.content:
+            if hasattr(item, "text"):
+                # browser_evaluate の結果は "### Result\n\"...\"\n..." 形式
+                text = item.text
+                for line in text.split("\n"):
+                    line = line.strip().strip('"')
+                    if line.startswith("{"):
+                        data = json.loads(line)
+                        return (data["x"], data["y"], data["w"], data["h"])
+    except Exception as e:
+        logger.debug("Editor bounds detection failed: %s", e)
+    return None
+
+
+def crop_to_editor_panel(
+    screenshot_data: bytes,
+    editor_bounds: tuple[int, int, int, int] | None = None,
+) -> bytes:
+    """スクリーンショットからエディタパネル領域をクロップする
+
+    VS Codeのレイアウト:
+        [Activity Bar 48px][Sidebar ~300px][Editor Panel][...]
+        [                    Status Bar 22px                 ]
+
+    editor_bounds が指定されている場合はそれを使用し、
+    なければヒューリスティックに推定する。
+
+    Args:
+        screenshot_data: フルスクリーンショットのPNGデータ
+        editor_bounds: (x, y, width, height) JS評価で取得した値
+
+    Returns:
+        クロップされたPNGデータ
+    """
+    from PIL import Image
+
+    img = Image.open(io.BytesIO(screenshot_data))
+    w, h = img.size
+
+    if editor_bounds:
+        x, y, ew, eh = editor_bounds
+        # Bounding Boxでクロップ（少し広めに取る）
+        left = max(0, x - 5)
+        top = max(0, y - 5)
+        right = min(w, x + ew + 5)
+        bottom = min(h, y + eh + 5)
+    else:
+        # ヒューリスティック: Activity Bar(48px) + Sidebar(~300px) を除外
+        # Status bar(22px) を下から除外
+        left = min(int(w * 0.25), 350)  # サイドバーの右端（幅の25%か350pxの小さい方）
+        top = 0
+        right = w
+        bottom = max(0, h - 22)  # ステータスバーを除外
+
+    cropped = img.crop((left, top, right, bottom))
+
+    # クロップ後のサイズをログ
+    logger.info(
+        "Cropped screenshot: %dx%d -> %dx%d (bounds=%s)",
+        w,
+        h,
+        cropped.size[0],
+        cropped.size[1],
+        editor_bounds,
+    )
+
+    buf = io.BytesIO()
+    cropped.save(buf, format="PNG")
+    return buf.getvalue()
 
 
 @dataclass

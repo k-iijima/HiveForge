@@ -96,12 +96,15 @@ def hive_monitor_snapshot(event_loop, mcp_client):
 
 @pytest.fixture(scope="module")
 def hive_monitor_screenshot(event_loop, mcp_client, hive_monitor_snapshot):
-    """Hive MonitorのスクリーンショットPNG画像を取得
+    """Hive Monitorのスクリーンショットをエディタパネル領域にクロップして取得
 
-    hive_monitor_snapshot 依存により、Hive Monitorが開かれた状態で
-    スクリーンショットを撮る。VLM評価テストで使用する。
+    フル画面(1920x1080等)からエディタパネル部分だけを切り出す。
+    KPIダッシュボードが画像の大部分を占めるようになり、
+    VLMがテキストやゲージを正確に読み取れるようになる。
+
+    hive_monitor_snapshot 依存により、Hive Monitorが開かれた状態で撮影する。
     """
-    return event_loop.run_until_complete(mcp_client.screenshot())
+    return event_loop.run_until_complete(_capture_cropped_screenshot(mcp_client))
 
 
 async def _open_hive_monitor(client) -> str:
@@ -172,6 +175,27 @@ async def _open_hive_monitor(client) -> str:
 
     # Assert: スナップショットを返す
     return await client.snapshot()
+
+
+async def _capture_cropped_screenshot(client) -> bytes:
+    """スクリーンショットを撮影し、エディタパネル領域にクロップして返す
+
+    フル画面のうちKPIダッシュボードが表示されているエディタ部分だけを切り出す。
+    VLMが「画像が小さすぎる」「ぼやけている」と報告する問題を解決する。
+
+    Returns:
+        エディタパネル領域にクロップされたPNG画像データ
+    """
+    from tests.e2e.vlm_visual_evaluator import crop_to_editor_panel, detect_editor_bounds
+
+    # 1. エディタ領域の座標をJS評価で検出
+    editor_bounds = await detect_editor_bounds(client)
+
+    # 2. フルスクリーンショットを撮影
+    full_screenshot = await client.screenshot()
+
+    # 3. エディタ領域にクロップ
+    return crop_to_editor_panel(full_screenshot, editor_bounds)
 
 
 # ============================================================
