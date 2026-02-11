@@ -131,22 +131,32 @@ jobs:
     # VLM テストは非決定的なので失敗しても全体を止めない
     continue-on-error: true
 
-    services:
-      playwright-mcp:
-        image: ghcr.io/anthropics/playwright-mcp:latest
-        ports:
-          - 8931:8931
-
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: "pip"
+      - name: Set up Node.js (for Playwright MCP)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
+      - name: Start Playwright MCP server
+        run: |
+          npx -y @playwright/mcp@latest --port 8931 --headless &
+          # サーバー起動を待機
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:8931/mcp >/dev/null 2>&1 || curl -s http://localhost:8931 >/dev/null 2>&1; then
+              echo "Playwright MCP server ready"
+              break
+            fi
+            echo "Waiting for Playwright MCP server... ($i/30)"
+            sleep 1
+          done
       - name: Run L3 E2E tests (VLM visual)
         env:
           VLM_PROVIDER: "anthropic"
