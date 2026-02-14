@@ -274,6 +274,8 @@ def _create_hierarchical_session(
         " #[fg=cyan,bold]#{pane_title}#[default] ",
     )
     _tmux("set-option", "-t", SESSION_NAME, "mouse", "on")
+    # ペイン内プロセス終了時もペインを残す（セッション消滅防止）
+    _tmux("set-option", "-t", SESSION_NAME, "remain-on-exit", "on")
     # window 一覧にアイコンを表示
     _tmux("set-option", "-t", SESSION_NAME, "status-left-length", "40")
 
@@ -457,6 +459,8 @@ def _create_monitor_session(agent_ids: list[str]) -> dict[str, str]:
     _tmux("set-option", "-t", SESSION_NAME, "pane-border-status", "top")
     _tmux("set-option", "-t", SESSION_NAME, "pane-border-format", " #{pane_title} ")
     _tmux("set-option", "-t", SESSION_NAME, "mouse", "on")
+    # ペイン内プロセス終了時もペインを残す（セッション消滅防止）
+    _tmux("set-option", "-t", SESSION_NAME, "remain-on-exit", "on")
 
     return agent_logs
 
@@ -588,21 +592,34 @@ def run_tmux_monitor(server_url: str) -> None:
     stop_event = threading.Event()
 
     def _sse_router() -> None:
-        try:
-            for event in iter_sse_events(stream_url):
-                if stop_event.is_set():
-                    break
-                _route_event_to_layout(event, layout)
-        except Exception:
-            if not stop_event.is_set():
-                _write_to_log(layout.overview_log, "[monitor] SSE接続断 — 再接続待ち")
+        while not stop_event.is_set():
+            try:
+                for event in iter_sse_events(stream_url):
+                    if stop_event.is_set():
+                        return
+                    _route_event_to_layout(event, layout)
+            except Exception:
+                if not stop_event.is_set():
+                    _write_to_log(
+                        layout.overview_log,
+                        "[monitor] SSE接続断 — 5秒後に再接続",
+                    )
+                    stop_event.wait(5)
 
     router_thread = threading.Thread(target=_sse_router, daemon=True)
     router_thread.start()
 
-    # フォアグラウンドで tmux にアタッチ
+    # フォアグラウンドで tmux にアタッチ（セッション消滅時は再試行）
     try:
-        subprocess.run(["tmux", "attach-session", "-t", SESSION_NAME], check=False)
+        while _session_exists():
+            subprocess.run(
+                ["tmux", "attach-session", "-t", SESSION_NAME],
+                check=False,
+            )
+            if not _session_exists():
+                break
+            # デタッチ後もセッションが生きている場合は再アタッチ
+            time.sleep(0.5)
     except KeyboardInterrupt:
         pass
     finally:

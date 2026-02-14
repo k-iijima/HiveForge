@@ -591,6 +591,7 @@ class TestRunTmuxMonitor:
         with pytest.raises(SystemExit, match="1"):
             run_tmux_monitor("http://localhost:8000")
 
+    @patch("colonyforge.monitor._session_exists", side_effect=[True, False, False])
     @patch("colonyforge.monitor.subprocess.run")
     @patch("colonyforge.monitor.iter_sse_events", return_value=iter([]))
     @patch("colonyforge.monitor._create_monitor_session")
@@ -599,7 +600,15 @@ class TestRunTmuxMonitor:
     @patch("colonyforge.monitor._fetch_hierarchy", return_value={})
     @patch("colonyforge.monitor.shutil.which", return_value="/usr/bin/tmux")
     def test_creates_session_and_subscribes(
-        self, mock_which, mock_hier, mock_fetch, mock_kill, mock_create, mock_sse, mock_run
+        self,
+        mock_which,
+        mock_hier,
+        mock_fetch,
+        mock_kill,
+        mock_create,
+        mock_sse,
+        mock_run,
+        mock_exists,
     ):
         """hierarchy が空の場合、フラットレイアウトにフォールバックする"""
         # Arrange
@@ -621,6 +630,7 @@ class TestRunTmuxMonitor:
             check=False,
         )
 
+    @patch("colonyforge.monitor._session_exists", side_effect=[True, False, False])
     @patch("colonyforge.monitor.subprocess.run")
     @patch("colonyforge.monitor.iter_sse_events", return_value=iter([]))
     @patch("colonyforge.monitor._create_hierarchical_session")
@@ -628,7 +638,7 @@ class TestRunTmuxMonitor:
     @patch("colonyforge.monitor._fetch_hierarchy")
     @patch("colonyforge.monitor.shutil.which", return_value="/usr/bin/tmux")
     def test_uses_hierarchy_when_available(
-        self, mock_which, mock_hier, mock_kill, mock_create_h, mock_sse, mock_run
+        self, mock_which, mock_hier, mock_kill, mock_create_h, mock_sse, mock_run, mock_exists
     ):
         """hierarchy が取れた場合、Colony ベースのレイアウトを使う"""
         # Arrange
