@@ -390,20 +390,20 @@ class TestKPIDashboardSnapshot:
     """
 
     @pytest.mark.asyncio
-    async def test_navigate_to_kpi_dashboard(self, agent_ui_server, kpi_html_path: str):
+    async def test_navigate_to_kpi_dashboard(self, agent_ui_server, kpi_http_server: str):
         """KPIダッシュボードHTMLに遷移できることを確認"""
         # Act: KPIダッシュボードに遷移
-        result = await agent_ui_server._handle_navigate({"url": kpi_html_path})
+        result = await agent_ui_server._handle_navigate({"url": kpi_http_server})
 
         # Assert: 遷移成功
         assert len(result) > 0
         assert "Navigated to" in result[0].text
 
     @pytest.mark.asyncio
-    async def test_capture_kpi_dashboard(self, agent_ui_server, kpi_html_path: str):
+    async def test_capture_kpi_dashboard(self, agent_ui_server, kpi_http_server: str):
         """KPIダッシュボードの画面キャプチャが取得できることを確認"""
         # Arrange: ページに遷移
-        await agent_ui_server._handle_navigate({"url": kpi_html_path})
+        await agent_ui_server._handle_navigate({"url": kpi_http_server})
         await asyncio.sleep(0.5)
 
         # Act: 画面キャプチャ
@@ -415,10 +415,10 @@ class TestKPIDashboardSnapshot:
         assert "Saved" in text or "Captured" in text
 
     @pytest.mark.asyncio
-    async def test_snapshot_contains_kpi_dashboard_title(self, agent_ui_server, kpi_html_path: str):
+    async def test_snapshot_contains_kpi_dashboard_title(self, agent_ui_server, kpi_http_server: str):
         """スナップショットに「KPI Dashboard」タイトルが含まれることを確認"""
         # Arrange: ページに遷移してJSレンダリング待機
-        await agent_ui_server._handle_navigate({"url": kpi_html_path})
+        await agent_ui_server._handle_navigate({"url": kpi_http_server})
         await asyncio.sleep(1)
 
         # Act: アクセシビリティスナップショット取得
@@ -429,14 +429,14 @@ class TestKPIDashboardSnapshot:
 
     @pytest.mark.asyncio
     async def test_snapshot_contains_task_performance_metrics(
-        self, agent_ui_server, kpi_html_path: str
+        self, agent_ui_server, kpi_http_server: str
     ):
         """Task Performanceセクションのメトリクス値が表示されていることを確認
 
         Correctness=80.0%, Lead Time=121.6s 等の値がDOMに存在する。
         """
         # Arrange
-        await agent_ui_server._handle_navigate({"url": kpi_html_path})
+        await agent_ui_server._handle_navigate({"url": kpi_http_server})
         await asyncio.sleep(1)
 
         # Act
@@ -450,14 +450,14 @@ class TestKPIDashboardSnapshot:
 
     @pytest.mark.asyncio
     async def test_snapshot_contains_collaboration_metrics(
-        self, agent_ui_server, kpi_html_path: str
+        self, agent_ui_server, kpi_http_server: str
     ):
         """Collaboration Qualityセクションのメトリクスが表示されていることを確認
 
         Cost/Task=1405.0 tok, Overhead=30.0% 等の値がDOMに存在する。
         """
         # Arrange
-        await agent_ui_server._handle_navigate({"url": kpi_html_path})
+        await agent_ui_server._handle_navigate({"url": kpi_http_server})
         await asyncio.sleep(1)
 
         # Act
@@ -469,11 +469,11 @@ class TestKPIDashboardSnapshot:
 
     @pytest.mark.asyncio
     async def test_snapshot_contains_gate_accuracy_section(
-        self, agent_ui_server, kpi_html_path: str
+        self, agent_ui_server, kpi_http_server: str
     ):
         """Gate Accuracyセクションのラベルが表示されていることを確認"""
         # Arrange
-        await agent_ui_server._handle_navigate({"url": kpi_html_path})
+        await agent_ui_server._handle_navigate({"url": kpi_http_server})
         await asyncio.sleep(1)
 
         # Act
@@ -486,10 +486,10 @@ class TestKPIDashboardSnapshot:
         )
 
     @pytest.mark.asyncio
-    async def test_snapshot_contains_outcomes(self, agent_ui_server, kpi_html_path: str):
+    async def test_snapshot_contains_outcomes(self, agent_ui_server, kpi_http_server: str):
         """Outcomesセクション（success: 8, failure: 2）が表示されていることを確認"""
         # Arrange
-        await agent_ui_server._handle_navigate({"url": kpi_html_path})
+        await agent_ui_server._handle_navigate({"url": kpi_http_server})
         await asyncio.sleep(1)
 
         # Act
@@ -500,10 +500,10 @@ class TestKPIDashboardSnapshot:
         assert "failure" in snapshot.lower(), f"Missing failure: {snapshot[:500]}"
 
     @pytest.mark.asyncio
-    async def test_snapshot_contains_failure_classes(self, agent_ui_server, kpi_html_path: str):
+    async def test_snapshot_contains_failure_classes(self, agent_ui_server, kpi_http_server: str):
         """Failure Classesセクション（timeout, implementation_error）が表示されていることを確認"""
         # Arrange
-        await agent_ui_server._handle_navigate({"url": kpi_html_path})
+        await agent_ui_server._handle_navigate({"url": kpi_http_server})
         await asyncio.sleep(1)
 
         # Act
@@ -517,11 +517,11 @@ class TestKPIDashboardSnapshot:
 
     @pytest.mark.asyncio
     async def test_snapshot_contains_episode_colony_counts(
-        self, agent_ui_server, kpi_html_path: str
+        self, agent_ui_server, kpi_http_server: str
     ):
         """エピソード数（10）とコロニー数（3）がヘッダーに表示されていることを確認"""
         # Arrange
-        await agent_ui_server._handle_navigate({"url": kpi_html_path})
+        await agent_ui_server._handle_navigate({"url": kpi_http_server})
         await asyncio.sleep(1)
 
         # Act
@@ -532,14 +532,14 @@ class TestKPIDashboardSnapshot:
         assert "3 colonies" in snapshot, f"Missing colony count: {snapshot[:300]}"
 
     @pytest.mark.asyncio
-    async def test_snapshot_contains_all_section_headers(self, agent_ui_server, kpi_html_path: str):
+    async def test_snapshot_contains_all_section_headers(self, agent_ui_server, kpi_http_server: str):
         """全セクションヘッダーが存在することを確認
 
         Task Performance, Collaboration Quality, Gate Accuracy,
         Outcomes, Failure Classes の5セクション。
         """
         # Arrange
-        await agent_ui_server._handle_navigate({"url": kpi_html_path})
+        await agent_ui_server._handle_navigate({"url": kpi_http_server})
         await asyncio.sleep(1)
 
         # Act
@@ -558,10 +558,10 @@ class TestKPIDashboardSnapshot:
             assert header in snapshot_upper, f"Missing section header '{header}': {snapshot[:500]}"
 
     @pytest.mark.asyncio
-    async def test_dashboard_no_change_on_static_page(self, agent_ui_server, kpi_html_path: str):
+    async def test_dashboard_no_change_on_static_page(self, agent_ui_server, kpi_http_server: str):
         """静的ページで2回キャプチャ→差分比較で変化なしと判定されることを確認"""
         # Arrange: 遷移して2回キャプチャ
-        await agent_ui_server._handle_navigate({"url": kpi_html_path})
+        await agent_ui_server._handle_navigate({"url": kpi_http_server})
         await asyncio.sleep(1)
         await agent_ui_server._handle_capture_screen({})
         await agent_ui_server._handle_capture_screen({})
@@ -577,10 +577,10 @@ class TestKPIDashboardSnapshot:
         )
 
     @pytest.mark.asyncio
-    async def test_scroll_kpi_dashboard(self, agent_ui_server, kpi_html_path: str):
+    async def test_scroll_kpi_dashboard(self, agent_ui_server, kpi_http_server: str):
         """KPIダッシュボードでスクロールが動作することを確認"""
         # Arrange
-        await agent_ui_server._handle_navigate({"url": kpi_html_path})
+        await agent_ui_server._handle_navigate({"url": kpi_http_server})
         await asyncio.sleep(0.5)
 
         # Act
@@ -606,10 +606,10 @@ class TestKPIDashboardVLM:
 
     @vlm_required
     @pytest.mark.asyncio
-    async def test_vlm_recognizes_kpi_dashboard(self, agent_ui_server, kpi_html_path: str):
+    async def test_vlm_recognizes_kpi_dashboard(self, agent_ui_server, kpi_http_server: str):
         """VLMがKPIダッシュボードを認識できることを確認"""
         # Arrange
-        await agent_ui_server._handle_navigate({"url": kpi_html_path})
+        await agent_ui_server._handle_navigate({"url": kpi_http_server})
         await asyncio.sleep(1)
         await agent_ui_server._handle_capture_screen({})
 
@@ -638,10 +638,10 @@ class TestKPIDashboardVLM:
 
     @vlm_required
     @pytest.mark.asyncio
-    async def test_vlm_identifies_task_performance(self, agent_ui_server, kpi_html_path: str):
+    async def test_vlm_identifies_task_performance(self, agent_ui_server, kpi_http_server: str):
         """VLMがTask Performanceセクションのメトリクスを識別できることを確認"""
         # Arrange
-        await agent_ui_server._handle_navigate({"url": kpi_html_path})
+        await agent_ui_server._handle_navigate({"url": kpi_http_server})
         await asyncio.sleep(1)
         await agent_ui_server._handle_capture_screen({})
 
@@ -665,10 +665,10 @@ class TestKPIDashboardVLM:
 
     @vlm_required
     @pytest.mark.asyncio
-    async def test_vlm_recognizes_gauge_colors(self, agent_ui_server, kpi_html_path: str):
+    async def test_vlm_recognizes_gauge_colors(self, agent_ui_server, kpi_http_server: str):
         """VLMがゲージバーの色分け（緑/橙/赤）を認識できることを確認"""
         # Arrange
-        await agent_ui_server._handle_navigate({"url": kpi_html_path})
+        await agent_ui_server._handle_navigate({"url": kpi_http_server})
         await asyncio.sleep(1)
         await agent_ui_server._handle_capture_screen({})
 
@@ -692,10 +692,10 @@ class TestKPIDashboardVLM:
 
     @vlm_required
     @pytest.mark.asyncio
-    async def test_vlm_reads_outcomes(self, agent_ui_server, kpi_html_path: str):
+    async def test_vlm_reads_outcomes(self, agent_ui_server, kpi_http_server: str):
         """VLMがOutcomes（success/failure）を読み取れることを確認"""
         # Arrange
-        await agent_ui_server._handle_navigate({"url": kpi_html_path})
+        await agent_ui_server._handle_navigate({"url": kpi_http_server})
         await asyncio.sleep(1)
         await agent_ui_server._handle_capture_screen({})
 
