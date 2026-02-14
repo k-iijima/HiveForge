@@ -521,24 +521,40 @@ export class HiveMonitorPanel {
             h += '<div class="status-indicator ' + sc + '"></div>';
             h += '</div>';
 
-            // エージェントをフルノードとしてツリー展開（吹き出し付き）
-            if (hasQueen || wc > 0) {
+            // エージェントをツリー展開: Queen → Workers の階層構造
+            if (hasQueen && colony.queen_bee) {
+                h += '<div class="branch-line vertical short"></div>';
+                // Queen level
+                h += '<div class="queen-level">';
+                h += renderAgentNode(colony.queen_bee, true);
+                h += '</div>';
+
+                // Workers under Queen
+                if (wc > 0) {
+                    h += '<div class="branch-line vertical short"></div>';
+                    h += '<div class="agents-level">';
+                    colony.workers.forEach((w, idx) => {
+                        const aFirst = idx === 0;
+                        const aLast = idx === colony.workers.length - 1;
+                        h += '<div class="agent-branch">';
+                        h += '<div class="branch-connector-agent '
+                            + (aFirst ? 'first ' : '') + (aLast ? 'last' : '') + '"></div>';
+                        h += renderAgentNode(w, false);
+                        h += '</div>';
+                    });
+                    h += '</div>';
+                }
+            } else if (wc > 0) {
+                // Queenなし — Workers のみ
                 h += '<div class="branch-line vertical short"></div>';
                 h += '<div class="agents-level">';
-                const agents = [];
-                if (hasQueen && colony.queen_bee) {
-                    agents.push({ agent: colony.queen_bee, isQueen: true });
-                }
-                colony.workers.forEach(w => {
-                    agents.push({ agent: w, isQueen: false });
-                });
-                agents.forEach((a, idx) => {
+                colony.workers.forEach((w, idx) => {
                     const aFirst = idx === 0;
-                    const aLast = idx === agents.length - 1;
+                    const aLast = idx === colony.workers.length - 1;
                     h += '<div class="agent-branch">';
                     h += '<div class="branch-connector-agent '
                         + (aFirst ? 'first ' : '') + (aLast ? 'last' : '') + '"></div>';
-                    h += renderAgentNode(a.agent, a.isQueen);
+                    h += renderAgentNode(w, false);
                     h += '</div>';
                 });
                 h += '</div>';
@@ -969,7 +985,12 @@ export class HiveMonitorPanel {
             }
             .colony-container { display: flex; flex-direction: column; align-items: center; }
 
-            /* Agent tree nodes (full nodes below colony) */
+            /* Queen level (single centered node between Colony and Workers) */
+            .queen-level {
+                display: flex; justify-content: center;
+            }
+
+            /* Agent tree nodes (Workers below Queen) */
             .agents-level {
                 display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;
             }
