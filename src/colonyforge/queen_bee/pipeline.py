@@ -37,6 +37,20 @@ class PipelineError(Exception):
     """パイプライン実行エラーの基底"""
 
 
+class TaskExecutionError(PipelineError):
+    """タスク実行中のエラー
+
+    Worker Beeでのタスク実行中に発生した例外をラップする。
+    元の例外型情報を保持し、呼び出し元で例外種別に応じた制御を可能にする。
+    """
+
+    def __init__(self, task_id: str, worker_id: str, cause: Exception) -> None:
+        self.task_id = task_id
+        self.worker_id = worker_id
+        self.cause_type = type(cause).__name__
+        super().__init__(f"タスク {task_id} 実行失敗 ({self.cause_type}): {cause}")
+
+
 class PlanValidationFailedError(PipelineError):
     """Guard Bee検証失敗"""
 

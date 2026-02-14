@@ -187,7 +187,9 @@ class ExecutionMixin:
             }
 
         except Exception as e:
-            logger.exception(f"目標実行エラー: {e}")
+            # MCP境界層: 例外型情報を保持してRunFailedEventに記録
+            exc_type = type(e).__name__
+            logger.exception("目標実行エラー (%s): %s", exc_type, e)
 
             run_failed = RunFailedEvent(
                 id=generate_event_id(),
@@ -197,6 +199,7 @@ class ExecutionMixin:
                     "colony_id": self.colony_id,
                     "goal": goal,
                     "reason": str(e),
+                    "exception_type": exc_type,
                 },
             )
             self.ar.append(run_failed, run_id)
@@ -206,6 +209,7 @@ class ExecutionMixin:
                 "run_id": run_id,
                 "goal": goal,
                 "error": str(e),
+                "exception_type": exc_type,
             }
 
     async def handle_plan_tasks(self, arguments: dict[str, Any]) -> dict[str, Any]:

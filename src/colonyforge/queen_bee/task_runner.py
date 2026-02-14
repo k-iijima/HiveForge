@@ -160,13 +160,13 @@ class TaskRunnerMixin:
 
         except Exception as e:
             worker.current_task_id = None
-            logger.exception(f"タスク実行エラー: {e}")
-            return {
-                "status": "error",
-                "task_id": task_id,
-                "worker_id": worker.worker_id,
-                "error": str(e),
-            }
+            from .pipeline import TaskExecutionError
+
+            raise TaskExecutionError(
+                task_id=task_id,
+                worker_id=worker.worker_id,
+                cause=e,
+            ) from e
 
     async def _get_llm_client(self) -> Any:
         """LLMクライアントを取得（遅延初期化）"""

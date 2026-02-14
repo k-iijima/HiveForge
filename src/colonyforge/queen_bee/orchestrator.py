@@ -124,19 +124,21 @@ class ColonyOrchestrator:
         try:
             result_data = await execute_fn(task_id, goal, context)
         except Exception as exc:
-            error_msg = f"{type(exc).__name__}: {exc}"
+            exc_type = type(exc).__name__
+            error_msg = f"{exc_type}: {exc}"
             logger.error(
-                "タスク %s で例外発生: %s (run_id=%s)",
+                "タスク %s で例外発生: %s (run_id=%s, exc_type=%s)",
                 task_id,
                 error_msg,
                 ctx.run_id,
+                exc_type,
             )
             ctx.add_result(
                 TaskResult(
                     task_id=task_id,
                     goal=goal,
                     status="failed",
-                    error=str(exc),
+                    error=error_msg,
                 )
             )
             if callback:
