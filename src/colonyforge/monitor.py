@@ -296,7 +296,8 @@ def _fetch_hierarchy(server_url: str) -> dict[str, object]:
         req = Request(url)
         with urlopen(req, timeout=5) as resp:
             data = json.loads(resp.read().decode("utf-8"))
-            return data.get("hierarchy", {})
+            hierarchy: dict[str, object] = data.get("hierarchy", {})
+            return hierarchy
     except Exception:
         return {}
 

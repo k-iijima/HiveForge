@@ -361,3 +361,127 @@ class TestActivityStream:
 
         # Assert: ハンドラが解除されている
         assert len(bus._subscribers) == initial_count
+
+
+# =============================================================================
+# POST /activity/emit テスト
+# =============================================================================
+
+
+class TestActivityEmit:
+    """イベント投入エンドポイントのテスト"""
+
+    @pytest.mark.asyncio
+    async def test_emit_event(self, client):
+        """HTTP経由でイベントを投入できる"""
+        # Arrange
+        payload = {
+            "activity_type": "llm.request",
+            "agent_id": "worker-1",
+            "role": "worker_bee",
+            "hive_id": "h-1",
+            "summary": "テストリクエスト",
+        }
+
+        # Act
+        response = client.post("/activity/emit", json=payload)
+
+        # Assert
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "ok"
+        assert "event_id" in data
+
+        # ActivityBusに反映されている
+        bus = ActivityBus.get_instance()
+        recent = bus.get_recent_events()
+        assert len(recent) == 1
+        assert recent[0].summary == "テストリクエスト"
+
+    @pytest.mark.asyncio
+    async def test_emit_registers_agent(self, client):
+        """agent.started イベントでエージェントが登録される"""
+        # Arrange
+        payload = {
+            "activity_type": "agent.started",
+            "agent_id": "queen-1",
+            "role": "queen_bee",
+            "hive_id": "h-1",
+            "colony_id": "c-1",
+            "summary": "Queen起動",
+        }
+
+        # Act
+        response = client.post("/activity/emit", json=payload)
+
+        # Assert
+        assert response.status_code == 200
+        bus = ActivityBus.get_instance()
+        agents = bus.get_active_agents()
+        assert len(agents) == 1
+        assert agents[0].agent_id == "queen-1"
+
+    @pytest.mark.asyncio
+    async def test_emit_with_detail(self, client):
+        """detail付きのイベントを投入できる"""
+        # Arrange
+        payload = {
+            "activity_type": "mcp.tool_call",
+            "agent_id": "w-1",
+            "summary": "create_file",
+            "detail": {"tool": "create_file", "path": "/tmp/test.py"},
+        }
+
+        # Act
+        response = client.post("/activity/emit", json=payload)
+
+        # Assert
+        assert response.status_code == 200
+        bus = ActivityBus.get_instance()
+        recent = bus.get_recent_events()
+        assert recent[0].detail["tool"] == "create_file"
+
+
+# =============================================================================
+# POST /activity/seed テスト
+# =============================================================================
+
+
+class TestActivitySeed:
+    """デモデータ投入エンドポイントのテスト"""
+
+    @pytest.mark.asyncio
+    async def test_seed_creates_agents_and_events(self, client):
+        """seedで複数エージェントとイベントが投入される"""
+        # Act
+        response = client.post("/activity/seed")
+
+        # Assert
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "ok"
+        assert data["agents_registered"] == 7
+        assert data["events_emitted"] > 20
+
+        # エージェントが登録されている
+        bus = ActivityBus.get_instance()
+        agents = bus.get_active_agents()
+        assert len(agents) == 7
+
+        # 階層構造が構築されている
+        hierarchy = bus.get_hierarchy()
+        assert "hive-alpha" in hierarchy
+
+    @pytest.mark.asyncio
+    async def test_seed_events_visible_in_recent(self, client):
+        """seedで投入したイベントがrecentに表示される"""
+        # Arrange
+        client.post("/activity/seed")
+
+        # Act
+        response = client.get("/activity/recent")
+
+        # Assert
+        assert response.status_code == 200
+        events = response.json()["events"]
+        assert len(events) > 20
