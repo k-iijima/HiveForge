@@ -135,17 +135,23 @@ class AnthropicProvider(VLMProvider):
         return self.api_key is not None
 
     async def analyze(self, image_data: bytes, prompt: str) -> VLMAnalysisResult:
-        """Anthropic Claudeで画像を分析"""
-        import anthropic  # type: ignore[import-not-found]
+        """Anthropic Claudeで画像を分析
 
+        AsyncAnthropicクライアントを使用し、タイムアウト60秒を設定。
+        """
         if not self.api_key:
             raise RuntimeError("ANTHROPIC_API_KEY is not set")
 
+        import anthropic  # type: ignore[import-not-found]
+
         image_base64 = base64.b64encode(image_data).decode("utf-8")
 
-        client = anthropic.Anthropic(api_key=self.api_key)
+        client = anthropic.AsyncAnthropic(
+            api_key=self.api_key,
+            timeout=60.0,
+        )
 
-        message = client.messages.create(
+        message = await client.messages.create(
             model=self.model,
             max_tokens=4096,
             messages=[

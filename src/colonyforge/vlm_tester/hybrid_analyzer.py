@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -17,6 +18,10 @@ from colonyforge.vlm_tester.vlm_providers import (
     MultiProviderVLMClient,
     VLMAnalysisResult,
 )
+
+# VLM API呼び出しのタイムアウト（秒）
+# AnthropicProvider側にも60秒のタイムアウトがあるが、安全策として設定
+VLM_TIMEOUT_SECONDS = 90
 
 
 class AnalysisLevel(Enum):
@@ -136,27 +141,33 @@ class HybridAnalyzer:
         prompt: str,
         level: AnalysisLevel,
     ) -> VLMAnalysisResult | None:
-        """VLM分析を実行"""
+        """VLM分析を実行
+
+        VLM API呼び出しにはVLM_TIMEOUT_SECONDSのタイムアウトを設定し、
+        タイムアウトまたは例外発生時はNoneを返す。
+        """
         try:
+            coro: Any
             if level == AnalysisLevel.VLM_OLLAMA:
                 self._stats["vlm_ollama"] += 1
-                return await self.vlm_client.analyze(image_data, prompt, provider_name="ollama")
+                coro = self.vlm_client.analyze(image_data, prompt, provider_name="ollama")
             elif level == AnalysisLevel.VLM_CLOUD:
                 self._stats["vlm_cloud"] += 1
-                return await self.vlm_client.analyze(image_data, prompt, provider_name="anthropic")
+                coro = self.vlm_client.analyze(image_data, prompt, provider_name="anthropic")
             else:
                 # HYBRID: 利用可能なプロバイダーを自動選択
                 available = self.vlm_client.get_available_providers()
                 if "ollama" in available:
                     self._stats["vlm_ollama"] += 1
-                    return await self.vlm_client.analyze(image_data, prompt, provider_name="ollama")
+                    coro = self.vlm_client.analyze(image_data, prompt, provider_name="ollama")
                 elif "anthropic" in available:
                     self._stats["vlm_cloud"] += 1
-                    return await self.vlm_client.analyze(
-                        image_data, prompt, provider_name="anthropic"
-                    )
+                    coro = self.vlm_client.analyze(image_data, prompt, provider_name="anthropic")
                 else:
                     return None
+            return await asyncio.wait_for(coro, timeout=VLM_TIMEOUT_SECONDS)
+        except TimeoutError:
+            return None
         except Exception:
             return None
 

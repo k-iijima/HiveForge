@@ -473,6 +473,56 @@ class TestAnthropicProvider:
         # Assert
         assert provider.name == "anthropic"
 
+    @pytest.mark.asyncio
+    async def test_analyze_raises_without_api_key(self):
+        """APIキーがない場合はRuntimeErrorを投げる"""
+        # Arrange
+        with patch.dict(os.environ, {}, clear=True):
+            with patch.dict(os.environ, {"HOME": "/tmp"}):
+                provider = AnthropicProvider()
+
+                # Act & Assert
+                with pytest.raises(RuntimeError, match="ANTHROPIC_API_KEY is not set"):
+                    await provider.analyze(b"fake-image", "test prompt")
+
+    @pytest.mark.asyncio
+    async def test_analyze_uses_async_client(self):
+        """analyzeがAsyncAnthropicクライアントを使用する
+
+        同期Anthropicクライアントではなく非同期AsyncAnthropicを使い、
+        イベントループをブロックしないことを確認する。
+        """
+        # Arrange: AnthropicのAsyncAnthropicをモック
+        mock_message = MagicMock()
+        mock_block = MagicMock()
+        mock_block.text = "VLM analysis result"
+        mock_message.content = [mock_block]
+
+        mock_client_instance = MagicMock()
+        mock_client_instance.messages = MagicMock()
+        mock_client_instance.messages.create = AsyncMock(return_value=mock_message)
+
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            provider = AnthropicProvider()
+
+            # anthropicモジュールをモック
+            mock_anthropic = MagicMock()
+            mock_anthropic.AsyncAnthropic.return_value = mock_client_instance
+
+            with patch.dict("sys.modules", {"anthropic": mock_anthropic}):
+                # Act
+                result = await provider.analyze(b"fake-image-data", "describe this")
+
+                # Assert: AsyncAnthropicが呼ばれた（同期Anthropicではない）
+                mock_anthropic.AsyncAnthropic.assert_called_once_with(
+                    api_key="test-key",
+                    timeout=60.0,
+                )
+                # messages.createがawaitされた
+                mock_client_instance.messages.create.assert_awaited_once()
+                assert result.response == "VLM analysis result"
+                assert result.provider == "anthropic"
+
 
 class TestMultiProviderVLMClient:
     """MultiProviderVLMClient のテスト"""
@@ -639,3 +689,65 @@ class TestHybridAnalyzer:
         # Assert
         assert result.analysis_level == AnalysisLevel.LOCAL_ONLY
         assert result.vlm_response is None
+
+    @pytest.mark.asyncio
+    async def test_run_vlm_analysis_returns_none_on_timeout(self):
+        """VLM API呼び出しがタイムアウトした場合はNoneを返す
+
+        VLMプロバイダーが応答しない場合にVLM_TIMEOUT_SECONDSで
+        タイムアウトし、テスト全体をブロックしないことを確認する。
+        """
+        import asyncio
+
+        # Arrange: 永遠に待つVLMクライアントをモック
+        async def slow_analyze(*args, **kwargs):
+            await asyncio.sleep(9999)
+
+        mock_vlm_client = MagicMock()
+        mock_vlm_client.analyze = slow_analyze
+        mock_vlm_client.get_available_providers.return_value = ["ollama"]
+
+        analyzer = HybridAnalyzer()
+        analyzer.vlm_client = mock_vlm_client
+
+        # Act: タイムアウトを短くしてテスト
+        from colonyforge.vlm_tester import hybrid_analyzer
+
+        original_timeout = hybrid_analyzer.VLM_TIMEOUT_SECONDS
+        hybrid_analyzer.VLM_TIMEOUT_SECONDS = 0.1
+        try:
+            result = await analyzer._run_vlm_analysis(
+                b"fake-image",
+                "test prompt",
+                AnalysisLevel.HYBRID,
+            )
+        finally:
+            hybrid_analyzer.VLM_TIMEOUT_SECONDS = original_timeout
+
+        # Assert: タイムアウトでNoneが返される
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_run_vlm_analysis_returns_none_on_exception(self):
+        """VLM API呼び出しが例外を投げた場合はNoneを返す
+
+        VLMプロバイダーでエラーが発生してもクラッシュせず、
+        Noneを返してローカル分析結果のみで応答できることを確認する。
+        """
+        # Arrange: 例外を投げるVLMクライアントをモック
+        mock_vlm_client = MagicMock()
+        mock_vlm_client.analyze = AsyncMock(side_effect=RuntimeError("API error"))
+        mock_vlm_client.get_available_providers.return_value = ["anthropic"]
+
+        analyzer = HybridAnalyzer()
+        analyzer.vlm_client = mock_vlm_client
+
+        # Act
+        result = await analyzer._run_vlm_analysis(
+            b"fake-image",
+            "test prompt",
+            AnalysisLevel.HYBRID,
+        )
+
+        # Assert: 例外時もNoneが返される
+        assert result is None
