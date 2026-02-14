@@ -76,10 +76,10 @@ export class HiveMonitorPanel {
                         vscode.commands.executeCommand('colonyforge.openTerminalMonitor');
                         break;
                     case 'selectHive':
-                        vscode.commands.executeCommand('colonyforge.selectHive', message.hiveId);
+                        // ノードクリック → フィルタリングは webview 側 JS で処理済み
                         break;
                     case 'selectColony':
-                        vscode.commands.executeCommand('colonyforge.selectColony', message.colonyId);
+                        // ノードクリック → フィルタリングは webview 側 JS で処理済み
                         break;
                     case 'focusAgent':
                         this._focusTmuxAgent(message.agentId);
@@ -803,18 +803,10 @@ export class HiveMonitorPanel {
         });
 
         // グローバル関数（onclick用）
-        window.selectHive = function(id) { vscodeApi.postMessage({ command: 'selectHive', hiveId: id }); };
-        window.selectColony = function(id) { vscodeApi.postMessage({ command: 'selectColony', colonyId: id }); };
         window.focusAgent = function(id) { vscodeApi.postMessage({ command: 'focusAgent', agentId: id }); };
         window.filterByBeekeeper = function() { setActivityFilter({ type: 'beekeeper' }); };
-        window.filterByHive = function(id) {
-            vscodeApi.postMessage({ command: 'selectHive', hiveId: id });
-            setActivityFilter({ type: 'hive', id: id });
-        };
-        window.filterByColony = function(id) {
-            vscodeApi.postMessage({ command: 'selectColony', colonyId: id });
-            setActivityFilter({ type: 'colony', id: id });
-        };
+        window.filterByHive = function(id) { setActivityFilter({ type: 'hive', id: id }); };
+        window.filterByColony = function(id) { setActivityFilter({ type: 'colony', id: id }); };
         window.clearActivityFilter = function() { clearActivityFilter(); };
 
         // --- ズーム＆パン ---

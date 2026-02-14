@@ -6,7 +6,7 @@
 
 import * as vscode from 'vscode';
 import { ColonyForgeClient } from '../client';
-import { HiveTreeDataProvider } from '../views/hiveTreeView';
+import { HiveTreeDataProvider, HiveTreeItem } from '../views/hiveTreeView';
 
 let hiveTreeProvider: HiveTreeDataProvider | undefined;
 let apiClient: ColonyForgeClient | undefined;
@@ -60,10 +60,18 @@ export async function createHive(): Promise<void> {
 /**
  * Hiveを終了
  */
-export async function closeHive(hiveId?: string): Promise<void> {
+export async function closeHive(itemOrId?: HiveTreeItem | string): Promise<void> {
     if (!apiClient) {
         vscode.window.showErrorMessage('ColonyForge: サーバーに接続されていません');
         return;
+    }
+
+    // TreeView inline button からは HiveTreeItem が渡される
+    let hiveId: string | undefined;
+    if (itemOrId instanceof HiveTreeItem) {
+        hiveId = itemOrId.itemId;
+    } else {
+        hiveId = itemOrId;
     }
 
     if (!hiveId) {

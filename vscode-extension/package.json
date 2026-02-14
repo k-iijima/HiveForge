@@ -265,7 +265,7 @@
         },
         {
           "command": "colonyforge.completeColony",
-          "when": "view == colonyforge.hives && viewItem =~ /^(runningColony|inProgressColony)$/",
+          "when": "view == colonyforge.hives && viewItem == runningColony",
           "group": "inline@1"
         },
         {

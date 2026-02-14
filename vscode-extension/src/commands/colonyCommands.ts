@@ -6,7 +6,7 @@
 
 import * as vscode from 'vscode';
 import { ColonyForgeClient } from '../client';
-import { HiveTreeDataProvider } from '../views/hiveTreeView';
+import { HiveTreeDataProvider, HiveTreeItem } from '../views/hiveTreeView';
 
 let hiveTreeProvider: HiveTreeDataProvider | undefined;
 let apiClient: ColonyForgeClient | undefined;
@@ -21,10 +21,18 @@ export function setHiveTreeProviderForColony(provider: HiveTreeDataProvider): vo
 /**
  * Colonyを作成
  */
-export async function createColony(hiveId?: string): Promise<void> {
+export async function createColony(itemOrId?: HiveTreeItem | string): Promise<void> {
     if (!apiClient) {
         vscode.window.showErrorMessage('ColonyForge: サーバーに接続されていません');
         return;
+    }
+
+    // TreeView inline button からは HiveTreeItem が渡される
+    let hiveId: string | undefined;
+    if (itemOrId instanceof HiveTreeItem) {
+        hiveId = itemOrId.itemId;
+    } else {
+        hiveId = itemOrId;
     }
 
     // Hiveが指定されていない場合は選択ダイアログ
@@ -87,10 +95,18 @@ export async function createColony(hiveId?: string): Promise<void> {
 /**
  * Colonyを開始
  */
-export async function startColony(colonyId?: string): Promise<void> {
+export async function startColony(itemOrId?: HiveTreeItem | string): Promise<void> {
     if (!apiClient) {
         vscode.window.showErrorMessage('ColonyForge: サーバーに接続されていません');
         return;
+    }
+
+    // TreeView inline button からは HiveTreeItem が渡される (itemId = "hiveId::colonyId")
+    let colonyId: string | undefined;
+    if (itemOrId instanceof HiveTreeItem) {
+        colonyId = itemOrId.itemId.split('::')[1] || itemOrId.itemId;
+    } else {
+        colonyId = itemOrId;
     }
 
     if (!colonyId) {
@@ -111,10 +127,18 @@ export async function startColony(colonyId?: string): Promise<void> {
 /**
  * Colonyを完了
  */
-export async function completeColony(colonyId?: string): Promise<void> {
+export async function completeColony(itemOrId?: HiveTreeItem | string): Promise<void> {
     if (!apiClient) {
         vscode.window.showErrorMessage('ColonyForge: サーバーに接続されていません');
         return;
+    }
+
+    // TreeView inline button からは HiveTreeItem が渡される (itemId = "hiveId::colonyId")
+    let colonyId: string | undefined;
+    if (itemOrId instanceof HiveTreeItem) {
+        colonyId = itemOrId.itemId.split('::')[1] || itemOrId.itemId;
+    } else {
+        colonyId = itemOrId;
     }
 
     if (!colonyId) {
