@@ -18,10 +18,11 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
 import time
 from collections.abc import Iterator
-from urllib.error import URLError
 from urllib.request import Request, urlopen
+from urllib.error import URLError
 
 # アイコン定義
 _ROLE_ICONS: dict[str, str] = {
@@ -340,7 +341,7 @@ def run_tmux_monitor(server_url: str) -> None:
 
     stream_url = f"{server_url.rstrip('/')}/activity/stream"
 
-    print("🐝 ColonyForge Agent Monitor (tmux)")
+    print(f"🐝 ColonyForge Agent Monitor (tmux)")
     print(f"   Server: {server_url}")
 
     # 既存セッションをクリーンアップ
@@ -375,9 +376,6 @@ def run_tmux_monitor(server_url: str) -> None:
 
     # tmux をアタッチ（バックグラウンドで SSE を処理）
     print(f"   Agents: {initial_agents or ['(none)']}")
-    print(f"\n   tmux attach -t {SESSION_NAME}")
-    print("   でモニターに接続してください。")
-    print("   Ctrl+C でイベントルーティングを停止します。")
     print()
 
     # 既存イベントをペインに表示
@@ -392,58 +390,74 @@ def run_tmux_monitor(server_url: str) -> None:
         if agent_id_r in agent_logs:
             _write_to_log(agent_logs[agent_id_r], formatted_r)
 
-    # SSE ストリームを購読してペインにルーティング
-    try:
-        for event in iter_sse_events(stream_url):
-            agent = event.get("agent", {})
-            if not isinstance(agent, dict):
-                agent = {}
-            agent_id: str = str(agent.get("agent_id", "?"))
-            formatted = format_event(event, color=False)
+    # SSEルーティングをバックグラウンドスレッドで開始
+    stop_event = threading.Event()
 
-            # 全イベントを overview に
-            _write_to_log(overview_log, formatted)
+    def _sse_router() -> None:
+        """SSE ストリームを購読してペインにルーティングする（バックグラウンド）。"""
+        try:
+            for event in iter_sse_events(stream_url):
+                if stop_event.is_set():
+                    break
+                agent = event.get("agent", {})
+                if not isinstance(agent, dict):
+                    agent = {}
+                agent_id: str = str(agent.get("agent_id", "?"))
+                formatted = format_event(event, color=False)
 
-            # エージェント固有ペインに
-            if agent_id in agent_logs:
-                _write_to_log(agent_logs[agent_id], formatted)
-            elif agent_id != "?":
-                # 新しいエージェントを動的に追加
-                log_path = f"/tmp/colonyforge-monitor/{agent_id}.log"
-                open(log_path, "w").close()
-                _write_to_log(
-                    log_path,
-                    f"{'─' * 40}\n📡 Monitoring: {agent_id}\n{'─' * 40}",
-                )
-                agent_logs[agent_id] = log_path
+                _write_to_log(overview_log, formatted)
 
-                # tmux ペインを動的追加
-                if _session_exists():
-                    _tmux(
-                        "split-window",
-                        "-t",
-                        SESSION_NAME,
-                        "-h",
-                        "tail",
-                        "-f",
+                if agent_id in agent_logs:
+                    _write_to_log(agent_logs[agent_id], formatted)
+                elif agent_id != "?":
+                    log_path = f"/tmp/colonyforge-monitor/{agent_id}.log"
+                    open(log_path, "w").close()
+                    _write_to_log(
                         log_path,
+                        f"{'─' * 40}\n📡 Monitoring: {agent_id}\n{'─' * 40}",
                     )
-                    pane_count = len(agent_logs) - 1  # __overview__ を除く
-                    _tmux(
-                        "select-pane",
-                        "-t",
-                        f"{SESSION_NAME}:0.{pane_count}",
-                        "-T",
-                        agent_id,
-                    )
-                    _tmux("select-layout", "-t", SESSION_NAME, "tiled")
+                    agent_logs[agent_id] = log_path
 
-                _write_to_log(agent_logs[agent_id], formatted)
+                    if _session_exists():
+                        _tmux(
+                            "split-window",
+                            "-t",
+                            SESSION_NAME,
+                            "-h",
+                            "tail",
+                            "-f",
+                            log_path,
+                        )
+                        pane_count = len(agent_logs) - 1
+                        _tmux(
+                            "select-pane",
+                            "-t",
+                            f"{SESSION_NAME}:0.{pane_count}",
+                            "-T",
+                            agent_id,
+                        )
+                        _tmux("select-layout", "-t", SESSION_NAME, "tiled")
 
+                    _write_to_log(agent_logs[agent_id], formatted)
+        except Exception:
+            if not stop_event.is_set():
+                _write_to_log(overview_log, "[monitor] SSE接続断 — 再接続待ち")
+
+    router_thread = threading.Thread(target=_sse_router, daemon=True)
+    router_thread.start()
+
+    # フォアグラウンドで tmux にアタッチ（ユーザーが操作可能）
+    try:
+        subprocess.run(["tmux", "attach-session", "-t", SESSION_NAME], check=False)
     except KeyboardInterrupt:
-        print(f"\n{_DIM}[monitor] イベントルーティング停止{_RESET}")
-        print(f"   tmux セッション '{SESSION_NAME}' はまだ生きています。")
-        print(f"   終了: tmux kill-session -t {SESSION_NAME}")
+        pass
+    finally:
+        stop_event.set()
+        print(f"\n{_DIM}[monitor] 終了{_RESET}")
+        if _session_exists():
+            print(f"   tmux セッション '{SESSION_NAME}' はまだ生きています。")
+            print(f"   再接続: tmux attach -t {SESSION_NAME}")
+            print(f"   終了: tmux kill-session -t {SESSION_NAME}")
 
 
 # =============================================================================

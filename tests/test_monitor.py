@@ -9,16 +9,17 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
 from colonyforge.monitor import (
+    SESSION_NAME,
     _ACTIVITY_ICONS,
     _ROLE_COLORS,
     _ROLE_ICONS,
-    SESSION_NAME,
     _create_monitor_session,
     _fetch_hierarchy,
     _fetch_initial_agents,
@@ -32,6 +33,7 @@ from colonyforge.monitor import (
     run_single_terminal,
     run_tmux_monitor,
 )
+
 
 # =============================================================================
 # format_event テスト
@@ -584,15 +586,16 @@ class TestRunTmuxMonitor:
         with pytest.raises(SystemExit, match="1"):
             run_tmux_monitor("http://localhost:8000")
 
+    @patch("colonyforge.monitor.subprocess.run")
     @patch("colonyforge.monitor.iter_sse_events", return_value=iter([]))
     @patch("colonyforge.monitor._create_monitor_session")
     @patch("colonyforge.monitor._kill_session")
     @patch("colonyforge.monitor._fetch_initial_agents", return_value=["w-1"])
     @patch("colonyforge.monitor.shutil.which", return_value="/usr/bin/tmux")
     def test_creates_session_and_subscribes(
-        self, mock_which, mock_fetch, mock_kill, mock_create, mock_sse
+        self, mock_which, mock_fetch, mock_kill, mock_create, mock_sse, mock_run
     ):
-        """tmuxセッションを作成してSSEに接続する"""
+        """tmuxセッションを作成してSSEに接続し、自動アタッチする"""
         # Arrange
         mock_create.return_value = {
             "__overview__": "/tmp/test-overview.log",
@@ -606,6 +609,11 @@ class TestRunTmuxMonitor:
         mock_kill.assert_called_once()
         mock_fetch.assert_called_once_with("http://localhost:8000")
         mock_create.assert_called_once_with(["w-1"])
+        # tmux attach が自動実行される
+        mock_run.assert_any_call(
+            ["tmux", "attach-session", "-t", "colonyforge-monitor"],
+            check=False,
+        )
 
 
 # =============================================================================
@@ -619,9 +627,11 @@ class TestCLIIntegration:
     def test_monitor_subcommand_registered(self):
         """monitor サブコマンドがパーサーに登録されている"""
         # Arrange
-        # Act: --help で monitor が表示されるか確認
-
         from colonyforge.cli import main
+
+        # Act: --help で monitor が表示されるか確認
+        import io
+        from contextlib import redirect_stdout, redirect_stderr
 
         with pytest.raises(SystemExit):
             import sys
