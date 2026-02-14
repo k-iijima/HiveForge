@@ -72,6 +72,9 @@ export class HiveMonitorPanel {
                     case 'refresh':
                         this._update();
                         break;
+                    case 'openTerminalMonitor':
+                        vscode.commands.executeCommand('colonyforge.openTerminalMonitor');
+                        break;
                     case 'selectHive':
                         vscode.commands.executeCommand('colonyforge.selectHive', message.hiveId);
                         break;
@@ -234,6 +237,9 @@ export class HiveMonitorPanel {
 <body>
     <div class="header">
         <h1>🐝 Hive Monitor</h1>
+        <div class="header-actions">
+            <button class="header-btn" id="btnTerminalMonitor" title="Terminal Monitorを開く">💻 Terminal</button>
+        </div>
         <div class="stats" id="stats"></div>
     </div>
     <div class="tab-bar" role="tablist" aria-label="Hive Monitor tabs">
@@ -286,6 +292,11 @@ export class HiveMonitorPanel {
             btn.addEventListener('click', () => {
                 switchTab(btn.getAttribute('data-tab'));
             });
+        });
+
+        // ターミナルモニターボタン
+        document.getElementById('btnTerminalMonitor')?.addEventListener('click', () => {
+            vscodeApi.postMessage({ command: 'openTerminalMonitor' });
         });
 
         // 保存された状態を復元
@@ -768,6 +779,19 @@ export class HiveMonitorPanel {
                 flex-shrink: 0;
             }
             .header h1 { font-size: 15px; font-weight: 600; }
+            .header-actions { display: flex; gap: 8px; align-items: center; }
+            .header-btn {
+                padding: 3px 10px;
+                font-size: 12px;
+                background: var(--vscode-button-secondaryBackground, #3a3d41);
+                color: var(--vscode-button-secondaryForeground, #ccc);
+                border: 1px solid var(--vscode-widget-border);
+                border-radius: 3px;
+                cursor: pointer;
+            }
+            .header-btn:hover {
+                background: var(--vscode-button-secondaryHoverBackground, #505357);
+            }
             .stats { display: flex; gap: 16px; }
             .stat { font-size: 12px; color: var(--vscode-descriptionForeground); }
             .stat strong { color: var(--vscode-foreground); }

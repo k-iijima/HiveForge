@@ -146,6 +146,10 @@ export class ColonyForgeClient {
         this.client.defaults.baseURL = url;
     }
 
+    getServerUrl(): string {
+        return this.client.defaults.baseURL ?? 'http://localhost:8000';
+    }
+
     setCurrentRunId(runId: string | undefined): void {
         this.currentRunId = runId;
     }

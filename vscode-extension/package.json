@@ -167,6 +167,11 @@
         "command": "colonyforge.completeColony",
         "title": "ColonyForge: Colonyを完了",
         "icon": "$(check)"
+      },
+      {
+        "command": "colonyforge.openTerminalMonitor",
+        "title": "ColonyForge: Terminal Monitorを開く",
+        "icon": "$(terminal)"
       }
     ],
     "menus": {
@@ -175,6 +180,11 @@
           "command": "colonyforge.showHiveMonitor",
           "when": "view == colonyforge.hives",
           "group": "navigation@0"
+        },
+        {
+          "command": "colonyforge.openTerminalMonitor",
+          "when": "view == colonyforge.hives",
+          "group": "navigation@1"
         },
         {
           "command": "colonyforge.createHive",

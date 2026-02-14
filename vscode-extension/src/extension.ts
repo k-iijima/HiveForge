@@ -76,6 +76,31 @@ export function activate(context: vscode.ExtensionContext) {
         })
     );
 
+    // Terminal Monitor コマンド
+    context.subscriptions.push(
+        vscode.commands.registerCommand('colonyforge.openTerminalMonitor', async () => {
+            const mode = await vscode.window.showQuickPick(
+                [
+                    { label: '$(split-horizontal) tmux モード', description: 'エージェント別ペイン分割', value: 'tmux' },
+                    { label: '$(terminal) 単一ターミナル', description: 'カラー出力（tmux不要）', value: 'single' },
+                    { label: '$(beaker) デモ付き tmux', description: 'デモデータ自動投入 + tmux', value: 'seed' },
+                ],
+                { placeHolder: 'Monitor モードを選択' },
+            );
+            if (!mode) { return; }
+            const serverUrl = client.getServerUrl();
+            const args = ['monitor', '--url', serverUrl];
+            if (mode.value === 'single') { args.push('--no-tmux'); }
+            if (mode.value === 'seed') { args.push('--seed'); }
+            const terminal = vscode.window.createTerminal({
+                name: '🐝 Colony Monitor',
+                iconPath: new vscode.ThemeIcon('pulse'),
+            });
+            terminal.show();
+            terminal.sendText(`colonyforge ${args.join(' ')}`);
+        })
+    );
+
     // Chat Participant (@colonyforge) を登録
     // Note: vscode.chat API may not be available in all environments (e.g., code-server)
     try {
