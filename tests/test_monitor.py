@@ -17,14 +17,19 @@ import pytest
 
 from colonyforge.monitor import (
     SESSION_NAME,
+    ColonyLayout,
+    MonitorLayout,
     _ACTIVITY_ICONS,
     _ROLE_COLORS,
     _ROLE_ICONS,
+    _add_agent_to_layout,
+    _create_hierarchical_session,
     _create_monitor_session,
     _fetch_hierarchy,
     _fetch_initial_agents,
     _fetch_recent_events,
     _kill_session,
+    _route_event_to_layout,
     _seed_server,
     _session_exists,
     _write_to_log,
@@ -591,11 +596,12 @@ class TestRunTmuxMonitor:
     @patch("colonyforge.monitor._create_monitor_session")
     @patch("colonyforge.monitor._kill_session")
     @patch("colonyforge.monitor._fetch_initial_agents", return_value=["w-1"])
+    @patch("colonyforge.monitor._fetch_hierarchy", return_value={})
     @patch("colonyforge.monitor.shutil.which", return_value="/usr/bin/tmux")
     def test_creates_session_and_subscribes(
-        self, mock_which, mock_fetch, mock_kill, mock_create, mock_sse, mock_run
+        self, mock_which, mock_hier, mock_fetch, mock_kill, mock_create, mock_sse, mock_run
     ):
-        """tmuxセッションを作成してSSEに接続し、自動アタッチする"""
+        """hierarchy が空の場合、フラットレイアウトにフォールバックする"""
         # Arrange
         mock_create.return_value = {
             "__overview__": "/tmp/test-overview.log",
@@ -605,15 +611,185 @@ class TestRunTmuxMonitor:
         # Act: iter_sse_events が空なのですぐに終了
         run_tmux_monitor("http://localhost:8000")
 
-        # Assert
+        # Assert: hierarchy が空なので _fetch_initial_agents → _create_monitor_session
         mock_kill.assert_called_once()
+        mock_hier.assert_called_once_with("http://localhost:8000")
         mock_fetch.assert_called_once_with("http://localhost:8000")
         mock_create.assert_called_once_with(["w-1"])
-        # tmux attach が自動実行される
         mock_run.assert_any_call(
             ["tmux", "attach-session", "-t", "colonyforge-monitor"],
             check=False,
         )
+
+    @patch("colonyforge.monitor.subprocess.run")
+    @patch("colonyforge.monitor.iter_sse_events", return_value=iter([]))
+    @patch("colonyforge.monitor._create_hierarchical_session")
+    @patch("colonyforge.monitor._kill_session")
+    @patch("colonyforge.monitor._fetch_hierarchy")
+    @patch("colonyforge.monitor.shutil.which", return_value="/usr/bin/tmux")
+    def test_uses_hierarchy_when_available(
+        self, mock_which, mock_hier, mock_kill, mock_create_h, mock_sse, mock_run
+    ):
+        """hierarchy が取れた場合、Colony ベースのレイアウトを使う"""
+        # Arrange
+        mock_hier.return_value = {
+            "hive-alpha": {
+                "beekeeper": {"agent_id": "bk-A"},
+                "colonies": {
+                    "colony-fe": {
+                        "queen_bee": {"agent_id": "q-fe"},
+                        "workers": [{"agent_id": "w-1"}],
+                    },
+                },
+            },
+        }
+        mock_create_h.return_value = MonitorLayout(
+            overview_log="/tmp/test-overview.log",
+            colonies={
+                "colony-fe": ColonyLayout(
+                    colony_id="colony-fe",
+                    window_index=1,
+                    queen_log="/tmp/q-fe.log",
+                    worker_logs={"w-1": "/tmp/w-1.log"},
+                ),
+            },
+            agent_to_colony={"q-fe": "colony-fe", "w-1": "colony-fe"},
+            standalone_logs={"bk-A": "/tmp/bk-A.log"},
+        )
+
+        # Act
+        run_tmux_monitor("http://localhost:8000")
+
+        # Assert: _create_hierarchical_session が呼ばれる
+        mock_create_h.assert_called_once()
+        mock_run.assert_any_call(
+            ["tmux", "attach-session", "-t", "colonyforge-monitor"],
+            check=False,
+        )
+
+
+# =============================================================================
+# _route_event_to_layout テスト
+# =============================================================================
+
+
+class TestRouteEventToLayout:
+    """イベントルーティングのテスト"""
+
+    def _make_layout(self, tmp_path):
+        """テスト用 MonitorLayout を作成する"""
+        overview = str(tmp_path / "overview.log")
+        queen_log = str(tmp_path / "queen.log")
+        w1_log = str(tmp_path / "w1.log")
+        bk_log = str(tmp_path / "bk.log")
+        for p in [overview, queen_log, w1_log, bk_log]:
+            open(p, "w").close()
+        return MonitorLayout(
+            overview_log=overview,
+            colonies={
+                "col-fe": ColonyLayout(
+                    colony_id="col-fe",
+                    window_index=1,
+                    queen_log=queen_log,
+                    worker_logs={"w-1": w1_log},
+                ),
+            },
+            agent_to_colony={"q-fe": "col-fe", "w-1": "col-fe"},
+            standalone_logs={"bk-A": bk_log},
+        )
+
+    def test_queen_event_routed_to_queen_log(self, tmp_path):
+        """Queen のイベントは Queen ログに書かれる"""
+        # Arrange
+        layout = self._make_layout(tmp_path)
+        event = {
+            "agent": {"agent_id": "q-fe", "role": "queen_bee", "colony_id": "col-fe"},
+            "activity_type": "llm.request",
+            "summary": "queen thinking",
+            "timestamp": "2026-02-14T10:00:00Z",
+        }
+
+        # Act
+        _route_event_to_layout(event, layout)
+
+        # Assert
+        queen_content = open(layout.colonies["col-fe"].queen_log).read()
+        assert "queen thinking" in queen_content
+        overview_content = open(layout.overview_log).read()
+        assert "queen thinking" in overview_content
+
+    def test_worker_event_routed_to_worker_log(self, tmp_path):
+        """Worker のイベントは Worker ログに書かれる"""
+        # Arrange
+        layout = self._make_layout(tmp_path)
+        event = {
+            "agent": {"agent_id": "w-1", "role": "worker_bee", "colony_id": "col-fe"},
+            "activity_type": "mcp.tool_call",
+            "summary": "running tool",
+            "timestamp": "2026-02-14T10:00:01Z",
+        }
+
+        # Act
+        _route_event_to_layout(event, layout)
+
+        # Assert
+        w1_content = open(layout.colonies["col-fe"].worker_logs["w-1"]).read()
+        assert "running tool" in w1_content
+
+    def test_beekeeper_event_routed_to_standalone(self, tmp_path):
+        """Beekeeper のイベントは standalone ログに書かれる"""
+        # Arrange
+        layout = self._make_layout(tmp_path)
+        event = {
+            "agent": {"agent_id": "bk-A", "role": "beekeeper"},
+            "activity_type": "message.sent",
+            "summary": "assigning hive",
+            "timestamp": "2026-02-14T10:00:02Z",
+        }
+
+        # Act
+        _route_event_to_layout(event, layout)
+
+        # Assert
+        bk_content = open(layout.standalone_logs["bk-A"]).read()
+        assert "assigning hive" in bk_content
+
+    def test_unknown_agent_without_colony_goes_to_standalone(self, tmp_path):
+        """Colony 不明の未知エージェントは standalone に追加される"""
+        # Arrange
+        layout = self._make_layout(tmp_path)
+        event = {
+            "agent": {"agent_id": "new-agent", "role": "worker_bee"},
+            "activity_type": "agent.started",
+            "summary": "hello",
+            "timestamp": "2026-02-14T10:00:03Z",
+        }
+
+        # Act
+        _route_event_to_layout(event, layout)
+
+        # Assert
+        assert "new-agent" in layout.standalone_logs
+
+    @patch("colonyforge.monitor._session_exists", return_value=False)
+    def test_unknown_agent_with_colony_added_dynamically(self, mock_sess, tmp_path):
+        """Colony が分かる未知エージェントは動的に Colony に追加される"""
+        # Arrange
+        layout = self._make_layout(tmp_path)
+        event = {
+            "agent": {"agent_id": "w-new", "role": "worker_bee", "colony_id": "col-fe"},
+            "activity_type": "agent.started",
+            "summary": "new worker",
+            "timestamp": "2026-02-14T10:00:04Z",
+        }
+
+        # Act
+        _route_event_to_layout(event, layout)
+
+        # Assert: Colony col-fe に追加された
+        assert "w-new" in layout.agent_to_colony
+        assert layout.agent_to_colony["w-new"] == "col-fe"
+        assert "w-new" in layout.colonies["col-fe"].worker_logs
 
 
 # =============================================================================
