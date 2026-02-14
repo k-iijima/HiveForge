@@ -493,4 +493,4 @@ Git ワークフローと GitHub Projection（AR→GitHub 同期）は相補的�
 - [AGENTS.md](../AGENTS.md) — 開発原則（TDD, コミット規約）
 - [ARCHITECTURE.md](ARCHITECTURE.md) — Plane分離アーキテクチャ（§12.4）
 - [DEVELOPMENT_PLAN_v2.md](DEVELOPMENT_PLAN_v2.md) — 開発計画
-- [コンセプト_v6.md](コンセプト_v6.md) — 設計思想
+- [コンセプト.md](コンセプト.md) — 設計思想

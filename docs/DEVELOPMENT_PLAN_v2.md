@@ -3,7 +3,7 @@
 > **策定日**: 2026-02-08
 > **前版**: [DEVELOPMENT_PLAN_v1.md](archive/DEVELOPMENT_PLAN_v1.md) — 2026-02-07策定
 > **トリガー**: v1.5コンセプト（Swarming Protocol, Guard Bee, Honeycomb等）の導入に伴い計画を再編
-> **コンセプト**: [コンセプト_v6.md](コンセプト_v6.md)
+> **コンセプト**: [コンセプト.md](コンセプト.md)
 
 ---
 
@@ -16,7 +16,7 @@
 | **ユニットテスト** | `pytest` で確認 | 固定値は記載しない（CIで自動取得） |
 | **カバレッジ** | `pytest --cov` で確認 | 同上 |
 | **Lint (Ruff)** | ✅ All passed | — |
-| **EventType数** | 95 | `core/events/types.py` |
+| **EventType数** | 67 | `core/events/types.py` |
 
 > テスト件数・カバレッジは**計測値のみを正とし**、ドキュメントに固定値を書かない。
 
@@ -24,7 +24,7 @@
 
 | コンポーネント | ステータス | 詳細 | 既知の制約 |
 |---------------|-----------|------|------------|
-| **Hive Core** (イベント, AR, 状態機械) | ✅ 完了 | 95 EventType, 5状態機械, ハッシュ連鎖 | — |
+| **Hive Core** (イベント, AR, 状態機械) | ✅ 完了 | 67 EventType, 5状態機械, ハッシュ連鎖 | — |
 | **Hive/Colony AR永続化** | ✅ M1-1完了 | HiveStore + HiveAggregate, JSONL永続化 | — |
 | **API Server** (FastAPI REST) | ✅ 完了 | Hive/Colony CRUD が AR永続化と接続済み | 認証ミドルウェア実装済 (`auth.enabled: false` がデフォルト) |
 | **MCP Server** (Copilot連携) | ✅ 完了 | 全ツール実装・テスト済 | — |
@@ -173,7 +173,7 @@ M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)  
 
 **目標**: Swarming Protocol, Guard Bee, Honeycomb を実装し、「学習するシステム」の基盤を構築する。
 
-> **設計参照**: [コンセプト_v6.md](コンセプト_v6.md) §3-7
+> **設計参照**: [コンセプト.md](コンセプト.md) §3-7
 
 #### M3-1: Honeycomb（ハニカム）
 
@@ -371,7 +371,7 @@ M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)  
 | M5-1b | 入力バリデーション強化（MCP + APIルート） | ✅ 完了 |
 | M5-2 | パフォーマンス計測・最適化 | ✅ ベンチマーク基盤完了 |
 | M5-3 | CI/CD強化（3ジョブ分割、カバレッジゲート96%） | ✅ 完了 |
-| M5-4 | KPIダッシュボード（Hive Monitor Webview統合） | 未着手 |
+| M5-4 | KPIダッシュボード（Hive Monitor Webview統合） | 🟡 部分完了（フロントエンド統合済、バックエンド未着手） |
 | M5-5 | サンプルプロジェクト作成 | 未着手 |
 | M5-6 | ユーザードキュメント完成 | 未着手 |
 
@@ -471,7 +471,7 @@ M1〜M4完了。M2全サブタスク完了（M2-0〜M2-4）。M5一部着手済�
 |------|-----------|
 | テスト件数/カバレッジ | `pytest` / `pytest --cov` 実行結果 |
 | フェーズ進捗 | 本計画 (DEVELOPMENT_PLAN_v2.md) |
-| 設計思想 | コンセプト_v6.md |
+| 設計思想 | コンセプト.md |
 | 詳細設計（状態機械/イベント型/プロトコル） | v5-hive-design.md |
 | API仕様 | FastAPI自動生成 `/docs` |
 | 実装ステータス | コード + テスト |
@@ -480,7 +480,7 @@ M1〜M4完了。M2全サブタスク完了（M2-0〜M2-4）。M5一部着手済�
 
 | ドキュメント | 役割 | 記述レベル |
 |---|---|---|
-| [コンセプト_v6.md](コンセプト_v6.md) | **なぜ**: 設計思想・ビジョン | 概念・メタファー |
+| [コンセプト.md](コンセプト.md) | **なぜ**: 設計思想・ビジョン | 概念・メタファー |
 | [v5-hive-design.md](design/v5-hive-design.md) | **何を**: 詳細設計・スキーマ | 正式な仕様 |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | **今どう**: 実装の現況 | 実装の事実 |
 | **本書** | **次に何**: 開発計画 | タスク・優先度 |
@@ -492,7 +492,7 @@ M1〜M4完了。M2全サブタスク完了（M2-0〜M2-4）。M5一部着手済�
 
 | ドキュメント | 移動先 | 理由 |
 |-------------|--------|------|
-| コンセプト_v5.md | `docs/archive/` | v6に統合 |
+| コンセプト_v5.md | `docs/archive/` | コンセプト.mdに統合 |
 | DEVELOPMENT_PLAN_v1.md | `docs/archive/` | v2に更新 |
 | IMPLEMENTATION_STATUS.md | `docs/archive/` | 古い数値 |
 | ROADMAP.md | `docs/archive/` | 計画に統合 |

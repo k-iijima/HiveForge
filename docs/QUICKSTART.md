@@ -1,7 +1,7 @@
 # ColonyForge クイックスタート
 
 > **本書の役割**: 手順書。セットアップから動作確認までの具体的な操作手順を記載。
-> アーキテクチャの詳細は [ARCHITECTURE.md](ARCHITECTURE.md)、設計思想は [コンセプト_v6.md](コンセプト_v6.md) を参照。
+> アーキテクチャの詳細は [ARCHITECTURE.md](ARCHITECTURE.md)、設計思想は [コンセプト.md](コンセプト.md) を参照。
 
 ## 🚀 F5で即起動
 

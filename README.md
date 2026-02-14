@@ -87,7 +87,7 @@ Worker × N案生成 → Forager探索拡張 → Referee多面的採点 → Guar
 | M2: 接続 | ✅ 完了（M2-0〜M2-4 全完了） |
 | M3: 適応的協調 | ✅ 全完了 (M3-1〜M3-8) |
 | M4: 自律 | ✅ 完了 (M4-1, M4-2) |
-| M5: 運用品質 | 🔄 M5-1/M5-2基盤/M5-3 完了、M5-4〜M5-6 未着手 |
+| M5: 運用品質 | 🔄 M5-1/M5-2基盤/M5-3 完了、M5-4 部分完了、M5-5・M5-6 未着手 |
 
 詳細: [docs/DEVELOPMENT_PLAN_v2.md](docs/DEVELOPMENT_PLAN_v2.md)
 
@@ -158,7 +158,7 @@ colonyforge serve
 ```
 src/colonyforge/
 ├── core/              # コア基盤（イベント、AR、状態機械）
-│   ├── events/        #   95 EventType (パッケージ化済)
+│   ├── events/        #   67 EventType (パッケージ化済)
 │   ├── models/        #   ドメインモデル (ActionClass等)
 │   ├── ar/            #   Akashic Record (JSONL永続化)
 │   ├── state/         #   5状態機械
@@ -188,6 +188,7 @@ src/colonyforge/
 ├── vlm/               # VLM（画像解析）
 ├── vlm_tester/        # E2Eテスト支援
 ├── silence.py         # 沈黙検出
+├── monitor.py         # Hiveモニター
 └── cli.py             # CLI
 
 vscode-extension/      # VS Code拡張
@@ -200,7 +201,7 @@ Vault/                 # イベントログ (gitignore)
 | ドキュメント | 役割 | 説明 |
 |--------------|------|------|
 | [AGENTS.md](AGENTS.md) | 規約 | AI開発ガイドライン |
-| [docs/コンセプト_v6.md](docs/コンセプト_v6.md) | **なぜ** | 設計思想・ビジョン・ユースケース |
+| [docs/コンセプト.md](docs/コンセプト.md) | **なぜ** | 設計思想・ビジョン・ユースケース |
 | [docs/design/v5-hive-design.md](docs/design/v5-hive-design.md) | **何を** | 詳細設計・スキーマ・プロトコル（Single Source of Truth） |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | **今どうなっている** | 実装の現況・コンポーネント構成 |
 | [docs/DEVELOPMENT_PLAN_v2.md](docs/DEVELOPMENT_PLAN_v2.md) | **次に何をする** | 開発計画・マイルストーン |

@@ -6,7 +6,7 @@
 >
 > | ドキュメント | 役割 | 記述レベル |
 > |---|---|---|
-> | [コンセプト_v6.md](コンセプト_v6.md) | **なぜ**: 設計思想・ビジョン・ユースケース | 概念・メタファー |
+> | [コンセプト.md](コンセプト.md) | **なぜ**: 設計思想・ビジョン・ユースケース | 概念・メタファー |
 > | [v5-hive-design.md](design/v5-hive-design.md) | **何を**: 詳細設計・スキーマ・プロトコル定義 | 正式な仕様（Single Source of Truth） |
 > | **本書 (ARCHITECTURE.md)** | **今どうなっている**: 実装の現況・ディレクトリ構造 | 実装の事実 |
 > | [DEVELOPMENT_PLAN_v2.md](DEVELOPMENT_PLAN_v2.md) | **次に何をする**: 開発計画・マイルストーン | タスク・優先度 |
@@ -173,7 +173,7 @@ colonyforge/
 ├── core/                  # コアモジュール（他から参照される）
 │   ├── events/           # イベントモデル（M3-6でパッケージ化）
 │   │   ├── base.py           # BaseEvent
-│   │   ├── types.py          # EventType enum (95種)
+│   │   ├── types.py          # EventType enum (67種)
 │   │   ├── run.py            # Run関連イベント
 │   │   ├── hive.py           # Hive/Colony関連イベント
 │   │   ├── worker.py         # Worker Beeイベント
@@ -533,7 +533,7 @@ class BaseEvent(BaseModel):
 | **System** | `system.heartbeat` / `system.error` / `system.silence_detected` / `system.emergency_stop` | システム |
 | **Unknown** | （任意の文字列） | 前方互換用（`UnknownEvent`として読み込み） |
 
-> 全95 EventType。イベント型の正式なスキーマ定義・payload仕様は [v5-hive-design.md §3](design/v5-hive-design.md) を参照。
+> 全67 EventType。イベント型の正式なスキーマ定義・payload仕様は [v5-hive-design.md §3](design/v5-hive-design.md) を参照。
 
 ### 4.3 RunProjection（状態投影）
 
@@ -783,9 +783,10 @@ ColonyForge/
 │   ├── __init__.py
 │   ├── cli.py               # CLIエントリポイント
 │   ├── silence.py           # 沈黙検出
+│   ├── monitor.py           # Hiveモニター
 │   ├── core/                # コアモジュール
 │   │   ├── config.py        # 設定管理
-│   │   ├── events/          # イベントモデル (95 EventType)
+│   │   ├── events/          # イベントモデル (67 EventType)
 │   │   │   ├── base.py          # BaseEvent
 │   │   │   ├── types.py         # EventType enum
 │   │   │   ├── run.py           # Run/Task/Requirement
@@ -962,11 +963,10 @@ ColonyForge/
 │       │   ├── decisionCommands.ts
 │       │   └── filterCommands.ts
 │       ├── providers/       # TreeViewプロバイダー
+│       ├── chatHandler.ts   # Copilot Chat連携
 │       ├── views/           # Webviewパネル
-│       │   ├── dashboardPanel.ts
 │       │   ├── hiveMonitorPanel.ts
 │       │   ├── hiveTreeView.ts
-│       │   ├── agentMonitorPanel.ts
 │       │   └── requirementDetailView.ts
 │       ├── utils/           # ユーティリティ
 │       └── test/            # テスト
@@ -981,9 +981,16 @@ ColonyForge/
 │   ├── DEVELOPMENT_PLAN_v2.md
 │   ├── QUICKSTART.md
 │   ├── VLM_TESTER.md
-│   ├── コンセプト_v6.md
+│   ├── コンセプト.md
 │   ├── design/              # 詳細設計
-│   │   └── v5-hive-design.md
+│   │   ├── v5-hive-design.md
+│   │   └── M5-4_hive_monitor_unification.md
+│   ├── architecture/        # MkDocs: アーキテクチャ
+│   ├── development/         # MkDocs: 開発ガイド
+│   ├── getting-started/     # MkDocs: はじめに
+│   ├── guide/               # MkDocs: ユーザーガイド
+│   ├── reference/           # MkDocs: APIリファレンス
+│   ├── issues/              # 設計課題
 │   └── archive/             # 旧ドキュメント
 ├── Vault/                   # イベントログ（gitignore）
 ├── AGENTS.md                # AI開発ガイドライン
@@ -1138,7 +1145,7 @@ logging:
 ### 12.4 Plane分離アーキテクチャ（M5/M6構想）
 
 サンドボックス実行環境により、エージェントの自動化と安全性を両立する。
-詳細は [コンセプト_v6.md §9.4](コンセプト_v6.md) を参照。
+詳細は [コンセプト.md §9.4](コンセプト.md) を参照。
 
 - [ ] Step 1: docker compose 最小構成（Plane概念の導入）
 - [ ] Step 2: Worker エフェメラルコンテナ化（Execution Plane分離）
@@ -1163,4 +1170,4 @@ logging:
 - [QUICKSTART.md](QUICKSTART.md) - 動作確認手順
 - [AGENTS.md](../AGENTS.md) - AI開発ガイドライン
 - [GIT_WORKFLOW.md](GIT_WORKFLOW.md) - Gitワークフロー規約（ブランチ・Worktree・PRゲート）
-- [コンセプト_v6.md](コンセプト_v6.md) - 設計思想（最新版）
+- [コンセプト.md](コンセプト.md) - 設計思想（最新版）

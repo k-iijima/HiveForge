@@ -1,6 +1,6 @@
 # VLM Tester - ビジュアルテスト用MCPサーバー
 
-VLM Tester は Claude Vision を使用して VS Code 拡張機能のビジュアルテストを自動化する MCP サーバーです。
+VLM Tester は VLM（Vision Language Model）を使用して VS Code 拡張機能のビジュアルテストを自動化する MCP サーバーです。Ollama（ローカルVLM）やClaude Vision等のクラウドVLMに対応しています。
 
 ## 概要
 

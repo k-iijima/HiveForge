@@ -232,7 +232,7 @@ pip install -e ".[dev]"
 
 ## コードスタイル
 
-- Python 3.12+
+- Python 3.11+
 - 型ヒント必須
 - Ruffでフォーマット・リント
 - docstringは日本語可
@@ -278,6 +278,7 @@ src/colonyforge/
 ├── vlm/            # VLM（画像解析）
 ├── vlm_tester/     # VLM Tester（E2Eテスト支援）
 ├── silence.py      # 沈黙検出
+├── monitor.py      # Hiveモニター
 └── cli.py          # CLIツール
 
 tests/              # テストコード（実装と1:1対応）

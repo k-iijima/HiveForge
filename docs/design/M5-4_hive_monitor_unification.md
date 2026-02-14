@@ -3,6 +3,10 @@
 > **目的**: 3つの Webview パネル（Dashboard / Hive Monitor / Agent Monitor）を Hive Monitor に一本化し、  
 > KPI ダッシュボードの null 指標問題を解消する。
 
+> **実装ステータス**:
+> - フロントエンド統合: **完了**（`dashboardPanel.ts`・`agentMonitorPanel.ts` は削除済み、Hive Monitor に統合）
+> - バックエンドAPI拡張（`/kpi/event-counters` 等）: **未着手**
+
 ---
 
 ## 1. 現状分析 (As-Is)

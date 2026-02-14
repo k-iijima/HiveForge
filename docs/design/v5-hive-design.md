@@ -1,9 +1,9 @@
-# v5 Hive設計ドキュメント
+# ColonyForge 設計ドキュメント（Hive Core）
 
 > Phase 0: 設計検証の成果物
 > **本書は状態機械・イベント型・通信プロトコルの正式定義（Single Source of Truth）です。**
 >
-> 設計思想・ビジョンは [コンセプト_v6.md](../コンセプト_v6.md) を参照。
+> 設計思想・ビジョンは [コンセプト.md](../コンセプト.md) を参照。
 > 開発計画は [DEVELOPMENT_PLAN_v2.md](../DEVELOPMENT_PLAN_v2.md) を参照。
 
 作成日: 2026-02-01
