@@ -89,7 +89,7 @@ export function activate(context: vscode.ExtensionContext) {
             );
             if (!mode) { return; }
             const serverUrl = client.getServerUrl();
-            const args = ['monitor', '--url', serverUrl];
+            const args = ['monitor', '--server-url', serverUrl];
             if (mode.value === 'single') { args.push('--no-tmux'); }
             if (mode.value === 'seed') { args.push('--seed'); }
             const terminal = vscode.window.createTerminal({
