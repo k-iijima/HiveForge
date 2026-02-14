@@ -142,6 +142,7 @@ nav:
     - architecture/index.md
     - Event Types: architecture/events.md
     - Configuration: architecture/configuration.md
+    - design/requirement-analysis-colony.md
   - Reference:
     - reference/index.md
     - API Reference: reference/api.md

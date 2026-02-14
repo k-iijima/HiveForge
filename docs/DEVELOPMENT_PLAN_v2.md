@@ -48,7 +48,8 @@
 | **KPI Calculator** | ✅ M3-1完了 | HoneycombのKPICalculatorとして実装済 | — |
 | **LLM Orchestrator** | ✅ M4-2完了 | ColonyOrchestrator（層別並列実行）+ ColonyResult（結果集約）+ ExecutionPipeline（ゲート統合） | — |
 | **介入・エスカレーション** | ✅ 完了 | API/MCPハンドラ実装済、InterventionStore JSONL永続化 | — |
-| **GitHub Projection** | ✅ 完了 | AR→GitHub Issue片方向同期、MCPハンドラ’実装済 | — |
+| **GitHub Projection** | ✅ 完了 | AR→GitHub Issue片方向同期、MCPハンドラ'実装済 | — |
+| **Requirement Analysis** | 🔄 一部実装 | models.py (AcceptanceCriterion, SpecDraft) + spec_persister.py (doorstop+pytest-bdd) 実装済 | オーケストレーター・スコアラー・ゲート未着手。品質重視設計（変更追跡・影響分析含む）。設計書: [requirement-analysis-colony.md](design/requirement-analysis-colony.md) |
 
 ---
 
@@ -57,9 +58,9 @@
 ### 2.1 全体像
 
 ```
-M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)    → M5 (運用)
- ■■■■■■■■■■     ■■■■■■■■■■     ■■■■■■■■■■         ■■■■■■■■■■     ░░░░░░░░░░
- 完了              完了             完了                完了              プロダクション
+M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)    → M5 (運用)    → M6 (要求分析)
+ ■■■■■■■■■■     ■■■■■■■■■■     ■■■■■■■■■■         ■■■■■■■■■■     ░░░░░░░░░░     ▓▓▓▓▓▓▓▓▓▓
+ 完了              完了             完了                完了              プロダクション     要求トレーサビリティ
 ```
 
 ### 2.2 完了マイルストーン
@@ -406,6 +407,64 @@ M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)  
 
 ---
 
+### M6: Requirement Analysis Colony（要求トレーサビリティ・変更追跡）
+
+**目標**: 「即タスク化」を防ぎ、要求の曖昧さを定量的に評価・解消する。doorstop + pytest-bdd によるトレーサビリティ基盤を構築する。**品質が基盤、速度は並列化で確保**の設計哲学に基づき、要件版管理と変更追跡を組み込む。
+
+**設計参照**: [requirement-analysis-colony.md](design/requirement-analysis-colony.md)
+
+#### M6-1: データモデル + 永続化基盤 ✅ 一部完了
+
+| タスク | 内容 | 対象ファイル | 状態 |
+|--------|------|-------------|------|
+| M6-1-a | AcceptanceCriterion / SpecDraft モデル定義 | `requirement_analysis/models.py` | ✅ |
+| M6-1-b | SpecPersister（doorstop YAML + pytest-bdd .feature） | `requirement_analysis/spec_persister.py` | ✅ |
+| M6-1-c | doorstop ドキュメント初期化（`reqs/` ディレクトリ） | `reqs/.doorstop.yml` | ✅ |
+| M6-1-d | 状態機械定義（RAState 拡張） | `core/state/machines.py` | 未着手 |
+| M6-1-e | EventType 追加（Phase 1: 10種） | `core/events/types.py` | 未着手 |
+
+#### M6-2: スコアリング + コアループ
+
+| タスク | 内容 | 対象ファイル |
+|--------|------|-------------|
+| M6-2-a | AmbiguityScorer 実装 | `requirement_analysis/scorer.py` |
+| M6-2-b | Intent Miner （LLM Worker） | `requirement_analysis/intent_miner.py` |
+| M6-2-c | RAOrchestrator 状態遷移エンジン | `requirement_analysis/orchestrator.py` |
+
+#### M6-3: 分析エージェント群
+
+| タスク | 内容 | 対象ファイル |
+|--------|------|-------------|
+| M6-3-a | Assumption Mapper | `requirement_analysis/assumption_mapper.py` |
+| M6-3-b | Risk Challenger | `requirement_analysis/risk_challenger.py` |
+| M6-3-c | Clarification Generator | `requirement_analysis/clarify_generator.py` |
+
+#### M6-4: 合成 + ゲート + 統合
+
+| タスク | 内容 | 対象ファイル |
+|--------|------|-------------|
+| M6-4-a | Spec Synthesizer | `requirement_analysis/spec_synthesizer.py` |
+| M6-4-b | Guard Gate（Req版） | `requirement_analysis/gate.py` |
+| M6-4-c | Beekeeper 統合 | `beekeeper/` 修正 |
+
+#### M6-5: 要件版管理と変更追跡
+
+| タスク | 内容 | 対象ファイル |
+|--------|------|-------------|
+| M6-5-a | ChangeReason + RequirementChangedPayload モデル | `requirement_analysis/models.py` |
+| M6-5-b | RA_REQ_CHANGED イベント実装 | `requirement_analysis/change_tracker.py` |
+| M6-5-c | ImpactAnalyzer（doorstop links 逆引き + reviewed リセット） | `requirement_analysis/impact_analyzer.py` |
+
+**完了条件**:
+- ユーザー要求から SpecDraft が自動生成され、doorstop YAML として永続化される
+- AmbiguityScore に基づく質問・スキップ判定が動作する
+- pytest-bdd の .feature ファイルで受入基準が自動検証可能
+- `doorstop publish` で要求仕様書が出力可能
+- 要件変更時に RA_REQ_CHANGED イベントが因果リンク付きで発行される
+- doorstop links 逆引きによる影響分析が動作する
+
+---
+
 ### M1-残: 基盤品質改善（並行作業）
 
 > M1のうち未完了項目。他マイルストーンと並行して進められる。
@@ -435,7 +494,8 @@ M1〜M4完了。M2全サブタスク完了（M2-0〜M2-4）。M5一部着手済�
 ```
      高
       │
-      │  ════════ 次: 運用品質 ════════
+      │  ════════ 次: 運用品質 + 要求分析 ════════
+      │  M6 (Requirement Analysis Colony) ← 要求トレーサビリティ
       │  M5-4 (KPIダッシュボード)    ← Webview統合
       │  M5-5 (サンプルプロジェクト)  ← ドキュメント整備
       │  M5-6 (ユーザードキュメント)  ← GA準備
@@ -482,6 +542,7 @@ M1〜M4完了。M2全サブタスク完了（M2-0〜M2-4）。M5一部着手済�
 |---|---|---|
 | [コンセプト.md](コンセプト.md) | **なぜ**: 設計思想・ビジョン | 概念・メタファー |
 | [v5-hive-design.md](design/v5-hive-design.md) | **何を**: 詳細設計・スキーマ | 正式な仕様 |
+| [requirement-analysis-colony.md](design/requirement-analysis-colony.md) | **要求分析**: RA Colony設計・トレーサビリティ・要件版管理・変更追跡 | 設計仕様 |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | **今どう**: 実装の現況 | 実装の事実 |
 | **本書** | **次に何**: 開発計画 | タスク・優先度 |
 | [QUICKSTART.md](QUICKSTART.md) | **使い方**: セットアップ手順 | 手順書 |

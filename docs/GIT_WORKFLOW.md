@@ -277,6 +277,9 @@ develop:
 
 ### GitHub Actions ワークフロー構成
 
+> **実装状況**: `.github/workflows/ci.yml`（Lint/Unit）と `.github/workflows/e2e.yml`（E2Eテスト）が実装済み。
+> 以下は将来的な PR ゲートの完全形としての概念設計。
+
 ```yaml
 # .github/workflows/pr-gate.yml（概念設計）
 name: PR Gate

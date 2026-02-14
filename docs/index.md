@@ -54,11 +54,13 @@ ColonyForge is a **multi-agent collaborative development system** powered by LLM
 
 - **Multi-Agent Collaboration** — Hierarchical agent structure with specialized roles
 - **Generate → Verify → Select** — Parallel N-candidate generation with automated judging
+- **Quality as Foundation, Speed through Parallelism** — Rigorous requirement definition and specification
+- **Requirement Analysis Colony** — Prevents premature task creation; quantifies ambiguity. Manages requirements as single source of truth via doorstop
 - **Hive/Colony Hierarchy** — Organize multiple Runs into specialized Colonies
 - **Akashic Record (AR)** — Append-only immutable event log
 - **Honeycomb** — Learning and improvement from execution history
 - **Causal Tracing (Lineage)** — Trace "why" from any artifact
-- **State Machines** — Strict lifecycle management for Hive/Colony/Run/Task
+- **State Machines** — Strict lifecycle management for Hive/Colony/Run/Task/Requirement
 - **Evidence-first** — Decisions backed by diffs, tests, and rationale
 - **MCP Integration** — Operate directly from GitHub Copilot Chat
 - **VS Code Extension** — Dashboard and event log visualization

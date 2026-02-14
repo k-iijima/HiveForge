@@ -153,3 +153,40 @@ HoneycombシステムはColonyのパフォーマンススナップショット�
 | Collaboration Score | Colony間連携の品質 |
 
 これらのKPIは時系列のトレンド追跡により改善サイクル（PDCA）を可能にします。
+
+## 要求分析とトレーサビリティ
+
+ColonyForgeには**要求分析Colony（Requirement Analysis Colony）**が含まれており、実行前にユーザー要求を体系的に分析・明確化することで、性急なタスク分解を防ぎます。
+
+### コアフロー
+
+```mermaid
+graph LR
+    U[ユーザー要求] --> RA[RA Colony]
+    RA --> AS[AmbiguityScore]
+    AS -->|低| FP[高速パス → 実行]
+    AS -->|高| CL[明確化ループ]
+    CL --> SD[SpecDraft]
+    SD --> DS[doorstop YAML]
+    SD --> BDD[pytest-bdd .feature]
+```
+
+### 主要コンセプト
+
+| コンセプト | 説明 |
+|------------|------|
+| **SpecDraft** | RA Colonyが生成する構造化された仕様草案。doorstop YAMLとして永続化 |
+| **AcceptanceCriterion** | `text`, `measurable`, `metric`, `threshold` を持つ構造化受入基準 |
+| **AmbiguityScore** | 要求の曖昧さを定量的に評価（0.0〜1.0） |
+| **doorstop** | YAMLベースの要件管理ツール — `doorstop publish` で仕様書出力が可能 |
+| **pytest-bdd** | 受入基準を `.feature` ファイルとしてエクスポートし、自動検証を実現 |
+
+### トレーサビリティチェーン
+
+```
+ユーザー要求 → SpecDraft → doorstop YAML (REQ001.yml)
+                         → pytest-bdd .feature
+                         → ARイベント (ra.analysis_started, ra.spec_generated, ...)
+```
+
+全ての要件は、ユーザーの意図から仕様、そしてテスト検証まで追跡可能です。全ての状態変更は不変ARイベントとして記録されます。

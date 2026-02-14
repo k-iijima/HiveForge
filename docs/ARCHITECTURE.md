@@ -8,6 +8,7 @@
 > |---|---|---|
 > | [コンセプト.md](コンセプト.md) | **なぜ**: 設計思想・ビジョン・ユースケース | 概念・メタファー |
 > | [v5-hive-design.md](design/v5-hive-design.md) | **何を**: 詳細設計・スキーマ・プロトコル定義 | 正式な仕様（Single Source of Truth） |
+> | [requirement-analysis-colony.md](design/requirement-analysis-colony.md) | **要求分析**: RA Colony設計・トレーサビリティ | 設計仕様 |
 > | **本書 (ARCHITECTURE.md)** | **今どうなっている**: 実装の現況・ディレクトリ構造 | 実装の事実 |
 > | [DEVELOPMENT_PLAN_v2.md](DEVELOPMENT_PLAN_v2.md) | **次に何をする**: 開発計画・マイルストーン | タスク・優先度 |
 > | [GIT_WORKFLOW.md](GIT_WORKFLOW.md) | **Git運用**: ブランチ・Worktree・PRゲート | 運用規約 |
@@ -158,6 +159,7 @@ ColonyForgeは「**信頼できる部品を、信頼できる組み合わせ方�
 | **VS Code拡張** (コマンド) | Hive/Colony操作 | ✅ M2-1完了 | — |
 | **介入・エスカレーション** | API/MCPハンドラ | ✅ 完了 | InterventionStore JSONL永続化、ConferenceStore JSONL永続化 |
 | **GitHub Projection** | AR→GitHub Issue同期 | ✅ 完了 | httpx async、MCP統合済み |
+| **Requirement Analysis** | 要求分析Colony（doorstop永続化・トレーサビリティ・要件版管理） | 🔄 一部実装 | models.py + spec_persister.py 実装済。品質重視設計（変更追跡・影響分析含む）。オーケストレーター未着手 |
 | **Agent UI** | ブラウザ自動操作MCPサーバー | ✅ 完了 | — |
 | **VLM** | 画像解析・画面認識 | ✅ 完了 | String画像入力のbase64判定は仮定ベース |
 | **VLM Tester** | Playwright + VLMによるE2Eテスト | ✅ 完了 | — |
@@ -210,7 +212,8 @@ colonyforge/
 │   │   ├── models.py         # Episode, KPIScore等
 │   │   ├── store.py          # EpisodeStore (JSONL永続化)
 │   │   ├── recorder.py       # EpisodeRecorder
-│   │   └── kpi.py            # KPICalculator（lead_time他）
+│   │   ├── kpi.py            # KPICalculator（lead_time他）
+│   │   └── event_counters.py # イベントカウンター
 │   ├── swarming/         # Swarming Protocol (M3-2)
 │   │   ├── models.py         # SwarmingFeatures, SwarmingTemplate
 │   │   ├── engine.py         # SwarmingEngine（テンプレート選択）
@@ -236,11 +239,33 @@ colonyforge/
 │       ├── conferences.py # Conference API
 │       ├── guard_bee.py  # Guard Bee API
 │       ├── interventions.py # Intervention API
+│       ├── kpi.py        # KPI Dashboard API
 │       └── system.py     # ヘルスチェック等
 ├── mcp_server/            # MCP Server（coreに依存）
 │   ├── server.py
-│   ├── tools.py          # ツール定義
+│   ├── tools/            # ツール定義（モジュール分割済み）
+│   │   ├── beekeeper.py      # Beekeeperツール
+│   │   ├── colony.py         # Colonyツール
+│   │   ├── conference.py     # Conferenceツール
+│   │   ├── github.py         # GitHubツール
+│   │   ├── guard_bee.py      # Guard Beeツール
+│   │   ├── hive.py           # Hiveツール
+│   │   ├── intervention.py   # Interventionツール
+│   │   ├── run.py            # Runツール
+│   │   └── task.py           # Taskツール
 │   └── handlers/         # ハンドラー実装
+│       ├── base.py           # 基底ハンドラー
+│       ├── colony.py         # Colonyハンドラー
+│       ├── conference.py     # Conferenceハンドラー
+│       ├── decision.py       # Decisionハンドラー
+│       ├── github.py         # GitHubハンドラー
+│       ├── guard_bee.py      # Guard Beeハンドラー
+│       ├── hive.py           # Hiveハンドラー
+│       ├── intervention.py   # Interventionハンドラー
+│       ├── lineage.py        # Lineageハンドラー
+│       ├── requirement.py    # Requirementハンドラー
+│       ├── run.py            # Runハンドラー
+│       └── task.py           # Taskハンドラー
 ├── beekeeper/             # Beekeeper層（core, llmに依存）
 │   ├── server.py         # MCPサーバー
 │   ├── handler.py        # コアハンドラー
@@ -250,19 +275,26 @@ colonyforge/
 │   ├── conflict.py       # 衝突検出
 │   ├── escalation.py     # エスカレーション
 │   ├── resolver.py       # 衝突解決
-│   └── tool_definitions.py # ツール定義
+│   ├── tool_definitions.py # ツール定義
+│   ├── hive_handlers.py  # Hive操作ハンドラー
+│   ├── llm_integration.py # LLM統合
+│   ├── queen_delegation.py # Queen Bee委譲
+│   └── user_handlers.py  # ユーザー操作ハンドラー
 ├── queen_bee/             # Queen Bee層（core, llmに依存、M4実装済）
 │   ├── server.py         # MCPサーバー
 │   ├── planner.py        # TaskPlanner（LLMタスク分解・依存分析）(M4-1)
 │   ├── orchestrator.py   # ColonyOrchestrator（層別並列実行）(M4-2)
 │   ├── pipeline.py       # ExecutionPipeline（Guard Bee/承認ゲート統合）
+│   ├── pipeline_execution.py # パイプライン実行制御
 │   ├── context.py        # TaskResult / TaskContext（コンテキスト共有）(M4-2)
 │   ├── result.py         # ColonyResult / ColonyResultBuilder（結果集約）(M4-2)
 │   ├── approval.py       # PlanApprovalGate（承認制御）(M4-1)
 │   ├── communication.py  # エージェント間通信
+│   ├── execution.py      # タスク実行制御
 │   ├── progress.py       # 進捗管理
 │   ├── retry.py          # リトライ制御
-│   └── scheduler.py      # Colonyスケジューラー
+│   ├── scheduler.py      # Colonyスケジューラー
+│   └── task_runner.py    # タスクランナー
 ├── worker_bee/            # Worker Bee層（core, llmに依存）
 │   ├── server.py         # MCPサーバー
 │   ├── process.py        # タスク実行
@@ -534,6 +566,8 @@ class BaseEvent(BaseModel):
 | **Unknown** | （任意の文字列） | 前方互換用（`UnknownEvent`として読み込み） |
 
 > 全67 EventType。イベント型の正式なスキーマ定義・payload仕様は [v5-hive-design.md §3](design/v5-hive-design.md) を参照。
+>
+> **RA Colony イベント（計画中）**: 要求分析のイベント型は [requirement-analysis-colony.md §6](design/requirement-analysis-colony.md) で Phase 1（10種）/ Phase 2（7種）として設計済み。実装時に `EventType` に追加予定。
 
 ### 4.3 RunProjection（状態投影）
 
@@ -824,13 +858,21 @@ ColonyForge/
 │   │   │   ├── models.py        # Episode, KPIScore等
 │   │   │   ├── store.py         # EpisodeStore (JSONL永続化)
 │   │   │   ├── recorder.py      # EpisodeRecorder
-│   │   │   └── kpi.py           # KPICalculator
+│   │   │   ├── kpi.py           # KPICalculator
+│   │   │   └── event_counters.py # イベントカウンター
 │   │   └── swarming/        # Swarming Protocol (M3-2)
 │   │       ├── models.py        # SwarmingFeatures, Template
 │   │       ├── engine.py        # SwarmingEngine
 │   │       └── templates.py     # 4テンプレート定義
-│   │   # ──── 以下は core/github/ ────
-│   │   # github/            # GitHub Projection（§2.2に記載）
+│   │   └── github/          # GitHub Projection（AR→GitHub同期）
+│   │       ├── client.py        # httpx async GitHubクライアント
+│   │       └── projection.py    # SyncState、イベント→Issue投影
+│   ├── requirement_analysis/ # 要求分析Colony（doorstop永続化・トレーサビリティ・変更追跡）
+│   │   ├── __init__.py       # 公開API
+│   │   ├── models.py         # AcceptanceCriterion, SpecDraft, SpecPersistResult
+│   │   ├── spec_persister.py # doorstop YAML書き出し + pytest-bdd .feature生成
+│   │   ├── change_tracker.py # 要件変更追跡（RA_REQ_CHANGED イベント発行）
+│   │   └── impact_analyzer.py # 影響分析（doorstop links 逆引き + reviewed リセット）
 │   ├── api/                 # REST API
 │   │   ├── server.py        # FastAPIアプリ
 │   │   ├── dependencies.py  # 依存性注入（AppState）
@@ -844,14 +886,37 @@ ColonyForge/
 │   │       ├── hives.py         # Hive CRUD
 │   │       ├── colonies.py      # Colony CRUD
 │   │       ├── activity.py      # Activity API
+│   │       ├── beekeeper.py     # Beekeeper API
 │   │       ├── conferences.py   # Conference API
+│   │       ├── guard_bee.py     # Guard Bee API
 │   │       ├── interventions.py # Intervention API
 │   │       ├── kpi.py           # KPI Dashboard API (M5-4)
 │   │       └── system.py
 │   ├── mcp_server/          # MCP Server
 │   │   ├── server.py
-│   │   ├── tools.py         # ツール定義
+│   │   ├── tools/            # ツール定義（モジュール分割済み）
+│   │   │   ├── beekeeper.py
+│   │   │   ├── colony.py
+│   │   │   ├── conference.py
+│   │   │   ├── github.py
+│   │   │   ├── guard_bee.py
+│   │   │   ├── hive.py
+│   │   │   ├── intervention.py
+│   │   │   ├── run.py
+│   │   │   └── task.py
 │   │   └── handlers/        # ハンドラー実装
+│   │       ├── base.py
+│   │       ├── colony.py
+│   │       ├── conference.py
+│   │       ├── decision.py
+│   │       ├── github.py
+│   │       ├── guard_bee.py
+│   │       ├── hive.py
+│   │       ├── intervention.py
+│   │       ├── lineage.py
+│   │       ├── requirement.py
+│   │       ├── run.py
+│   │       └── task.py
 │   ├── beekeeper/           # Beekeeper層
 │   │   ├── server.py        # MCPサーバー
 │   │   ├── handler.py       # コアハンドラー
@@ -861,19 +926,26 @@ ColonyForge/
 │   │   ├── conflict.py      # 衝突検出
 │   │   ├── escalation.py    # エスカレーション
 │   │   ├── resolver.py      # 衝突解決
-│   │   └── tool_definitions.py # ツール定義
+│   │   ├── tool_definitions.py # ツール定義
+│   │   ├── hive_handlers.py # Hive操作ハンドラー
+│   │   ├── llm_integration.py # LLM統合
+│   │   ├── queen_delegation.py # Queen Bee委譲
+│   │   └── user_handlers.py # ユーザー操作ハンドラー
 │   ├── queen_bee/           # Queen Bee層 (M4実装済)
 │   │   ├── server.py        # MCPサーバー
 │   │   ├── planner.py       # TaskPlanner（LLMタスク分解）(M4-1)
 │   │   ├── orchestrator.py  # ColonyOrchestrator（並列実行）(M4-2)
 │   │   ├── pipeline.py      # ExecutionPipeline（ゲート統合）
+│   │   ├── pipeline_execution.py # パイプライン実行制御
 │   │   ├── context.py       # TaskResult / TaskContext (M4-2)
 │   │   ├── result.py        # ColonyResult / ColonyResultBuilder (M4-2)
 │   │   ├── approval.py      # PlanApprovalGate（承認制御）(M4-1)
 │   │   ├── communication.py # エージェント間通信
+│   │   ├── execution.py     # タスク実行制御
 │   │   ├── progress.py      # 進捗管理
 │   │   ├── retry.py         # リトライ制御
-│   │   └── scheduler.py     # Colony スケジューラー
+│   │   ├── scheduler.py     # Colony スケジューラー
+│   │   └── task_runner.py   # タスクランナー
 │   ├── worker_bee/          # Worker Bee層
 │   │   ├── server.py        # MCPサーバー
 │   │   ├── process.py       # タスク実行
@@ -944,9 +1016,15 @@ ColonyForge/
 │   ├── conftest.py
 │   ├── test_*.py            # 各モジュール対応テスト
 │   └── e2e/                 # E2Eテスト
+│       ├── conftest.py
 │       ├── test_colonyforge_visual.py
 │       ├── test_colonyforge_extension.py
-│       └── test_hive_flow.py
+│       ├── test_hive_flow.py
+│       ├── test_agent_chain_llm.py
+│       ├── test_github_projection_e2e.py
+│       ├── test_hive_monitor_real.py
+│       ├── test_kpi_dashboard_visual.py
+│       └── vlm_visual_evaluator.py
 ├── vscode-extension/        # VS Code拡張
 │   ├── package.json
 │   ├── tsconfig.json
@@ -1087,6 +1165,7 @@ logging:
 | M3: 適応的協調 | Honeycomb, Swarming, Guard Bee, Forager Bee, Referee Bee, Sentinel拡張, Waggle Dance, Scout Bee | ✅ 完了（M3-1〜M3-8全完了） |
 | M4: 自律 | LLMタスク分解、Orchestrator | ✅ 完了（M4-1, M4-2） |
 | M5: 運用品質 | セキュリティ、パフォーマンス、CI/CD、KPIダッシュボード | 🔄 M5-1/M5-2基盤/M5-3完了、M5-4〜M5-6未着手 |
+| M6: 要求分析 | RA Colony、要求トレーサビリティ、doorstop連携、要件版管理・変更追跡 | 🔄 データモデル+永続化実装済、コアループ未着手 |
 
 ### 11.3 ゲート条件
 
@@ -1125,6 +1204,15 @@ logging:
 - [x] Scout Bee: 過去実績に基づく編成最適化 (M3-8) ✅
 - [x] Queen Bee タスク分解: LLMタスク分解実装 (M4-1) ✅
 - [x] LLM Orchestrator: 自律的なタスク分解・実行 (M4-2) ✅
+- [ ] **Requirement Analysis Colony**: 要求分析の自動化（[設計書](design/requirement-analysis-colony.md)） — 品質重視設計
+  - [x] W1: データモデル (`models.py` — AcceptanceCriterion, SpecDraft) ✅
+  - [x] W4: Spec Persister (`spec_persister.py` — doorstop + pytest-bdd) ✅
+  - [ ] W1: 状態機械 + EventType拡張
+  - [ ] W2: AmbiguityScorer + Intent Miner + RAOrchestrator
+  - [ ] W3: Assumption Mapper + Risk Challenger
+  - [ ] W4: Spec Synthesizer + Guard Gate + Beekeeper統合
+  - [ ] W6: 要件変更追跡 (`change_tracker.py` — RA_REQ_CHANGED イベント)
+  - [ ] W7: 影響分析 (`impact_analyzer.py` — doorstop links 逆引き)
 - [ ] Artifact管理: 成果物の保存と参照
 - [ ] 因果リンクの自動設定（[Issue #001](issues/001-lineage-auto-parents.md)）
 - [ ] イベント署名: 改ざん者の特定
@@ -1167,6 +1255,7 @@ logging:
 
 - [DEVELOPMENT_PLAN_v2.md](DEVELOPMENT_PLAN_v2.md) - 開発計画（進捗の正）
 - [v5-hive-design.md](design/v5-hive-design.md) - 詳細設計（Single Source of Truth）
+- [requirement-analysis-colony.md](design/requirement-analysis-colony.md) - 要求分析Colony設計書
 - [QUICKSTART.md](QUICKSTART.md) - 動作確認手順
 - [AGENTS.md](../AGENTS.md) - AI開発ガイドライン
 - [GIT_WORKFLOW.md](GIT_WORKFLOW.md) - Gitワークフロー規約（ブランチ・Worktree・PRゲート）

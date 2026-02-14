@@ -80,18 +80,41 @@ pip install -e ".[dev]"
 
 ## API エンドポイント
 
+### Run/Task操作
+
 | Method | Path | 説明 |
 |--------|------|------|
 | GET | `/health` | ヘルスチェック |
 | POST | `/runs` | Run開始 |
+| GET | `/runs` | Run一覧 |
 | GET | `/runs/{run_id}` | Run詳細 |
 | POST | `/runs/{run_id}/complete` | Run完了 |
 | POST | `/runs/{run_id}/emergency-stop` | 緊急停止 |
+| POST | `/runs/{run_id}/heartbeat` | ハートビート |
 | POST | `/runs/{run_id}/tasks` | Task作成 |
+| GET | `/runs/{run_id}/tasks` | Task一覧 |
+| POST | `/runs/{run_id}/tasks/{task_id}/complete` | Task完了 |
+| POST | `/runs/{run_id}/tasks/{task_id}/fail` | Task失敗 |
+| POST | `/runs/{run_id}/tasks/{task_id}/assign` | Taskアサイン |
+| POST | `/runs/{run_id}/tasks/{task_id}/progress` | Task進捗報告 |
 | GET | `/runs/{run_id}/events` | イベント一覧 |
 | GET | `/runs/{run_id}/events/{id}/lineage` | 因果リンク |
+
+### Guard Bee（品質検証）
+
+| Method | Path | 説明 |
+|--------|------|------|
 | POST | `/guard-bee/verify` | Guard Bee品質検証 |
 | GET | `/guard-bee/reports/{run_id}` | Guard Bee検証レポート |
+
+### Beekeeper/KPI
+
+| Method | Path | 説明 |
+|--------|------|------|
+| GET | `/beekeeper/status` | Beekeeperステータス |
+| POST | `/beekeeper/feedback` | Beekeeperフィードバック |
+| GET | `/kpi/scores` | KPIスコア |
+| GET | `/kpi/summary` | KPIサマリー |
 
 ---
 
@@ -163,11 +186,18 @@ Copilot Chatで `@colonyforge` を使用（要: VS Code再読み込み）:
 | ツール | 説明 |
 |--------|------|
 | `start_run` | Run開始 |
+| `get_run_status` | Run状態取得 |
+| `complete_run` | Run完了 |
 | `create_task` | Task作成 |
+| `assign_task` | Taskアサイン |
 | `complete_task` | Task完了 |
+| `fail_task` | Task失敗 |
+| `report_progress` | 進捗報告 |
+| `heartbeat` | ハートビート |
 | `emergency_stop` | 緊急停止 |
 | `get_lineage` | 因果リンク取得 |
 | `record_decision` | Decision記録 |
+| `create_requirement` | Requirement作成 |
 
 ### Guard Bee（品質検証）
 
@@ -175,6 +205,31 @@ Copilot Chatで `@colonyforge` を使用（要: VS Code再読み込み）:
 |--------|------|
 | `verify_colony` | Colony成果物をGuard Beeで品質検証 |
 | `get_guard_report` | Guard Bee検証レポート取得 |
+
+### Beekeeper・介入・Conference
+
+| ツール | 説明 |
+|--------|------|
+| `get_beekeeper_status` | Beekeeperステータス |
+| `beekeeper_feedback` | Beekeeperフィードバック |
+| `send_message` | メッセージ送信 |
+| `user_intervene` | ユーザー介入 |
+| `queen_escalate` | Queen Beeエスカレーション |
+| `approve` | 承認 |
+| `reject` | 却下 |
+| `get_escalation` | エスカレーション取得 |
+| `list_escalations` | エスカレーション一覧 |
+| `start_conference` | Conference開始 |
+| `get_conference` | Conference取得 |
+| `end_conference` | Conference終了 |
+| `list_conferences` | Conference一覧 |
+
+### GitHub Projection
+
+| ツール | 説明 |
+|--------|------|
+| `sync_run_to_github` | RunをGitHub Issueに同期 |
+| `get_github_sync_status` | GitHub同期状態取得 |
 
 ### Copilot Chat MCP設定
 

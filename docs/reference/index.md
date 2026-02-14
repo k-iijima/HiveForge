@@ -24,3 +24,19 @@ The following modules are documented via mkdocstrings (auto-generated from docst
 - [`colonyforge.queen_bee`](api.md#queen-bee) — Queen Bee agent
 - [`colonyforge.worker_bee`](api.md#worker-bee) — Worker Bee agent
 - [`colonyforge.guard_bee`](api.md#guard-bee) — Guard Bee agent
+
+### Requirement Analysis
+
+- [`colonyforge.requirement_analysis`](api.md#requirement-analysis) — Requirement Analysis Colony
+  - `AcceptanceCriterion` — Structured acceptance criteria
+  - `SpecDraft` — Specification draft model
+  - `SpecPersister` — doorstop + pytest-bdd persistence
+  - `SpecPersistResult` — Persistence result
+  - `ChangeReason` — Requirement change reason types (§11.3)
+  - `RequirementChangedPayload` — Change event payload with causal links
+  - `ImpactAnalyzer` — Impact analysis via doorstop links
+  - `ImpactReport` — Impact analysis result
+
+### Design Documents
+
+- [Requirement Analysis Colony](../design/requirement-analysis-colony.md) — RA Colony design specification (quality-first, versioning & change tracking)

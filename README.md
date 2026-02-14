@@ -7,6 +7,7 @@
 > **Note:** 本プロジェクトは **HiveForge** から **ColonyForge** にリネームされました（2025-02）。
 > パッケージ名・CLI コマンド・import パス等はすべて `colonyforge` に統一されています。
 > 過去の `hiveforge` との後方互換性は維持していません。
+> また。本プロジェクトは実験的なものですのでご注意ください。しばらくは予告ない破壊的変更が入ります。
 
 ColonyForgeは、LLMを活用した自律型ソフトウェア開発支援システムです。複数の専門エージェント（Beekeeper, Queen Bee, Worker Bee, Sentinel Hornet, Guard Bee, Forager Bee, Referee Bee）が協調し、VS Code + GitHub Copilot Chat と連携してソフトウェア開発を支援します。
 
