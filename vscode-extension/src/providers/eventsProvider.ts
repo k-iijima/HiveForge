@@ -135,8 +135,12 @@ export class EventsProvider implements vscode.TreeDataProvider<EventItem> {
             }
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            console.error('Failed to get events:', error);
-            vscode.window.showErrorMessage(`ColonyForge: イベント一覧の取得に失敗しました: ${message}`);
+            if (message.includes('ECONNREFUSED') || message.includes('ENOTFOUND') || message.includes('ETIMEDOUT')) {
+                console.warn('[ColonyForge] Server unreachable — skipping events fetch');
+            } else {
+                console.error('Failed to get events:', error);
+                vscode.window.showErrorMessage(`ColonyForge: イベント一覧の取得に失敗しました: ${message}`);
+            }
             return [];
         }
     }

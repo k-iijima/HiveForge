@@ -117,8 +117,12 @@ export class DecisionsProvider implements vscode.TreeDataProvider<DecisionItem> 
                 .map(e => new DecisionItem(e));
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            console.error('Failed to get decisions:', error);
-            vscode.window.showErrorMessage(`ColonyForge: Decisionsの取得に失敗しました: ${message}`);
+            if (message.includes('ECONNREFUSED') || message.includes('ENOTFOUND') || message.includes('ETIMEDOUT')) {
+                console.warn('[ColonyForge] Server unreachable — skipping decisions fetch');
+            } else {
+                console.error('Failed to get decisions:', error);
+                vscode.window.showErrorMessage(`ColonyForge: Decisionsの取得に失敗しました: ${message}`);
+            }
             return [];
         }
     }

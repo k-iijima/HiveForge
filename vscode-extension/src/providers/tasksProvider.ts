@@ -85,8 +85,12 @@ export class TasksProvider implements vscode.TreeDataProvider<TaskItem> {
             return filtered.map(task => new TaskItem(task, vscode.TreeItemCollapsibleState.None));
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            console.error('Failed to get tasks:', error);
-            vscode.window.showErrorMessage(`ColonyForge: Task一覧の取得に失敗しました: ${message}`);
+            if (message.includes('ECONNREFUSED') || message.includes('ENOTFOUND') || message.includes('ETIMEDOUT')) {
+                console.warn('[ColonyForge] Server unreachable — skipping tasks fetch');
+            } else {
+                console.error('Failed to get tasks:', error);
+                vscode.window.showErrorMessage(`ColonyForge: Task一覧の取得に失敗しました: ${message}`);
+            }
             return [];
         }
     }

@@ -108,8 +108,12 @@ export class RunsProvider implements vscode.TreeDataProvider<RunItem> {
             return runs.map(run => new RunItem(run, vscode.TreeItemCollapsibleState.None));
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            console.error('Failed to get runs:', error);
-            vscode.window.showErrorMessage(`ColonyForge: Run一覧の取得に失敗しました: ${message}`);
+            if (message.includes('ECONNREFUSED') || message.includes('ENOTFOUND') || message.includes('ETIMEDOUT')) {
+                console.warn('[ColonyForge] Server unreachable — skipping runs fetch');
+            } else {
+                console.error('Failed to get runs:', error);
+                vscode.window.showErrorMessage(`ColonyForge: Run一覧の取得に失敗しました: ${message}`);
+            }
             return [];
         }
     }
