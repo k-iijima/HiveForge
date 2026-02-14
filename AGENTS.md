@@ -277,8 +277,9 @@ src/colonyforge/
 ├── agent_ui/       # Agent UI MCPサーバー
 ├── vlm/            # VLM（画像解析）
 ├── vlm_tester/     # VLM Tester（E2Eテスト支援）
+├── requirement_analysis/ # 要求分析Colony（M6）
 ├── silence.py      # 沈黙検出
-├── monitor.py      # Hiveモニター
+├── monitor/        # Hiveモニター（パッケージ化済み）
 └── cli.py          # CLIツール
 
 tests/              # テストコード（実装と1:1対応）
