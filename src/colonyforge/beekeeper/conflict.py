@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import contextlib
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
@@ -68,12 +69,12 @@ class ConflictDetector:
     複数Colonyからのリソース要求を監視し、衝突を検出。
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._claims: dict[str, list[ResourceClaim]] = {}  # resource_id -> claims
         self._conflicts: dict[str, Conflict] = {}
-        self._on_conflict_detected: list[callable] = []
+        self._on_conflict_detected: list[Callable[..., Any]] = []
 
-    def add_conflict_listener(self, listener: callable) -> None:
+    def add_conflict_listener(self, listener: Callable[..., Any]) -> None:
         """衝突検出リスナー追加"""
         self._on_conflict_detected.append(listener)
 
@@ -211,7 +212,7 @@ class ConflictDetector:
 
     def get_claims_by_colony(self, colony_id: str) -> list[ResourceClaim]:
         """Colony別の要求一覧"""
-        claims = []
+        claims: list[ResourceClaim] = []
         for resource_claims in self._claims.values():
             claims.extend(c for c in resource_claims if c.colony_id == colony_id)
         return claims

@@ -95,7 +95,7 @@ class EpisodeRecorder:
         )
         return episode
 
-    def _determine_outcome(self, events: list) -> Outcome:
+    def _determine_outcome(self, events: list[Any]) -> Outcome:
         """ARイベントから結果を判定"""
         event_types = {e.type for e in events}
 
@@ -116,7 +116,7 @@ class EpisodeRecorder:
             # イベントが不完全な場合
             return Outcome.PARTIAL
 
-    def _calculate_duration(self, events: list) -> float:
+    def _calculate_duration(self, events: list[Any]) -> float:
         """イベントのタイムスタンプから所要時間を計算"""
         if len(events) < 2:
             return 0.0
@@ -140,7 +140,7 @@ class EpisodeRecorder:
 
         return 0.0
 
-    def _classify_failure(self, events: list) -> FailureClass | None:
+    def _classify_failure(self, events: list[Any]) -> FailureClass | None:
         """イベントから失敗分類を推定"""
         for event in reversed(events):
             if event.type in (EventType.TASK_FAILED, EventType.RUN_FAILED):
@@ -164,7 +164,7 @@ class EpisodeRecorder:
 
         return None
 
-    def _count_tokens(self, events: list) -> int:
+    def _count_tokens(self, events: list[Any]) -> int:
         """イベントからトークン使用量を算出"""
         total = 0
         for event in events:
@@ -185,7 +185,7 @@ class EpisodeRecorder:
         }
     )
 
-    def _count_sentinel_interventions(self, events: list) -> int:
+    def _count_sentinel_interventions(self, events: list[Any]) -> int:
         """イベントからSentinel Hornet介入回数を算出
 
         定期レポート（SENTINEL_REPORT）は介入ではないためカウントしない。
@@ -198,7 +198,7 @@ class EpisodeRecorder:
         """
         return sum(1 for e in events if e.type in self._SENTINEL_INTERVENTION_TYPES)
 
-    def _calculate_kpi_scores(self, events: list, duration: float) -> KPIScores:
+    def _calculate_kpi_scores(self, events: list[Any], duration: float) -> KPIScores:
         """イベントからKPIスコアを算出
 
         単一Episodeレベルで算出可能なKPIを計算:
@@ -217,7 +217,7 @@ class EpisodeRecorder:
             Outcome.PARTIAL: 0.5,
             Outcome.FAILURE: 0.0,
         }
-        correctness = correctness_map.get(outcome, 0.0)
+        correctness = float(correctness_map.get(outcome, 0.0))
 
         # incident_rate: 失敗/部分失敗を 1.0, 成功を 0.0
         incident_rate = 0.0 if outcome == Outcome.SUCCESS else 1.0

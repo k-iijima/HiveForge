@@ -7,7 +7,7 @@ import argparse
 import sys
 
 
-def main():
+def main() -> None:
     """メインエントリーポイント"""
     parser = argparse.ArgumentParser(
         description="ColonyForge - 自律型ソフトウェア組立システム",
@@ -116,7 +116,7 @@ def main():
         sys.exit(1)
 
 
-def run_server(args):
+def run_server(args: argparse.Namespace) -> None:
     """APIサーバーを起動"""
     import uvicorn
 
@@ -128,14 +128,14 @@ def run_server(args):
     )
 
 
-def run_mcp():
+def run_mcp() -> None:
     """MCPサーバーを起動"""
     from .mcp_server import main as mcp_main
 
     mcp_main()
 
 
-def run_init(args):
+def run_init(args: argparse.Namespace) -> None:
     """プロジェクトを初期化"""
 
     from .core import get_settings
@@ -152,7 +152,7 @@ def run_init(args):
     print("  2. Copilot ChatでMCPサーバーを設定")
 
 
-def run_status(args):
+def run_status(args: argparse.Namespace) -> None:
     """Run状態を表示"""
     from .core import AkashicRecord, build_run_projection, get_settings
 
@@ -189,11 +189,11 @@ def run_status(args):
             print(f"  - {req.description}")
 
 
-def run_task(args):
+def run_task(args: argparse.Namespace) -> None:
     """タスクをLLMで実行（ワンパス）"""
     import asyncio
 
-    async def _run():
+    async def _run() -> None:
         from .llm.client import LLMClient
         from .llm.runner import AgentRunner
         from .llm.tools import get_basic_tools
@@ -226,12 +226,12 @@ def run_task(args):
     asyncio.run(_run())
 
 
-def run_chat(args):
+def run_chat(args: argparse.Namespace) -> None:
     """Beekeeperと対話"""
     import asyncio
     import os
 
-    async def _chat():
+    async def _chat() -> None:
         from .beekeeper import BeekeeperMCPServer
         from .core import AkashicRecord, get_settings
 
@@ -271,7 +271,7 @@ def run_chat(args):
     asyncio.run(_chat())
 
 
-def run_record_decision(args):
+def run_record_decision(args: argparse.Namespace) -> None:
     """Decisionをイベントとして記録"""
     from .core import AkashicRecord, get_settings
     from .core.events import DecisionRecordedEvent, RunStartedEvent

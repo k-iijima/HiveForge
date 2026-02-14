@@ -3,6 +3,8 @@
 Run管理に関するエンドポイント。
 """
 
+from typing import Any
+
 from fastapi import APIRouter, HTTPException, status
 
 from ...core import RunProjection, build_run_projection, generate_event_id
@@ -40,7 +42,7 @@ def _get_task_completed_event_ids(run_id: str, task_ids: set[str]) -> list[str]:
 
 
 @router.post("", response_model=StartRunResponse, status_code=status.HTTP_201_CREATED)
-async def start_run(request: StartRunRequest):
+async def start_run(request: StartRunRequest) -> StartRunResponse:
     """新しいRunを開始"""
     ar = get_ar()
     active_runs = get_active_runs()
@@ -70,7 +72,7 @@ async def start_run(request: StartRunRequest):
 
 
 @router.get("", response_model=list[RunStatusResponse])
-async def list_runs(active_only: bool = True):
+async def list_runs(active_only: bool = True) -> list[RunStatusResponse]:
     """Run一覧を取得"""
     ar = get_ar()
     active_runs = get_active_runs()
@@ -79,6 +81,7 @@ async def list_runs(active_only: bool = True):
     run_ids = list(active_runs.keys()) if active_only else ar.list_runs()
 
     for run_id in run_ids:
+        proj: RunProjection | None = None
         if run_id in active_runs:
             proj = active_runs[run_id]
         else:
@@ -108,7 +111,7 @@ async def list_runs(active_only: bool = True):
 
 
 @router.get("/{run_id}", response_model=RunStatusResponse)
-async def get_run(run_id: str):
+async def get_run(run_id: str) -> RunStatusResponse:
     """Run詳細を取得"""
     ar = get_ar()
     active_runs = get_active_runs()
@@ -137,7 +140,7 @@ async def get_run(run_id: str):
 
 
 @router.post("/{run_id}/complete")
-async def complete_run(run_id: str, request: CompleteRunRequest | None = None):
+async def complete_run(run_id: str, request: CompleteRunRequest | None = None) -> dict[str, Any]:
     """Runを完了
 
     未完了タスクがある場合はエラーを返す。
@@ -163,7 +166,7 @@ async def complete_run(run_id: str, request: CompleteRunRequest | None = None):
 
     if (incomplete_tasks or pending_requirements) and not force:
         # 未完了タスクまたは未解決の確認要請がある場合はエラー
-        detail = {
+        detail: dict[str, Any] = {
             "message": "Cannot complete run with incomplete tasks or pending requirements",
             "hint": "強制完了する場合は force=true を指定してください",
         }
@@ -224,7 +227,7 @@ async def complete_run(run_id: str, request: CompleteRunRequest | None = None):
     proj.state = RunState.COMPLETED
     proj.completed_at = event.timestamp
 
-    result = {"status": "completed", "run_id": run_id}
+    result: dict[str, Any] = {"status": "completed", "run_id": run_id}
     if cancelled_task_ids:
         result["cancelled_task_ids"] = cancelled_task_ids
     if cancelled_requirement_ids:
@@ -233,7 +236,7 @@ async def complete_run(run_id: str, request: CompleteRunRequest | None = None):
 
 
 @router.post("/{run_id}/emergency-stop")
-async def emergency_stop(run_id: str, request: EmergencyStopRequest):
+async def emergency_stop(run_id: str, request: EmergencyStopRequest) -> dict[str, Any]:
     """緊急停止
 
     進行中の全タスクを中断し、未解決の確認要請を却下し、Runを即座に停止する。
@@ -292,7 +295,7 @@ async def emergency_stop(run_id: str, request: EmergencyStopRequest):
     proj.state = RunState.ABORTED
     proj.completed_at = event.timestamp
 
-    result = {
+    result: dict[str, Any] = {
         "status": "aborted",
         "run_id": run_id,
         "reason": request.reason,
@@ -306,7 +309,7 @@ async def emergency_stop(run_id: str, request: EmergencyStopRequest):
 
 
 @router.post("/{run_id}/heartbeat")
-async def send_heartbeat(run_id: str):
+async def send_heartbeat(run_id: str) -> dict[str, Any]:
     """ハートビートを送信"""
     active_runs = get_active_runs()
     if run_id not in active_runs:

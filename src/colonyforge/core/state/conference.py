@@ -57,7 +57,9 @@ class ConferenceProjection:
     duration_seconds: int = 0
 
 
-def build_conference_projection(events: list, conference_id: str) -> ConferenceProjection | None:
+def build_conference_projection(
+    events: list[Any], conference_id: str
+) -> ConferenceProjection | None:
     """イベントリストからConference Projectionを構築
 
     Args:

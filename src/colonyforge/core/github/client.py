@@ -87,7 +87,7 @@ class GitHubClient:
         if labels:
             payload["labels"] = labels
 
-        return await self._post(url, payload)
+        return await self._post(url, payload)  # type: ignore[no-any-return]
 
     async def update_issue(
         self,
@@ -123,7 +123,7 @@ class GitHubClient:
         if labels is not None:
             payload["labels"] = labels
 
-        return await self._patch(url, payload)
+        return await self._patch(url, payload)  # type: ignore[no-any-return]
 
     async def close_issue(self, issue_number: int) -> dict[str, Any]:
         """Issue をクローズする
@@ -157,7 +157,7 @@ class GitHubClient:
             GitHubClientError: API 呼び出しに失敗した場合
         """
         url = f"{self._base_url}/repos/{self._owner}/{self._repo}/issues/{issue_number}/comments"
-        return await self._post(url, {"body": body})
+        return await self._post(url, {"body": body})  # type: ignore[no-any-return]
 
     # ------------------------------------------------------------------
     # ラベル操作
@@ -177,7 +177,7 @@ class GitHubClient:
             GitHubClientError: API 呼び出しに失敗した場合
         """
         url = f"{self._base_url}/repos/{self._owner}/{self._repo}/issues/{issue_number}/labels"
-        return await self._post(url, {"labels": labels})
+        return await self._post(url, {"labels": labels})  # type: ignore[no-any-return]
 
     # ------------------------------------------------------------------
     # 内部ヘルパー

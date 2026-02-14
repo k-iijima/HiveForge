@@ -229,7 +229,7 @@ class AgentRunner:
                 messages.append(
                     Message(
                         role="assistant",
-                        content=response.content,
+                        content=response.content or "",
                         tool_calls=response.tool_calls,
                     )
                 )
@@ -265,7 +265,7 @@ class AgentRunner:
                         f"(残り{self._tool_use_retries_left}回)"
                     )
                     # 再試行プロンプトを追加して次の反復へ
-                    messages.append(Message(role="assistant", content=response.content))
+                    messages.append(Message(role="assistant", content=response.content or ""))
                     messages.append(Message(role="user", content=self.TOOL_USE_RETRY_PROMPT))
                     continue
                 else:

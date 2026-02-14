@@ -41,7 +41,7 @@ class SilenceDetector:
         self.on_silence = on_silence
         self._last_activity: datetime | None = None
         self._running = False
-        self._task: asyncio.Task | None = None
+        self._task: asyncio.Task[None] | None = None
 
     def record_activity(self, timestamp: datetime | None = None) -> None:
         """アクティビティを記録"""

@@ -68,7 +68,7 @@ class ConflictResolver:
     衝突を解決するための戦略を適用。
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._strategies: dict[ConflictType, ResolutionStrategy] = {
             ConflictType.FILE_CONFLICT: ResolutionStrategy.FIRST_COME,
             ConflictType.RESOURCE_LOCK: ResolutionStrategy.LOCK_AND_QUEUE,

@@ -97,7 +97,7 @@ class ConferenceManager:
     Conferenceセッションのライフサイクルを管理。
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._sessions: dict[str, ConferenceSession] = {}
         self._on_started: list[Callable[[ConferenceSession], None]] = []
         self._on_concluded: list[Callable[[ConferenceSession], None]] = []

@@ -12,13 +12,19 @@ from ..core.events import (
 )
 
 if TYPE_CHECKING:
-    pass
+    from ..core.ar.hive_storage import HiveStore
+    from .session import BeekeeperSession, BeekeeperSessionManager
 
 logger = logging.getLogger(__name__)
 
 
 class HiveHandlersMixin:
     """Hive/Colony CRUD + ステータスハンドラ"""
+
+    if TYPE_CHECKING:
+        current_session: BeekeeperSession | None
+        hive_store: HiveStore | None
+        session_manager: BeekeeperSessionManager
 
     async def handle_get_status(self, arguments: dict[str, Any]) -> dict[str, Any]:
         """ステータス取得ハンドラ

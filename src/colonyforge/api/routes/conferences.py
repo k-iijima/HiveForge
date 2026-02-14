@@ -64,7 +64,7 @@ class ConferenceResponse(BaseModel):
 
 
 @router.post("", response_model=ConferenceResponse, status_code=status.HTTP_201_CREATED)
-async def start_conference(request: StartConferenceRequest):
+async def start_conference(request: StartConferenceRequest) -> ConferenceResponse:
     """会議を開始"""
     ar = get_ar()
     store = get_conference_store()
@@ -108,7 +108,9 @@ async def start_conference(request: StartConferenceRequest):
 
 
 @router.get("", response_model=list[ConferenceResponse])
-async def list_conferences(hive_id: str | None = None, active_only: bool = False):
+async def list_conferences(
+    hive_id: str | None = None, active_only: bool = False
+) -> list[ConferenceResponse]:
     """会議一覧を取得"""
     store = get_conference_store()
 
@@ -138,7 +140,7 @@ async def list_conferences(hive_id: str | None = None, active_only: bool = False
 
 
 @router.get("/{conference_id}", response_model=ConferenceResponse)
-async def get_conference(conference_id: str):
+async def get_conference(conference_id: str) -> ConferenceResponse:
     """会議詳細を取得"""
     store = get_conference_store()
     conference = store.get(conference_id)
@@ -162,7 +164,9 @@ async def get_conference(conference_id: str):
 
 
 @router.post("/{conference_id}/end", response_model=ConferenceResponse)
-async def end_conference(conference_id: str, request: EndConferenceRequest | None = None):
+async def end_conference(
+    conference_id: str, request: EndConferenceRequest | None = None
+) -> ConferenceResponse:
     """会議を終了"""
     ar = get_ar()
     store = get_conference_store()

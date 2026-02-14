@@ -197,9 +197,9 @@ class RetryExecutor:
                 result.attempts.append(attempt)
 
                 # タイムアウト通知
-                for listener in self._on_timeout:
+                for timeout_listener in self._on_timeout:
                     with contextlib.suppress(Exception):
-                        listener(attempt.error)
+                        timeout_listener(attempt.error)
 
                 if timeout.behavior == TimeoutBehavior.FAIL:
                     result.error = attempt.error
@@ -221,9 +221,9 @@ class RetryExecutor:
                     break
 
             # リトライ通知
-            for listener in self._on_retry:
+            for retry_listener in self._on_retry:
                 with contextlib.suppress(Exception):
-                    listener(attempt)
+                    retry_listener(attempt)
 
             # リトライ遅延
             delay = self._policy.get_delay(attempt_num)

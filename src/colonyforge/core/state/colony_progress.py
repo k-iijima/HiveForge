@@ -5,7 +5,7 @@ Colony配下のRun/Task完了時に Colony の進捗を自動更新する。
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from colonyforge.core.events import EventType
 
@@ -22,7 +22,7 @@ class ColonyProgressTracker:
     def __init__(self) -> None:
         """トラッカーを初期化"""
         # colony_id -> {"runs": {run_id: status, ...}, "status": "..."}
-        self.colonies: dict[str, dict] = {}
+        self.colonies: dict[str, dict[str, Any]] = {}
         # run_id -> colony_id のマッピング
         self._run_to_colony: dict[str, str] = {}
 
@@ -104,7 +104,7 @@ class ColonyProgressTracker:
         """
         if colony_id not in self.colonies:
             return "unknown"
-        return self.colonies[colony_id]["status"]
+        return self.colonies[colony_id]["status"]  # type: ignore[no-any-return]
 
     def should_emit_colony_event(self, event: BaseEvent) -> str | None:
         """イベント適用後にColonyイベントを発行すべきか判定

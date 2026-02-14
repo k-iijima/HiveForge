@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..core import generate_event_id
 from ..core.events import (
@@ -14,11 +14,27 @@ from ..core.events import (
     RequirementRejectedEvent,
 )
 
+if TYPE_CHECKING:
+    from ..core import AkashicRecord
+    from ..queen_bee.server import QueenBeeMCPServer
+    from .session import BeekeeperSession, BeekeeperSessionManager
+
 logger = logging.getLogger(__name__)
 
 
 class UserHandlersMixin:
     """ユーザー操作系ハンドラ: メッセージ・承認・拒否・緊急停止・確認"""
+
+    if TYPE_CHECKING:
+        current_session: BeekeeperSession | None
+        session_manager: BeekeeperSessionManager
+        ar: AkashicRecord
+        _pending_requests: dict[str, asyncio.Future[str]]
+        _queens: dict[str, QueenBeeMCPServer]
+
+        async def run_with_llm(
+            self, message: str, context: dict[str, Any] | None = None
+        ) -> dict[str, Any]: ...
 
     async def handle_send_message(self, arguments: dict[str, Any]) -> dict[str, Any]:
         """メッセージ送信ハンドラ

@@ -4,6 +4,7 @@ FastAPIベースのREST API。
 Run管理、Task操作、イベント取得などを提供。
 """
 
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
@@ -34,7 +35,7 @@ from .routes import (
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """アプリケーションライフサイクル"""
     # 起動時
     settings = get_settings()

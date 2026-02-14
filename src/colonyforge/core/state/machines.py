@@ -70,7 +70,7 @@ class StateMachine:
             TransitionError: 不正な遷移の場合
         """
         key = (self.current_state, event.type)
-        transition = self._transitions.get(key)
+        transition = self._transitions.get(key)  # type: ignore[arg-type]
 
         if not transition:
             valid = self.get_valid_events()
@@ -94,7 +94,7 @@ class RunStateMachine(StateMachine):
     - RUNNING -> ABORTED (ユーザー中断時または緊急停止時)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         transitions = [
             Transition(RunState.RUNNING, RunState.COMPLETED, EventType.RUN_COMPLETED),
             Transition(RunState.RUNNING, RunState.FAILED, EventType.RUN_FAILED),
@@ -160,7 +160,7 @@ class RequirementStateMachine(StateMachine):
     - PENDING -> REJECTED (拒否時)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         transitions = [
             Transition(
                 RequirementState.PENDING, RequirementState.APPROVED, EventType.REQUIREMENT_APPROVED
@@ -227,7 +227,7 @@ class HiveStateMachine(StateMachine):
     - IDLE -> CLOSED (Hive終了時)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         transitions = [
             # ACTIVE -> IDLE: 全Colony完了時
             Transition(HiveState.ACTIVE, HiveState.IDLE, EventType.COLONY_COMPLETED),
@@ -255,7 +255,7 @@ class ColonyStateMachine(StateMachine):
     - SUSPENDED -> FAILED (失敗終了時)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         transitions = [
             # PENDING -> IN_PROGRESS: Colony開始時
             Transition(ColonyState.PENDING, ColonyState.IN_PROGRESS, EventType.COLONY_STARTED),

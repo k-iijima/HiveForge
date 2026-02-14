@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import portalocker
 
@@ -50,7 +51,7 @@ class HiveStore:
         """イベントファイルパスを取得"""
         return self._get_hive_dir(hive_id) / "events.jsonl"
 
-    def _find_last_hash(self, f, file_size: int) -> str | None:
+    def _find_last_hash(self, f: Any, file_size: int) -> str | None:
         """ファイル末尾から最後のイベントのハッシュを段階的に取得
 
         チャンクサイズを段階的に拡大して探索する。
@@ -118,7 +119,7 @@ class HiveStore:
 
             # 末尾に追記
             f.seek(0, 2)
-            f.write((updated_event.to_jsonl() + "\n").encode("utf-8"))
+            f.write((updated_event.to_jsonl() + "\n").encode("utf-8"))  # type: ignore[arg-type]
 
         return updated_event
 

@@ -39,7 +39,7 @@ class VLMClient:
             if not api_key:
                 raise RuntimeError("ANTHROPIC_API_KEY environment variable is not set")
 
-            import anthropic
+            import anthropic  # type: ignore[import-not-found]
 
             self._client = anthropic.Anthropic(api_key=api_key)
 

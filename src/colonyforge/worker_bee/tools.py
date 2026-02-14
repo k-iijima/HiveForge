@@ -92,9 +92,9 @@ class ToolExecutor:
     ツールの登録・実行・結果管理を行う。
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._tools: dict[str, ToolDefinition] = {}
-        self._handlers: dict[str, Callable] = {}  # tool_id -> async handler
+        self._handlers: dict[str, Callable[..., Any]] = {}  # tool_id -> async handler
         self._results: dict[str, ToolResult] = {}
         self._on_started: list[Callable[[ToolInvocation], None]] = []
         self._on_completed: list[Callable[[ToolResult], None]] = []
@@ -183,9 +183,9 @@ class ToolExecutor:
         )
 
         # 開始通知
-        for listener in self._on_started:
+        for started_listener in self._on_started:
             with contextlib.suppress(Exception):
-                listener(invocation)
+                started_listener(invocation)
 
         try:
             # タイムアウト付き実行
@@ -220,9 +220,9 @@ class ToolExecutor:
         self._results[result.result_id] = result
 
         # 完了通知
-        for listener in self._on_completed:
+        for completed_listener in self._on_completed:
             with contextlib.suppress(Exception):
-                listener(result)
+                completed_listener(result)
 
         return result
 
@@ -278,7 +278,7 @@ async def sleep_handler(seconds: float) -> str:
     return f"Slept for {seconds}s"
 
 
-def create_builtin_tools() -> list[tuple[ToolDefinition, Callable]]:
+def create_builtin_tools() -> list[tuple[ToolDefinition, Callable[..., Any]]]:
     """組み込みツール作成"""
     return [
         (

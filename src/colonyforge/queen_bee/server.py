@@ -56,8 +56,11 @@ class QueenBeeMCPServer(
 
     def __post_init__(self) -> None:
         """初期化"""
-        self._llm_client = None
-        self._agent_runner = None
+        from ..llm.client import LLMClient
+        from ..llm.runner import AgentRunner
+
+        self._llm_client: LLMClient | None = None
+        self._agent_runner: AgentRunner | None = None
         self._workers: dict[str, ManagedWorker] = {}
         self._pending_tasks: list[dict[str, Any]] = []
         self._current_run_id: str | None = None

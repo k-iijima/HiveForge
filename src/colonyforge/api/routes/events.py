@@ -19,7 +19,7 @@ async def get_events(
     run_id: str,
     since: datetime | None = None,
     limit: Annotated[int, Query(ge=1, le=10000, description="取得件数上限")] = 100,
-):
+) -> list[EventResponse]:
     """イベント一覧を取得"""
     ar = get_ar()
     events = []
@@ -52,7 +52,7 @@ async def get_event_lineage(
         Query(description="探索方向"),
     ] = "both",
     max_depth: Annotated[int, Query(ge=1, le=100, description="最大探索深度")] = 10,
-):
+) -> LineageResponse:
     """イベントの因果リンクを取得
 
     Args:

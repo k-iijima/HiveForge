@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from ulid import ULID
 
 from .models import (
@@ -31,7 +33,7 @@ class ScenarioGenerator:
     def __init__(self) -> None:
         self._generators: dict[
             ScenarioCategory,
-            _ScenarioGeneratorFunc,
+            Callable[[ChangeImpactGraph], list[Scenario]],
         ] = {
             ScenarioCategory.NORMAL_CROSS: self._gen_normal_cross,
             ScenarioCategory.BOUNDARY: self._gen_boundary,
@@ -244,5 +246,5 @@ class ScenarioGenerator:
         ]
 
 
-# 型エイリアス
-_ScenarioGeneratorFunc = type(ScenarioGenerator._gen_normal_cross)
+# 型エイリアス（後方互換）
+_ScenarioGeneratorFunc = Callable[[ChangeImpactGraph], list[Scenario]]

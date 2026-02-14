@@ -186,4 +186,4 @@ class ActionExecutor:
         if self._mcp_client is None:
             raise RuntimeError("MCP client is not set. Call set_mcp_client() first.")
 
-        await self._mcp_client.drag(start_x, start_y, end_x, end_y)
+        await self._mcp_client.drag(start_x, start_y, end_x, end_y)  # type: ignore[attr-defined]

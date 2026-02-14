@@ -6,6 +6,7 @@
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
+from typing import Any
 
 
 class ActionClass(StrEnum):
@@ -26,17 +27,17 @@ class ActionClass(StrEnum):
     CRITICAL = "critical"
     """回復困難な操作（システム変更、認証情報操作、不可逆操作）"""
 
-    def __lt__(self, other: "ActionClass") -> bool:
+    def __lt__(self, other: "ActionClass") -> bool:  # type: ignore[override]
         order = [ActionClass.SAFE, ActionClass.CAREFUL, ActionClass.DANGEROUS, ActionClass.CRITICAL]
         return order.index(self) < order.index(other)
 
-    def __le__(self, other: "ActionClass") -> bool:
+    def __le__(self, other: "ActionClass") -> bool:  # type: ignore[override]
         return self == other or self < other
 
-    def __gt__(self, other: "ActionClass") -> bool:
+    def __gt__(self, other: "ActionClass") -> bool:  # type: ignore[override]
         return not self <= other
 
-    def __ge__(self, other: "ActionClass") -> bool:
+    def __ge__(self, other: "ActionClass") -> bool:  # type: ignore[override]
         return not self < other
 
 
@@ -61,7 +62,7 @@ class TrustLevel(StrEnum):
     FULL = "full"
     """完全信頼エージェント - 全操作自動承認"""
 
-    def __lt__(self, other: "TrustLevel") -> bool:
+    def __lt__(self, other: "TrustLevel") -> bool:  # type: ignore[override]
         order = [
             TrustLevel.UNTRUSTED,
             TrustLevel.LIMITED,
@@ -71,13 +72,13 @@ class TrustLevel(StrEnum):
         ]
         return order.index(self) < order.index(other)
 
-    def __le__(self, other: "TrustLevel") -> bool:
+    def __le__(self, other: "TrustLevel") -> bool:  # type: ignore[override]
         return self == other or self < other
 
-    def __gt__(self, other: "TrustLevel") -> bool:
+    def __gt__(self, other: "TrustLevel") -> bool:  # type: ignore[override]
         return not self <= other
 
-    def __ge__(self, other: "TrustLevel") -> bool:
+    def __ge__(self, other: "TrustLevel") -> bool:  # type: ignore[override]
         return not self < other
 
 
@@ -113,10 +114,10 @@ class ConfirmationRequest:
     description: str
     """操作の説明"""
 
-    parameters: dict = field(default_factory=dict)
+    parameters: dict[str, Any] = field(default_factory=dict)
     """パラメータ"""
 
-    context: dict = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
     """追加コンテキスト（ファイルパスなど）"""
 
 
@@ -130,7 +131,7 @@ class ConfirmationResponse:
     reason: str = ""
     """理由（拒否時など）"""
 
-    modified_parameters: dict | None = None
+    modified_parameters: dict[str, Any] | None = None
     """変更されたパラメータ（部分承認時）"""
 
 
@@ -211,7 +212,7 @@ def get_max_action_class(trust_level: TrustLevel, auto_approve_only: bool = Fals
 class TrustManager:
     """信頼レベル管理"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._agent_trust: dict[str, TrustLevel] = {}
         self._tool_classes: dict[str, ActionClass] = {}
         self._confirmation_handler: Callable[[ConfirmationRequest], ConfirmationResponse] | None = (
@@ -265,8 +266,8 @@ class TrustManager:
         agent_id: str,
         tool_name: str,
         description: str,
-        parameters: dict | None = None,
-        context: dict | None = None,
+        parameters: dict[str, Any] | None = None,
+        context: dict[str, Any] | None = None,
     ) -> ConfirmationResponse:
         """承認をリクエスト
 

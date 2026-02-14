@@ -47,7 +47,7 @@ class VLMTesterMCPServer:
     def _setup_handlers(self) -> None:
         """MCPハンドラーを設定"""
 
-        @self.server.list_tools()
+        @self.server.list_tools()  # type: ignore[untyped-decorator,no-untyped-call]
         async def list_tools() -> list[Tool]:
             return [
                 Tool(
@@ -143,7 +143,7 @@ class VLMTesterMCPServer:
                 ),
             ]
 
-        @self.server.call_tool()
+        @self.server.call_tool()  # type: ignore[untyped-decorator]
         async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             if name == "capture_screen":
                 return await self._handle_capture_screen(arguments)

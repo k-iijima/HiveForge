@@ -262,7 +262,9 @@ class RateLimitContext:
     async def __aenter__(self) -> "RateLimitContext":
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+    async def __aexit__(
+        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: object
+    ) -> None:
         self._limiter.release()
 
 
@@ -344,7 +346,7 @@ class RateLimiterRegistry:
     複数のLLMプロバイダー/モデルを管理。
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._limiters: dict[str, RateLimiter] = {}
         self._lock = asyncio.Lock()
 

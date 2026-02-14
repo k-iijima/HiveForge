@@ -35,9 +35,9 @@ class PlaywrightMCPClient:
             "PLAYWRIGHT_MCP_URL", "http://localhost:8931"
         )
         self._session: ClientSession | None = None
-        self._read = None
-        self._write = None
-        self._streams_cm = None
+        self._read: Any = None
+        self._write: Any = None
+        self._streams_cm: Any = None
 
     async def _ensure_connected(self) -> None:
         """接続されていなければ接続"""

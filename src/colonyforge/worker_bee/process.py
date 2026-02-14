@@ -80,7 +80,7 @@ class WorkerProcessManager:
         self._on_worker_started: Callable[[WorkerProcess], None] | None = None
         self._on_worker_stopped: Callable[[WorkerProcess], None] | None = None
         self._on_worker_crashed: Callable[[WorkerProcess], None] | None = None
-        self._health_check_task: asyncio.Task | None = None
+        self._health_check_task: asyncio.Task[None] | None = None
         self._running = False
 
     def set_callbacks(

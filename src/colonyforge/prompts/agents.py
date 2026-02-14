@@ -151,17 +151,17 @@ def get_prompt_from_config(
     loader = PromptLoader(vault_path)
 
     if agent_type == "beekeeper":
-        config = loader.load_beekeeper_config(hive_id)
-        if config:
-            return config.prompt.system
+        bk_config = loader.load_beekeeper_config(hive_id)
+        if bk_config:
+            return bk_config.prompt.system
     elif agent_type == "queen_bee":
-        config = loader.load_queen_bee_config(hive_id, colony_id)
-        if config:
-            return config.prompt.system
+        qb_config = loader.load_queen_bee_config(hive_id, colony_id)
+        if qb_config:
+            return qb_config.prompt.system
     elif agent_type == "worker_bee":
-        config = loader.load_worker_bee_config(worker_name, hive_id, colony_id)
-        if config:
-            return config.prompt.system
+        wb_config = loader.load_worker_bee_config(worker_name, hive_id, colony_id)
+        if wb_config:
+            return wb_config.prompt.system
 
     return get_system_prompt(agent_type)
 

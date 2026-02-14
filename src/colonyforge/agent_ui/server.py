@@ -10,7 +10,7 @@ from typing import Any
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import ImageContent, TextContent
+from mcp.types import ImageContent, ListToolsResult, TextContent
 
 from .handlers import AgentUIHandlers
 from .session import BrowserSession
@@ -36,11 +36,11 @@ class AgentUIMCPServer:
     def _setup_handlers(self) -> None:
         """MCPハンドラーを設定"""
 
-        @self.server.list_tools()
-        async def list_tools():
-            return get_tool_definitions()
+        @self.server.list_tools()  # type: ignore[untyped-decorator,no-untyped-call]
+        async def list_tools() -> ListToolsResult:
+            return get_tool_definitions()  # type: ignore[return-value]
 
-        @self.server.call_tool()
+        @self.server.call_tool()  # type: ignore[untyped-decorator]
         async def call_tool(
             name: str, arguments: dict[str, Any]
         ) -> list[TextContent | ImageContent]:
@@ -61,24 +61,24 @@ class AgentUIMCPServer:
 
             handler = handler_map.get(name)
             if handler:
-                return await handler(arguments)
+                return await handler(arguments)  # type: ignore[return-value]
             return [TextContent(type="text", text=f"Unknown tool: {name}")]
 
     # 後方互換性のためのプロパティ
     @property
-    def analyzer(self):
+    def analyzer(self) -> Any:
         return self.handlers.analyzer
 
     @property
-    def diff_analyzer(self):
+    def diff_analyzer(self) -> Any:
         return self.handlers.diff_analyzer
 
     @property
-    def _last_capture(self):
+    def _last_capture(self) -> Any:
         return self.handlers._last_capture
 
     @_last_capture.setter
-    def _last_capture(self, value):
+    def _last_capture(self, value: Any) -> None:
         self.handlers._last_capture = value
 
     # 後方互換性のためのハンドラーメソッド（テスト用）

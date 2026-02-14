@@ -164,7 +164,7 @@ class HybridAnalyzer:
         """ローカル分析結果からテキストを抽出"""
         ocr_result = local_results.get("ocr")
         if ocr_result and ocr_result.success:
-            return ocr_result.data.get("text", "")
+            return str(ocr_result.data.get("text", ""))
         return ""
 
     def _combine_results(

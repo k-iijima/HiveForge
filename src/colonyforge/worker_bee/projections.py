@@ -63,7 +63,7 @@ def _apply_event(projection: WorkerProjection, event: BaseEvent) -> None:
     # worker_idを持つイベントのみ処理
     if not hasattr(event, "worker_id"):
         return
-    if event.worker_id != projection.worker_id:  # type: ignore
+    if event.worker_id != projection.worker_id:
         return
 
     projection.last_activity = event.timestamp
@@ -149,7 +149,7 @@ def build_worker_pool_projection(
     for event in events:
         if not hasattr(event, "worker_id"):
             continue
-        worker_id = event.worker_id  # type: ignore
+        worker_id = event.worker_id
         if worker_id not in pool.workers:
             pool.workers[worker_id] = WorkerProjection(worker_id=worker_id)
         _apply_event(pool.workers[worker_id], event)

@@ -58,7 +58,7 @@ class ColonyForgeMCPServer:
     - heartbeat: ハートビートを送信
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.server = Server("colonyforge")
         self._ar: AkashicRecord | None = None
         self._hive_store: HiveStore | None = None
@@ -105,12 +105,12 @@ class ColonyForgeMCPServer:
     def _setup_handlers(self) -> None:  # pragma: no cover
         """MCPハンドラーを設定"""
 
-        @self.server.list_tools()
+        @self.server.list_tools()  # type: ignore[untyped-decorator,no-untyped-call]
         async def list_tools() -> ListToolsResult:
             """利用可能なツール一覧"""
             return ListToolsResult(tools=get_tool_definitions())
 
-        @self.server.call_tool()
+        @self.server.call_tool()  # type: ignore[untyped-decorator]
         async def call_tool(name: str, arguments: dict[str, Any]) -> CallToolResult:
             """ツールを実行"""
             try:
@@ -239,7 +239,7 @@ class ColonyForgeMCPServer:
             await self.server.run(read_stream, write_stream, init_options)
 
 
-def main():  # pragma: no cover
+def main() -> None:  # pragma: no cover
     """エントリーポイント"""
     server = ColonyForgeMCPServer()
     asyncio.run(server.run())

@@ -89,7 +89,7 @@ class HiveAggregate:
         Args:
             event: 適用するイベント
         """
-        handler = self._handlers.get(event.type)
+        handler = self._handlers.get(event.type)  # type: ignore[call-overload]
         if handler:
             handler(self, event)
 

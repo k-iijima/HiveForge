@@ -10,6 +10,7 @@ import re
 from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import portalocker
 
@@ -92,7 +93,7 @@ class AkashicRecord:
         return data[start:].decode("utf-8", errors="replace")
 
     def _find_last_hash_from_tail(
-        self, f, file_size: int, initial_chunk_size: int = 8192
+        self, f: Any, file_size: int, initial_chunk_size: int = 8192
     ) -> str | None:
         """ファイル末尾から最後のイベントのハッシュを取得
 
@@ -194,7 +195,7 @@ class AkashicRecord:
 
             # 末尾に追記
             f.seek(0, 2)  # ファイル末尾へ移動
-            f.write((updated_event.to_jsonl() + "\n").encode("utf-8"))
+            f.write((updated_event.to_jsonl() + "\n").encode("utf-8"))  # type: ignore[arg-type]
 
         # キャッシュも更新（同一インスタンス内の最適化用）
         self._last_hash = updated_event.hash

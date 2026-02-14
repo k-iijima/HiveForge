@@ -14,7 +14,7 @@ from pathlib import PurePath
 from typing import Any
 from uuid import UUID
 
-import jcs
+import jcs  # type: ignore[import-untyped]
 from pydantic import BaseModel, Field, computed_field, field_validator
 from ulid import ULID
 
@@ -127,7 +127,7 @@ class BaseEvent(BaseModel):
         description="親イベントのID（因果リンク用）",
     )
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def hash(self) -> str:
         """イベントのハッシュ値を計算"""

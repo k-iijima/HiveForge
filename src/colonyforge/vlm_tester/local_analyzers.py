@@ -111,7 +111,7 @@ class OCRAnalyzer:
         from PIL import Image
 
         image = Image.open(io.BytesIO(image_data))
-        text = pytesseract.image_to_string(image, lang="eng+jpn")
+        text: str = pytesseract.image_to_string(image, lang="eng+jpn")
         return text
 
 

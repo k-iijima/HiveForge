@@ -194,32 +194,32 @@ class PromptLoader:
         # Queen Bee
         queen_path = colony_dir / "queen_bee.yml"
         if not queen_path.exists():
-            config = QueenBeeConfig(
+            queen_config = QueenBeeConfig(
                 name="default",
                 description="Default Queen Bee",
                 prompt=PromptTemplate(system=QUEEN_BEE_SYSTEM),
             )
-            self._save_config(queen_path, config)
+            self._save_config(queen_path, queen_config)
 
         # Worker Bee
         worker_path = colony_dir / "default_worker_bee.yml"
         if not worker_path.exists():
-            config = WorkerBeeConfig(
+            worker_config = WorkerBeeConfig(
                 name="default",
                 description="Default Worker Bee",
                 prompt=PromptTemplate(system=WORKER_BEE_SYSTEM),
             )
-            self._save_config(worker_path, config)
+            self._save_config(worker_path, worker_config)
 
         # Beekeeper
         beekeeper_path = hive_dir / "beekeeper.yml"
         if not beekeeper_path.exists():
-            config = BeekeeperConfig(
+            beekeeper_config = BeekeeperConfig(
                 name="default",
                 description="Default Beekeeper",
                 prompt=PromptTemplate(system=BEEKEEPER_SYSTEM),
             )
-            self._save_config(beekeeper_path, config)
+            self._save_config(beekeeper_path, beekeeper_config)
 
     def _save_config(self, path: Path, config: BaseModel) -> None:
         """Save configuration to a YAML file."""

@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import AsyncGenerator
+from typing import Any
 
 from fastapi import APIRouter, Query
 from fastapi.responses import StreamingResponse
@@ -18,7 +20,7 @@ router = APIRouter(prefix="/activity", tags=["Activity"])
 
 
 @router.get("/recent")
-async def get_recent_events(limit: int = Query(default=100, ge=1, le=1000)):
+async def get_recent_events(limit: int = Query(default=100, ge=1, le=1000)) -> dict[str, Any]:
     """最近のアクティビティイベントを取得"""
     bus = ActivityBus.get_instance()
     events = bus.get_recent_events(limit=limit)
@@ -26,13 +28,13 @@ async def get_recent_events(limit: int = Query(default=100, ge=1, le=1000)):
 
 
 @router.get("/hierarchy")
-async def get_hierarchy():
+async def get_hierarchy() -> dict[str, Any]:
     """アクティブエージェントの階層構造を取得"""
     bus = ActivityBus.get_instance()
     hierarchy = bus.get_hierarchy()
 
     # AgentInfoをシリアライズ
-    def serialize_hierarchy(h: dict) -> dict:
+    def serialize_hierarchy(h: dict[str, Any]) -> dict[str, Any]:
         result = {}
         for hive_id, hive_data in h.items():
             beekeeper = hive_data.get("beekeeper")
@@ -53,7 +55,7 @@ async def get_hierarchy():
 
 
 @router.get("/agents")
-async def get_active_agents():
+async def get_active_agents() -> dict[str, Any]:
     """アクティブなエージェント一覧を取得"""
     bus = ActivityBus.get_instance()
     agents = bus.get_active_agents()
@@ -61,7 +63,7 @@ async def get_active_agents():
 
 
 @router.get("/stream")
-async def stream_events():
+async def stream_events() -> StreamingResponse:
     """SSEでアクティビティイベントをリアルタイム配信
 
     Server-Sent Events (SSE) ストリーム。
@@ -69,7 +71,7 @@ async def stream_events():
     リアルタイムにエージェント活動を表示する。
     """
 
-    async def event_generator():
+    async def event_generator() -> AsyncGenerator[str, None]:
         bus = ActivityBus.get_instance()
         queue: asyncio.Queue[ActivityEvent] = asyncio.Queue()
 

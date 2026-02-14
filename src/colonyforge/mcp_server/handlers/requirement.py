@@ -51,7 +51,7 @@ class RequirementHandlers(BaseHandler):
                 "description": description,
                 "options": args.get("options", []),
             },
-            parents=parents,
+            parents=parents or [],
         )
         ar.append(event, self._current_run_id)
 

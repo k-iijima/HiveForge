@@ -3,9 +3,17 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..core.swarming import SwarmingFeatures
+
+if TYPE_CHECKING:
+    from ..core import AkashicRecord
+    from ..core.config import LLMConfig
+    from ..core.swarming import SwarmingEngine
+    from ..llm.client import LLMClient
+    from ..llm.runner import AgentRunner
+    from .session import BeekeeperSession
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +21,24 @@ logger = logging.getLogger(__name__)
 class LLMIntegrationMixin:
     """LLMクライアント・AgentRunner・内部ツール登録"""
 
-    async def _get_llm_client(self):
+    if TYPE_CHECKING:
+        ar: AkashicRecord
+        llm_config: LLMConfig | None
+        current_session: BeekeeperSession | None
+        _llm_client: LLMClient | None
+        _agent_runner: AgentRunner | None
+        _swarming_engine: SwarmingEngine
+
+        async def _delegate_to_queen(
+            self, colony_id: str, task: str, context: dict[str, Any] | None = None
+        ) -> str: ...
+        async def _ask_user(self, question: str, options: list[str] | None = None) -> str: ...
+        async def handle_create_hive(self, arguments: dict[str, Any]) -> dict[str, Any]: ...
+        async def handle_create_colony(self, arguments: dict[str, Any]) -> dict[str, Any]: ...
+        async def handle_list_hives(self, arguments: dict[str, Any]) -> dict[str, Any]: ...
+        async def handle_get_status(self, arguments: dict[str, Any]) -> dict[str, Any]: ...
+
+    async def _get_llm_client(self) -> Any:
         """LLMクライアントを取得（遅延初期化）"""
         if self._llm_client is None:
             from ..llm.client import LLMClient
@@ -21,7 +46,7 @@ class LLMIntegrationMixin:
             self._llm_client = LLMClient(config=self.llm_config)
         return self._llm_client
 
-    async def _get_agent_runner(self):
+    async def _get_agent_runner(self) -> Any:
         """AgentRunnerを取得（遅延初期化）"""
         if self._agent_runner is None:
             from ..core.activity_bus import AgentInfo, AgentRole
@@ -47,7 +72,9 @@ class LLMIntegrationMixin:
 
     def _register_internal_tools(self) -> None:
         """Beekeeperが内部で使えるツールを登録"""
-        from ..llm.tools import ToolDefinition
+        from ..llm.tools import ToolDefinition  # type: ignore[attr-defined]
+
+        assert self._agent_runner is not None
 
         # Hiveを作成するツール
         create_hive = ToolDefinition(

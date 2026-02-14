@@ -133,7 +133,7 @@ class TaskPlanner:
         """
         messages = self._build_messages(goal, context or {})
         response = await self._client.chat(messages)
-        return self._parse_response(response.content)
+        return self._parse_response(response.content or "")
 
     def _build_messages(self, goal: str, context: dict[str, Any]) -> list[Message]:
         """LLM用メッセージを構築"""

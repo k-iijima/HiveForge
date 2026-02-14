@@ -55,8 +55,11 @@ class BeekeeperMCPServer(
 
     def __post_init__(self) -> None:
         """初期化"""
-        self._llm_client = None
-        self._agent_runner = None
+        from ..llm.client import LLMClient
+        from ..llm.runner import AgentRunner
+
+        self._llm_client: LLMClient | None = None
+        self._agent_runner: AgentRunner | None = None
         self._queens: dict[str, QueenBeeMCPServer] = {}  # colony_id -> Queen Bee
         self._swarming_engine = SwarmingEngine()
         self._pending_requests: dict[str, asyncio.Future[str]] = {}

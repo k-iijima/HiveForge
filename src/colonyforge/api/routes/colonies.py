@@ -5,6 +5,8 @@ Colony管理用のREST API。
 読み取りはイベント列からの投影（HiveAggregate）により再構築される。
 """
 
+from typing import Any
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
@@ -51,7 +53,7 @@ class ColonyStatusResponse(BaseModel):
 # --- ヘルパー ---
 
 
-def _rebuild_hive(hive_id: str):
+def _rebuild_hive(hive_id: str) -> Any:
     """HiveStoreからイベントをリプレイしてHive集約を再構築"""
     store = get_hive_store()
     events = list(store.replay(hive_id))

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..core import generate_event_id
 from ..core.events import (
@@ -13,11 +13,42 @@ from ..core.events import (
     RunStartedEvent,
 )
 
+if TYPE_CHECKING:
+    from ..core import AkashicRecord
+    from .server import ManagedWorker
+
 logger = logging.getLogger(__name__)
 
 
 class ExecutionMixin:
     """目標実行: handle_execute_goal, _execute_direct, 簡易ハンドラ"""
+
+    if TYPE_CHECKING:
+        colony_id: str
+        ar: AkashicRecord
+        use_pipeline: bool
+        _current_run_id: str | None
+        _workers: dict[str, ManagedWorker]
+
+        def add_worker(self, worker_id: str) -> ManagedWorker: ...
+        def get_worker(self, worker_id: str) -> ManagedWorker | None: ...
+        def get_idle_workers(self) -> list[ManagedWorker]: ...
+        async def _plan_tasks(self, goal: str, context: dict[str, Any]) -> list[dict[str, Any]]: ...
+        async def _execute_task(
+            self,
+            task_id: str,
+            run_id: str,
+            goal: str,
+            context: dict[str, Any],
+            worker: Any | None = None,
+        ) -> dict[str, Any]: ...
+        async def _execute_with_pipeline(
+            self,
+            run_id: str,
+            goal: str,
+            context: dict[str, Any],
+            approval_decision: Any | None = None,
+        ) -> dict[str, Any]: ...
 
     async def handle_execute_goal(self, arguments: dict[str, Any]) -> dict[str, Any]:
         """目標実行ハンドラ

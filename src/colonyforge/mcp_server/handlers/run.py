@@ -127,7 +127,7 @@ class RunHandlers(BaseHandler):
         pending_requirements = list(proj.pending_requirements)
 
         if (incomplete_tasks or pending_requirements) and not force:
-            result = {
+            result: dict[str, Any] = {
                 "error": "Cannot complete run with incomplete tasks or pending requirements",
                 "hint": "強制完了する場合は force=true を指定してください",
             }
@@ -189,16 +189,16 @@ class RunHandlers(BaseHandler):
 
         self._current_run_id = None
 
-        result = {
+        completion_result: dict[str, Any] = {
             "status": "completed",
             "run_id": run_id,
             "summary": args.get("summary", ""),
         }
         if cancelled_task_ids:
-            result["cancelled_task_ids"] = cancelled_task_ids
+            completion_result["cancelled_task_ids"] = cancelled_task_ids
         if cancelled_requirement_ids:
-            result["cancelled_requirement_ids"] = cancelled_requirement_ids
-        return result
+            completion_result["cancelled_requirement_ids"] = cancelled_requirement_ids
+        return completion_result
 
     async def handle_heartbeat(self, args: dict[str, Any]) -> dict[str, Any]:
         """ハートビート"""

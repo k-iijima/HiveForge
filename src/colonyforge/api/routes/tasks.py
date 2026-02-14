@@ -3,6 +3,8 @@
 Task管理に関するエンドポイント。
 """
 
+from typing import Any
+
 from fastapi import APIRouter, HTTPException, status
 
 from ...core import build_run_projection, generate_event_id
@@ -44,7 +46,7 @@ def _get_task_created_event_id(run_id: str, task_id: str) -> str | None:
 
 
 @router.post("", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)
-async def create_task(run_id: str, request: CreateTaskRequest):
+async def create_task(run_id: str, request: CreateTaskRequest) -> TaskResponse:
     """Taskを作成"""
     active_runs = get_active_runs()
     if run_id not in active_runs:
@@ -87,7 +89,7 @@ async def create_task(run_id: str, request: CreateTaskRequest):
 
 
 @router.get("", response_model=list[TaskResponse])
-async def list_tasks(run_id: str):
+async def list_tasks(run_id: str) -> list[TaskResponse]:
     """Task一覧を取得"""
     active_runs = get_active_runs()
     ar = get_ar()
@@ -114,7 +116,7 @@ async def list_tasks(run_id: str):
 
 
 @router.post("/{task_id}/complete")
-async def complete_task(run_id: str, task_id: str, request: CompleteTaskRequest):
+async def complete_task(run_id: str, task_id: str, request: CompleteTaskRequest) -> dict[str, Any]:
     """Taskを完了"""
     active_runs = get_active_runs()
     if run_id not in active_runs:
@@ -148,7 +150,7 @@ async def complete_task(run_id: str, task_id: str, request: CompleteTaskRequest)
 
 
 @router.post("/{task_id}/fail")
-async def fail_task(run_id: str, task_id: str, request: FailTaskRequest):
+async def fail_task(run_id: str, task_id: str, request: FailTaskRequest) -> dict[str, Any]:
     """Taskを失敗"""
     active_runs = get_active_runs()
     if run_id not in active_runs:
@@ -182,7 +184,7 @@ async def fail_task(run_id: str, task_id: str, request: FailTaskRequest):
 
 
 @router.post("/{task_id}/assign")
-async def assign_task(run_id: str, task_id: str, request: AssignTaskRequest):
+async def assign_task(run_id: str, task_id: str, request: AssignTaskRequest) -> dict[str, Any]:
     """Taskを担当者に割り当て"""
     active_runs = get_active_runs()
     if run_id not in active_runs:
@@ -216,7 +218,9 @@ async def assign_task(run_id: str, task_id: str, request: AssignTaskRequest):
 
 
 @router.post("/{task_id}/progress")
-async def report_progress(run_id: str, task_id: str, request: ReportProgressRequest):
+async def report_progress(
+    run_id: str, task_id: str, request: ReportProgressRequest
+) -> dict[str, Any]:
     """Taskの進捗を報告"""
     active_runs = get_active_runs()
     if run_id not in active_runs:

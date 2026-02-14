@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -71,6 +72,8 @@ class FeedbackRecord(BaseModel):
     )
     escalation_id: str = Field(..., description="対応したエスカレーション/介入のID")
     resolution: str = Field(..., description="解決方法")
-    beekeeper_adjustment: dict = Field(default_factory=dict, description="Beekeeperへの調整")
+    beekeeper_adjustment: dict[str, Any] = Field(
+        default_factory=dict, description="Beekeeperへの調整"
+    )
     lesson_learned: str = Field(default="", description="学んだ教訓")
     timestamp: str = Field(..., description="タイムスタンプ (ISO形式)")

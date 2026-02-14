@@ -32,8 +32,7 @@ jobs:
 
       - name: Type check with mypy
         run: |
-          mypy src/colonyforge --ignore-missing-imports
-        continue-on-error: true  # 段階的に厳格化（M1-3で完全対応予定）
+          mypy src/colonyforge
 
   test:
     name: Test & Coverage

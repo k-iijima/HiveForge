@@ -41,17 +41,17 @@ class ScoringEngine:
 
     def _calc_correctness(self, m: dict[str, Any]) -> float:
         """テスト合格率"""
-        total = m.get("tests_total", 0)
+        total = int(m.get("tests_total", 0))
         if total == 0:
             return 0.0
-        return m.get("tests_passed", 0) / total
+        return float(m.get("tests_passed", 0)) / total
 
     def _calc_robustness(self, m: dict[str, Any]) -> float:
         """変異テスト耐性: 1.0 - (survived / total)"""
-        total = m.get("mutation_total", 0)
+        total = int(m.get("mutation_total", 0))
         if total == 0:
             return 0.0
-        survived = m.get("mutation_survived", 0)
+        survived = float(m.get("mutation_survived", 0))
         return max(0.0, 1.0 - survived / total)
 
     def _calc_consistency(self, m: dict[str, Any]) -> float:
@@ -60,7 +60,7 @@ class ScoringEngine:
 
     def _calc_security(self, m: dict[str, Any]) -> float:
         """セキュリティスコア: 1.0 - violations * 0.1"""
-        violations = m.get("lint_violations", 0)
+        violations = int(m.get("lint_violations", 0))
         if violations == 0 and "lint_violations" not in m:
             return 0.0
         return max(0.0, 1.0 - violations * 0.1)

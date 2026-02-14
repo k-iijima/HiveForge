@@ -3,17 +3,33 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..core import generate_event_id
 from ..core.models.action_class import TrustLevel
 from ..core.swarming import SwarmingFeatures
+
+if TYPE_CHECKING:
+    from ..core import AkashicRecord
+    from ..core.config import LLMConfig
+    from ..core.swarming import SwarmingEngine
+    from ..queen_bee.server import QueenBeeMCPServer
+    from .session import BeekeeperSession
 
 logger = logging.getLogger(__name__)
 
 
 class QueenDelegationMixin:
     """Queen Beeへのタスク委譲・パイプライン実行・結果整形"""
+
+    if TYPE_CHECKING:
+        ar: AkashicRecord
+        llm_config: LLMConfig | None
+        current_session: BeekeeperSession | None
+        _swarming_engine: SwarmingEngine
+        _queens: dict[str, QueenBeeMCPServer]
+
+        async def _ask_user(self, question: str, options: list[str] | None = None) -> str: ...
 
     async def _delegate_to_queen(
         self, colony_id: str, task: str, context: dict[str, Any] | None = None

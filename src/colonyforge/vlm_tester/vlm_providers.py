@@ -136,7 +136,7 @@ class AnthropicProvider(VLMProvider):
 
     async def analyze(self, image_data: bytes, prompt: str) -> VLMAnalysisResult:
         """Anthropic Claudeで画像を分析"""
-        import anthropic
+        import anthropic  # type: ignore[import-not-found]
 
         if not self.api_key:
             raise RuntimeError("ANTHROPIC_API_KEY is not set")

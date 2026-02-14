@@ -3,6 +3,8 @@
 確認要請に関するエンドポイント。
 """
 
+from typing import Any
+
 from fastapi import APIRouter, HTTPException, status
 
 from ...core import build_run_projection, generate_event_id
@@ -45,7 +47,7 @@ router = APIRouter(prefix="/runs/{run_id}/requirements", tags=["Requirements"])
 
 
 @router.get("", response_model=list[RequirementResponse])
-async def get_requirements(run_id: str, pending_only: bool = False):
+async def get_requirements(run_id: str, pending_only: bool = False) -> list[RequirementResponse]:
     """確認要請一覧を取得"""
     ar = get_ar()
     events = list(ar.replay(run_id))
@@ -88,7 +90,7 @@ async def get_requirements(run_id: str, pending_only: bool = False):
 
 
 @router.post("", response_model=RequirementResponse, status_code=status.HTTP_201_CREATED)
-async def create_requirement(run_id: str, request: CreateRequirementRequest):
+async def create_requirement(run_id: str, request: CreateRequirementRequest) -> RequirementResponse:
     """確認要請を作成"""
     active_runs = get_active_runs()
     if run_id not in active_runs:
@@ -98,7 +100,7 @@ async def create_requirement(run_id: str, request: CreateRequirementRequest):
     requirement_id = generate_event_id()
 
     # auto-parents: 明示指定がなければ run.started を親にする
-    parents = None
+    parents: list[str] = []
     run_started_id = _get_run_started_event_id(run_id)
     if run_started_id:
         parents = [run_started_id]
@@ -128,7 +130,9 @@ async def create_requirement(run_id: str, request: CreateRequirementRequest):
 
 
 @router.post("/{requirement_id}/resolve")
-async def resolve_requirement(run_id: str, requirement_id: str, request: ResolveRequirementRequest):
+async def resolve_requirement(
+    run_id: str, requirement_id: str, request: ResolveRequirementRequest
+) -> dict[str, Any]:
     """確認要請を解決（承認/却下）"""
     active_runs = get_active_runs()
     if run_id not in active_runs:
@@ -137,11 +141,12 @@ async def resolve_requirement(run_id: str, requirement_id: str, request: Resolve
     ar = get_ar()
 
     # auto-parents: requirement.created を親にする
-    parents = None
+    parents: list[str] = []
     req_created_id = _get_requirement_created_event_id(run_id, requirement_id)
     if req_created_id:
         parents = [req_created_id]
 
+    event: RequirementApprovedEvent | RequirementRejectedEvent
     if request.approved:
         event = RequirementApprovedEvent(
             run_id=run_id,

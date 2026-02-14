@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..core import generate_event_id
 from ..core.events import (
@@ -13,11 +13,27 @@ from ..core.events import (
     TaskFailedEvent,
 )
 
+if TYPE_CHECKING:
+    from ..core import AkashicRecord
+    from ..core.config import LLMConfig
+    from ..llm.client import LLMClient
+    from ..llm.runner import AgentRunner
+    from .server import ManagedWorker
+
 logger = logging.getLogger(__name__)
 
 
 class TaskRunnerMixin:
     """タスク実行・タスク分解・LLMクライアント初期化"""
+
+    if TYPE_CHECKING:
+        colony_id: str
+        ar: AkashicRecord
+        llm_config: LLMConfig | None
+        _llm_client: LLMClient | None
+        _agent_runner: AgentRunner | None
+
+        def get_idle_workers(self) -> list[ManagedWorker]: ...
 
     async def _plan_tasks(self, goal: str, context: dict[str, Any]) -> list[dict[str, Any]]:
         """LLMを使ってタスクを分解
@@ -152,7 +168,7 @@ class TaskRunnerMixin:
                 "error": str(e),
             }
 
-    async def _get_llm_client(self):
+    async def _get_llm_client(self) -> Any:
         """LLMクライアントを取得（遅延初期化）"""
         if self._llm_client is None:
             from ..llm.client import LLMClient
@@ -160,7 +176,7 @@ class TaskRunnerMixin:
             self._llm_client = LLMClient(config=self.llm_config)
         return self._llm_client
 
-    async def _get_agent_runner(self):
+    async def _get_agent_runner(self) -> Any:
         """AgentRunnerを取得（遅延初期化）"""
         if self._agent_runner is None:
             from ..core.activity_bus import AgentInfo, AgentRole

@@ -151,7 +151,7 @@ class SentinelHornet:
 
         # 2. イベント型パターンの周期性検出（A→B→A→B...）
         if len(events) >= self.max_loop_count * 2:
-            type_sequence = [e.type for e in events]
+            type_sequence: list[EventType] = [e.type for e in events]  # type: ignore[misc]
             alerts.extend(self._detect_type_cycle(type_sequence, colony_id))
 
         return alerts

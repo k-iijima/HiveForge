@@ -194,6 +194,9 @@ def parse_event(data: dict[str, Any] | str) -> BaseEvent:
     if isinstance(data, str):
         data = json.loads(data)
 
+    # json.loadsの結果はdict[str, Any]であることを保証（型ナローイング）
+    assert isinstance(data, dict)
+
     original_data = dict(data)
 
     try:

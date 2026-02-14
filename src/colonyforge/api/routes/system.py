@@ -12,14 +12,14 @@ router = APIRouter(tags=["System"])
 
 
 @router.get("/health", response_model=HealthResponse)
-async def health_check():
+async def health_check() -> HealthResponse:
     """ヘルスチェック"""
     try:
-        from ...core import __version__
+        from ...core import __version__ as _version  # type: ignore[attr-defined]
     except ImportError:
-        __version__ = "0.1.0"
+        _version = "0.1.0"
     return HealthResponse(
         status="healthy",
-        version=__version__,
+        version=_version,
         active_runs=len(get_active_runs()),
     )

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..core import generate_event_id
 from ..core.events import (
@@ -11,11 +11,31 @@ from ..core.events import (
     RunFailedEvent,
 )
 
+if TYPE_CHECKING:
+    from ..core import AkashicRecord
+    from ..core.models.action_class import TrustLevel
+
 logger = logging.getLogger(__name__)
 
 
 class PipelineExecutionMixin:
     """Pipeline経由の実行 + 承認再開"""
+
+    if TYPE_CHECKING:
+        colony_id: str
+        ar: AkashicRecord
+        trust_level: TrustLevel
+        _pending_approvals: dict[str, dict[str, Any]]
+
+        async def _plan_tasks(self, goal: str, context: dict[str, Any]) -> list[dict[str, Any]]: ...
+        async def _execute_task(
+            self,
+            task_id: str,
+            run_id: str,
+            goal: str,
+            context: dict[str, Any],
+            worker: Any | None = None,
+        ) -> dict[str, Any]: ...
 
     async def _execute_with_pipeline(
         self,

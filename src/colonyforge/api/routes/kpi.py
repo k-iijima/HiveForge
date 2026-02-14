@@ -9,6 +9,8 @@ M5-4: KPIダッシュボード（Hive Monitor統合）
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Query
 
 from ...core import get_settings
@@ -27,7 +29,7 @@ def _get_calculator() -> KPICalculator:
 @router.get("/scores")
 async def get_kpi_scores(
     colony_id: str | None = Query(default=None, description="Colony ID（未指定時は全体）"),
-):
+) -> dict[str, Any]:
     """基本KPIスコアを取得
 
     5つのKPI指標を返す:
@@ -45,7 +47,7 @@ async def get_kpi_scores(
 @router.get("/summary")
 async def get_kpi_summary(
     colony_id: str | None = Query(default=None, description="Colony ID（未指定時は全体）"),
-):
+) -> dict[str, Any]:
     """KPIサマリーを取得
 
     基本KPIに加えてOutcome/FailureClass内訳を含む。
@@ -64,7 +66,7 @@ async def get_collaboration_metrics(
     decision_count: int = Query(default=0, ge=0, description="意思決定回数"),
     referee_selected_count: int = Query(default=0, ge=0, description="Referee選抜数"),
     referee_candidate_count: int = Query(default=0, ge=0, description="Referee候補総数"),
-):
+) -> dict[str, Any]:
     """協調品質メトリクスを取得
 
     - rework_rate: 再作業率
@@ -94,7 +96,7 @@ async def get_gate_accuracy(
     sentinel_alert_count: int = Query(default=0, ge=0, description="Sentinel alert数"),
     sentinel_false_alarm_count: int = Query(default=0, ge=0, description="Sentinel 誤検知数"),
     total_monitoring_periods: int = Query(default=0, ge=0, description="監視期間数"),
-):
+) -> dict[str, Any]:
     """ゲート精度メトリクスを取得
 
     - guard_pass_rate / conditional_pass_rate / fail_rate
@@ -127,7 +129,7 @@ async def get_evaluation_summary(
     sentinel_alert_count: int = Query(default=0, ge=0),
     sentinel_false_alarm_count: int = Query(default=0, ge=0),
     total_monitoring_periods: int = Query(default=0, ge=0),
-):
+) -> dict[str, Any]:
     """包括的評価サマリーを取得
 
     基本KPI + 協調品質 + ゲート精度を統合した
@@ -153,7 +155,7 @@ async def get_evaluation_summary(
 
 
 @router.get("/colonies")
-async def get_kpi_colonies():
+async def get_kpi_colonies() -> dict[str, Any]:
     """KPIデータが存在するColony一覧を取得"""
     calc = _get_calculator()
     colonies = calc.store.list_colonies()

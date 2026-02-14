@@ -59,8 +59,8 @@ class WorkerBeeMCPServer:
     def __post_init__(self) -> None:
         """初期化"""
         self.context = WorkerContext(worker_id=self.worker_id)
-        self._llm_client = None
-        self._agent_runner = None
+        self._llm_client: Any = None
+        self._agent_runner: Any = None
 
     @property
     def state(self) -> WorkerState:
@@ -309,7 +309,7 @@ class WorkerBeeMCPServer:
             "progress": self.context.progress,
         }
 
-    async def _get_llm_client(self):
+    async def _get_llm_client(self) -> Any:
         """LLMクライアントを取得（遅延初期化）"""
         if self._llm_client is None:
             from ..llm.client import LLMClient
@@ -317,7 +317,7 @@ class WorkerBeeMCPServer:
             self._llm_client = LLMClient(config=self.llm_config)
         return self._llm_client
 
-    async def _get_agent_runner(self):
+    async def _get_agent_runner(self) -> Any:
         """AgentRunnerを取得（遅延初期化）"""
         if self._agent_runner is None:
             from ..core.activity_bus import AgentInfo, AgentRole
