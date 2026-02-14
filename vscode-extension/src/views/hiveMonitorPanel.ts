@@ -278,9 +278,9 @@ export class HiveMonitorPanel {
                 'task.progress':    '📊 進捗を報告しています...',
             };
             // サマリーが短ければ付加
-            const base = templates[type] || ('📌 ' + type);
+            const base = templates[type] || ('📌 ' + esc(type));
             if (summary && summary.length > 0 && summary.length <= 25) {
-                return base.replace(/\\.\\.\\.$/, '') + ' — ' + summary;
+                return base.replace(/\\.\\.\\.$$/, '') + ' — ' + summary;
             }
             return base;
         }
@@ -973,6 +973,13 @@ export class HiveMonitorPanel {
                 33% { content: '.'; }
                 66% { content: '..'; }
                 100% { content: '...'; }
+            }
+
+            /* アクセシビリティ: モーション低減設定対応 */
+            @media (prefers-reduced-motion: reduce) {
+                .bubble-ongoing { animation: none; }
+                .status-indicator.active { animation: none; }
+                .loading-spinner { animation: none; }
             }
 
             /* Activity Ticker (bottom bar) */
