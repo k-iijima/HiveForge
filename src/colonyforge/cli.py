@@ -67,6 +67,12 @@ def main() -> None:
         action="store_true",
         help="デモ用エージェント・イベントを自動投入してから開始",
     )
+    monitor_parser.add_argument(
+        "--seed-delay",
+        type=float,
+        default=0.5,
+        help="seed投入時のイベント間遅延秒数（既定: 0.5）",
+    )
 
     # record-decision コマンド
     decision_parser = subparsers.add_parser(

@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import AsyncGenerator
+import random
+
 from typing import Any
+from collections.abc import AsyncGenerator
 
 from fastapi import APIRouter, Query
 from fastapi.responses import StreamingResponse
@@ -110,12 +112,18 @@ async def emit_event(req: EmitEventRequest) -> dict[str, str]:
 
 
 @router.post("/seed")
-async def seed_demo_data() -> dict[str, Any]:
+async def seed_demo_data(
+    delay: float = Query(default=0.05, ge=0.0, le=5.0, description="イベント間の遅延秒数"),
+) -> dict[str, Any]:
     """デモ用テストデータを投入する
 
     2つのHive、複数エージェントを登録し、
     各種アクティビティイベントを発行する。
     モニターの動作確認用。
+
+    Args:
+        delay: イベント間の遅延秒数（デフォルト 0.05秒）。
+               じっくり観察したい場合は 0.5〜1.0 を推奨。
     """
     bus = ActivityBus.get_instance()
 
@@ -172,6 +180,8 @@ async def seed_demo_data() -> dict[str, Any]:
             )
         )
         emitted += 1
+        if delay > 0:
+            await asyncio.sleep(delay)
 
     # Step 2: 各種アクティビティ
     scenarios: list[tuple[str, ActivityType, str]] = [
@@ -210,7 +220,8 @@ async def seed_demo_data() -> dict[str, Any]:
             )
         )
         emitted += 1
-        await asyncio.sleep(0.05)  # リアルタイム感を出す
+        if delay > 0:
+            await asyncio.sleep(delay)
 
     return {
         "status": "ok",

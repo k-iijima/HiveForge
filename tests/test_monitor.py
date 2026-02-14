@@ -869,7 +869,7 @@ class TestCLIIntegration:
 
     @patch("colonyforge.cli.run_monitor")
     def test_monitor_seed_flag(self, mock_run_monitor):
-        """--seed フラグが正しく渡される"""
+        """--seed フラグと --seed-delay が正しく渡される"""
         # Arrange
         import sys
 
@@ -881,6 +881,8 @@ class TestCLIIntegration:
                 "monitor",
                 "--no-tmux",
                 "--seed",
+                "--seed-delay",
+                "1.0",
             ]
 
             # Act
@@ -891,6 +893,7 @@ class TestCLIIntegration:
             # Assert
             args = mock_run_monitor.call_args[0][0]
             assert args.seed is True
+            assert args.seed_delay == 1.0
         finally:
             sys.argv = original_argv
 
@@ -924,6 +927,27 @@ class TestSeedServer:
         mock_urlopen.assert_called_once()
 
     @patch("colonyforge.monitor.urlopen")
+    def test_seed_passes_delay_query_param(self, mock_urlopen):
+        """delay値がURLクエリパラメータとして渡される"""
+        # Arrange
+        response_data = json.dumps(
+            {"status": "ok", "agents_registered": 7, "events_emitted": 30}
+        ).encode()
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = response_data
+        mock_resp.__enter__ = MagicMock(return_value=mock_resp)
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value = mock_resp
+
+        # Act
+        result = _seed_server("http://localhost:8000", delay=1.0)
+
+        # Assert
+        assert result is True
+        req_arg = mock_urlopen.call_args[0][0]
+        assert "delay=1.0" in req_arg.full_url
+
+    @patch("colonyforge.monitor.urlopen")
     def test_seed_connection_error(self, mock_urlopen):
         """接続エラー時にFalseを返す"""
         # Arrange
@@ -940,19 +964,20 @@ class TestSeedServer:
     @patch("colonyforge.monitor.run_single_terminal")
     @patch("colonyforge.monitor._seed_server")
     def test_monitor_main_with_seed(self, mock_seed, mock_single):
-        """--seed 指定時に _seed_server が呼ばれる"""
+        """--seed 指定時に _seed_server が delay 付きで呼ばれる"""
         # Arrange
         args = argparse.Namespace(
             server_url="http://localhost:8000",
             no_tmux=True,
             seed=True,
+            seed_delay=1.0,
         )
 
         # Act
         monitor_main(args)
 
         # Assert
-        mock_seed.assert_called_once_with("http://localhost:8000")
+        mock_seed.assert_called_once_with("http://localhost:8000", delay=1.0)
         mock_single.assert_called_once()
 
     @patch("colonyforge.monitor.run_single_terminal")

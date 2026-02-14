@@ -744,17 +744,23 @@ def _add_agent_to_layout(
 # =============================================================================
 
 
-def _seed_server(server_url: str) -> bool:
+def _seed_server(server_url: str, delay: float = 0.5) -> bool:
     """POST /activity/seed を呼んでデモデータを投入する。
+
+    Args:
+        server_url: APIサーバーURL
+        delay: イベント間の遅延秒数
 
     Returns:
         成功したら True
     """
-    url = f"{server_url.rstrip('/')}/activity/seed"
+    url = f"{server_url.rstrip('/')}/activity/seed?delay={delay}"
+    # delay が大きい場合はタイムアウトも伸ばす
+    timeout = max(30, int(delay * 40))
     try:
         req = Request(url, data=b"{}", method="POST")
         req.add_header("Content-Type", "application/json")
-        with urlopen(req, timeout=10) as resp:
+        with urlopen(req, timeout=timeout) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             agents = data.get("agents_registered", 0)
             events = data.get("events_emitted", 0)
@@ -773,9 +779,10 @@ def monitor_main(args: argparse.Namespace) -> None:
     server_url: str = args.server_url
     no_tmux: bool = args.no_tmux
     seed: bool = getattr(args, "seed", False)
+    seed_delay: float = getattr(args, "seed_delay", 0.5)
 
     if seed:
-        _seed_server(server_url)
+        _seed_server(server_url, delay=seed_delay)
 
     if no_tmux:
         run_single_terminal(server_url)

@@ -548,3 +548,24 @@ class TestActivitySeed:
         assert response.status_code == 200
         events = response.json()["events"]
         assert len(events) > 20
+
+    @pytest.mark.asyncio
+    async def test_seed_accepts_delay_param(self, client):
+        """delay=0でイベント間遅延なしで投入できる"""
+        # Act: delay=0 で即時投入
+        response = client.post("/activity/seed?delay=0")
+
+        # Assert
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "ok"
+        assert data["events_emitted"] > 20
+
+    @pytest.mark.asyncio
+    async def test_seed_rejects_invalid_delay(self, client):
+        """delay が範囲外の場合は 422 を返す"""
+        # Act: delay > 5.0 は範囲外
+        response = client.post("/activity/seed?delay=10.0")
+
+        # Assert
+        assert response.status_code == 422
