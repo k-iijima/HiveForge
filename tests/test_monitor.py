@@ -591,7 +591,23 @@ class TestRunTmuxMonitor:
         with pytest.raises(SystemExit, match="1"):
             run_tmux_monitor("http://localhost:8000")
 
-    @patch("colonyforge.monitor._session_exists", side_effect=[True, False, False])
+    @patch("colonyforge.monitor._session_exists", return_value=True)
+    @patch("colonyforge.monitor.subprocess.run")
+    @patch("colonyforge.monitor._kill_session")
+    @patch("colonyforge.monitor.shutil.which", return_value="/usr/bin/tmux")
+    def test_reuses_existing_session(self, mock_which, mock_kill, mock_run, mock_exists):
+        """既存のtmuxセッションがある場合、新規作成せず接続する"""
+        # Act
+        run_tmux_monitor("http://localhost:8000")
+
+        # Assert: 既存セッションにアタッチ、kill は呼ばれない
+        mock_run.assert_called_once_with(
+            ["tmux", "attach-session", "-t", "colonyforge-monitor"],
+            check=False,
+        )
+        mock_kill.assert_not_called()
+
+    @patch("colonyforge.monitor._session_exists", side_effect=[False, True, False, False])
     @patch("colonyforge.monitor.subprocess.run")
     @patch("colonyforge.monitor.iter_sse_events", return_value=iter([]))
     @patch("colonyforge.monitor._create_monitor_session")
@@ -630,7 +646,7 @@ class TestRunTmuxMonitor:
             check=False,
         )
 
-    @patch("colonyforge.monitor._session_exists", side_effect=[True, False, False])
+    @patch("colonyforge.monitor._session_exists", side_effect=[False, True, False, False])
     @patch("colonyforge.monitor.subprocess.run")
     @patch("colonyforge.monitor.iter_sse_events", return_value=iter([]))
     @patch("colonyforge.monitor._create_hierarchical_session")

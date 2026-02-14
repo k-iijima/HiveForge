@@ -532,8 +532,18 @@ def run_tmux_monitor(server_url: str) -> None:
     print("🐝 ColonyForge Agent Monitor (tmux)")
     print(f"   Server: {server_url}")
 
-    # 既存セッションをクリーンアップ
-    _kill_session()
+    # 既存セッションがあれば再利用（2重起動時の衝突防止）
+    if _session_exists():
+        print("   ℹ 既存セッションに接続します")
+        print(f"   Ctrl+B → d でデタッチ")
+        try:
+            subprocess.run(["tmux", "attach-session", "-t", SESSION_NAME], check=False)
+        except KeyboardInterrupt:
+            pass
+        return
+
+    # 新規セッションを作成
+    _kill_session()  # 念のため
 
     # hierarchy を取得して Colony ベースのレイアウトを構築
     hierarchy = _fetch_hierarchy(server_url)

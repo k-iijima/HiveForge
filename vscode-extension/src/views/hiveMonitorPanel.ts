@@ -377,6 +377,35 @@ export class HiveMonitorPanel {
         // 全イベントキャッシュ（エージェント別最新アクティビティ検索用）
         let cachedAllEvents = [];
 
+        // アクティビティフィルター状態
+        // null | {type:'beekeeper'} | {type:'hive',id:string} | {type:'colony',id:string}
+        let activityFilter = null;
+
+        function applyActivityFilter(events) {
+            if (!activityFilter) return events;
+            switch (activityFilter.type) {
+                case 'beekeeper':
+                    return events.filter(e => e.agent.role === 'beekeeper');
+                case 'hive':
+                    return events.filter(e => e.agent.hive_id === activityFilter.id);
+                case 'colony':
+                    return events.filter(e => e.agent.colony_id === activityFilter.id);
+                default:
+                    return events;
+            }
+        }
+
+        function setActivityFilter(filter) {
+            activityFilter = filter;
+            switchTab('activity');
+            renderTicker(cachedAllEvents);
+        }
+
+        function clearActivityFilter() {
+            activityFilter = null;
+            renderTicker(cachedAllEvents);
+        }
+
         /** activity_type → 日本語吹き出しテキスト変換 */
         function getBubbleText(type, summary) {
             const templates = {
@@ -479,7 +508,7 @@ export class HiveMonitorPanel {
             let h = '<div class="tree-graph">';
             // Beekeeper
             h += '<div class="beekeeper-level">'
-                + '<div class="node beekeeper-node">'
+                + '<div class="node beekeeper-node" onclick="filterByBeekeeper()">'
                 + '<div class="node-icon">👤</div>'
                 + '<div class="node-label">Beekeeper</div>'
                 + '<div class="node-sublabel">統括者</div>'
@@ -503,7 +532,7 @@ export class HiveMonitorPanel {
             let h = '<div class="hive-branch">';
             h += '<div class="branch-connector ' + (isFirst ? 'first ' : '') + (isLast ? 'last' : '') + '"></div>';
             h += '<div class="hive-container">';
-            h += '<div class="node hive-node ' + sc + '" onclick="selectHive(\\'' + esc(hive.hive_id) + '\\')">';
+            h += '<div class="node hive-node ' + sc + '" onclick="filterByHive(\\'' + esc(hive.hive_id) + '\\')">';
             h += '<div class="node-icon">🏠</div>';
             h += '<div class="node-label">' + esc(hive.name) + '</div>';
             h += '<div class="node-sublabel">' + hive.colonies.length + ' colonies</div>';
@@ -543,7 +572,7 @@ export class HiveMonitorPanel {
                 h += renderSpeechBubble(colonyBubbleEv);
             }
 
-            h += '<div class="node colony-node ' + sc + '" onclick="selectColony(\\'' + esc(colony.colony_id) + '\\')">';
+            h += '<div class="node colony-node ' + sc + '" onclick="filterByColony(\\'' + esc(colony.colony_id) + '\\')">';
 
             // 活動中インジケーターバー
             if (meta) {
@@ -622,12 +651,29 @@ export class HiveMonitorPanel {
         /** 画面下部のアクティビティティッカー → Activityタブのフィード */
         function renderTicker(events) {
             const el = document.getElementById('activityFeed');
-            if (!events || events.length === 0) {
-                el.innerHTML = '<div class="ticker-empty">アクティビティなし</div>';
+            const filtered = applyActivityFilter(events);
+
+            let h = '';
+
+            // フィルターヘッダー
+            if (activityFilter) {
+                const labels = {
+                    'beekeeper': '👤 Beekeeper',
+                    'hive': '🏠 ' + (activityFilter.id || ''),
+                    'colony': '🏗️ ' + (activityFilter.id || ''),
+                };
+                h += '<div class="filter-header">'
+                    + '<span class="filter-label">' + (labels[activityFilter.type] || '') + ' のアクティビティ</span>'
+                    + '<button class="filter-clear" onclick="clearActivityFilter()">✕ フィルター解除</button>'
+                    + '</div>';
+            }
+
+            if (!filtered || filtered.length === 0) {
+                h += '<div class="ticker-empty">' + (activityFilter ? 'フィルター対象のアクティビティなし' : 'アクティビティなし') + '</div>';
+                el.innerHTML = h;
                 return;
             }
-            let h = '';
-            events.forEach(ev => {
+            filtered.forEach(ev => {
                 const m = getMeta(ev.activity_type);
                 h += '<div class="ticker-item" style="border-left-color:' + m.color + '">'
                     + '<span class="ticker-icon">' + m.icon + '</span>'
@@ -760,6 +806,16 @@ export class HiveMonitorPanel {
         window.selectHive = function(id) { vscodeApi.postMessage({ command: 'selectHive', hiveId: id }); };
         window.selectColony = function(id) { vscodeApi.postMessage({ command: 'selectColony', colonyId: id }); };
         window.focusAgent = function(id) { vscodeApi.postMessage({ command: 'focusAgent', agentId: id }); };
+        window.filterByBeekeeper = function() { setActivityFilter({ type: 'beekeeper' }); };
+        window.filterByHive = function(id) {
+            vscodeApi.postMessage({ command: 'selectHive', hiveId: id });
+            setActivityFilter({ type: 'hive', id: id });
+        };
+        window.filterByColony = function(id) {
+            vscodeApi.postMessage({ command: 'selectColony', colonyId: id });
+            setActivityFilter({ type: 'colony', id: id });
+        };
+        window.clearActivityFilter = function() { clearActivityFilter(); };
 
         // --- ズーム＆パン ---
         const viewport = document.getElementById('treeViewport');
@@ -1463,6 +1519,35 @@ export class HiveMonitorPanel {
             .kpi-tag.success { background: rgba(76,175,80,0.2); color: #4caf50; }
             .kpi-tag.failure { background: rgba(244,67,54,0.2); color: #f44336; }
             .kpi-tag.other { background: rgba(158,158,158,0.2); color: #9e9e9e; }
+
+            /* Activity filter header */
+            .filter-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 6px 12px;
+                background: var(--vscode-inputValidation-infoBackground, rgba(0,122,204,0.1));
+                border-bottom: 1px solid var(--vscode-widget-border);
+                flex-shrink: 0;
+            }
+            .filter-label {
+                font-size: 12px;
+                font-weight: 600;
+                color: var(--vscode-foreground);
+            }
+            .filter-clear {
+                font-size: 11px;
+                padding: 2px 8px;
+                background: var(--vscode-button-secondaryBackground, #3a3d41);
+                color: var(--vscode-button-secondaryForeground, #ccc);
+                border: 1px solid var(--vscode-widget-border);
+                border-radius: 3px;
+                cursor: pointer;
+                font-family: var(--vscode-font-family);
+            }
+            .filter-clear:hover {
+                background: var(--vscode-button-secondaryHoverBackground, #505357);
+            }
         `;
     }
 
