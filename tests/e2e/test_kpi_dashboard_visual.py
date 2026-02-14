@@ -290,11 +290,20 @@ render(DATA);
 
 
 def _get_container_ip() -> str:
-    """Docker network上のdev containerのIPアドレスを取得する
+    """Playwright MCPのブラウザからアクセスできるHTTPサーバーのホストを決定する
 
-    Playwright MCPコンテナからアクセスできるIPアドレスを返す。
-    hostname -Iで取得できない場合はfallback 172.18.0.5を使用。
+    CI環境（PLAYWRIGHT_MCP_URL が localhost を指す場合）:
+        ブラウザと HTTP サーバーが同一マシン上で動作するため 127.0.0.1 を使用。
+    Docker環境（devcontainer 等）:
+        Playwright MCP が別コンテナで動作するため、hostname -I で
+        dev container の IP を取得して使用。
     """
+    # CI環境: Playwrightが同一マシンなら localhost で十分
+    playwright_url = os.environ.get("PLAYWRIGHT_MCP_URL", "")
+    if "localhost" in playwright_url or "127.0.0.1" in playwright_url:
+        return "127.0.0.1"
+
+    # Docker環境: コンテナIPを使用
     import subprocess
 
     try:
@@ -323,8 +332,8 @@ class _NoKeepAliveHandler(http.server.SimpleHTTPRequestHandler):
 
     def setup(self) -> None:
         """ソケットにタイムアウトを設定してハング防止."""
-        self.connection.settimeout(10)
         super().setup()
+        self.connection.settimeout(10)
 
 
 @pytest.fixture
