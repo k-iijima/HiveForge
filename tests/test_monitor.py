@@ -9,36 +9,36 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import shutil
 import subprocess
-from unittest.mock import MagicMock, mock_open, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from colonyforge.monitor import (
-    SESSION_NAME,
-    ColonyLayout,
-    MonitorLayout,
-    _ACTIVITY_ICONS,
-    _ROLE_COLORS,
-    _ROLE_ICONS,
-    _add_agent_to_layout,
-    _create_hierarchical_session,
-    _create_monitor_session,
-    _fetch_hierarchy,
-    _fetch_initial_agents,
-    _fetch_recent_events,
-    _kill_session,
-    _route_event_to_layout,
-    _seed_server,
-    _session_exists,
-    _write_to_log,
-    format_event,
+from colonyforge.monitor.api_client import (
+    fetch_hierarchy,
+    fetch_initial_agents,
+    fetch_recent_events,
+    seed_server,
+)
+from colonyforge.monitor.constants import ACTIVITY_ICONS, ROLE_COLORS, ROLE_ICONS
+from colonyforge.monitor.formatter import format_event
+from colonyforge.monitor.routing import (
+    route_event_to_layout,
+    write_to_log,
+)
+from colonyforge.monitor.runner import (
     monitor_main,
     run_single_terminal,
     run_tmux_monitor,
 )
-
+from colonyforge.monitor.tmux_layout import (
+    SESSION_NAME,
+    ColonyLayout,
+    MonitorLayout,
+    create_flat_session,
+    kill_session,
+    session_exists,
+)
 
 # =============================================================================
 # format_event テスト
@@ -152,7 +152,7 @@ class TestFormatEvent:
 
         # Assert
         for at in expected_types:
-            assert at in _ACTIVITY_ICONS, f"Missing icon for {at}"
+            assert at in ACTIVITY_ICONS, f"Missing icon for {at}"
 
     def test_all_roles_have_icons_and_colors(self):
         """全ロールにアイコンと色が定義されている"""
@@ -161,8 +161,8 @@ class TestFormatEvent:
 
         # Assert
         for role in expected_roles:
-            assert role in _ROLE_ICONS, f"Missing icon for {role}"
-            assert role in _ROLE_COLORS, f"Missing color for {role}"
+            assert role in ROLE_ICONS, f"Missing icon for {role}"
+            assert role in ROLE_COLORS, f"Missing color for {role}"
 
     def test_non_dict_agent_treated_as_empty(self):
         """agent がdict以外の場合、空dictとして扱う"""
@@ -182,7 +182,7 @@ class TestFormatEvent:
 
 
 # =============================================================================
-# _write_to_log テスト
+# write_to_log テスト
 # =============================================================================
 
 
@@ -196,8 +196,8 @@ class TestWriteToLog:
         open(log_path, "w").close()
 
         # Act
-        _write_to_log(log_path, "line 1")
-        _write_to_log(log_path, "line 2")
+        write_to_log(log_path, "line 1")
+        write_to_log(log_path, "line 2")
 
         # Assert
         with open(log_path) as f:
@@ -207,14 +207,14 @@ class TestWriteToLog:
 
 
 # =============================================================================
-# _session_exists / _kill_session テスト
+# session_exists / kill_session テスト
 # =============================================================================
 
 
 class TestTmuxSession:
     """tmuxセッション操作のテスト"""
 
-    @patch("colonyforge.monitor._tmux")
+    @patch("colonyforge.monitor.tmux_layout.tmux")
     def test_session_exists_true(self, mock_tmux):
         """セッションが存在する場合 True を返す"""
         # Arrange
@@ -223,13 +223,13 @@ class TestTmuxSession:
         )
 
         # Act
-        result = _session_exists()
+        result = session_exists()
 
         # Assert
         assert result is True
         mock_tmux.assert_called_once_with("has-session", "-t", SESSION_NAME, check=False)
 
-    @patch("colonyforge.monitor._tmux")
+    @patch("colonyforge.monitor.tmux_layout.tmux")
     def test_session_exists_false(self, mock_tmux):
         """セッションが存在しない場合 False を返す"""
         # Arrange
@@ -238,41 +238,41 @@ class TestTmuxSession:
         )
 
         # Act
-        result = _session_exists()
+        result = session_exists()
 
         # Assert
         assert result is False
 
-    @patch("colonyforge.monitor._session_exists", return_value=True)
-    @patch("colonyforge.monitor._tmux")
+    @patch("colonyforge.monitor.tmux_layout.session_exists", return_value=True)
+    @patch("colonyforge.monitor.tmux_layout.tmux")
     def test_kill_session_when_exists(self, mock_tmux, mock_exists):
         """セッションが存在する場合、kill-session が呼ばれる"""
         # Act
-        _kill_session()
+        kill_session()
 
         # Assert
         mock_tmux.assert_called_once_with("kill-session", "-t", SESSION_NAME, check=False)
 
-    @patch("colonyforge.monitor._session_exists", return_value=False)
-    @patch("colonyforge.monitor._tmux")
+    @patch("colonyforge.monitor.tmux_layout.session_exists", return_value=False)
+    @patch("colonyforge.monitor.tmux_layout.tmux")
     def test_kill_session_when_not_exists(self, mock_tmux, mock_exists):
         """セッションが存在しない場合、kill-session は呼ばれない"""
         # Act
-        _kill_session()
+        kill_session()
 
         # Assert
         mock_tmux.assert_not_called()
 
 
 # =============================================================================
-# _create_monitor_session テスト
+# create_flat_session テスト
 # =============================================================================
 
 
 class TestCreateMonitorSession:
     """tmuxセッション作成のテスト"""
 
-    @patch("colonyforge.monitor._tmux")
+    @patch("colonyforge.monitor.tmux_layout.tmux")
     def test_creates_session_with_agents(self, mock_tmux):
         """エージェント一覧からtmuxセッションを作成できる"""
         # Arrange
@@ -282,7 +282,7 @@ class TestCreateMonitorSession:
         agent_ids = ["worker-1", "queen-1"]
 
         # Act
-        logs = _create_monitor_session(agent_ids)
+        logs = create_flat_session(agent_ids)
 
         # Assert: ログファイルマッピングが返される
         assert "__overview__" in logs
@@ -294,7 +294,7 @@ class TestCreateMonitorSession:
         new_session_calls = [c for c in calls if "new-session" in c]
         assert len(new_session_calls) == 1
 
-    @patch("colonyforge.monitor._tmux")
+    @patch("colonyforge.monitor.tmux_layout.tmux")
     def test_creates_log_files(self, mock_tmux):
         """各エージェントのログファイルが作成される"""
         # Arrange
@@ -303,13 +303,13 @@ class TestCreateMonitorSession:
         )
 
         # Act
-        logs = _create_monitor_session(["w-1", "qb-1"])
+        logs = create_flat_session(["w-1", "qb-1"])
 
         # Assert: ログファイルが存在する
         for path in logs.values():
             assert os.path.exists(path)
 
-    @patch("colonyforge.monitor._tmux")
+    @patch("colonyforge.monitor.tmux_layout.tmux")
     def test_empty_agents_creates_overview_only(self, mock_tmux):
         """エージェントが空でもoverviewペインは作成される"""
         # Arrange
@@ -318,7 +318,7 @@ class TestCreateMonitorSession:
         )
 
         # Act
-        logs = _create_monitor_session([])
+        logs = create_flat_session([])
 
         # Assert: overviewのみ
         assert "__overview__" in logs
@@ -326,14 +326,14 @@ class TestCreateMonitorSession:
 
 
 # =============================================================================
-# _fetch_initial_agents テスト
+# fetch_initial_agents テスト
 # =============================================================================
 
 
 class TestFetchInitialAgents:
     """初期エージェント取得のテスト"""
 
-    @patch("colonyforge.monitor.urlopen")
+    @patch("colonyforge.monitor.api_client.urlopen")
     def test_returns_agent_ids(self, mock_urlopen):
         """APIからエージェントID一覧を取得できる"""
         # Arrange
@@ -350,33 +350,33 @@ class TestFetchInitialAgents:
         mock_urlopen.return_value = mock_resp
 
         # Act
-        result = _fetch_initial_agents("http://localhost:8000")
+        result = fetch_initial_agents("http://localhost:8000")
 
         # Assert
         assert result == ["worker-1", "queen-1"]
 
-    @patch("colonyforge.monitor.urlopen")
+    @patch("colonyforge.monitor.api_client.urlopen")
     def test_returns_empty_on_error(self, mock_urlopen):
         """APIエラー時は空リストを返す"""
         # Arrange
         mock_urlopen.side_effect = ConnectionError("refused")
 
         # Act
-        result = _fetch_initial_agents("http://localhost:8000")
+        result = fetch_initial_agents("http://localhost:8000")
 
         # Assert
         assert result == []
 
 
 # =============================================================================
-# _fetch_hierarchy テスト
+# fetch_hierarchy テスト
 # =============================================================================
 
 
 class TestFetchHierarchy:
     """階層取得のテスト"""
 
-    @patch("colonyforge.monitor.urlopen")
+    @patch("colonyforge.monitor.api_client.urlopen")
     def test_returns_hierarchy(self, mock_urlopen):
         """APIから階層構造を取得できる"""
         # Arrange
@@ -395,33 +395,33 @@ class TestFetchHierarchy:
         mock_urlopen.return_value = mock_resp
 
         # Act
-        result = _fetch_hierarchy("http://localhost:8000")
+        result = fetch_hierarchy("http://localhost:8000")
 
         # Assert
         assert "h-1" in result
 
-    @patch("colonyforge.monitor.urlopen")
+    @patch("colonyforge.monitor.api_client.urlopen")
     def test_returns_empty_on_error(self, mock_urlopen):
         """APIエラー時は空dictを返す"""
         # Arrange
         mock_urlopen.side_effect = ConnectionError("refused")
 
         # Act
-        result = _fetch_hierarchy("http://localhost:8000")
+        result = fetch_hierarchy("http://localhost:8000")
 
         # Assert
         assert result == {}
 
 
 # =============================================================================
-# _fetch_recent_events テスト
+# fetch_recent_events テスト
 # =============================================================================
 
 
 class TestFetchRecentEvents:
     """既存イベント取得のテスト"""
 
-    @patch("colonyforge.monitor.urlopen")
+    @patch("colonyforge.monitor.api_client.urlopen")
     def test_returns_events(self, mock_urlopen):
         """APIから既存イベント一覧を取得できる"""
         # Arrange: 2件のイベントを返すレスポンス
@@ -450,26 +450,26 @@ class TestFetchRecentEvents:
         mock_urlopen.return_value = mock_resp
 
         # Act
-        result = _fetch_recent_events("http://localhost:8000")
+        result = fetch_recent_events("http://localhost:8000")
 
         # Assert: 2件取得できる
         assert len(result) == 2
         assert result[0]["event_id"] == "e1"
         assert result[1]["event_id"] == "e2"
 
-    @patch("colonyforge.monitor.urlopen")
+    @patch("colonyforge.monitor.api_client.urlopen")
     def test_returns_empty_on_error(self, mock_urlopen):
         """APIエラー時は空リストを返す"""
         # Arrange
         mock_urlopen.side_effect = ConnectionError("refused")
 
         # Act
-        result = _fetch_recent_events("http://localhost:9999")
+        result = fetch_recent_events("http://localhost:9999")
 
         # Assert
         assert result == []
 
-    @patch("colonyforge.monitor.urlopen")
+    @patch("colonyforge.monitor.api_client.urlopen")
     def test_passes_limit_parameter(self, mock_urlopen):
         """limit パラメータがURLに含まれる"""
         # Arrange
@@ -480,7 +480,7 @@ class TestFetchRecentEvents:
         mock_urlopen.return_value = mock_resp
 
         # Act
-        _fetch_recent_events("http://localhost:8000", limit=10)
+        fetch_recent_events("http://localhost:8000", limit=10)
 
         # Assert: URLにlimit=10が含まれる
         call_args = mock_urlopen.call_args
@@ -496,8 +496,8 @@ class TestFetchRecentEvents:
 class TestRunSingleTerminalRecentEvents:
     """単一ターミナルモードで既存イベントが表示されるテスト"""
 
-    @patch("colonyforge.monitor.iter_sse_events")
-    @patch("colonyforge.monitor._fetch_recent_events")
+    @patch("colonyforge.monitor.runner.iter_sse_events")
+    @patch("colonyforge.monitor.runner.fetch_recent_events")
     def test_shows_recent_events_on_startup(self, mock_fetch_recent, mock_iter_sse, capsys):
         """起動時に既存イベントが表示される"""
         # Arrange: 既存イベント2件、SSEは空
@@ -521,8 +521,8 @@ class TestRunSingleTerminalRecentEvents:
         assert "w-1" in captured.out
         assert "started" in captured.out
 
-    @patch("colonyforge.monitor.iter_sse_events")
-    @patch("colonyforge.monitor._fetch_recent_events")
+    @patch("colonyforge.monitor.runner.iter_sse_events")
+    @patch("colonyforge.monitor.runner.fetch_recent_events")
     def test_no_recent_header_when_empty(self, mock_fetch_recent, mock_iter_sse, capsys):
         """既存イベントがない場合はヘッダーを表示しない"""
         # Arrange
@@ -545,7 +545,7 @@ class TestRunSingleTerminalRecentEvents:
 class TestMonitorMain:
     """CLIエントリポイントのテスト"""
 
-    @patch("colonyforge.monitor.run_single_terminal")
+    @patch("colonyforge.monitor.runner.run_single_terminal")
     def test_no_tmux_flag_calls_single_terminal(self, mock_single):
         """--no-tmux フラグで単一ターミナルモードが呼ばれる"""
         # Arrange
@@ -560,7 +560,7 @@ class TestMonitorMain:
         # Assert
         mock_single.assert_called_once_with("http://localhost:8000")
 
-    @patch("colonyforge.monitor.run_tmux_monitor")
+    @patch("colonyforge.monitor.runner.run_tmux_monitor")
     def test_default_calls_tmux_monitor(self, mock_tmux):
         """デフォルトでtmuxモニターが呼ばれる"""
         # Arrange
@@ -584,17 +584,17 @@ class TestMonitorMain:
 class TestRunTmuxMonitor:
     """tmuxモニター起動のテスト"""
 
-    @patch("colonyforge.monitor.shutil.which", return_value=None)
+    @patch("colonyforge.monitor.runner.shutil.which", return_value=None)
     def test_exits_if_tmux_not_installed(self, mock_which):
         """tmuxが未インストールの場合、sys.exit(1)で終了する"""
         # Act & Assert
         with pytest.raises(SystemExit, match="1"):
             run_tmux_monitor("http://localhost:8000")
 
-    @patch("colonyforge.monitor._session_exists", return_value=True)
-    @patch("colonyforge.monitor.subprocess.run")
-    @patch("colonyforge.monitor._kill_session")
-    @patch("colonyforge.monitor.shutil.which", return_value="/usr/bin/tmux")
+    @patch("colonyforge.monitor.runner.session_exists", return_value=True)
+    @patch("colonyforge.monitor.runner.subprocess.run")
+    @patch("colonyforge.monitor.runner.kill_session")
+    @patch("colonyforge.monitor.runner.shutil.which", return_value="/usr/bin/tmux")
     def test_reuses_existing_session(self, mock_which, mock_kill, mock_run, mock_exists):
         """既存のtmuxセッションがある場合、新規作成せず接続する"""
         # Act
@@ -607,14 +607,14 @@ class TestRunTmuxMonitor:
         )
         mock_kill.assert_not_called()
 
-    @patch("colonyforge.monitor._session_exists", side_effect=[False, True, False, False])
-    @patch("colonyforge.monitor.subprocess.run")
-    @patch("colonyforge.monitor.iter_sse_events", return_value=iter([]))
-    @patch("colonyforge.monitor._create_monitor_session")
-    @patch("colonyforge.monitor._kill_session")
-    @patch("colonyforge.monitor._fetch_initial_agents", return_value=["w-1"])
-    @patch("colonyforge.monitor._fetch_hierarchy", return_value={})
-    @patch("colonyforge.monitor.shutil.which", return_value="/usr/bin/tmux")
+    @patch("colonyforge.monitor.runner.session_exists", side_effect=[False, True, False, False])
+    @patch("colonyforge.monitor.runner.subprocess.run")
+    @patch("colonyforge.monitor.runner.iter_sse_events", return_value=iter([]))
+    @patch("colonyforge.monitor.runner.create_flat_session")
+    @patch("colonyforge.monitor.runner.kill_session")
+    @patch("colonyforge.monitor.runner.fetch_initial_agents", return_value=["w-1"])
+    @patch("colonyforge.monitor.runner.fetch_hierarchy", return_value={})
+    @patch("colonyforge.monitor.runner.shutil.which", return_value="/usr/bin/tmux")
     def test_creates_session_and_subscribes(
         self,
         mock_which,
@@ -636,7 +636,7 @@ class TestRunTmuxMonitor:
         # Act: iter_sse_events が空なのですぐに終了
         run_tmux_monitor("http://localhost:8000")
 
-        # Assert: hierarchy が空なので _fetch_initial_agents → _create_monitor_session
+        # Assert: hierarchy が空なので fetch_initial_agents → create_flat_session
         mock_kill.assert_called_once()
         mock_hier.assert_called_once_with("http://localhost:8000")
         mock_fetch.assert_called_once_with("http://localhost:8000")
@@ -646,13 +646,13 @@ class TestRunTmuxMonitor:
             check=False,
         )
 
-    @patch("colonyforge.monitor._session_exists", side_effect=[False, True, False, False])
-    @patch("colonyforge.monitor.subprocess.run")
-    @patch("colonyforge.monitor.iter_sse_events", return_value=iter([]))
-    @patch("colonyforge.monitor._create_hierarchical_session")
-    @patch("colonyforge.monitor._kill_session")
-    @patch("colonyforge.monitor._fetch_hierarchy")
-    @patch("colonyforge.monitor.shutil.which", return_value="/usr/bin/tmux")
+    @patch("colonyforge.monitor.runner.session_exists", side_effect=[False, True, False, False])
+    @patch("colonyforge.monitor.runner.subprocess.run")
+    @patch("colonyforge.monitor.runner.iter_sse_events", return_value=iter([]))
+    @patch("colonyforge.monitor.runner.create_hierarchical_session")
+    @patch("colonyforge.monitor.runner.kill_session")
+    @patch("colonyforge.monitor.runner.fetch_hierarchy")
+    @patch("colonyforge.monitor.runner.shutil.which", return_value="/usr/bin/tmux")
     def test_uses_hierarchy_when_available(
         self, mock_which, mock_hier, mock_kill, mock_create_h, mock_sse, mock_run, mock_exists
     ):
@@ -686,7 +686,7 @@ class TestRunTmuxMonitor:
         # Act
         run_tmux_monitor("http://localhost:8000")
 
-        # Assert: _create_hierarchical_session が呼ばれる
+        # Assert: create_hierarchical_session が呼ばれる
         mock_create_h.assert_called_once()
         mock_run.assert_any_call(
             ["tmux", "attach-session", "-t", "colonyforge-monitor"],
@@ -695,7 +695,7 @@ class TestRunTmuxMonitor:
 
 
 # =============================================================================
-# _route_event_to_layout テスト
+# route_event_to_layout テスト
 # =============================================================================
 
 
@@ -736,12 +736,12 @@ class TestRouteEventToLayout:
         }
 
         # Act
-        _route_event_to_layout(event, layout)
+        route_event_to_layout(event, layout)
 
         # Assert
-        queen_content = open(layout.colonies["col-fe"].queen_log).read()
+        queen_content = layout.colonies["col-fe"].queen_log.read_text()
         assert "queen thinking" in queen_content
-        overview_content = open(layout.overview_log).read()
+        overview_content = layout.overview_log.read_text()
         assert "queen thinking" in overview_content
 
     def test_worker_event_routed_to_worker_log(self, tmp_path):
@@ -756,10 +756,10 @@ class TestRouteEventToLayout:
         }
 
         # Act
-        _route_event_to_layout(event, layout)
+        route_event_to_layout(event, layout)
 
         # Assert
-        w1_content = open(layout.colonies["col-fe"].worker_logs["w-1"]).read()
+        w1_content = layout.colonies["col-fe"].worker_logs["w-1"].read_text()
         assert "running tool" in w1_content
 
     def test_beekeeper_event_routed_to_standalone(self, tmp_path):
@@ -774,10 +774,10 @@ class TestRouteEventToLayout:
         }
 
         # Act
-        _route_event_to_layout(event, layout)
+        route_event_to_layout(event, layout)
 
         # Assert
-        bk_content = open(layout.standalone_logs["bk-A"]).read()
+        bk_content = layout.standalone_logs["bk-A"].read_text()
         assert "assigning hive" in bk_content
 
     def test_unknown_agent_without_colony_goes_to_standalone(self, tmp_path):
@@ -792,12 +792,12 @@ class TestRouteEventToLayout:
         }
 
         # Act
-        _route_event_to_layout(event, layout)
+        route_event_to_layout(event, layout)
 
         # Assert
         assert "new-agent" in layout.standalone_logs
 
-    @patch("colonyforge.monitor._session_exists", return_value=False)
+    @patch("colonyforge.monitor.routing.session_exists", return_value=False)
     def test_unknown_agent_with_colony_added_dynamically(self, mock_sess, tmp_path):
         """Colony が分かる未知エージェントは動的に Colony に追加される"""
         # Arrange
@@ -810,7 +810,7 @@ class TestRouteEventToLayout:
         }
 
         # Act
-        _route_event_to_layout(event, layout)
+        route_event_to_layout(event, layout)
 
         # Assert: Colony col-fe に追加された
         assert "w-new" in layout.agent_to_colony
@@ -829,11 +829,9 @@ class TestCLIIntegration:
     def test_monitor_subcommand_registered(self):
         """monitor サブコマンドがパーサーに登録されている"""
         # Arrange
-        from colonyforge.cli import main
-
         # Act: --help で monitor が表示されるか確認
-        import io
-        from contextlib import redirect_stdout, redirect_stderr
+
+        from colonyforge.cli import main
 
         with pytest.raises(SystemExit):
             import sys
@@ -925,14 +923,14 @@ class TestCLIIntegration:
 
 
 # =============================================================================
-# _seed_server テスト
+# seed_server テスト
 # =============================================================================
 
 
 class TestSeedServer:
-    """_seed_server のテスト"""
+    """seed_server のテスト"""
 
-    @patch("colonyforge.monitor.urlopen")
+    @patch("colonyforge.monitor.api_client.urlopen")
     def test_seed_success(self, mock_urlopen):
         """seed成功時にTrueを返し、エージェント数・イベント数を表示する"""
         # Arrange
@@ -946,13 +944,13 @@ class TestSeedServer:
         mock_urlopen.return_value = mock_resp
 
         # Act
-        result = _seed_server("http://localhost:8000")
+        result = seed_server("http://localhost:8000")
 
         # Assert
         assert result is True
         mock_urlopen.assert_called_once()
 
-    @patch("colonyforge.monitor.urlopen")
+    @patch("colonyforge.monitor.api_client.urlopen")
     def test_seed_passes_delay_query_param(self, mock_urlopen):
         """delay値がURLクエリパラメータとして渡される"""
         # Arrange
@@ -966,14 +964,14 @@ class TestSeedServer:
         mock_urlopen.return_value = mock_resp
 
         # Act
-        result = _seed_server("http://localhost:8000", delay=1.0)
+        result = seed_server("http://localhost:8000", delay=1.0)
 
         # Assert
         assert result is True
         req_arg = mock_urlopen.call_args[0][0]
         assert "delay=1.0" in req_arg.full_url
 
-    @patch("colonyforge.monitor.urlopen")
+    @patch("colonyforge.monitor.api_client.urlopen")
     def test_seed_connection_error(self, mock_urlopen):
         """接続エラー時にFalseを返す"""
         # Arrange
@@ -982,15 +980,15 @@ class TestSeedServer:
         mock_urlopen.side_effect = URLError("Connection refused")
 
         # Act
-        result = _seed_server("http://localhost:9999")
+        result = seed_server("http://localhost:9999")
 
         # Assert
         assert result is False
 
-    @patch("colonyforge.monitor.run_single_terminal")
-    @patch("colonyforge.monitor._seed_server")
+    @patch("colonyforge.monitor.runner.run_single_terminal")
+    @patch("colonyforge.monitor.runner.seed_server")
     def test_monitor_main_with_seed(self, mock_seed, mock_single):
-        """--seed 指定時に _seed_server が delay 付きで呼ばれる"""
+        """--seed 指定時に seed_server が delay 付きで呼ばれる"""
         # Arrange
         args = argparse.Namespace(
             server_url="http://localhost:8000",
@@ -1006,10 +1004,10 @@ class TestSeedServer:
         mock_seed.assert_called_once_with("http://localhost:8000", delay=1.0)
         mock_single.assert_called_once()
 
-    @patch("colonyforge.monitor.run_single_terminal")
-    @patch("colonyforge.monitor._seed_server")
+    @patch("colonyforge.monitor.runner.run_single_terminal")
+    @patch("colonyforge.monitor.runner.seed_server")
     def test_monitor_main_without_seed(self, mock_seed, mock_single):
-        """--seed 未指定時は _seed_server が呼ばれない"""
+        """--seed 未指定時は seed_server が呼ばれない"""
         # Arrange
         args = argparse.Namespace(
             server_url="http://localhost:8000",
