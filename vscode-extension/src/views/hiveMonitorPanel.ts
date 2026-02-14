@@ -149,6 +149,7 @@ export class HiveMonitorPanel {
                 command: 'updateData',
                 hives,
                 recentEvents: events.slice(0, 10),
+                allEvents: events,
                 evaluation,
             });
         } catch (error) {
@@ -258,6 +259,89 @@ export class HiveMonitorPanel {
             return { beekeeper: '👤', queen_bee: '👑', worker_bee: '🐝' }[role] || '🔵';
         }
 
+        // 全イベントキャッシュ（エージェント別最新アクティビティ検索用）
+        let cachedAllEvents = [];
+
+        /** activity_type → 日本語吹き出しテキスト変換 */
+        function getBubbleText(type, summary) {
+            const templates = {
+                'llm.request':      '🧠 LLMで解析しています...',
+                'llm.response':     '💬 回答を受信しました',
+                'mcp.tool_call':    '🔧 ツールを実行中...',
+                'mcp.tool_result':  '📦 結果を受信しました',
+                'agent.started':    '▶️ 作業を開始しました',
+                'agent.completed':  '✅ 作業が完了しました',
+                'agent.error':      '❌ エラーが発生しました',
+                'message.sent':     '📤 メッセージを送信中...',
+                'message.received': '📥 指示を受信しました',
+                'task.assigned':    '📋 タスクを割り当てています...',
+                'task.progress':    '📊 進捗を報告しています...',
+            };
+            // サマリーが短ければ付加
+            const base = templates[type] || ('📌 ' + type);
+            if (summary && summary.length > 0 && summary.length <= 25) {
+                return base.replace(/\\.\\.\\.$/, '') + ' — ' + summary;
+            }
+            return base;
+        }
+
+        /** 進行中アクティビティか判定 */
+        function isOngoing(type) {
+            return /\\.(request|tool_call|sent|started|assigned|progress)$/.test(type);
+        }
+
+        /** 吹き出し描画 */
+        function renderSpeechBubble(ev) {
+            if (!ev) return '';
+            const m = getMeta(ev.activity_type);
+            const text = getBubbleText(ev.activity_type, esc(ev.summary).substring(0, 30));
+            const ongoing = isOngoing(ev.activity_type);
+            const errorCls = ev.activity_type === 'agent.error' ? ' bubble-error' : '';
+            const ongoingCls = ongoing ? ' bubble-ongoing' : '';
+            return '<div class="speech-bubble' + errorCls + ongoingCls + '" style="border-color:' + m.color + ';">'
+                + '<span class="bubble-text">' + text + '</span>'
+                + '<div class="bubble-arrow" style="border-top-color:' + m.color + ';"></div>'
+                + '</div>';
+        }
+
+        /** エージェント別最新イベント取得 */
+        function getAgentLatestEvent(agentId) {
+            return cachedAllEvents.find(e => e.agent.agent_id === agentId) || null;
+        }
+
+        /** フルエージェントノード描画（吹き出し付き） */
+        function renderAgentNode(agent, isQueen) {
+            const latestEv = getAgentLatestEvent(agent.agent_id);
+            const isActive = !!latestEv;
+            const sc = isActive ? 'active' : 'idle';
+            const icon = isQueen ? '👑' : '🐝';
+            const roleCls = isQueen ? 'queen-agent-node' : 'worker-agent-node';
+            const shortId = agent.agent_id.length > 12
+                ? agent.agent_id.substring(0, 12) + '…'
+                : agent.agent_id;
+
+            let h = '<div class="agent-tree-item">';
+
+            // 吹き出し（最新アクティビティ）
+            h += renderSpeechBubble(latestEv);
+
+            // エージェントノード
+            h += '<div class="node agent-node ' + roleCls + ' ' + sc + '">';
+            h += '<div class="node-icon">' + icon + '</div>';
+            h += '<div class="node-label">' + esc(shortId) + '</div>';
+            if (latestEv) {
+                const m = getMeta(latestEv.activity_type);
+                h += '<div class="node-sublabel" style="color:' + m.color + '">' + m.icon + ' ' + m.label + '</div>';
+            } else {
+                h += '<div class="node-sublabel">idle</div>';
+            }
+            h += '<div class="status-indicator ' + sc + '"></div>';
+            h += '</div>';
+
+            h += '</div>';
+            return h;
+        }
+
         function formatTime(ts) {
             try {
                 const d = new Date(ts);
@@ -330,10 +414,20 @@ export class HiveMonitorPanel {
             const recent = colony.recentActivity || [];
             const latestType = recent.length > 0 ? recent[0].activity_type : null;
             const meta = latestType ? getMeta(latestType) : null;
+            const agentCount = (hasQueen ? 1 : 0) + wc;
+
+            // Colonyレベルの吹き出し（エージェントがいない場合のみ）
+            const colonyBubbleEv = recent.length > 0 ? recent[0] : null;
 
             let h = '<div class="colony-branch">';
             h += '<div class="branch-connector-h ' + (isFirst ? 'first ' : '') + (isLast ? 'last' : '') + '"></div>';
             h += '<div class="colony-container">';
+
+            // Colonyレベル吹き出し（エージェント不在時）
+            if (colonyBubbleEv && agentCount === 0) {
+                h += renderSpeechBubble(colonyBubbleEv);
+            }
+
             h += '<div class="node colony-node ' + sc + '" onclick="selectColony(\\'' + esc(colony.colony_id) + '\\')">';
 
             // 活動中インジケーターバー
@@ -352,34 +446,25 @@ export class HiveMonitorPanel {
             h += '<div class="status-indicator ' + sc + '"></div>';
             h += '</div>';
 
-            // エージェントバッジ
+            // エージェントをフルノードとしてツリー展開（吹き出し付き）
             if (hasQueen || wc > 0) {
-                h += '<div class="agents-row">';
+                h += '<div class="branch-line vertical short"></div>';
+                h += '<div class="agents-level">';
+                const agents = [];
                 if (hasQueen && colony.queen_bee) {
-                    h += '<div class="agent-badge queen">'
-                        + '<span class="agent-icon">👑</span>'
-                        + '<span class="agent-name">' + esc(colony.queen_bee.agent_id) + '</span>'
-                        + '</div>';
+                    agents.push({ agent: colony.queen_bee, isQueen: true });
                 }
                 colony.workers.forEach(w => {
-                    h += '<div class="agent-badge worker">'
-                        + '<span class="agent-icon">🐝</span>'
-                        + '<span class="agent-name">' + esc(w.agent_id) + '</span>'
-                        + '</div>';
+                    agents.push({ agent: w, isQueen: false });
                 });
-                h += '</div>';
-            }
-
-            // 最新アクティビティミニログ
-            if (recent.length > 0) {
-                h += '<div class="colony-activity-log">';
-                recent.forEach(ev => {
-                    const m = getMeta(ev.activity_type);
-                    h += '<div class="mini-event">'
-                        + '<span class="mini-icon">' + m.icon + '</span>'
-                        + '<span class="mini-text">' + esc(ev.summary).substring(0, 40) + '</span>'
-                        + '<span class="mini-time">' + formatTime(ev.timestamp) + '</span>'
-                        + '</div>';
+                agents.forEach((a, idx) => {
+                    const aFirst = idx === 0;
+                    const aLast = idx === agents.length - 1;
+                    h += '<div class="agent-branch">';
+                    h += '<div class="branch-connector-agent '
+                        + (aFirst ? 'first ' : '') + (aLast ? 'last' : '') + '"></div>';
+                    h += renderAgentNode(a.agent, a.isQueen);
+                    h += '</div>';
                 });
                 h += '</div>';
             }
@@ -529,6 +614,7 @@ export class HiveMonitorPanel {
             switch (msg.command) {
                 case 'updateData':
                     hideError();
+                    cachedAllEvents = msg.allEvents || [];
                     renderTree(msg.hives);
                     renderStats(msg.hives);
                     renderTicker(msg.recentEvents);
@@ -751,53 +837,142 @@ export class HiveMonitorPanel {
             }
             .colony-container { display: flex; flex-direction: column; align-items: center; }
 
-            /* Agent badges */
-            .agents-row {
-                display: flex; flex-wrap: wrap; gap: 4px;
-                justify-content: center; margin-top: 8px; max-width: 200px;
+            /* Agent tree nodes (full nodes below colony) */
+            .agents-level {
+                display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;
             }
-            .agent-badge {
-                display: flex; align-items: center; gap: 4px;
-                padding: 2px 8px; border-radius: 12px; font-size: 10px;
-                background: var(--vscode-badge-background); color: var(--vscode-badge-foreground);
+            .agent-branch {
+                display: flex; flex-direction: column; align-items: center;
             }
-            .agent-badge.queen {
-                background: linear-gradient(135deg, #ffd700 0%, #ffb300 100%);
-                color: #333;
+            .branch-connector-agent {
+                width: 100%; height: 14px; position: relative;
             }
-            .agent-badge.worker {
-                background: var(--vscode-button-secondaryBackground);
-                color: var(--vscode-button-secondaryForeground);
+            .branch-connector-agent::before {
+                content: ''; position: absolute; top: 0; left: 50%;
+                width: 2px; height: 7px;
+                background: var(--vscode-widget-border);
             }
-            .agent-icon { font-size: 10px; }
-            .agent-name {
-                max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            .branch-connector-agent::after {
+                content: ''; position: absolute; top: 7px; left: 0; right: 0;
+                height: 2px; background: var(--vscode-widget-border);
+            }
+            .branch-connector-agent.first::after { left: 50%; }
+            .branch-connector-agent.last::after { right: 50%; }
+            .branch-connector-agent.first.last::after { display: none; }
+
+            .agent-tree-item {
+                display: flex; flex-direction: column; align-items: center;
+            }
+            .agent-node {
+                min-width: 100px; padding: 8px 10px;
+                border-radius: 8px;
+                border: 2px solid var(--vscode-widget-border);
+                text-align: center;
+                transition: all 0.3s ease;
+                position: relative;
+                cursor: default;
+            }
+            .agent-node .node-icon { font-size: 18px; margin-bottom: 2px; }
+            .agent-node .node-label {
+                font-weight: 600; font-size: 10px; margin-bottom: 1px;
+                max-width: 90px;
+                overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            }
+            .agent-node .node-sublabel { font-size: 9px; }
+            .agent-node:hover {
+                border-color: var(--vscode-focusBorder);
+                transform: translateY(-1px);
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
             }
 
-            /* Colony mini activity log */
-            .colony-activity-log {
-                margin-top: 6px;
-                width: 100%;
-                max-width: 180px;
+            /* Queen agent node */
+            .queen-agent-node {
+                border-color: #ffd700;
+                background: linear-gradient(135deg, var(--vscode-editor-background) 0%, rgba(255,215,0,0.08) 100%);
             }
-            .mini-event {
-                display: flex;
-                align-items: center;
-                gap: 4px;
-                padding: 2px 0;
-                font-size: 9px;
-                color: var(--vscode-descriptionForeground);
-                animation: fadeIn 0.3s ease;
+            .queen-agent-node.active {
+                border-color: #ffb300;
+                background: linear-gradient(135deg, var(--vscode-editor-background) 0%, rgba(255,179,0,0.15) 100%);
             }
-            @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-            .mini-icon { flex-shrink: 0; }
-            .mini-text {
-                flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+
+            /* Worker agent node */
+            .worker-agent-node.active {
+                border-color: #4caf50;
+                background: linear-gradient(135deg, var(--vscode-editor-background) 0%, rgba(76,175,80,0.08) 100%);
             }
-            .mini-time {
-                flex-shrink: 0;
-                font-family: var(--vscode-editor-font-family);
-                opacity: 0.7;
+
+            /* Speech bubble */
+            .speech-bubble {
+                position: relative;
+                background: var(--vscode-editor-background);
+                border: 1.5px solid #9e9e9e;
+                border-radius: 10px;
+                padding: 4px 10px;
+                margin-bottom: 6px;
+                max-width: 220px;
+                animation: bubbleAppear 0.4s ease-out;
+            }
+            .speech-bubble .bubble-text {
+                font-size: 10px;
+                line-height: 1.3;
+                color: var(--vscode-foreground);
+                display: block;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            .speech-bubble .bubble-arrow {
+                position: absolute;
+                bottom: -7px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 0; height: 0;
+                border-left: 6px solid transparent;
+                border-right: 6px solid transparent;
+                border-top: 7px solid #9e9e9e;
+            }
+            .speech-bubble .bubble-arrow::after {
+                content: '';
+                position: absolute;
+                top: -8.5px;
+                left: -5px;
+                width: 0; height: 0;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 6px solid var(--vscode-editor-background);
+            }
+
+            /* Ongoing activity: pulsing bubble */
+            .speech-bubble.bubble-ongoing {
+                animation: bubbleAppear 0.4s ease-out, bubblePulse 2s ease-in-out 0.4s infinite;
+            }
+            .speech-bubble.bubble-ongoing .bubble-text::after {
+                content: '';
+                animation: ellipsis 1.5s steps(3, end) infinite;
+            }
+
+            /* Error bubble */
+            .speech-bubble.bubble-error {
+                border-color: #f44336;
+                background: rgba(244, 67, 54, 0.05);
+            }
+            .speech-bubble.bubble-error .bubble-arrow {
+                border-top-color: #f44336;
+            }
+
+            @keyframes bubbleAppear {
+                from { opacity: 0; transform: translateY(4px) scale(0.95); }
+                to { opacity: 1; transform: translateY(0) scale(1); }
+            }
+            @keyframes bubblePulse {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.7; }
+            }
+            @keyframes ellipsis {
+                0% { content: ''; }
+                33% { content: '.'; }
+                66% { content: '..'; }
+                100% { content: '...'; }
             }
 
             /* Activity Ticker (bottom bar) */
