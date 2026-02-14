@@ -1,0 +1,510 @@
+# M5-4: Hive Monitor 統合 — 変更仕様書
+
+> **目的**: 3つの Webview パネル（Dashboard / Hive Monitor / Agent Monitor）を Hive Monitor に一本化し、  
+> KPI ダッシュボードの null 指標問題を解消する。
+
+---
+
+## 1. 現状分析 (As-Is)
+
+### 1.1 ユーザーは誰か — Beekeeper モデル
+
+ColonyForge のユーザー（開発者）は **Beekeeper** を通じてシステムと対話する。  
+ユーザーは Queen / Worker に直接指示を出さず、Beekeeper がHive/Colony を統括する。
+
+**ユーザーの主たる関心事:**
+
+| 関心事 | 頻度 | 要求される応答速度 |
+|--------|------|-------------------|
+| A. 今何が動いているか（リアルタイム監視） | 常時 | < 2秒 |
+| B. 進捗は順調か（Run/Task進捗） | 分単位 | < 5秒 |
+| C. 承認・却下が必要か（確認要請） | 不定（バッジ通知） | 即時表示 |
+| D. 品質は保たれているか（KPI俯瞰） | 区切り時 | 5-10秒許容 |
+| E. Beekeeper への自然言語指示 | 不定 | 対話型 |
+
+### 1.2 現行 GUI コンポーネントの 5W1H
+
+#### サイドバー TreeView × 6（存続）
+
+| View | Who | What | When | Where | Why | How |
+|------|-----|------|------|-------|-----|-----|
+| **Hives** | Beekeeper | Hive→Colony 階層。CRUD 操作 | Hive 作成・Colony 開始・完了時 | サイドバー最上部 | 組織構造の把握・操作 | `GET /activity/hierarchy` / 5秒 |
+| **Runs** | Beekeeper | 実行中 Run 一覧 + バッジ（未承認数） | Run 開始・完了・確認要請発生時 | サイドバー | 作業単位の選択・状態確認 | `GET /runs` / 5秒 |
+| **Tasks** | Beekeeper | 選択 Run のタスク一覧 + CRUD | タスク割当・進捗更新・完了時 | サイドバー | 作業の粒度管理 | `GET /runs/{id}/tasks` / 5秒 |
+| **確認要請** | Beekeeper | 未承認要請 + バッジ | エスカレーション発生時 | サイドバー | 承認/却下の意思決定 | `GET /runs/{id}/requirements` / 5秒 |
+| **Decisions** | Beekeeper | 意思決定ログ | Decision 記録時 | サイドバー | 合意事項の参照 | `GET /runs/{id}/events` filter / 5秒 |
+| **イベントログ** | Beekeeper | イベント時系列/因果ツリー | デバッグ・監査時 | サイドバー | 全イベントの可視化 | `GET /runs/{id}/events` / 5秒 |
+
+**判定**: 6つの TreeView はそれぞれ固有のユーザーシナリオを持ち、重複なし。**全て存続**。
+
+#### Webview パネル × 3 + 確認要請詳細
+
+| Panel | Who | What | When | Where | Why | How | 問題 |
+|-------|-----|------|------|-------|-----|-----|------|
+| **Dashboard** | Beekeeper | Run 進捗バー + 6統計カード | Run 選択後の俯瞰 | エディタ領域 | Run 全体像を一目で把握 | `GET /runs/{id}` / 3秒全差替 | **80%がサイドバーと重複**。Runs/Tasks TreeView で同等情報が参照可能 |
+| **Hive Monitor** | Beekeeper | Hive/Colony ツリーグラフ + KPI + Ticker | 常時監視 | エディタ領域 | リアルタイムエージェント活動の視覚化 | `/activity/hierarchy` + `/activity/recent` + `/kpi/evaluation` / 2秒差分更新 | KPI 10/15指標が常に null |
+| **Agent Monitor** | Beekeeper | 左:階層ツリー 右:Activity ログ | 問題発生時のデバッグ | エディタ領域 | エージェント間通信の詳細追跡 | `/activity/hierarchy` + `/activity/recent` / 2秒全差替 | **API が Hive Monitor と完全同一**。表示レイアウトの違いのみ |
+| **確認要請詳細** | Beekeeper | オプション選択 + コメント付き承認/却下 | 確認要請クリック時 | エディタ領域 | 詳細情報を見ながらの意思決定 | 静的表示 + POST `/resolve` | 問題なし |
+
+#### Chat Participant × 1（存続）
+
+| Component | Who | What | When | Where | Why | How |
+|-----------|-----|------|------|-------|-----|-----|
+| **@colonyforge** | Beekeeper | 自然言語対話 → Beekeeper エージェント | 指示・質問時 | Copilot Chat | ユーザーの唯一の対話チャネル | `/status`, `/hives`, free text → `POST /beekeeper/send_message` |
+
+### 1.3 問題の要約
+
+| # | 問題 | 影響 |
+|---|------|------|
+| P1 | **Dashboard は Runs/Tasks TreeView と 80% 重複** | ユーザーの認知負荷増大。2箇所で同じ情報を見る |
+| P2 | **Agent Monitor は Hive Monitor と API が同一** | 保守コスト倍増。同じ 2 秒ポーリングが 2 パネルで走る |
+| P3 | **KPI 10/15 指標が null** | collaboration・gate_accuracy は外部カウンタが必要だが未渡し |
+| P4 | **Dashboard・Agent Monitor が全 HTML 差替え方式** | フリッカー発生、パフォーマンス劣化 |
+| P5 | **パネル間の動線が不明確** | 3 つの Webview のどれを開くべきか、ユーザーが迷う |
+
+---
+
+## 2. 変更方針 (To-Be)
+
+### 2.1 決定事項
+
+| 決定 | 内容 |
+|------|------|
+| **D1** | Dashboard パネルを**廃止** |
+| **D2** | Agent Monitor パネルを**廃止** |
+| **D3** | Hive Monitor を**統合パネル**に拡張（タブ UI） |
+| **D4** | バックエンドに **AR イベントカウント API** を追加（null 指標解消） |
+| **D5** | Colony セレクタ UI を KPI セクションに追加 |
+| **D6** | Failure Class 詳細表示を KPI セクションに追加 |
+| **D7** | トレンドグラフは**今回スコープ外**（後日実装） |
+
+### 2.2 統合後の Hive Monitor — タブ構成
+
+```
+┌──────────────────────────────────────────────────┐
+│ 🐝 Hive Monitor          [Colony ▼] [Refresh]   │
+├──────────────────────────────────────────────────┤
+│  [ Monitor ]  [ KPI ]  [ Activity ]              │
+├──────────────────────────────────────────────────┤
+│                                                  │
+│  (タブに応じたコンテンツ)                          │
+│                                                  │
+└──────────────────────────────────────────────────┘
+```
+
+| タブ | 内容 | 旧パネル由来 | API |
+|------|------|-------------|-----|
+| **Monitor** | Hive/Colony ツリーグラフ + **吹き出し** + Ticker | Hive Monitor | `/activity/hierarchy`, `/activity/recent` |
+| **KPI** | KPI ゲージ 15 本 + Outcomes + Failure Classes + Colony セレクタ | Hive Monitor (renderKPI) + **新規** | `/kpi/evaluation`, `/kpi/colonies`, **新規**: `/kpi/event-counters` |
+| **Activity** | 左:階層ツリー + 右:Activity ログ（2ペイン） | Agent Monitor | `/activity/hierarchy`, `/activity/recent` |
+
+### 2.4 ビジュアル強化 — 吹き出し (Speech Bubble) UI
+
+> **「何が行われているか見えること」は開発者 UX において最重要要素である。**
+
+各アクター（Beekeeper / Hive / Colony / Queen / Worker）のノードに、  
+現在の活動を **吹き出し** で表示し、一目で「誰が何をしているか」を把握可能にする。
+
+#### 吹き出しの例
+
+```
+                 ┌─────────────────────────────┐
+                 │ 📋 タスクを分割しています... │
+                 └──────────┬──────────────────┘
+                            ▼
+                    ┌──────────────┐
+                    │  👑 Queen    │  ← active (緑パルス)
+                    │  colony-api  │
+                    └──────────────┘
+                   ╱                ╲
+          ┌──────────────┐  ┌──────────────┐
+          │  🐝 Worker-1 │  │  🐝 Worker-2 │
+          │              │  │              │
+          └──────────────┘  └──────────────┘
+   ┌──────────────────────────┐  │
+   │ 🔧 ツールを実行中...     │  │
+   └──────────────────────────┘  │
+              ┌──────────────────────────────┐
+              │ 🧠 LLMで解析しています...    │
+              └──────────────────────────────┘
+```
+
+#### 吹き出しの生成ルール
+
+`ActivityEvent.activity_type` と `summary` からテンプレートで生成:
+
+| activity_type | 吹き出しテキスト | アイコン | 色 |
+|---------------|-----------------|---------|-----|
+| `llm.request` | 「🧠 LLMで解析しています...」 | 🧠 | #9c27b0 |
+| `llm.response` | 「💬 回答を受信しました」 | 💬 | #9c27b0 |
+| `mcp.tool_call` | 「🔧 ツールを実行中...」 | 🔧 | #2196f3 |
+| `mcp.tool_result` | 「📦 結果を受信しました」 | 📦 | #2196f3 |
+| `agent.started` | 「▶️ 作業を開始しました」 | ▶️ | #4caf50 |
+| `agent.completed` | 「✅ 作業が完了しました」 | ✅ | #4caf50 |
+| `agent.error` | 「❌ エラーが発生しました」 | ❌ | #f44336 |
+| `message.sent` | 「📤 メッセージを送信中...」 | 📤 | #ff9800 |
+| `message.received` | 「📥 指示を受信しました」 | 📥 | #ff9800 |
+| `task.assigned` | 「📋 タスクを割り当てています...」 | 📋 | #00bcd4 |
+| `task.progress` | 「📊 進捗を報告しています...」 | 📊 | #00bcd4 |
+
+- **進行中アクティビティ** (`.request`, `.tool_call`, `.sent`, `.started`, `.assigned`): 「...」付き + パルスアニメーション
+- **完了アクティビティ** (`.response`, `.result`, `.completed`): 吹き出しは 3 秒後にフェードアウト
+- **エラー** (`.error`): 赤色吹き出し、消えない（次のイベントまで保持）
+
+#### 吹き出しの配置
+
+- 各エージェントノード（Queen / Worker）の**上部**に表示
+- Colony レベルの吹き出しは Colony ノードの上部
+- 最新 1 件のみ表示（複数吹き出しのフラッディングを防止）
+- summary テキストを 30 文字で truncate
+
+#### エージェントノードの可視化強化
+
+現状 Queen/Worker は小さなバッジとして表示されているが、  
+**ファーストクラスのノード**として描画し、ツリー構造を完成させる:
+
+```
+Beekeeper ─── Hive ─── Colony ──┬── Queen (フルノード)
+                                ├── Worker-1 (フルノード)
+                                └── Worker-2 (フルノード)
+```
+
+各ノードに:
+- アクティブ/アイドル インジケーター（緑パルス / グレー）
+- 吹き出し（最新アクティビティ）
+- ロールアイコン（👑 / 🐝）
+
+### 2.3 ユーザー動線 (To-Be)
+
+```
+ユーザー
+  ├── サイドバー (TreeView) ─── 構造化データの CRUD・選択
+  │     ├── Hives ──── [🔍] ──→ Hive Monitor (Monitor タブ)
+  │     ├── Runs ───── [📊] ──→ Hive Monitor (KPI タブ)  ← 旧 Dashboard ボタンを置換
+  │     ├── Tasks
+  │     ├── 確認要請 ──────────→ 確認要請詳細 Webview
+  │     ├── Decisions
+  │     └── イベントログ
+  │
+  ├── Hive Monitor (統合 Webview) ── リアルタイム視覚化 + KPI + Activity
+  │     ├── Monitor タブ: 全体俯瞰（ツリーグラフ）
+  │     ├── KPI タブ:     品質指標（ゲージ + Colony 比較）
+  │     └── Activity タブ: エージェント活動詳細
+  │
+  ├── 確認要請詳細 Webview ── 承認/却下の意思決定
+  │
+  └── @colonyforge Chat ── 自然言語対話
+```
+
+---
+
+## 3. 詳細変更仕様
+
+### 3.1 バックエンド変更
+
+#### 3.1.1 新規エンドポイント: `GET /kpi/event-counters`
+
+AR イベントストアから Guard/Sentinel/Escalation カウンターを**自動集計**する。
+
+```python
+@router.get("/event-counters")
+async def get_event_counters(
+    colony_id: str | None = Query(default=None),
+    run_id: str | None = Query(default=None),
+) -> dict[str, int]:
+    """ARイベントから品質ゲートカウンターを自動集計
+
+    Returns:
+        guard_pass_count, guard_conditional_count, guard_fail_count,
+        guard_total_count, guard_reject_count,
+        sentinel_alert_count, sentinel_false_alarm_count,
+        total_monitoring_periods,
+        escalation_count, decision_count,
+        referee_selected_count, referee_candidate_count
+    """
+```
+
+**集計対象イベント（EventType → カウンター）:**
+
+| EventType | カウンター増分 |
+|-----------|---------------|
+| `guard.passed` | `guard_pass_count += 1`, `guard_total_count += 1` |
+| `guard.conditional_passed` | `guard_conditional_count += 1`, `guard_total_count += 1` |
+| `guard.failed` | `guard_fail_count += 1`, `guard_total_count += 1`, `guard_reject_count += 1` |
+| `sentinel.alert_raised` | `sentinel_alert_count += 1` |
+| `sentinel.report` | `total_monitoring_periods += 1` |
+| `intervention.queen_escalation` | `escalation_count += 1` |
+| `decision.recorded` | `decision_count += 1` |
+| `decision.proposal.created` | `referee_candidate_count += 1` |
+| `decision.applied` | `referee_selected_count += 1` |
+
+**false_alarm 判定**: `sentinel.alert_raised` イベントの payload に `false_alarm: true` フィールドが存在する場合にカウント。存在しない場合は 0。
+
+#### 3.1.2 `GET /kpi/evaluation` の拡張
+
+カウンターパラメータが**全て 0 の場合**（＝フロントエンドが渡さない場合）、  
+内部で `get_event_counters()` を呼び出して自動補完する。
+
+```python
+@router.get("/evaluation")
+async def get_evaluation_summary(
+    colony_id: str | None = Query(default=None),
+    # ...既存カウンターパラメータ（すべて default=0 のまま）...
+    auto_count: bool = Query(default=True, description="ARイベントから自動集計する"),
+) -> dict[str, Any]:
+    if auto_count and all(v == 0 for v in [guard_pass_count, ...]):
+        counters = await get_event_counters(colony_id=colony_id)
+        # counters でパラメータを上書き
+```
+
+**後方互換性**: 既存の手動カウンター渡しも引き続き動作。`auto_count=False` で無効化可能。
+
+#### 3.1.3 Failure Class 詳細エンドポイント
+
+既にバックエンドの `EvaluationSummary.failure_classes` に `dict[FailureClass, int]` が含まれている。  
+フロントエンド側の描画追加のみ（バックエンド変更不要）。
+
+### 3.2 フロントエンド変更
+
+#### 3.2.1 廃止ファイル
+
+| ファイル | 行数 | 対応 |
+|---------|------|------|
+| `views/dashboardPanel.ts` | 386行 | **削除** |
+| `views/agentMonitorPanel.ts` | 444行 | **削除** |
+
+#### 3.2.2 package.json 変更
+
+```diff
+  "commands": [
+-   { "command": "colonyforge.showDashboard", "title": "ダッシュボードを表示", ... },
+-   { "command": "colonyforge.showAgentMonitor", "title": "Agent Monitorを表示", ... },
+    { "command": "colonyforge.showHiveMonitor", "title": "Hive Monitorを表示", ... },
+    ...
+  ],
+  "menus": {
+    "view/item/context": [
+-     // Runs の Dashboard/Agent Monitor ボタンを削除
+-     { "command": "colonyforge.showDashboard", "when": "viewItem == run", "group": "inline" },
+-     { "command": "colonyforge.showAgentMonitor", "when": "viewItem == run", "group": "inline" },
++     // Runs に Hive Monitor ボタンを配置
++     { "command": "colonyforge.showHiveMonitor", "when": "viewItem == run", "group": "inline" },
+    ]
+  }
+```
+
+#### 3.2.3 extension.ts 変更
+
+```diff
+- import { AgentMonitorPanel } from './views/agentMonitorPanel';
+  import { HiveMonitorPanel } from './views/hiveMonitorPanel';
+
+  // AgentMonitor コマンド削除
+- context.subscriptions.push(
+-     vscode.commands.registerCommand('colonyforge.showAgentMonitor', () => {
+-         AgentMonitorPanel.createOrShow(context.extensionUri, client);
+-     })
+- );
+
+  // Dashboard コマンド → HiveMonitor に転送
+  context.subscriptions.push(
+      vscode.commands.registerCommand('colonyforge.showDashboard', () => {
+-         DashboardPanel.createOrShow(context.extensionUri, client);
++         HiveMonitorPanel.createOrShow(context.extensionUri, client);
+      })
+  );
+```
+
+#### 3.2.4 hiveMonitorPanel.ts 変更（統合パネル化）
+
+**変更内容:**
+
+1. **タブ UI 追加**: Monitor / KPI / Activity の 3 タブ
+2. **Activity タブ**: Agent Monitor の 2 ペインレイアウト（階層+ログ）を統合
+3. **KPI タブ改善**:
+   - Colony セレクタ dropdown（`GET /kpi/colonies` からリスト取得）
+   - カウンター自動集計（`auto_count=true` パラメータ付き）
+   - Failure Class 詳細ブレイクダウン表示
+4. **postMessage 差分更新維持**: Activity タブも差分更新方式
+
+**HTML 構造 (To-Be):**
+
+```html
+<div class="header">
+    <h1>🐝 Hive Monitor</h1>
+    <div class="header-controls">
+        <select id="colonySelector"><!-- /kpi/colonies から動的生成 --></select>
+        <button id="refreshBtn">↻</button>
+    </div>
+</div>
+<div class="tab-bar">
+    <button class="tab active" data-tab="monitor">Monitor</button>
+    <button class="tab" data-tab="kpi">KPI</button>
+    <button class="tab" data-tab="activity">Activity</button>
+</div>
+<div id="tab-monitor" class="tab-content active">
+    <!-- 既存のツリーグラフ + Ticker -->
+</div>
+<div id="tab-kpi" class="tab-content">
+    <!-- KPI ゲージ + Failure Classes -->
+</div>
+<div id="tab-activity" class="tab-content">
+    <!-- 旧 Agent Monitor の 2 ペインレイアウト -->
+</div>
+```
+
+**データフロー (To-Be):**
+
+```
+_update() {
+    // 共通データ（全タブで必要）
+    const [hierarchy, events] = await Promise.all([
+        client.getActivityHierarchy(),
+        client.getRecentActivity(50),
+    ]);
+
+    // KPI データ（KPI タブ用、失敗しても他タブに影響なし）
+    let evaluation = null;
+    try {
+        evaluation = await client.getEvaluation(selectedColonyId);
+    } catch { /* ignore */ }
+
+    // Colony 一覧（初回 or Colony セレクタ更新時のみ）
+    if (!coloniesLoaded) {
+        colonies = await client.getKPIColonies();
+        coloniesLoaded = true;
+    }
+
+    postMessage({
+        command: 'updateData',
+        hives,              // Monitor タブ用
+        recentEvents,       // Monitor (Ticker) + Activity (ログ) 用
+        hierarchy,          // Activity (階層ツリー) 用
+        evaluation,         // KPI タブ用
+        colonies,           // Colony セレクタ用
+    });
+}
+```
+
+#### 3.2.5 client.ts 変更
+
+`getEvaluation()` メソッドに `auto_count` パラメータ対応を追加:
+
+```typescript
+async getEvaluation(colonyId?: string): Promise<EvaluationSummary> {
+    const response = await this.client.get<EvaluationSummary>('/kpi/evaluation', {
+        params: {
+            ...(colonyId ? { colony_id: colonyId } : {}),
+            auto_count: true,  // ← 追加
+        },
+    });
+    return response.data;
+}
+```
+
+#### 3.2.6 commands/runCommands.ts 変更
+
+Dashboard ボタン → Hive Monitor ボタンへのリダイレクト:
+
+```diff
+- import { DashboardPanel } from '../views/dashboardPanel';
+  import { HiveMonitorPanel } from '../views/hiveMonitorPanel';
+
+  // "showDashboard" コマンドの登録先を変更
+```
+
+### 3.3 テスト変更
+
+#### 3.3.1 バックエンド新規テスト
+
+| テストファイル | テスト内容 |
+|---------------|-----------|
+| `tests/test_kpi_event_counters.py` | `GET /kpi/event-counters` — 各 EventType のカウント正確性 |
+| `tests/test_kpi.py` (追加) | `auto_count=True` 時の evaluation 自動集計 |
+
+#### 3.3.2 フロントエンド変更テスト
+
+| テストファイル | 変更内容 |
+|---------------|---------|
+| `vscode-extension/src/test/hiveMonitorPanel.test.ts` | タブ切替、Colony セレクタ、Activity 2 ペイン |
+| `vscode-extension/src/test/dashboardPanel.test.ts` | **削除** |
+| `vscode-extension/src/test/agentMonitorPanel.test.ts` | **削除** |
+| `vscode-extension/src/test/extension.test.ts` | Dashboard/AgentMonitor コマンド削除に対応 |
+
+---
+
+## 4. 実装計画
+
+### Phase 1: バックエンド（null 指標解消）
+
+| Step | 内容 | TDD |
+|------|------|-----|
+| 1-1 | `test_kpi_event_counters.py` 作成 | RED |
+| 1-2 | `GET /kpi/event-counters` 実装 | GREEN |
+| 1-3 | `GET /kpi/evaluation` に `auto_count` 追加 | GREEN |
+| 1-4 | リファクタ + コミット | REFACTOR |
+
+### Phase 2: フロントエンド統合
+
+| Step | 内容 | TDD |
+|------|------|-----|
+| 2-1 | hiveMonitorPanel.ts にタブ UI 追加 | - |
+| 2-2 | Activity タブ統合（Agent Monitor 2 ペイン移植） | - |
+| 2-3 | KPI タブ改善（Colony セレクタ + Failure Classes） | - |
+| 2-4 | client.ts に `auto_count` 対応 | - |
+| 2-5 | dashboardPanel.ts / agentMonitorPanel.ts 削除 | - |
+| 2-6 | package.json / extension.ts / commands 整理 | - |
+| 2-7 | テスト更新 | - |
+| 2-8 | `npm run compile` + `npm run lint` 通過確認 | - |
+
+### Phase 3: 検証
+
+| Step | 内容 |
+|------|------|
+| 3-1 | `pytest tests --ignore=tests/e2e -q` 全通過 |
+| 3-2 | `npm run compile && npm run lint` 全通過 |
+| 3-3 | コミット + PR |
+
+---
+
+## 5. 影響範囲
+
+### 5.1 削除されるコード
+
+| 対象 | 行数 |
+|------|------|
+| `dashboardPanel.ts` | 386 行 |
+| `agentMonitorPanel.ts` | 444 行 |
+| `dashboardPanel.test.ts` | ≈ 100 行 |
+| `agentMonitorPanel.test.ts` | ≈ 100 行 |
+| package.json コマンド/メニュー | 約 20 行 |
+| **合計削除** | **≈ 1,050 行** |
+
+### 5.2 追加・変更されるコード
+
+| 対象 | 行数（推定） |
+|------|-------------|
+| `hiveMonitorPanel.ts` タブ UI + Activity 統合 | +300 行 |
+| バックエンド `event_counters.py` | +120 行 |
+| テスト `test_kpi_event_counters.py` | +150 行 |
+| client.ts 変更 | +5 行 |
+| extension.ts 変更 | -15 行 |
+| **純増減** | **≈ −490 行** |
+
+### 5.3 破壊的変更
+
+| 変更 | 影響 | 緩和策 |
+|------|------|--------|
+| `colonyforge.showDashboard` コマンド廃止 | キーバインド設定している場合 | HiveMonitor にリダイレクト（1バージョン） |
+| `colonyforge.showAgentMonitor` コマンド廃止 | 同上 | 同上 |
+
+---
+
+## 6. 非スコープ（今回見送り）
+
+| 項目 | 理由 |
+|------|------|
+| トレンドグラフ（時系列 KPI） | ユーザー要望で後回し |
+| Run 進捗の Hive Monitor 統合 | サイドバー TreeView で十分 |
+| WebSocket リアルタイム更新 | ポーリング方式で現状十分 |
+| Colony 間 KPI 比較表 | トレンドグラフと合わせて後日 |
