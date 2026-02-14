@@ -17,16 +17,11 @@
         }
     },
     "chat.mcp.access": "all",
-    // Ubuntu WSL の Docker を使用（GPU サポート）
-    // Dev Containers: WSL 内の Docker を使用
-    "dev.containers.executeInWSL": true,
-    "dev.containers.executeInWSLDistro": "Ubuntu",
-    // Docker 拡張機能: WSL の Docker API に接続
-    "docker.host": "tcp://localhost:2375",
-    "docker.context": "wsl-docker",
-    // Docker CLI のパスを明示的に指定（WSLラッパーではなくネイティブCLI）
-    "docker.dockerPath": "C:\\Users\\kiiji\\bin\\docker.exe",
-    "containers.containerCommand": "C:\\Users\\kiiji\\bin\\docker.exe",
+    // Docker Desktop を使用（WSL 2 backend）
+    // Docker Desktop があれば WSL 内の Docker は不要
+    "dev.containers.executeInWSL": false,
+    // Docker 拡張機能: Docker Desktop のデフォルトコンテキストを使用
+    "dev.containers.dockerPath": "",
     "chat.tools.terminal.autoApprove": {
         "/^cd /workspace/ColonyForge/vscode-extension && npm run lint 2>&1 \\| tail -10$/": {
             "approve": true,

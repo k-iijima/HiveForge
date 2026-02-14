@@ -1,5 +1,6 @@
 #!/bin/bash
 # Ollama起動スクリプト（GPU自動検出）
+# Docker Desktop / WSL ネイティブ Docker の両方に対応
 # GPUがあればGPU版、なければCPU版を起動
 
 set -e
@@ -9,6 +10,13 @@ cd /workspace/ColonyForge
 # 既存のOllamaが動いているか確認
 if curl -s http://ollama:11434/api/tags &>/dev/null || curl -s http://localhost:11434/api/tags &>/dev/null; then
     echo "✅ Ollama is already running, skipping startup..."
+    exit 0
+fi
+
+# Docker が利用可能か確認（Docker Desktop / WSL Docker 両対応）
+if ! docker info &>/dev/null 2>&1; then
+    echo "⚠️  Docker is not accessible from inside the container."
+    echo "   Ollama must be started separately (e.g., via 'docker compose --profile gpu up -d ollama')."
     exit 0
 fi
 
@@ -32,7 +40,7 @@ detect_gpu() {
         return 0
     fi
 
-    echo "  → GPU未検出（COLONYFORGE_GPU=nvidia で強制可能）"
+    echo "  → GPU未検出（CPU モードで起動、COLONYFORGE_GPU=nvidia で強制可能）"
     return 1
 }
 

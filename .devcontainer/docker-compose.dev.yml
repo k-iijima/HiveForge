@@ -4,9 +4,9 @@ services:
       context: ..
       dockerfile: .devcontainer/Dockerfile.dev
     volumes:
-      # WSL Docker環境用：Windowsパスを/mnt/形式に変換
-      # Docker Desktop with WSL backend では /mnt/d/... 形式が必要
-      - /mnt/d/projects/biz/ColonyForge:/workspace/ColonyForge:cached
+      # プロジェクトルート（docker-compose.dev.yml の親ディレクトリ）をマウント
+      # 相対パスなので Docker Desktop / WSL Docker / Linux いずれでも動作する
+      - ..:/workspace/ColonyForge:cached
       # .venvは/home/vscode/.venv に配置してpipのユーザーインストールと分離
       - colonyforge-venv:/home/vscode/.venv
       - /var/run/docker.sock:/var/run/docker.sock

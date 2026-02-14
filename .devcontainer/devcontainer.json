@@ -1,6 +1,6 @@
 {
   "name": "ColonyForge Dev",
-  // Docker Desktop または WSL Docker で動作
+  // Docker Desktop / WSL Docker / Linux いずれでも動作
   //
   // 使用方法:
   // 1. Docker Desktop を起動
@@ -10,8 +10,6 @@
   ],
   "service": "colonyforge-dev",
   "workspaceFolder": "/workspace/ColonyForge",
-  // ワークスペースマウントはdocker-compose.dev.ymlで定義（WSLパス形式）
-  // Docker ComposeモードではここでのworkspaceMountは機能しないため削除
   "customizations": {
     "vscode": {
       "extensions": [
@@ -46,7 +44,7 @@
       }
     }
   },
-  "postCreateCommand": "cd /workspace/ColonyForge && pip install -e '.[dev]' && pre-commit install && mkdir -p /workspace/ColonyForge/Vault && sudo chown -R vscode:vscode /workspace/ColonyForge/Vault",
+  "postCreateCommand": "cd /workspace/ColonyForge && pip install -e '.[dev]' && sudo chown -R vscode:vscode .git/hooks && pre-commit install && mkdir -p /workspace/ColonyForge/Vault && sudo chown -R vscode:vscode /workspace/ColonyForge/Vault",
   "postStartCommand": "sudo chown root:docker /var/run/docker.sock 2>/dev/null || true; bash .devcontainer/start-ollama.sh || true",
   "waitFor": "postCreateCommand",
   "remoteEnv": {
