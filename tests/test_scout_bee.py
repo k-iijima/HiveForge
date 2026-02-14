@@ -596,3 +596,171 @@ class TestFeatureConstants:
 
         # Assert: 全キー同値 → similarity = 1.0
         assert sim == pytest.approx(1.0)
+
+
+# ==================== ScoutBee LLM統合テスト ====================
+
+
+class TestScoutBeeLLMIntegration:
+    """ScoutBee LLM統合テスト
+
+    recommend_with_llm()がAgentRunnerを使って
+    推薦理由を強化できることを検証する。
+    """
+
+    def _make_episodes(self, count: int = 10) -> list[Episode]:
+        """テスト用エピソードリストを作成"""
+        episodes = []
+        for i in range(count):
+            episodes.append(
+                _make_episode(
+                    episode_id=f"ep-{i:03d}",
+                    task_features={"complexity": 3.0, "risk": 2.0, "urgency": 3.0},
+                    template_used="fast",
+                    outcome=Outcome.SUCCESS,
+                    duration_seconds=100.0 + i * 10,
+                )
+            )
+        return episodes
+
+    def test_create_scout_with_runner(self):
+        """AgentRunner付きでScoutBeeを作成できる"""
+        from unittest.mock import AsyncMock
+
+        # Arrange
+        mock_runner = AsyncMock()
+
+        # Act
+        scout = ScoutBee(agent_runner=mock_runner)
+
+        # Assert
+        assert scout.agent_runner is mock_runner
+
+    def test_create_scout_without_runner(self):
+        """AgentRunnerなしで作成した場合はNone"""
+        # Act
+        scout = ScoutBee()
+
+        # Assert
+        assert scout.agent_runner is None
+
+    def test_recommend_still_works_without_runner(self):
+        """AgentRunnerなしでもrecommend()はルールベースで動作"""
+        # Arrange
+        scout = ScoutBee(min_episodes=2)
+        episodes = self._make_episodes(5)
+        target = {"complexity": 3.0, "risk": 2.0, "urgency": 3.0}
+
+        # Act
+        report = scout.recommend(target, episodes)
+
+        # Assert
+        assert report.verdict == ScoutVerdict.RECOMMENDED
+        assert report.recommended_template == "fast"
+
+    @pytest.mark.asyncio
+    async def test_recommend_with_llm_enhances_reason(self):
+        """LLMが推薦理由を強化する"""
+        from unittest.mock import AsyncMock, MagicMock
+
+        # Arrange
+        mock_runner = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.success = True
+        mock_result.output = "Based on 10 similar episodes, fast template achieves 100% success."
+        mock_result.error = None
+        mock_runner.run.return_value = mock_result
+
+        scout = ScoutBee(min_episodes=2, agent_runner=mock_runner)
+        episodes = self._make_episodes(10)
+        target = {"complexity": 3.0, "risk": 2.0, "urgency": 3.0}
+
+        # Act
+        report = await scout.recommend_with_llm(target, episodes, "Build login API")
+
+        # Assert: LLMの出力が推薦理由に使われる
+        assert report.verdict == ScoutVerdict.RECOMMENDED
+        assert report.proposal is not None
+        assert "100% success" in report.proposal.reason
+        mock_runner.run.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_recommend_with_llm_falls_back_on_cold_start(self):
+        """コールドスタート時はLLMを呼ばない"""
+        from unittest.mock import AsyncMock
+
+        # Arrange
+        mock_runner = AsyncMock()
+        scout = ScoutBee(min_episodes=5, agent_runner=mock_runner)
+        episodes = self._make_episodes(2)  # min_episodes未満
+        target = {"complexity": 3.0}
+
+        # Act
+        report = await scout.recommend_with_llm(target, episodes)
+
+        # Assert: LLMは呼ばれない
+        assert report.verdict == ScoutVerdict.COLD_START
+        mock_runner.run.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_recommend_with_llm_falls_back_on_no_runner(self):
+        """AgentRunnerなしの場合はルールベースのみで返す"""
+        # Arrange
+        scout = ScoutBee(min_episodes=2)  # runner なし
+        episodes = self._make_episodes(5)
+        target = {"complexity": 3.0, "risk": 2.0, "urgency": 3.0}
+
+        # Act
+        report = await scout.recommend_with_llm(target, episodes, "Build API")
+
+        # Assert: ルールベースの結果がそのまま返る
+        assert report.verdict == ScoutVerdict.RECOMMENDED
+        assert report.proposal is not None
+        # LLMなしなのでルールベースの推薦理由
+        assert "fast" in report.proposal.reason
+
+    @pytest.mark.asyncio
+    async def test_recommend_with_llm_handles_llm_error(self):
+        """LLMエラー時はルールベースの結果を返す"""
+        from unittest.mock import AsyncMock
+
+        # Arrange
+        mock_runner = AsyncMock()
+        mock_runner.run.side_effect = RuntimeError("LLM接続エラー")
+
+        scout = ScoutBee(min_episodes=2, agent_runner=mock_runner)
+        episodes = self._make_episodes(5)
+        target = {"complexity": 3.0, "risk": 2.0, "urgency": 3.0}
+
+        # Act: エラーは握りつぶされずwarningログのみ
+        report = await scout.recommend_with_llm(target, episodes)
+
+        # Assert: ルールベースの結果がフォールバック
+        assert report.verdict == ScoutVerdict.RECOMMENDED
+        assert report.proposal is not None
+
+    @pytest.mark.asyncio
+    async def test_recommend_with_llm_prompt_contains_task_info(self):
+        """LLM呼び出し時のプロンプトにタスク情報が含まれる"""
+        from unittest.mock import AsyncMock, MagicMock
+
+        # Arrange
+        mock_runner = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.success = True
+        mock_result.output = "Enhanced reason"
+        mock_result.error = None
+        mock_runner.run.return_value = mock_result
+
+        scout = ScoutBee(min_episodes=2, agent_runner=mock_runner)
+        episodes = self._make_episodes(5)
+        target = {"complexity": 3.0, "risk": 2.0, "urgency": 3.0}
+
+        # Act
+        await scout.recommend_with_llm(target, episodes, "Build authentication module")
+
+        # Assert: runner.run に渡されたプロンプトにタスク情報が含まれる
+        call_args = mock_runner.run.call_args
+        prompt = call_args[0][0] if call_args[0] else call_args[1].get("user_message", "")
+        assert "Build authentication module" in prompt
+        assert "fast" in prompt  # 推薦テンプレート名
