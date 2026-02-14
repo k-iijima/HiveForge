@@ -944,6 +944,49 @@ class TestForagerExplorerLLMIntegration:
         assert results[1].passed is False
         assert mock_runner.run.call_count == 2
 
+    def test_build_prompt_uses_english(self):
+        """_build_promptが英語でプロンプトを構築する"""
+        # Arrange
+        explorer = ForagerExplorer()
+        scenario = self._make_scenario(
+            title="Boundary Test",
+            steps=["Pass empty list", "Verify no exception"],
+        )
+
+        # Act
+        prompt = explorer._build_prompt(scenario)
+
+        # Assert: 英語のキーワードが含まれる
+        assert "Execute the following exploratory test scenario" in prompt
+        assert "Boundary Test" in prompt
+        assert "Verification Steps" in prompt
+        assert "Pass empty list" in prompt
+
+    def test_build_prompt_contains_category_and_target(self):
+        """_build_promptにカテゴリとターゲットファイルが含まれる"""
+        # Arrange
+        explorer = ForagerExplorer()
+        scenario = self._make_scenario()
+
+        # Act
+        prompt = explorer._build_prompt(scenario)
+
+        # Assert
+        assert "Category:" in prompt
+        assert "Target files:" in prompt
+        assert "a.py" in prompt
+
+    def test_llm_config_stored(self):
+        """llm_configがインスタンスに保存される"""
+        # Arrange
+        config = {"model": "gpt-4o"}
+
+        # Act
+        explorer = ForagerExplorer(llm_config=config)
+
+        # Assert
+        assert explorer.llm_config == config
+
 
 # ==================== M3-4-d: 違和感検知 ====================
 

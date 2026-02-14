@@ -7,7 +7,7 @@ AgentRunner未設定時はスタブモード（常にpassed=True）でフォー�
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from .models import (
     Scenario,
@@ -27,8 +27,14 @@ class ForagerExplorer:
     設定されていない場合はスタブモード（記録のみ）で動作する。
     """
 
-    def __init__(self, agent_runner: AgentRunner | None = None) -> None:
+    def __init__(
+        self,
+        agent_runner: AgentRunner | None = None,
+        *,
+        llm_config: Any | None = None,
+    ) -> None:
         self.agent_runner = agent_runner
+        self.llm_config = llm_config
 
     async def run_scenarios(self, scenarios: list[Scenario]) -> list[ScenarioResult]:
         """シナリオを一括実行
@@ -104,11 +110,46 @@ class ForagerExplorer:
         """シナリオからLLMプロンプトを構築"""
         steps_text = "\n".join(f"  {i + 1}. {step}" for i, step in enumerate(scenario.steps))
         return (
-            f"以下の探索テストシナリオを実行してください。\n\n"
-            f"## シナリオ: {scenario.title}\n"
-            f"カテゴリ: {scenario.category.value}\n"
-            f"説明: {scenario.description}\n"
-            f"対象ファイル: {', '.join(scenario.target_nodes)}\n\n"
-            f"## 検証ステップ\n{steps_text}\n\n"
-            f"各ステップを実行し、問題があれば報告してください。"
+            f"Execute the following exploratory test scenario.\n\n"
+            f"## Scenario: {scenario.title}\n"
+            f"Category: {scenario.category.value}\n"
+            f"Description: {scenario.description}\n"
+            f"Target files: {', '.join(scenario.target_nodes)}\n\n"
+            f"## Verification Steps\n{steps_text}\n\n"
+            f"Execute each step and report any issues found."
         )
+
+    @classmethod
+    def create_with_runner(
+        cls,
+        vault_path: str = "./Vault",
+        hive_id: str = "0",
+        colony_id: str = "0",
+        llm_config: Any | None = None,
+    ) -> ForagerExplorer:
+        """LLM対応のForagerExplorerインスタンスを作成
+
+        AgentRunnerをforager_beeタイプで初期化し、
+        Forager Bee専用のシステムプロンプトを使用する。
+
+        Args:
+            vault_path: Vaultディレクトリパス
+            hive_id: Hive ID
+            colony_id: Colony ID
+            llm_config: LLM設定（省略時はデフォルト）
+
+        Returns:
+            LLM対応のForagerExplorerインスタンス
+        """
+        from ..llm.client import LLMClient
+        from ..llm.runner import AgentRunner
+
+        client = LLMClient(config=llm_config)
+        runner = AgentRunner(
+            client,
+            agent_type="forager_bee",
+            vault_path=vault_path,
+            hive_id=hive_id,
+            colony_id=colony_id,
+        )
+        return cls(agent_runner=runner, llm_config=llm_config)
