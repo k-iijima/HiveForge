@@ -7,6 +7,7 @@ IntentMiner, AssumptionMapper, RiskChallenger, ClarifyGenerator 等）を
 W2: コアの状態遷移管理・イベント発行・高速パス判定を実装。
 W3: AssumptionMapper, RiskChallenger, ClarifyGenerator を統合。
 W4: SpecSynthesizer, RAGuardGate (Req版) を統合。
+W5: ContextForager, WEB_RESEARCH/WEB_SKIPPED, RefereeComparer を統合。
 """
 
 from __future__ import annotations
@@ -23,22 +24,30 @@ from colonyforge.core.events.ra import (
     RAGateDecidedEvent,
     RAHypothesisBuiltEvent,
     RAIntakeReceivedEvent,
+    RARefereeComparedEvent,
     RASpecSynthesizedEvent,
     RATriageCompletedEvent,
     RAUserRespondedEvent,
+    RAWebResearchedEvent,
+    RAWebSkippedEvent,
 )
 from colonyforge.core.events.types import EventType
 from colonyforge.core.state.machines import RAStateMachine
+from colonyforge.requirement_analysis.context_forager import ContextForager
 from colonyforge.requirement_analysis.models import (
     AmbiguityScores,
     AnalysisPath,
     Assumption,
     ClarificationRound,
+    EvidencePack,
     FailureHypothesis,
     IntentGraph,
     RAGateResult,
+    RefereeResult,
     SpecDraft,
+    WebEvidencePack,
 )
+from colonyforge.requirement_analysis.referee_comparer import RefereeComparer
 from colonyforge.requirement_analysis.scorer import AmbiguityScorer
 
 # ---------------------------------------------------------------------------
@@ -68,6 +77,9 @@ _EVENT_CLASS_MAP: dict[EventType, type[BaseEvent]] = {
     EventType.RA_CHALLENGE_REVIEWED: RAChallengeReviewedEvent,
     EventType.RA_GATE_DECIDED: RAGateDecidedEvent,
     EventType.RA_COMPLETED: RACompletedEvent,
+    EventType.RA_WEB_RESEARCHED: RAWebResearchedEvent,
+    EventType.RA_WEB_SKIPPED: RAWebSkippedEvent,
+    EventType.RA_REFEREE_COMPARED: RARefereeComparedEvent,
 }
 
 
@@ -94,6 +106,8 @@ class RAOrchestrator:
         clarify_generator: Any | None = None,
         spec_synthesizer: Any | None = None,
         guard_gate: Any | None = None,
+        context_forager: ContextForager | None = None,
+        referee_comparer: RefereeComparer | None = None,
         request_id: str | None = None,
     ) -> None:
         self._state_machine = RAStateMachine()
@@ -104,6 +118,8 @@ class RAOrchestrator:
         self._clarify_generator = clarify_generator
         self._spec_synthesizer = spec_synthesizer
         self._guard_gate = guard_gate
+        self._context_forager = context_forager
+        self._referee_comparer = referee_comparer
         self.request_id: str = request_id or generate_event_id()
         self.raw_input: str = ""
         self.ambiguity_scores: AmbiguityScores | None = None
@@ -114,6 +130,9 @@ class RAOrchestrator:
         self.clarification_rounds: list[ClarificationRound] = []
         self.spec_drafts: list[SpecDraft] = []
         self.gate_result: RAGateResult | None = None
+        self.evidence_pack: EvidencePack | None = None
+        self.web_evidence_pack: WebEvidencePack | None = None
+        self.referee_result: RefereeResult | None = None
         self.events: list[BaseEvent] = []
 
     # ------------------------------------------------------------------
@@ -192,7 +211,9 @@ class RAOrchestrator:
         if state == RAState.TRIAGE:
             await self._step_context_enrich()
         elif state == RAState.CONTEXT_ENRICH:
-            await self._step_hypothesis_build()
+            await self._step_web_decision()
+        elif state == RAState.WEB_RESEARCH:
+            await self._step_after_web()
         elif state == RAState.HYPOTHESIS_BUILD:
             await self._step_clarify_gen()
         elif state == RAState.CLARIFY_GEN:
@@ -200,10 +221,12 @@ class RAOrchestrator:
         elif state == RAState.SPEC_SYNTHESIS:
             await self._step_challenge_review()
         elif state == RAState.CHALLENGE_REVIEW:
-            await self._step_guard_gate()
+            await self._step_challenge_review_or_referee()
+        elif state == RAState.REFEREE_COMPARE:
+            await self._step_after_referee()
         elif state == RAState.GUARD_GATE:
             await self._step_complete()
-        # W3-W4 で追加: USER_FEEDBACK, SPEC_PERSIST, USER_EDIT, REFEREE_COMPARE
+        # W3-W4 で追加: USER_FEEDBACK, SPEC_PERSIST, USER_EDIT
 
     # ------------------------------------------------------------------
     # get_status() — ステータスサマリ
@@ -234,6 +257,18 @@ class RAOrchestrator:
             status["spec_drafts_count"] = len(self.spec_drafts)
         if self.gate_result is not None:
             status["gate_passed"] = self.gate_result.passed
+        if self.evidence_pack is not None:
+            status["evidence_count"] = (
+                len(self.evidence_pack.related_decisions)
+                + len(self.evidence_pack.past_runs)
+                + len(self.evidence_pack.failure_history)
+                + len(self.evidence_pack.code_context)
+                + len(self.evidence_pack.similar_episodes)
+            )
+        if self.web_evidence_pack is not None:
+            status["web_search_performed"] = not self.web_evidence_pack.skipped
+        if self.referee_result is not None:
+            status["referee_selected_draft"] = self.referee_result.selected_draft_id
         return status
 
     # ------------------------------------------------------------------
@@ -241,12 +276,76 @@ class RAOrchestrator:
     # ------------------------------------------------------------------
 
     async def _step_context_enrich(self) -> None:
-        """TRIAGE → CONTEXT_ENRICH: コンテキスト収集."""
+        """TRIAGE → CONTEXT_ENRICH: コンテキスト収集.
+
+        ContextForager 注入時は AR イベントから証拠を収集する。
+        未注入時はスタブ動作（空の EvidencePack）。
+        """
+        if self._context_forager is not None:
+            self.evidence_pack = self._context_forager.forage(
+                self.raw_input,
+                intent_graph=self.intent_graph,
+            )
+        else:
+            self.evidence_pack = EvidencePack()
+
+        evidence_count = (
+            len(self.evidence_pack.related_decisions)
+            + len(self.evidence_pack.past_runs)
+            + len(self.evidence_pack.failure_history)
+            + len(self.evidence_pack.code_context)
+            + len(self.evidence_pack.similar_episodes)
+        )
+
         event = self._emit_event(
             RAContextEnrichedEvent,
-            payload={"source": "stub", "web_search_performed": False},
+            payload={
+                "source": "context_forager" if self._context_forager else "stub",
+                "evidence_count": evidence_count,
+            },
         )
         self._state_machine.transition(event)
+
+    async def _step_web_decision(self) -> None:
+        """CONTEXT_ENRICH → WEB_RESEARCH or HYPOTHESIS_BUILD: WEB検索判定.
+
+        ContextForager の should_search_web() で判定し、
+        必要なら WEB_RESEARCH へ遷移（次 step で仮説構築）、
+        不要なら RA_WEB_SKIPPED を記録後、直接仮説構築を実行して
+        HYPOTHESIS_BUILD へ遷移する。
+        """
+        forager = self._context_forager or ContextForager()
+        needed, reason = forager.should_search_web(
+            self.raw_input,
+            intent_graph=self.intent_graph,
+        )
+
+        if needed:
+            # WEB検索を実施（スタブ: 空のWebEvidencePack）
+            self.web_evidence_pack = WebEvidencePack(
+                trigger_reason=reason,
+                skipped=False,
+            )
+            event = self._emit_event(
+                RAWebResearchedEvent,
+                payload={
+                    "trigger_reason": reason,
+                    "findings_count": 0,
+                },
+            )
+            self._state_machine.transition(event)
+        else:
+            # WEB検索スキップ（記録のみ、状態遷移なし）
+            self._emit_event(
+                RAWebSkippedEvent,
+                payload={"reason": reason},
+            )
+            # そのまま仮説構築へ（CONTEXT_ENRICH → HYPOTHESIS_BUILD）
+            await self._step_hypothesis_build()
+
+    async def _step_after_web(self) -> None:
+        """WEB_RESEARCH → HYPOTHESIS_BUILD: WEB検索後に仮説構築へ."""
+        await self._step_hypothesis_build()
 
     async def _step_hypothesis_build(self) -> None:
         """CONTEXT_ENRICH → HYPOTHESIS_BUILD: 仮説構築.
@@ -343,6 +442,34 @@ class RAOrchestrator:
             payload={"verdict": "pass_with_risks", "challenges_count": 0},
         )
         self._state_machine.transition(event)
+
+    async def _step_challenge_review_or_referee(self) -> None:
+        """CHALLENGE_REVIEW → REFEREE_COMPARE or GUARD_GATE.
+
+        複数 spec_drafts があり referee_comparer が注入されていれば
+        REFEREE_COMPARE へ、そうでなければ GUARD_GATE へ遷移する。
+        """
+        if self._referee_comparer is not None and len(self.spec_drafts) >= 2:  # noqa: PLR2004
+            # Referee 比較を実施
+            draft_ids = [d.draft_id for d in self.spec_drafts]
+            self.referee_result = self._referee_comparer.compare(
+                self.spec_drafts,
+                draft_ids=draft_ids,
+            )
+            event = self._emit_event(
+                RARefereeComparedEvent,
+                payload={
+                    "selected_draft_id": self.referee_result.selected_draft_id,
+                    "drafts_compared": len(self.spec_drafts),
+                },
+            )
+            self._state_machine.transition(event)
+        else:
+            await self._step_guard_gate()
+
+    async def _step_after_referee(self) -> None:
+        """REFEREE_COMPARE → GUARD_GATE: Referee 比較後にゲート判定へ."""
+        await self._step_guard_gate()
 
     async def _step_guard_gate(self) -> None:
         """CHALLENGE_REVIEW → GUARD_GATE: ゲート判定.
