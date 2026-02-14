@@ -7,16 +7,17 @@
 
 ---
 
-## 1. 現状の事実認定（2026-02-08 更新）
+## 1. 現状の事実認定（2026-02-14 更新）
 
 ### 1.1 計測済みメトリクス
 
 | 指標 | 実測値 | 備考 |
 |------|--------|------|
 | **ユニットテスト** | `pytest` で確認 | 固定値は記載しない（CIで自動取得） |
-| **カバレッジ** | `pytest --cov` で確認 | 同上 |
+| **カバレッジ** | `pytest --cov` で確認 | 同上。`fail_under = 96` |
 | **Lint (Ruff)** | ✅ All passed | — |
-| **EventType数** | 67 | `core/events/types.py` |
+| **mypy --strict** | ✅ 0 errors in 221 files | M1-3 完了 |
+| **EventType数** | 81 | `core/events/types.py`（RA_* 14個含む） |
 
 > テスト件数・カバレッジは**計測値のみを正とし**、ドキュメントに固定値を書かない。
 
@@ -24,16 +25,16 @@
 
 | コンポーネント | ステータス | 詳細 | 既知の制約 |
 |---------------|-----------|------|------------|
-| **Hive Core** (イベント, AR, 状態機械) | ✅ 完了 | 67 EventType, 5状態機械, ハッシュ連鎖 | — |
+| **Hive Core** (イベント, AR, 状態機械) | ✅ 完了 | 81 EventType, 6状態機械 (Run/Task/Requirement/Hive/Colony/RA), ハッシュ連鏎 | — |
 | **Hive/Colony AR永続化** | ✅ M1-1完了 | HiveStore + HiveAggregate, JSONL永続化 | — |
 | **API Server** (FastAPI REST) | ✅ 完了 | Hive/Colony CRUD が AR永続化と接続済み | 認証ミドルウェア実装済 (`auth.enabled: false` がデフォルト) |
 | **MCP Server** (Copilot連携) | ✅ 完了 | 全ツール実装・テスト済 | — |
-| **CLI** | ✅ 完了 | `colonyforge chat` 等 | mypy strict未対応 (M1-3) |
+| **CLI** | ✅ 完了 | `colonyforge chat` 等 | — |
 | **Beekeeper server** | ✅ M2-2完了 | 全ハンドラ実装済 | — |
 | **Beekeeper handler** | ✅ 完了 | — | — |
 | **Queen Bee** | ✅ M4-1/M4-2完了 | LLMタスク分解・並列実行・ゲート統合実装済 | TaskPlanner + ColonyOrchestrator + ExecutionPipeline |
 | **Worker Bee** | ✅ 完了 | ツール実行, リトライ, Trust | — |
-| **Sentinel Hornet** | ✅ M3-6完了 | 7検出パターン + KPI劣化検出 + ロールバック/隔離 | — |
+| **Sentinel Hornet** | ✅ M3-6完了 | 5検出 (ループ/暴走/コスト/セキュリティ/型周期) + KPI劣化検出 + ロールバック/隔離 | — |
 | **VS Code拡張** (コマンド) | ✅ M2-1完了 | API接続コード作成済、TSコンパイル+Lint確認済 | — |
 | **VS Code拡張** (TreeView) | ✅ 完了 | Activity Hierarchy API連動 | — |
 | **VS Code拡張** (Hive Monitor) | ✅ 完了 | リアルタイムWebview | — |
@@ -49,7 +50,7 @@
 | **LLM Orchestrator** | ✅ M4-2完了 | ColonyOrchestrator（層別並列実行）+ ColonyResult（結果集約）+ ExecutionPipeline（ゲート統合） | — |
 | **介入・エスカレーション** | ✅ 完了 | API/MCPハンドラ実装済、InterventionStore JSONL永続化 | — |
 | **GitHub Projection** | ✅ 完了 | AR→GitHub Issue片方向同期、MCPハンドラ'実装済 | — |
-| **Requirement Analysis** | 🔄 一部実装 | models.py (AcceptanceCriterion, SpecDraft) + spec_persister.py (doorstop+pytest-bdd) 実装済 | オーケストレーター・スコアラー・ゲート未着手。品質重視設計（変更追跡・影響分析含む）。設計書: [requirement-analysis-colony.md](design/requirement-analysis-colony.md) |
+| **Requirement Analysis** | ✅ M6全完了 | 15ソース/3,603行 + 17テスト/8,859行。RAStateMachine (15状態) + 14 RA_* EventType + Beekeeper統合。変更追跡・影響分析実装済 | 設計書: [requirement-analysis-colony.md](design/requirement-analysis-colony.md) |
 
 ---
 
@@ -59,8 +60,8 @@
 
 ```
 M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)    → M5 (運用)    → M6 (要求分析)
- ■■■■■■■■■■     ■■■■■■■■■■     ■■■■■■■■■■         ■■■■■■■■■■     ░░░░░░░░░░     ▓▓▓▓▓▓▓▓▓▓
- 完了              完了             完了                完了              プロダクション     要求トレーサビリティ
+ ■■■■■■■■■■     ■■■■■■■■■■     ■■■■■■■■■■         ■■■■■■■■■■     ░░░░░░░░░░     ■■■■■■■■■■
+ 完了              完了             完了                完了              プロダクション     完了
 ```
 
 ### 2.2 完了マイルストーン
@@ -407,55 +408,57 @@ M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)  
 
 ---
 
-### M6: Requirement Analysis Colony（要求トレーサビリティ・変更追跡）
+### M6: Requirement Analysis Colony（要求トレーサビリティ・変更追跡） ✅ 完了
 
 **目標**: 「即タスク化」を防ぎ、要求の曖昧さを定量的に評価・解消する。doorstop + pytest-bdd によるトレーサビリティ基盤を構築する。**品質が基盤、速度は並列化で確保**の設計哲学に基づき、要件版管理と変更追跡を組み込む。
 
 **設計参照**: [requirement-analysis-colony.md](design/requirement-analysis-colony.md)
 
-#### M6-1: データモデル + 永続化基盤 ✅ 一部完了
+#### M6-1: データモデル + 永続化基盤 ✅ 完了
 
 | タスク | 内容 | 対象ファイル | 状態 |
 |--------|------|-------------|------|
-| M6-1-a | AcceptanceCriterion / SpecDraft モデル定義 | `requirement_analysis/models.py` | ✅ |
-| M6-1-b | SpecPersister（doorstop YAML + pytest-bdd .feature） | `requirement_analysis/spec_persister.py` | ✅ |
+| M6-1-a | AcceptanceCriterion / SpecDraft モデル定義 | `requirement_analysis/models.py` (677行) | ✅ |
+| M6-1-b | SpecPersister（doorstop YAML + pytest-bdd .feature） | `requirement_analysis/spec_persister.py` (320行) | ✅ |
 | M6-1-c | doorstop ドキュメント初期化（`reqs/` ディレクトリ） | `reqs/.doorstop.yml` | ✅ |
-| M6-1-d | 状態機械定義（RAState 拡張） | `core/state/machines.py` | 未着手 |
-| M6-1-e | EventType 追加（Phase 1: 10種） | `core/events/types.py` | 未着手 |
+| M6-1-d | RAStateMachine (15状態) | `core/state/machines.py` | ✅ |
+| M6-1-e | EventType 追加（14種 RA_*） | `core/events/types.py` + `core/events/ra.py` (105行) | ✅ |
 
-#### M6-2: スコアリング + コアループ
+#### M6-2: スコアリング + コアループ ✅ 完了
 
-| タスク | 内容 | 対象ファイル |
-|--------|------|-------------|
-| M6-2-a | AmbiguityScorer 実装 | `requirement_analysis/scorer.py` |
-| M6-2-b | Intent Miner （LLM Worker） | `requirement_analysis/intent_miner.py` |
-| M6-2-c | RAOrchestrator 状態遷移エンジン | `requirement_analysis/orchestrator.py` |
+| タスク | 内容 | 対象ファイル | 状態 |
+|--------|------|-------------|------|
+| M6-2-a | AmbiguityScorer 実装 | `requirement_analysis/scorer.py` (301行) | ✅ |
+| M6-2-b | Intent Miner （LLM Worker） | `requirement_analysis/intent_miner.py` (125行) | ✅ |
+| M6-2-c | RAOrchestrator 状態遷移エンジン | `requirement_analysis/orchestrator.py` (546行) | ✅ |
 
-#### M6-3: 分析エージェント群
+#### M6-3: 分析エージェント群 ✅ 完了
 
-| タスク | 内容 | 対象ファイル |
-|--------|------|-------------|
-| M6-3-a | Assumption Mapper | `requirement_analysis/assumption_mapper.py` |
-| M6-3-b | Risk Challenger | `requirement_analysis/risk_challenger.py` |
-| M6-3-c | Clarification Generator | `requirement_analysis/clarify_generator.py` |
+| タスク | 内容 | 対象ファイル | 状態 |
+|--------|------|-------------|------|
+| M6-3-a | Assumption Mapper | `requirement_analysis/assumption_mapper.py` (193行) | ✅ |
+| M6-3-b | Risk Challenger | `requirement_analysis/risk_challenger.py` (182行) | ✅ |
+| M6-3-c | Clarification Generator | `requirement_analysis/clarify_generator.py` (200行) | ✅ |
 
-#### M6-4: 合成 + ゲート + 統合
+#### M6-4: 合成 + ゲート + 統合 ✅ 完了
 
-| タスク | 内容 | 対象ファイル |
-|--------|------|-------------|
-| M6-4-a | Spec Synthesizer | `requirement_analysis/spec_synthesizer.py` |
-| M6-4-b | Guard Gate（Req版） | `requirement_analysis/gate.py` |
-| M6-4-c | Beekeeper 統合 | `beekeeper/` 修正 |
+| タスク | 内容 | 対象ファイル | 状態 |
+|--------|------|-------------|------|
+| M6-4-a | Spec Synthesizer | `requirement_analysis/spec_synthesizer.py` (208行) | ✅ |
+| M6-4-b | Guard Gate（Req版） | `requirement_analysis/gate.py` (185行) | ✅ |
+| M6-4-c | Beekeeper 統合 | `beekeeper/ra_integration.py` (231行) RequirementAnalysisMixin | ✅ |
 
-#### M6-5: 要件版管理と変更追跡
+#### M6-5: 要件版管理と変更追跡 ✅ 完了
 
-| タスク | 内容 | 対象ファイル |
-|--------|------|-------------|
-| M6-5-a | ChangeReason + RequirementChangedPayload モデル | `requirement_analysis/models.py` |
-| M6-5-b | RA_REQ_CHANGED イベント実装 | `requirement_analysis/change_tracker.py` |
-| M6-5-c | ImpactAnalyzer（doorstop links 逆引き + reviewed リセット） | `requirement_analysis/impact_analyzer.py` |
+| タスク | 内容 | 対象ファイル | 状態 |
+|--------|------|-------------|------|
+| M6-5-a | ChangeReason + RequirementChangedPayload モデル | `requirement_analysis/models.py` | ✅ |
+| M6-5-b | RA_REQ_CHANGED イベント実装 | `requirement_analysis/change_tracker.py` (76行) | ✅ |
+| M6-5-c | ImpactAnalyzer（doorstop links 逆引き + reviewed リセット） | `requirement_analysis/impact_analyzer.py` (84行) | ✅ |
+| M6-5-d | ContextForager（ARイベントからのコンテキスト収集） | `requirement_analysis/context_forager.py` (236行) | ✅ |
+| M6-5-e | RefereeComparer（複数SpecDraft比較採点） | `requirement_analysis/referee_comparer.py` (162行) | ✅ |
 
-**完了条件**:
+**完了条件**: ✅ 全達成
 - ユーザー要求から SpecDraft が自動生成され、doorstop YAML として永続化される
 - AmbiguityScore に基づく質問・スキップ判定が動作する
 - pytest-bdd の .feature ファイルで受入基準が自動検証可能
@@ -463,27 +466,29 @@ M1 (基盤固め)  → M2 (接続)    → M3 (適応的協調) → M4 (自律)  
 - 要件変更時に RA_REQ_CHANGED イベントが因果リンク付きで発行される
 - doorstop links 逆引きによる影響分析が動作する
 
+**実績**: ソース15ファイル/3,603行 + テスト17ファイル/8,859行
+
 ---
 
-### M1-残: 基盤品質改善（並行作業）
+### M1-残: 基盤品質改善 ✅ 完了
 
-> M1のうち未完了項目。他マイルストーンと並行して進められる。
+> M1の未完了項目。全件完了済。
 
-#### M1-3: 型安全性の確保
+#### M1-3: 型安全性の確保 ✅ 完了
 
-| タスク | 内容 |
-|--------|------|
-| M1-3-a〜f | 各モジュールの mypy --strict エラー解消 |
+| タスク | 内容 | 状態 |
+|--------|------|------|
+| M1-3-a〜f | 各モジュールの mypy --strict エラー解消 | ✅ |
 
-**完了条件**: `mypy --strict src/colonyforge/` がエラー 0
+**完了条件**: `mypy --strict src/colonyforge/` がエラー 0 ✅ 達成済み (221ソースファイル)
 
-#### M1-4: カバレッジ改善
+#### M1-4: カバレッジ改善 ✅ 完了
 
-| タスク | 内容 |
-|--------|------|
-| M1-4-a〜c | 低カバレッジファイルのテスト補強 |
+| タスク | 内容 | 状態 |
+|--------|------|------|
+| M1-4-a〜c | 低カバレッジファイルのテスト補強 | ✅ |
 
-**完了条件**: 全体カバレッジ 93% 以上 → ✅ 達成済み (96.29%)
+**完了条件**: 全体カバレッジ 93% 以上 → ✅ 達成済み (`fail_under=96`, 実測 96.12%)
 
 ---
 
@@ -607,9 +612,17 @@ M1〜M4完了。M2全サブタスク完了（M2-0〜M2-4）。M5一部着手済�
 - KPIダッシュボードで健全性が可視化
 - CI/CDが完全自動化されている
 
+### M6完了時 — 「要求トレーサビリティ」 ✅ 達成済み
+
+- 曖昧な要求が定量スコアリングで検出・解消される
+- SpecDraft がdoorstop YAMLとして自動永続化される
+- 要件変更が因果リンク付きで追跡可能（RA_REQ_CHANGED）
+- 影響分析（doorstop links逆引き）が動作する
+- Beekeeper統合により、RA AnalysisがColonyワークフローに組込まれている
+
 ---
 
-## 8. 技術的負債一覧（2026-02-11 精査）
+## 8. 技術的負債一覧（2026-02-14 精査）
 
 > **残存負債のみ**を表示。解消済み項目は折りたたみ内に移動。
 
@@ -619,14 +632,17 @@ M1〜M4完了。M2全サブタスク完了（M2-0〜M2-4）。M5一部着手済�
 
 | # | ファイル | 箇所 | 現状 | 改善タイミング |
 |---|---------|------|------|---------------|
-| P-05 | `vlm/analyzer.py:78` | UI要素抽出 | キーワードマッチングによる簡易実装 | 必要時 |
+| P-05 | `vlm/analyzer.py:80` | UI要素抽出 | キーワードマッチングによる簡易実装 | 必要時 |
+| P-06 | `requirement_analysis/scorer.py:291` | コンテキスト重み推定 | Context Forager Phase 2実装前の暫定ロジック | ContextForager完全統合時 |
 
 #### 将来拡張ノート（コード内コメント）
 
 | # | ファイル | コメント |
-|---|---------|---------|
+|---|---------|--------|
 | N-01 | `core/swarming/engine.py:22` | 「将来的にHoneycombデータ駆動に移行可能」 |
 | N-02 | `core/models/action_class.py:70` | `params` 引数は現在未使用（将来拡張用） |
+| N-03 | `core/policy_gate.py:62` | `scope_id` / `context` 引数が未使用（スコープ別ポリシー拡張用） |
+| N-04 | `core/honeycomb/kpi.py:111` | 「将来的に一次合格率（first-pass yield）に拡張予定」 |
 
 ### 8.2 解消済み負債
 
