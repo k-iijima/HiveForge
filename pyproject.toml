@@ -90,6 +90,7 @@ ignore = [
     "E501",   # line too long - handled by formatter
     "SIM117", # nested with - sometimes more readable for test setup
     "B017",   # pytest.raises(Exception) - intentional for frozen model tests
+    "B008",   # Query() in function defaults - standard FastAPI pattern
 ]
 
 [tool.mypy]

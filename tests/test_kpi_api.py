@@ -288,8 +288,8 @@ class TestEvaluationEndpoint:
 
         # Act
         response = c.get(
-            "/kpi/evaluation?"
-            "guard_pass_count=5&guard_conditional_count=2&guard_fail_count=1"
+            "/kpi/evaluation?count_mode=manual"
+            "&guard_pass_count=5&guard_conditional_count=2&guard_fail_count=1"
             "&guard_reject_count=1&guard_total_count=8"
         )
 
@@ -309,7 +309,7 @@ class TestEvaluationEndpoint:
         c, _ = client
 
         # Act
-        response = c.get("/kpi/evaluation")
+        response = c.get("/kpi/evaluation?count_mode=manual")
 
         # Assert
         assert response.status_code == 200
