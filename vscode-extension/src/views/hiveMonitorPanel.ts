@@ -42,7 +42,7 @@ export class HiveMonitorPanel {
     private _debounceTimer: NodeJS.Timeout | undefined;
     private _htmlInitialized = false;
     private _pendingEvents: ActivityEvent[] = [];
-    private static readonly DEBOUNCE_MS = 300;
+    private static readonly DEBOUNCE_MS = 500;
 
     private constructor(
         panel: vscode.WebviewPanel,
@@ -493,15 +493,20 @@ export class HiveMonitorPanel {
             } catch { return ts; }
         }
 
-        /** メインのツリー描画 */
+        /** メインのツリー描画（差分がある場合のみクロスフェードで更新） */
+        let prevTreeHtml = '';
         function renderTree(hives) {
             const el = document.getElementById('treeContainer');
             if (!hives || hives.length === 0) {
-                el.innerHTML = '<div class="empty-state">'
-                    + '<div class="empty-icon">🏠</div>'
+                const empty = '<div class="empty-state">'
+                    + '<div class="empty-icon">🏚️</div>'
                     + '<div class="empty-text">アクティブなHiveがありません</div>'
                     + '<div class="empty-hint">「Hiveを作成」コマンドで新しいHiveを開始してください</div>'
                     + '</div>';
+                if (prevTreeHtml !== empty) {
+                    prevTreeHtml = empty;
+                    el.innerHTML = empty;
+                }
                 return;
             }
 
@@ -521,10 +526,18 @@ export class HiveMonitorPanel {
             });
 
             h += '</div></div>';
-            el.innerHTML = h;
 
-            // 新規ノードにフェードインアニメーション
-            el.querySelectorAll('.node').forEach(n => n.classList.add('appear'));
+            // 差分がなければ DOM を触らない（ちらつき防止）
+            if (prevTreeHtml === h) { return; }
+            prevTreeHtml = h;
+
+            // クロスフェード: 旧コンテンツをフェードアウトしつつ新コンテンツを挿入
+            el.style.opacity = '0';
+            requestAnimationFrame(() => {
+                el.innerHTML = h;
+                el.querySelectorAll('.node').forEach(n => n.classList.add('appear'));
+                requestAnimationFrame(() => { el.style.opacity = '1'; });
+            });
         }
 
         function renderHive(hive, isFirst, isLast) {
@@ -633,7 +646,8 @@ export class HiveMonitorPanel {
             return h;
         }
 
-        /** 統計バー */
+        /** 統計バー（差分スキップ付き） */
+        let prevStatsHtml = '';
         function renderStats(hives) {
             const statsEl = document.getElementById('stats');
             const total = hives.length;
@@ -642,13 +656,18 @@ export class HiveMonitorPanel {
             const activeC = hives.reduce((s, h) => s + h.colonies.filter(c => c.status === 'running').length, 0);
             const totalW = hives.reduce((s, h) => s + h.colonies.reduce((ss, c) => ss + c.workers.length, 0), 0);
 
-            statsEl.innerHTML =
-                '<span class="stat">Hives: <strong>' + active + '/' + total + '</strong></span>'
-                + '<span class="stat">Colonies: <strong>' + activeC + '/' + totalC + '</strong></span>'
-                + '<span class="stat">Workers: <strong>' + totalW + '</strong></span>';
+            const h =
+                '<span class="stat">⬡ Hives: <strong>' + active + '/' + total + '</strong></span>'
+                + '<span class="stat">⬢ Colonies: <strong>' + activeC + '/' + totalC + '</strong></span>'
+                + '<span class="stat">🐝 Workers: <strong>' + totalW + '</strong></span>';
+            if (prevStatsHtml !== h) {
+                prevStatsHtml = h;
+                statsEl.innerHTML = h;
+            }
         }
 
-        /** 画面下部のアクティビティティッカー → Activityタブのフィード */
+        /** 画面下部のアクティビティティッカー → Activityタブのフィード（差分スキップ付き） */
+        let prevTickerHtml = '';
         function renderTicker(events) {
             const el = document.getElementById('activityFeed');
             const filtered = applyActivityFilter(events);
@@ -670,7 +689,10 @@ export class HiveMonitorPanel {
 
             if (!filtered || filtered.length === 0) {
                 h += '<div class="ticker-empty">' + (activityFilter ? 'フィルター対象のアクティビティなし' : 'アクティビティなし') + '</div>';
-                el.innerHTML = h;
+                if (prevTickerHtml !== h) {
+                    prevTickerHtml = h;
+                    el.innerHTML = h;
+                }
                 return;
             }
             filtered.forEach(ev => {
@@ -683,7 +705,10 @@ export class HiveMonitorPanel {
                     + '<span class="ticker-time">' + formatTime(ev.timestamp) + '</span>'
                     + '</div>';
             });
-            el.innerHTML = h;
+            if (prevTickerHtml !== h) {
+                prevTickerHtml = h;
+                el.innerHTML = h;
+            }
         }
 
         function showError(message) {
@@ -700,10 +725,15 @@ export class HiveMonitorPanel {
             document.getElementById('errorOverlay').style.display = 'none';
         }
 
-        /** KPIダッシュボード描画 */
+        /** KPIダッシュボード描画（差分スキップ付き） */
+        let prevKpiHtml = '';
         function renderKPI(ev) {
             const el = document.getElementById('kpiDashboard');
-            if (!ev) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">📊</div><div class="empty-text">KPIデータなし</div></div>'; return; }
+            if (!ev) {
+                const empty = '<div class="empty-state"><div class="empty-icon">📊</div><div class="empty-text">KPIデータなし</div></div>';
+                if (prevKpiHtml !== empty) { prevKpiHtml = empty; el.innerHTML = empty; }
+                return;
+            }
 
             const kpi = ev.kpi || {};
             const collab = ev.collaboration || {};
@@ -781,7 +811,10 @@ export class HiveMonitorPanel {
                 h += '</div></div>';
             }
 
-            el.innerHTML = h;
+            if (prevKpiHtml !== h) {
+                prevKpiHtml = h;
+                el.innerHTML = h;
+            }
         }
 
         // メッセージ受信
@@ -949,7 +982,7 @@ export class HiveMonitorPanel {
             }
             .tab.active {
                 color: var(--vscode-foreground);
-                border-bottom-color: var(--vscode-focusBorder);
+                border-bottom-color: #ffb300;
                 font-weight: 600;
             }
 
@@ -970,7 +1003,7 @@ export class HiveMonitorPanel {
                 justify-content: space-between;
                 align-items: center;
                 padding: 10px 20px;
-                border-bottom: 1px solid var(--vscode-widget-border);
+                border-bottom: 2px solid rgba(255, 179, 0, 0.2);
                 background: var(--vscode-titleBar-activeBackground, var(--vscode-editor-background));
                 flex-shrink: 0;
             }
@@ -998,6 +1031,9 @@ export class HiveMonitorPanel {
                 overflow: hidden;
                 position: relative;
                 cursor: grab;
+                /* Honeycomb background pattern */
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='49' viewBox='0 0 28 49'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM3 17.9v12.7l10.99 6.34 11.01-6.34V17.9L14 11.56 3 17.9zM0 15l12.98-7.5V0h-2v6.35L0 12.69v2.3zm0 18.5L12.98 41v8h-2v-6.85L0 35.81v-2.3zM15 0v7.5L27.99 15H28v-2.31h-.01L17 6.35V0h-2zm0 49v-8l12.99-7.5H28v2.31h-.01L17 42.15V49h-2z' fill='%23ffb300' fill-opacity='0.04'/%3E%3C/svg%3E");
+                background-color: var(--vscode-editor-background);
             }
             .container.grabbing {
                 cursor: grabbing;
@@ -1011,7 +1047,7 @@ export class HiveMonitorPanel {
                 min-height: 100%;
                 padding: 24px;
                 transform-origin: 0 0;
-                transition: transform 0.08s ease-out;
+                transition: transform 0.08s ease-out, opacity 0.15s ease;
             }
 
             /* Zoom controls */
@@ -1090,7 +1126,7 @@ export class HiveMonitorPanel {
             .colonies-level { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
 
             /* Branch lines */
-            .branch-line { background: var(--vscode-widget-border); }
+            .branch-line { background: rgba(255, 179, 0, 0.25); }
             .branch-line.vertical { width: 2px; height: 24px; margin: 0 auto; }
             .branch-line.vertical.short { height: 16px; }
 
@@ -1099,11 +1135,11 @@ export class HiveMonitorPanel {
             .branch-connector::before {
                 content: ''; position: absolute; top: 0; left: 50%;
                 width: 2px; height: 12px;
-                background: var(--vscode-widget-border);
+                background: rgba(255, 179, 0, 0.25);
             }
             .branch-connector::after {
                 content: ''; position: absolute; top: 12px; left: 0; right: 0;
-                height: 2px; background: var(--vscode-widget-border);
+                height: 2px; background: rgba(255, 179, 0, 0.25);
             }
             .branch-connector.first::after { left: 50%; }
             .branch-connector.last::after { right: 50%; }
@@ -1114,11 +1150,11 @@ export class HiveMonitorPanel {
             .branch-connector-h::before {
                 content: ''; position: absolute; top: 0; left: 50%;
                 width: 2px; height: 8px;
-                background: var(--vscode-widget-border);
+                background: rgba(255, 179, 0, 0.25);
             }
             .branch-connector-h::after {
                 content: ''; position: absolute; top: 8px; left: 0; right: 0;
-                height: 2px; background: var(--vscode-widget-border);
+                height: 2px; background: rgba(255, 179, 0, 0.25);
             }
             .branch-connector-h.first::after { left: 50%; }
             .branch-connector-h.last::after { right: 50%; }
@@ -1128,12 +1164,12 @@ export class HiveMonitorPanel {
             .node {
                 position: relative;
                 padding: 12px 16px;
-                border-radius: 8px;
+                border-radius: 10px;
                 border: 2px solid var(--vscode-widget-border);
                 background: var(--vscode-editor-background);
                 text-align: center;
                 cursor: pointer;
-                transition: all 0.3s ease;
+                transition: border-color 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
                 min-width: 130px;
                 overflow: hidden;
             }
@@ -1145,9 +1181,9 @@ export class HiveMonitorPanel {
                 to { opacity: 1; transform: translateY(0); }
             }
             .node:hover {
-                border-color: var(--vscode-focusBorder);
+                border-color: #ffb300;
                 transform: translateY(-2px);
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+                box-shadow: 0 4px 16px rgba(255, 179, 0, 0.15), 0 2px 6px rgba(0, 0, 0, 0.15);
             }
             .node-icon { font-size: 24px; margin-bottom: 4px; }
             .node-label {
@@ -1238,11 +1274,11 @@ export class HiveMonitorPanel {
             .branch-connector-agent::before {
                 content: ''; position: absolute; top: 0; left: 50%;
                 width: 2px; height: 7px;
-                background: var(--vscode-widget-border);
+                background: rgba(255, 179, 0, 0.25);
             }
             .branch-connector-agent::after {
                 content: ''; position: absolute; top: 7px; left: 0; right: 0;
-                height: 2px; background: var(--vscode-widget-border);
+                height: 2px; background: rgba(255, 179, 0, 0.25);
             }
             .branch-connector-agent.first::after { left: 50%; }
             .branch-connector-agent.last::after { right: 50%; }
@@ -1268,9 +1304,9 @@ export class HiveMonitorPanel {
             }
             .agent-node .node-sublabel { font-size: 9px; }
             .agent-node:hover {
-                border-color: var(--vscode-focusBorder);
+                border-color: #ffb300;
                 transform: translateY(-1px);
-                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+                box-shadow: 0 2px 10px rgba(255, 179, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.1);
             }
 
             /* Queen agent node */
@@ -1374,7 +1410,8 @@ export class HiveMonitorPanel {
             .activity-feed {
                 flex: 1;
                 overflow-y: auto;
-                background: var(--vscode-editor-background);
+                background-color: var(--vscode-editor-background);
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='49' viewBox='0 0 28 49'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM3 17.9v12.7l10.99 6.34 11.01-6.34V17.9L14 11.56 3 17.9zM0 15l12.98-7.5V0h-2v6.35L0 12.69v2.3zm0 18.5L12.98 41v8h-2v-6.85L0 35.81v-2.3zM15 0v7.5L27.99 15H28v-2.31h-.01L17 6.35V0h-2zm0 49v-8l12.99-7.5H28v2.31h-.01L17 42.15V49h-2z' fill='%23ffb300' fill-opacity='0.03'/%3E%3C/svg%3E");
                 padding: 8px 12px;
             }
             .ticker-empty {
@@ -1435,7 +1472,8 @@ export class HiveMonitorPanel {
             /* KPI Dashboard */
             .kpi-dashboard {
                 flex: 1;
-                background: var(--vscode-editor-background);
+                background-color: var(--vscode-editor-background);
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='49' viewBox='0 0 28 49'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM3 17.9v12.7l10.99 6.34 11.01-6.34V17.9L14 11.56 3 17.9zM0 15l12.98-7.5V0h-2v6.35L0 12.69v2.3zm0 18.5L12.98 41v8h-2v-6.85L0 35.81v-2.3zM15 0v7.5L27.99 15H28v-2.31h-.01L17 6.35V0h-2zm0 49v-8l12.99-7.5H28v2.31h-.01L17 42.15V49h-2z' fill='%23ffb300' fill-opacity='0.03'/%3E%3C/svg%3E");
                 padding: 12px 16px;
                 overflow-y: auto;
             }
