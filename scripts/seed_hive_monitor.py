@@ -254,7 +254,7 @@ async def seed_data():
 
     # Step 1: エージェントを登録（agent.started）
     print("\n📋 エージェントを登録中...")
-    for key, agent in all_agents.items():
+    for _, agent in all_agents.items():
         event = ActivityEvent(
             activity_type=ActivityType.AGENT_STARTED,
             agent=agent,
