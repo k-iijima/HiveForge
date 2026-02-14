@@ -63,6 +63,19 @@ from .pipeline import (
     PlanFallbackActivatedEvent,
     PlanValidationFailedEvent,
 )
+from .ra import (
+    RAChallengeReviewedEvent,
+    RAClarifyGeneratedEvent,
+    RACompletedEvent,
+    RAContextEnrichedEvent,
+    RAGateDecidedEvent,
+    RAHypothesisBuiltEvent,
+    RAIntakeReceivedEvent,
+    RAReqChangedEvent,
+    RASpecSynthesizedEvent,
+    RATriageCompletedEvent,
+    RAUserRespondedEvent,
+)
 from .run import (
     RequirementApprovedEvent,
     RequirementCreatedEvent,
@@ -183,6 +196,18 @@ EVENT_TYPE_MAP: dict[EventType, type[BaseEvent]] = {
     EventType.GITHUB_COMMENT_ADDED: GitHubCommentAddedEvent,
     EventType.GITHUB_LABEL_APPLIED: GitHubLabelAppliedEvent,
     EventType.GITHUB_PROJECT_SYNCED: GitHubProjectSyncedEvent,
+    # Requirement Analysis Colony (Phase 1, §6.1)
+    EventType.RA_INTAKE_RECEIVED: RAIntakeReceivedEvent,
+    EventType.RA_TRIAGE_COMPLETED: RATriageCompletedEvent,
+    EventType.RA_CONTEXT_ENRICHED: RAContextEnrichedEvent,
+    EventType.RA_HYPOTHESIS_BUILT: RAHypothesisBuiltEvent,
+    EventType.RA_CLARIFY_GENERATED: RAClarifyGeneratedEvent,
+    EventType.RA_USER_RESPONDED: RAUserRespondedEvent,
+    EventType.RA_SPEC_SYNTHESIZED: RASpecSynthesizedEvent,
+    EventType.RA_CHALLENGE_REVIEWED: RAChallengeReviewedEvent,
+    EventType.RA_GATE_DECIDED: RAGateDecidedEvent,
+    EventType.RA_COMPLETED: RACompletedEvent,
+    EventType.RA_REQ_CHANGED: RAReqChangedEvent,
 }
 
 

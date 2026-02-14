@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from ..core.config import LLMConfig
     from ..core.swarming import SwarmingEngine
     from ..queen_bee.server import QueenBeeMCPServer
+    from .ra_integration import RAAnalysisResult
     from .session import BeekeeperSession
 
 logger = logging.getLogger(__name__)
@@ -30,11 +31,42 @@ class QueenDelegationMixin:
         _queens: dict[str, QueenBeeMCPServer]
 
         async def _ask_user(self, question: str, options: list[str] | None = None) -> str: ...
+        async def _analyze_requirements(
+            self, task: str, context: dict[str, Any] | None = None
+        ) -> RAAnalysisResult: ...
+        def _format_analysis_summary(self, result: RAAnalysisResult) -> str: ...
 
     async def _delegate_to_queen(
         self, colony_id: str, task: str, context: dict[str, Any] | None = None
     ) -> str:
-        """Queen Beeにタスクを委譲"""
+        """Queen Beeにタスクを委譲（RA Colony 分析付き）
+
+        §2: 即タスク化を防ぐゲート — _analyze_requirements を実行し、
+        Guard Gate 通過後に _delegate_to_queen_internal で実行委譲する。
+        """
+        # RA Colony による要求分析
+        ra_result = await self._analyze_requirements(task, context)
+
+        if not ra_result.passed:
+            summary = self._format_analysis_summary(ra_result)
+            logger.warning(f"要求分析でブロック: {summary}")
+            return f"要求分析で中止されました:\n{summary}"
+
+        # RA 結果で context を補強
+        ctx = dict(context) if context else {}
+        if ra_result.spec_draft:
+            ctx["ra_spec_goal"] = ra_result.spec_draft.goal
+            ctx["ra_analysis_path"] = ra_result.analysis_path.value
+
+        return await self._delegate_to_queen_internal(colony_id, task, ctx)
+
+    async def _delegate_to_queen_internal(
+        self, colony_id: str, task: str, context: dict[str, Any] | None = None
+    ) -> str:
+        """Queen Beeにタスクを委譲する（内部実装）
+
+        RA分析済みのタスクを Queen Bee に実行委譲する。
+        """
         from ..queen_bee.server import QueenBeeMCPServer
 
         logger.info(f"タスクをQueen Bee ({colony_id}) に委譲: {task}")

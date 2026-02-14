@@ -83,6 +83,21 @@ from .pipeline import (
     PlanValidationFailedEvent,
 )
 
+# --- Requirement Analysis Colony ---
+from .ra import (
+    RAChallengeReviewedEvent,
+    RAClarifyGeneratedEvent,
+    RACompletedEvent,
+    RAContextEnrichedEvent,
+    RAGateDecidedEvent,
+    RAHypothesisBuiltEvent,
+    RAIntakeReceivedEvent,
+    RAReqChangedEvent,
+    RASpecSynthesizedEvent,
+    RATriageCompletedEvent,
+    RAUserRespondedEvent,
+)
+
 # --- レジストリ ---
 from .registry import (
     EVENT_TYPE_MAP,
@@ -233,6 +248,18 @@ __all__ = [
     "GitHubIssueUpdatedEvent",
     "GitHubLabelAppliedEvent",
     "GitHubProjectSyncedEvent",
+    # Requirement Analysis Colony
+    "RAChallengeReviewedEvent",
+    "RAClarifyGeneratedEvent",
+    "RACompletedEvent",
+    "RAContextEnrichedEvent",
+    "RAGateDecidedEvent",
+    "RAHypothesisBuiltEvent",
+    "RAIntakeReceivedEvent",
+    "RAReqChangedEvent",
+    "RASpecSynthesizedEvent",
+    "RATriageCompletedEvent",
+    "RAUserRespondedEvent",
     # レジストリ
     "EVENT_TYPE_MAP",
     "parse_event",

@@ -40,6 +40,32 @@ class RequirementState(StrEnum):
     REJECTED = "rejected"
 
 
+class RAState(StrEnum):
+    """Requirement Analysis プロセスの状態
+
+    注: 個別要件の承認ステータスは RequirementState(PENDING/APPROVED/REJECTED) が担う。
+    RAState はプロセス全体のライフサイクルを表現し、両者は別レイヤーで共存する。
+    設計書 §4.1 参照。
+    """
+
+    INTAKE = "intake"
+    TRIAGE = "triage"
+    CONTEXT_ENRICH = "context_enrich"
+    WEB_RESEARCH = "web_research"
+    HYPOTHESIS_BUILD = "hypothesis_build"
+    CLARIFY_GEN = "clarify_gen"
+    USER_FEEDBACK = "user_feedback"
+    SPEC_SYNTHESIS = "spec_synthesis"
+    SPEC_PERSIST = "spec_persist"
+    USER_EDIT = "user_edit"
+    CHALLENGE_REVIEW = "challenge_review"
+    REFEREE_COMPARE = "referee_compare"
+    GUARD_GATE = "guard_gate"
+    EXECUTION_READY = "execution_ready"
+    EXECUTION_READY_WITH_RISKS = "execution_ready_with_risks"
+    ABANDONED = "abandoned"
+
+
 class HiveState(StrEnum):
     """Hive状態
 

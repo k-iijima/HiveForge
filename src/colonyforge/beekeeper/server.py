@@ -26,6 +26,7 @@ from ..queen_bee.server import QueenBeeMCPServer
 from .hive_handlers import HiveHandlersMixin
 from .llm_integration import LLMIntegrationMixin
 from .queen_delegation import QueenDelegationMixin
+from .ra_integration import RequirementAnalysisMixin
 from .session import BeekeeperSession, BeekeeperSessionManager
 from .tool_definitions import get_mcp_tool_definitions
 from .user_handlers import UserHandlersMixin
@@ -39,6 +40,7 @@ class BeekeeperMCPServer(
     UserHandlersMixin,
     LLMIntegrationMixin,
     QueenDelegationMixin,
+    RequirementAnalysisMixin,
 ):
     """Beekeeper MCPサーバー
 
@@ -63,6 +65,8 @@ class BeekeeperMCPServer(
         self._queens: dict[str, QueenBeeMCPServer] = {}  # colony_id -> Queen Bee
         self._swarming_engine = SwarmingEngine()
         self._pending_requests: dict[str, asyncio.Future[str]] = {}
+        self._ra_enabled: bool = True
+        self._ra_components: dict[str, Any] = {}
         # HiveStoreが未設定の場合、ARと同じVaultパスで作成
         if self.hive_store is None:
             self.hive_store = HiveStore(self.ar.vault_path)

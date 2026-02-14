@@ -10,7 +10,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 
-from ..ar.projections import ColonyState, HiveState, RequirementState, RunState, TaskState
+from ..ar.projections import ColonyState, HiveState, RAState, RequirementState, RunState, TaskState
 from ..config import get_settings
 from ..events import (
     BaseEvent,
@@ -271,3 +271,95 @@ class ColonyStateMachine(StateMachine):
             Transition(ColonyState.SUSPENDED, ColonyState.FAILED, EventType.COLONY_FAILED),
         ]
         super().__init__(ColonyState.PENDING, transitions)
+
+
+class RAStateMachine(StateMachine):
+    """Requirement Analysis プロセス状態機械
+
+    設計書 §4 に基づく要求分析ライフサイクル管理。
+    個別要件の承認ステータス(RequirementState)とは別レイヤーで共存。
+
+    終端状態:
+    - EXECUTION_READY: 全リスク対処済み
+    - EXECUTION_READY_WITH_RISKS: LOW/MEDIUM残存で実行可
+    - ABANDONED: 放棄 or HIGH未対処でループ上限到達
+
+    注: GUARD_GATE → RA_COMPLETED は outcome payload で3方向に分岐するため、
+    transition() をオーバーライドして payload ベースのルーティングを実装。
+    """
+
+    # GUARD_GATE からの RA_COMPLETED outcome → 遷移先マッピング
+    _GUARD_GATE_OUTCOMES: dict[str, RAState] = {
+        "EXECUTION_READY": RAState.EXECUTION_READY,
+        "EXECUTION_READY_WITH_RISKS": RAState.EXECUTION_READY_WITH_RISKS,
+        "ABANDONED": RAState.ABANDONED,
+    }
+
+    def __init__(self) -> None:
+        transitions = [
+            # メインパス: INTAKE → TRIAGE → CONTEXT → HYPOTHESIS → CLARIFY → SPEC → CHALLENGE → GATE
+            Transition(RAState.INTAKE, RAState.TRIAGE, EventType.RA_TRIAGE_COMPLETED),
+            Transition(RAState.TRIAGE, RAState.CONTEXT_ENRICH, EventType.RA_CONTEXT_ENRICHED),
+            Transition(
+                RAState.CONTEXT_ENRICH, RAState.HYPOTHESIS_BUILD, EventType.RA_HYPOTHESIS_BUILT
+            ),
+            Transition(
+                RAState.HYPOTHESIS_BUILD, RAState.CLARIFY_GEN, EventType.RA_CLARIFY_GENERATED
+            ),
+            # CLARIFY_GEN → USER_FEEDBACK (質問あり) or SPEC_SYNTHESIS (質問不要)
+            Transition(RAState.CLARIFY_GEN, RAState.USER_FEEDBACK, EventType.RA_USER_RESPONDED),
+            Transition(RAState.CLARIFY_GEN, RAState.SPEC_SYNTHESIS, EventType.RA_SPEC_SYNTHESIZED),
+            # USER_FEEDBACK → HYPOTHESIS_BUILD (追加仮説) or SPEC_SYNTHESIS (十分) or ABANDONED (放棄)
+            Transition(
+                RAState.USER_FEEDBACK, RAState.HYPOTHESIS_BUILD, EventType.RA_HYPOTHESIS_BUILT
+            ),
+            Transition(
+                RAState.USER_FEEDBACK, RAState.SPEC_SYNTHESIS, EventType.RA_SPEC_SYNTHESIZED
+            ),
+            Transition(RAState.USER_FEEDBACK, RAState.ABANDONED, EventType.RA_COMPLETED),
+            # SPEC_SYNTHESIS → CHALLENGE_REVIEW
+            Transition(
+                RAState.SPEC_SYNTHESIS, RAState.CHALLENGE_REVIEW, EventType.RA_CHALLENGE_REVIEWED
+            ),
+            # CHALLENGE_REVIEW → GUARD_GATE (PASS) or SPEC_SYNTHESIS (BLOCK)
+            Transition(RAState.CHALLENGE_REVIEW, RAState.GUARD_GATE, EventType.RA_GATE_DECIDED),
+            Transition(
+                RAState.CHALLENGE_REVIEW, RAState.SPEC_SYNTHESIS, EventType.RA_SPEC_SYNTHESIZED
+            ),
+            # GUARD_GATE → CLARIFY_GEN (FAIL → ループ)
+            Transition(RAState.GUARD_GATE, RAState.CLARIFY_GEN, EventType.RA_CLARIFY_GENERATED),
+            # GUARD_GATE → RA_COMPLETED は transition() でpayloadルーティング
+            # (dictの衝突を避けるため、ここには登録しない)
+        ]
+        super().__init__(RAState.INTAKE, transitions)
+
+    def transition(self, event: BaseEvent) -> RAState:
+        """イベントを適用して状態遷移（GUARD_GATE→RA_COMPLETED のpayloadルーティング付き）."""
+        # GUARD_GATE + RA_COMPLETED: payload.outcome で遷移先を決定
+        if self.current_state == RAState.GUARD_GATE and event.type == EventType.RA_COMPLETED:
+            outcome = event.payload.get("outcome", "")
+            target = self._GUARD_GATE_OUTCOMES.get(outcome)
+            if target is None:
+                raise TransitionError(
+                    f"Unknown outcome '{outcome}' for RA_COMPLETED from GUARD_GATE. "
+                    f"Valid outcomes: {list(self._GUARD_GATE_OUTCOMES.keys())}"
+                )
+            self.current_state = target
+            return target  # type: ignore[return-value]
+
+        result = super().transition(event)
+        return result  # type: ignore[return-value]
+
+    def can_transition(self, event_type: EventType) -> bool:
+        """指定イベントで遷移可能か確認（GUARD_GATE + RA_COMPLETED 考慮）."""
+        if self.current_state == RAState.GUARD_GATE and event_type == EventType.RA_COMPLETED:
+            return True
+        return super().can_transition(event_type)
+
+    def get_valid_events(self) -> list[EventType]:
+        """現在の状態から遷移可能なイベント一覧を取得."""
+        events = super().get_valid_events()
+        # GUARD_GATE: RA_COMPLETED はpayloadルーティングで処理される
+        if self.current_state == RAState.GUARD_GATE and EventType.RA_COMPLETED not in events:
+            events.append(EventType.RA_COMPLETED)
+        return events

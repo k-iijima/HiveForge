@@ -110,6 +110,20 @@ class EventType(StrEnum):
     SILENCE_DETECTED = "system.silence_detected"
     EMERGENCY_STOP = "system.emergency_stop"
 
+    # Requirement Analysis Colony イベント（Phase 1: §6.1）
+    RA_INTAKE_RECEIVED = "ra.intake.received"
+    RA_TRIAGE_COMPLETED = "ra.triage.completed"
+    RA_CONTEXT_ENRICHED = "ra.context.enriched"
+    RA_HYPOTHESIS_BUILT = "ra.hypothesis.built"
+    RA_CLARIFY_GENERATED = "ra.clarify.generated"
+    RA_USER_RESPONDED = "ra.user.responded"
+    RA_SPEC_SYNTHESIZED = "ra.spec.synthesized"
+    RA_CHALLENGE_REVIEWED = "ra.challenge.reviewed"
+    RA_GATE_DECIDED = "ra.gate.decided"
+    RA_COMPLETED = "ra.completed"
+    # §11.3: Phase 2 だが Phase 1 と同時に導入
+    RA_REQ_CHANGED = "ra.req.changed"
+
     # GitHub Projection イベント（AR→GitHub片方向同期）
     GITHUB_ISSUE_CREATED = "github.issue_created"
     GITHUB_ISSUE_UPDATED = "github.issue_updated"
