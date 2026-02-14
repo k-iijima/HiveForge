@@ -300,8 +300,15 @@ class RAStateMachine(StateMachine):
             # メインパス: INTAKE → TRIAGE → CONTEXT → HYPOTHESIS → CLARIFY → SPEC → CHALLENGE → GATE
             Transition(RAState.INTAKE, RAState.TRIAGE, EventType.RA_TRIAGE_COMPLETED),
             Transition(RAState.TRIAGE, RAState.CONTEXT_ENRICH, EventType.RA_CONTEXT_ENRICHED),
+            # CONTEXT_ENRICH → WEB_RESEARCH (トリガー条件合致) or HYPOTHESIS_BUILD (スキップ)
             Transition(
                 RAState.CONTEXT_ENRICH, RAState.HYPOTHESIS_BUILD, EventType.RA_HYPOTHESIS_BUILT
+            ),
+            Transition(RAState.CONTEXT_ENRICH, RAState.WEB_RESEARCH, EventType.RA_WEB_RESEARCHED),
+            Transition(RAState.CONTEXT_ENRICH, RAState.HYPOTHESIS_BUILD, EventType.RA_WEB_SKIPPED),
+            # WEB_RESEARCH → HYPOTHESIS_BUILD
+            Transition(
+                RAState.WEB_RESEARCH, RAState.HYPOTHESIS_BUILD, EventType.RA_HYPOTHESIS_BUILT
             ),
             Transition(
                 RAState.HYPOTHESIS_BUILD, RAState.CLARIFY_GEN, EventType.RA_CLARIFY_GENERATED
@@ -322,10 +329,18 @@ class RAStateMachine(StateMachine):
                 RAState.SPEC_SYNTHESIS, RAState.CHALLENGE_REVIEW, EventType.RA_CHALLENGE_REVIEWED
             ),
             # CHALLENGE_REVIEW → GUARD_GATE (PASS) or SPEC_SYNTHESIS (BLOCK)
+            #                  or REFEREE_COMPARE (Phase 2: Best-of-N)
             Transition(RAState.CHALLENGE_REVIEW, RAState.GUARD_GATE, EventType.RA_GATE_DECIDED),
             Transition(
                 RAState.CHALLENGE_REVIEW, RAState.SPEC_SYNTHESIS, EventType.RA_SPEC_SYNTHESIZED
             ),
+            Transition(
+                RAState.CHALLENGE_REVIEW,
+                RAState.REFEREE_COMPARE,
+                EventType.RA_REFEREE_COMPARED,
+            ),
+            # REFEREE_COMPARE → GUARD_GATE (Phase 2)
+            Transition(RAState.REFEREE_COMPARE, RAState.GUARD_GATE, EventType.RA_GATE_DECIDED),
             # GUARD_GATE → CLARIFY_GEN (FAIL → ループ)
             Transition(RAState.GUARD_GATE, RAState.CLARIFY_GEN, EventType.RA_CLARIFY_GENERATED),
             # GUARD_GATE → RA_COMPLETED は transition() でpayloadルーティング

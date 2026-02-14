@@ -71,10 +71,13 @@ from .ra import (
     RAGateDecidedEvent,
     RAHypothesisBuiltEvent,
     RAIntakeReceivedEvent,
+    RARefereeComparedEvent,
     RAReqChangedEvent,
     RASpecSynthesizedEvent,
     RATriageCompletedEvent,
     RAUserRespondedEvent,
+    RAWebResearchedEvent,
+    RAWebSkippedEvent,
 )
 from .run import (
     RequirementApprovedEvent,
@@ -208,6 +211,10 @@ EVENT_TYPE_MAP: dict[EventType, type[BaseEvent]] = {
     EventType.RA_GATE_DECIDED: RAGateDecidedEvent,
     EventType.RA_COMPLETED: RACompletedEvent,
     EventType.RA_REQ_CHANGED: RAReqChangedEvent,
+    # Phase 2 追加
+    EventType.RA_WEB_RESEARCHED: RAWebResearchedEvent,
+    EventType.RA_WEB_SKIPPED: RAWebSkippedEvent,
+    EventType.RA_REFEREE_COMPARED: RARefereeComparedEvent,
 }
 
 

@@ -80,3 +80,26 @@ class RAReqChangedEvent(BaseEvent):
     """
 
     type: Literal[EventType.RA_REQ_CHANGED] = EventType.RA_REQ_CHANGED
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 追加イベント
+# ---------------------------------------------------------------------------
+
+
+class RAWebResearchedEvent(BaseEvent):
+    """WEB検索完了イベント — Web Researcher が外部情報を収集完了."""
+
+    type: Literal[EventType.RA_WEB_RESEARCHED] = EventType.RA_WEB_RESEARCHED
+
+
+class RAWebSkippedEvent(BaseEvent):
+    """WEB検索スキップイベント — トリガー条件不合致で検索をスキップ."""
+
+    type: Literal[EventType.RA_WEB_SKIPPED] = EventType.RA_WEB_SKIPPED
+
+
+class RARefereeComparedEvent(BaseEvent):
+    """Referee比較完了イベント — Best-of-N Spec比較が完了."""
+
+    type: Literal[EventType.RA_REFEREE_COMPARED] = EventType.RA_REFEREE_COMPARED

@@ -123,6 +123,10 @@ class EventType(StrEnum):
     RA_COMPLETED = "ra.completed"
     # §11.3: Phase 2 だが Phase 1 と同時に導入
     RA_REQ_CHANGED = "ra.req.changed"
+    # Phase 2 追加イベント（§6.1 拡張）
+    RA_WEB_RESEARCHED = "ra.web.researched"
+    RA_WEB_SKIPPED = "ra.web.skipped"
+    RA_REFEREE_COMPARED = "ra.referee.compared"
 
     # GitHub Projection イベント（AR→GitHub片方向同期）
     GITHUB_ISSUE_CREATED = "github.issue_created"

@@ -56,12 +56,12 @@ class TestRAEventTypes:
         assert event_type.value == value
 
     def test_ra_event_types_count(self):
-        """Phase 1 の10種 + RA_REQ_CHANGED = 11種のRAイベントが存在する"""
+        """Phase 1 の10種 + RA_REQ_CHANGED + Phase 2 の3種 = 14種のRAイベントが存在する"""
         # Arrange: RA関連のEventTypeを収集
         ra_types = [et for et in EventType if et.value.startswith("ra.")]
 
-        # Act & Assert: 11種
-        assert len(ra_types) == 11
+        # Act & Assert: 14種
+        assert len(ra_types) == 14
 
 
 class TestRAEventClasses:

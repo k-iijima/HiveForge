@@ -92,10 +92,13 @@ from .ra import (
     RAGateDecidedEvent,
     RAHypothesisBuiltEvent,
     RAIntakeReceivedEvent,
+    RARefereeComparedEvent,
     RAReqChangedEvent,
     RASpecSynthesizedEvent,
     RATriageCompletedEvent,
     RAUserRespondedEvent,
+    RAWebResearchedEvent,
+    RAWebSkippedEvent,
 )
 
 # --- レジストリ ---
@@ -256,10 +259,13 @@ __all__ = [
     "RAGateDecidedEvent",
     "RAHypothesisBuiltEvent",
     "RAIntakeReceivedEvent",
+    "RARefereeComparedEvent",
     "RAReqChangedEvent",
     "RASpecSynthesizedEvent",
     "RATriageCompletedEvent",
     "RAUserRespondedEvent",
+    "RAWebResearchedEvent",
+    "RAWebSkippedEvent",
     # レジストリ
     "EVENT_TYPE_MAP",
     "parse_event",

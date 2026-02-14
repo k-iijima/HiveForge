@@ -12,10 +12,19 @@
 - ChallengeVerdict / RequiredAction / Challenge / ChallengeReport: 反証検証（§5.8）
 - AmbiguityScores: 曖昧さの定量スコア（§5.9）
 - AnalysisPath: 高速パス判定結果（§8）
+
+Phase 2 追加:
+- DecisionRef / RunRef / FailureRef / CodeRef / EpisodeRef: 証拠参照モデル（§5.3）
+- EvidencePack: Context Forager 出力（§5.3）
+- WebSourceType / Freshness / WebFinding / WebEvidencePack: Web Researcher 出力（§5.3）
+- SpecScore / RefereeResult: Referee Bee 出力（§5.7）
+- ChangeReason / RequirementChangedPayload: 要件変更追跡（§11.3）
+- ImpactReport: 影響分析結果（§11.3）
 """
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 
@@ -427,3 +436,242 @@ class AnalysisPath(StrEnum):
 
     FULL_ANALYSIS = "full_analysis"
     """フルループ — ambiguity≥0.7 or execution_risk≥0.5"""
+
+
+# ---------------------------------------------------------------------------
+# §5.3 EvidencePack サブモデル — Context Forager 出力の構成部品
+# ---------------------------------------------------------------------------
+
+
+def _utcnow() -> datetime:
+    """UTC 現在時刻を返すファクトリ."""
+    return datetime.now(tz=UTC)
+
+
+class DecisionRef(BaseModel):
+    """過去の意思決定への参照（§5.3）."""
+
+    model_config = ConfigDict(strict=True, frozen=True)
+
+    decision_id: str = Field(..., description="意思決定ID")
+    summary: str = Field(..., description="意思決定の要約")
+    relevance_score: float = Field(ge=0.0, le=1.0, description="関連度スコア")
+    superseded: bool = Field(default=False, description="上書きされた決定か")
+
+
+class RunRef(BaseModel):
+    """過去の Run 実行結果への参照（§5.3）."""
+
+    model_config = ConfigDict(strict=True, frozen=True)
+
+    run_id: str = Field(..., description="Run ID")
+    goal: str = Field(..., description="Run の目標")
+    outcome: str = Field(..., description="SUCCESS | FAILURE | PARTIAL")
+    relevance_score: float = Field(ge=0.0, le=1.0, description="関連度スコア")
+
+
+class FailureRef(BaseModel):
+    """過去の失敗への参照（§5.3）."""
+
+    model_config = ConfigDict(strict=True, frozen=True)
+
+    run_id: str = Field(..., description="失敗した Run ID")
+    failure_class: str = Field(..., description="失敗分類")
+    summary: str = Field(..., description="失敗の要約")
+    relevance_score: float = Field(ge=0.0, le=1.0, description="関連度スコア")
+
+
+class CodeRef(BaseModel):
+    """関連コードファイルへの参照（§5.3）."""
+
+    model_config = ConfigDict(strict=True, frozen=True)
+
+    file_path: str = Field(..., description="ファイルパス")
+    summary: str = Field(..., description="コードの要約")
+    relevance_score: float = Field(ge=0.0, le=1.0, description="関連度スコア")
+
+
+class EpisodeRef(BaseModel):
+    """過去の Honeycomb エピソードへの参照（§5.3）."""
+
+    model_config = ConfigDict(strict=True, frozen=True)
+
+    episode_id: str = Field(..., description="エピソード ID")
+    goal: str = Field(..., description="エピソードの目標")
+    template_used: str = Field(..., description="使用テンプレート")
+    outcome: str = Field(..., description="結果")
+    similarity: float = Field(ge=0.0, le=1.0, description="類似度スコア")
+
+
+class EvidencePack(BaseModel):
+    """Context Forager の出力 — 内部証拠パック（§5.3）.
+
+    AR / Honeycomb から収集した過去の関連情報を構造化する。
+    """
+
+    model_config = ConfigDict(strict=True, frozen=True)
+
+    related_decisions: list[DecisionRef] = Field(
+        default_factory=list, description="関連する意思決定"
+    )
+    past_runs: list[RunRef] = Field(default_factory=list, description="過去の Run 結果")
+    failure_history: list[FailureRef] = Field(default_factory=list, description="過去の失敗履歴")
+    code_context: list[CodeRef] = Field(default_factory=list, description="関連コードファイル")
+    similar_episodes: list[EpisodeRef] = Field(default_factory=list, description="類似エピソード")
+    collected_at: datetime = Field(default_factory=_utcnow, description="収集日時")
+
+
+# ---------------------------------------------------------------------------
+# §5.3 WebEvidencePack — Web Researcher 出力
+# ---------------------------------------------------------------------------
+
+
+class WebSourceType(StrEnum):
+    """Web ソースの種類（§5.3）."""
+
+    OFFICIAL_DOCS = "official_docs"
+    SECURITY_ADVISORY = "security_advisory"
+    BLOG_ARTICLE = "blog_article"
+    STACK_OVERFLOW = "stack_overflow"
+    CHANGELOG = "changelog"
+    OTHER = "other"
+
+
+class Freshness(StrEnum):
+    """情報の鮮度（§5.3）."""
+
+    CURRENT = "current"
+    """6ヶ月以内."""
+
+    OUTDATED = "outdated"
+    """6ヶ月超."""
+
+    UNKNOWN = "unknown"
+    """日付不明."""
+
+
+class WebFinding(BaseModel):
+    """WEB 検索結果の1件（§5.3）."""
+
+    model_config = ConfigDict(strict=True, frozen=True)
+
+    url: str = Field(..., description="URL")
+    title: str = Field(..., description="タイトル")
+    summary: str = Field(..., max_length=500, description="要約（最大500文字）")
+    search_query: str = Field(..., description="検索クエリ")
+    retrieved_at: datetime = Field(default_factory=_utcnow, description="取得日時")
+    relevance_score: float = Field(ge=0.0, le=1.0, description="関連度スコア")
+    freshness: Freshness = Field(default=Freshness.UNKNOWN, description="情報の鮮度")
+    source_type: WebSourceType = Field(default=WebSourceType.OTHER, description="ソースタイプ")
+
+
+class WebEvidencePack(BaseModel):
+    """Web Researcher の出力 — 外部証拠パック（§5.3）.
+
+    WEB 検索結果を構造化する。skipped=True の場合は検索をスキップしたことを示す。
+    """
+
+    model_config = ConfigDict(strict=True, frozen=True)
+
+    search_queries: list[str] = Field(default_factory=list, description="検索クエリ群")
+    findings: list[WebFinding] = Field(
+        default_factory=list, max_length=5, description="検索結果（最大5件）"
+    )
+    search_cost_seconds: float = Field(default=0.0, ge=0.0, description="検索所要時間（秒）")
+    trigger_reason: str = Field(..., description="WEB 検索のトリガー理由")
+    skipped: bool = Field(default=False, description="検索をスキップしたか")
+
+
+# ---------------------------------------------------------------------------
+# §5.7 SpecScore / RefereeResult — Referee Bee 出力
+# ---------------------------------------------------------------------------
+
+
+class SpecScore(BaseModel):
+    """仕様草案のスコア — Referee Bee が各草案を評価（§5.7）."""
+
+    model_config = ConfigDict(strict=True, frozen=True)
+
+    draft_id: str = Field(..., description="草案ID")
+    testability: float = Field(ge=0.0, le=1.0, description="テスト可能性")
+    risk_coverage: float = Field(ge=0.0, le=1.0, description="リスクカバレッジ")
+    clarity: float = Field(ge=0.0, le=1.0, description="明瞭性")
+    completeness: float = Field(ge=0.0, le=1.0, description="完全性")
+    total: float = Field(ge=0.0, le=1.0, description="総合スコア")
+
+
+class RefereeResult(BaseModel):
+    """Referee Bee の比較結果 — Best-of-N 選択（§5.7）."""
+
+    model_config = ConfigDict(strict=True, frozen=True)
+
+    selected_draft_id: str = Field(..., description="選択された草案ID")
+    scores: list[SpecScore] = Field(..., description="各草案のスコア")
+
+
+# ---------------------------------------------------------------------------
+# §11.3 ChangeReason / RequirementChangedPayload — 要件変更追跡
+# ---------------------------------------------------------------------------
+
+
+class ChangeReason(StrEnum):
+    """要件変更の理由分類（§11.3）."""
+
+    USER_EDIT = "user_edit"
+    """ユーザーが YAML を直接編集."""
+
+    CLARIFICATION = "clarification"
+    """質問回答により仕様が変化."""
+
+    CHALLENGE_RESOLUTION = "challenge_resolution"
+    """Risk Challenger の指摘対応."""
+
+    REFEREE_SELECTION = "referee_selection"
+    """Referee Bee が別の草案を選択."""
+
+    DEPENDENCY_UPDATE = "dependency_update"
+    """依存要件の変更に伴う連鎖更新."""
+
+    FEEDBACK_LOOP = "feedback_loop"
+    """実行結果のフィードバックによる修正."""
+
+
+class RequirementChangedPayload(BaseModel):
+    """RA_REQ_CHANGED イベントの構造化ペイロード（§11.3）.
+
+    変更理由・版番号・差分・影響先を記録する。
+    """
+
+    model_config = ConfigDict(strict=True, frozen=True)
+
+    doorstop_id: str = Field(..., description="doorstop の要件ID")
+    prev_version: int = Field(ge=1, description="変更前の版番号")
+    new_version: int = Field(ge=2, description="変更後の版番号")
+    reason: ChangeReason = Field(..., description="変更理由")
+    cause_event_id: str | None = Field(
+        default=None, description="因果リンク — 変更を引き起こしたイベントID"
+    )
+    diff_summary: str = Field(..., description="差分の要約")
+    diff_lines: list[str] = Field(default_factory=list, description="unified diff 行のリスト")
+    affected_links: list[str] = Field(
+        default_factory=list,
+        description="doorstop links で影響を受ける要件ID群",
+    )
+
+
+# ---------------------------------------------------------------------------
+# §11.3 ImpactReport — ImpactAnalyzer 出力
+# ---------------------------------------------------------------------------
+
+
+class ImpactReport(BaseModel):
+    """影響分析結果 — doorstop links の逆引きで影響範囲を特定（§11.3）."""
+
+    model_config = ConfigDict(strict=True, frozen=True)
+
+    changed_id: str = Field(..., description="変更された要件ID")
+    affected_ids: list[str] = Field(default_factory=list, description="影響を受ける要件ID群")
+    requires_re_review: list[str] = Field(
+        default_factory=list, description="再レビューが必要な要件ID群"
+    )
+    cascade_depth: int = Field(ge=0, description="影響の連鎖深度")
