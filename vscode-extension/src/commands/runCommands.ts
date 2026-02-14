@@ -9,8 +9,6 @@ import { TasksProvider } from '../providers/tasksProvider';
 import { RequirementsProvider } from '../providers/requirementsProvider';
 import { EventsProvider } from '../providers/eventsProvider';
 import { DecisionsProvider } from '../providers/decisionsProvider';
-import { HiveMonitorPanel } from '../views/hiveMonitorPanel';
-
 import { RunItem } from '../providers/runsProvider';
 import { HiveEvent } from '../client';
 
@@ -32,7 +30,6 @@ export function registerRunCommands(
     refresh: () => void
 ): void {
     context.subscriptions.push(
-        vscode.commands.registerCommand('colonyforge.showDashboard', (item?: RunItem) => showDashboard(context, client, providers, item)),
         vscode.commands.registerCommand('colonyforge.startRun', () => startRun(client, refresh)),
         vscode.commands.registerCommand('colonyforge.viewEvents', (runId: string) => viewEvents(runId, client, providers.events)),
         vscode.commands.registerCommand('colonyforge.refresh', refresh),
@@ -41,18 +38,6 @@ export function registerRunCommands(
         vscode.commands.registerCommand('colonyforge.abortRun', (item: RunItem) => abortRun(item, client, refresh)),
         vscode.commands.registerCommand('colonyforge.showEventDetails', (event: HiveEvent) => showEventDetails(event))
     );
-}
-
-function showDashboard(context: vscode.ExtensionContext, client: ColonyForgeClient, providers: Providers, item?: RunItem): void {
-    // RunItemから起動された場合、そのRunを選択
-    if (item) {
-        client.setCurrentRunId(item.run.run_id);
-        providers.tasks.refresh();
-        providers.requirements.refresh();
-        providers.events.refresh();
-    }
-    // deprecated: DashboardPanel → HiveMonitor に統合 (v0.3.0)
-    HiveMonitorPanel.createOrShow(context.extensionUri, client);
 }
 
 async function startRun(client: ColonyForgeClient, refresh: () => void): Promise<void> {

@@ -36,19 +36,9 @@
     ],
     "commands": [
       {
-        "command": "colonyforge.showDashboard",
-        "title": "ColonyForge: ダッシュボードを表示",
-        "icon": "$(dashboard)"
-      },
-      {
         "command": "colonyforge.showHiveMonitor",
         "title": "ColonyForge: Hive Monitorを表示",
         "icon": "$(type-hierarchy)"
-      },
-      {
-        "command": "colonyforge.showAgentMonitor",
-        "title": "ColonyForge: Agent Monitorを表示",
-        "icon": "$(pulse)"
       },
       {
         "command": "colonyforge.startRun",
@@ -279,12 +269,7 @@
           "group": "inline@2"
         },
         {
-          "command": "colonyforge.showDashboard",
-          "when": "view == colonyforge.runs",
-          "group": "inline@0"
-        },
-        {
-          "command": "colonyforge.showAgentMonitor",
+          "command": "colonyforge.showHiveMonitor",
           "when": "view == colonyforge.runs",
           "group": "inline@0"
         },

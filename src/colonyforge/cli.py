@@ -47,6 +47,22 @@ def main() -> None:
     chat_parser = subparsers.add_parser("chat", help="Beekeeperと対話")
     chat_parser.add_argument("message", help="Beekeeperに送るメッセージ")
 
+    # monitor コマンド（tmuxエージェントモニター）
+    monitor_parser = subparsers.add_parser(
+        "monitor",
+        help="tmuxでエージェント活動をリアルタイム監視",
+    )
+    monitor_parser.add_argument(
+        "--server-url",
+        default="http://localhost:8000",
+        help="ColonyForge APIサーバーのURL（既定: http://localhost:8000）",
+    )
+    monitor_parser.add_argument(
+        "--no-tmux",
+        action="store_true",
+        help="tmuxを使わず単一ターミナルで出力",
+    )
+
     # record-decision コマンド
     decision_parser = subparsers.add_parser(
         "record-decision",
@@ -109,6 +125,8 @@ def main() -> None:
         run_task(args)
     elif args.command == "chat":
         run_chat(args)
+    elif args.command == "monitor":
+        run_monitor(args)
     elif args.command == "record-decision":
         run_record_decision(args)
     else:
@@ -269,6 +287,13 @@ def run_chat(args: argparse.Namespace) -> None:
             await beekeeper.close()
 
     asyncio.run(_chat())
+
+
+def run_monitor(args: argparse.Namespace) -> None:
+    """tmuxエージェントモニターを起動"""
+    from .monitor import monitor_main
+
+    monitor_main(args)
 
 
 def run_record_decision(args: argparse.Namespace) -> None:

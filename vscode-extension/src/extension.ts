@@ -61,20 +61,17 @@ export function activate(context: vscode.ExtensionContext) {
     registerHiveCommands(context, client);
     registerColonyCommands(context, client);
 
-    // Hive Monitor コマンド
+    // Hive Monitor コマンド（RunItem からの起動にも対応）
     context.subscriptions.push(
-        vscode.commands.registerCommand('colonyforge.showHiveMonitor', () => {
-            HiveMonitorPanel.createOrShow(context.extensionUri, client);
-        })
-    );
-
-    // Agent Monitor コマンド (deprecated: v0.3.0 で Hive Monitor に統合予定)
-    context.subscriptions.push(
-        vscode.commands.registerCommand('colonyforge.showAgentMonitor', () => {
-            vscode.window.showInformationMessage(
-                'Agent Monitor は Hive Monitor に統合されました。Hive Monitor を開きます。',
-                'OK'
-            );
+        vscode.commands.registerCommand('colonyforge.showHiveMonitor', (item?: unknown) => {
+            // Runs TreeView のコンテキストメニューから RunItem が渡される場合
+            const runItem = item as { run?: { run_id?: string } } | undefined;
+            if (runItem?.run?.run_id) {
+                client.setCurrentRunId(runItem.run.run_id);
+                providers.tasks.refresh();
+                providers.requirements.refresh();
+                providers.events.refresh();
+            }
             HiveMonitorPanel.createOrShow(context.extensionUri, client);
         })
     );
