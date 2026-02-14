@@ -224,6 +224,69 @@ class TestActivityStream:
         assert "/activity/stream" in routes
 
     @pytest.mark.asyncio
+    async def test_stream_replays_recent_events_on_connect(self):
+        """SSE接続時に直近イベントがreplayされる
+
+        replay パラメータを指定すると、接続時に既存イベントが
+        即座に送信されてからリアルタイム配信に移行する。
+        """
+        from colonyforge.api.routes.activity import stream_events
+
+        # Arrange: 事前にイベントを3件発行
+        bus = ActivityBus.get_instance()
+        for i in range(3):
+            await bus.emit(_make_event(summary=f"replay-event-{i}"))
+
+        # Act: replay=10 で接続（既存3件が即座に来るはず）
+        response = await stream_events(replay=10)
+        gen = response.body_iterator
+
+        # 既存イベントを取得
+        replayed: list[str] = []
+        for _ in range(3):
+            chunk = await asyncio.wait_for(gen.__anext__(), timeout=2.0)
+            replayed.append(chunk)
+
+        # Assert: replay されたイベントが含まれる
+        assert len(replayed) == 3
+        for i, chunk in enumerate(replayed):
+            assert chunk.startswith("data: ")
+            assert f"replay-event-{i}" in chunk
+
+        await gen.aclose()
+
+    @pytest.mark.asyncio
+    async def test_stream_replay_zero_skips_existing(self):
+        """replay=0 で既存イベントをスキップする
+
+        replay パラメータが0の場合、直近イベントは送信されず
+        新規イベントのみ配信される。
+        """
+        from colonyforge.api.routes.activity import stream_events
+
+        # Arrange: 事前にイベントを発行
+        bus = ActivityBus.get_instance()
+        await bus.emit(_make_event(summary="should-be-skipped"))
+
+        # Act: replay=0 で接続（既存イベントは来ない）
+        response = await stream_events(replay=0)
+        gen = response.body_iterator
+
+        # ジェネレータを起動（subscribe → queue.get 待ち）
+        next_task = asyncio.create_task(gen.__anext__())
+        await asyncio.sleep(0.05)
+
+        # 新規イベントを発行
+        await bus.emit(_make_event(summary="new-after-connect"))
+        chunk = await asyncio.wait_for(next_task, timeout=2.0)
+
+        # Assert: 新規イベントのみ受信
+        assert "new-after-connect" in chunk
+        assert "should-be-skipped" not in chunk
+
+        await gen.aclose()
+
+    @pytest.mark.asyncio
     async def test_stream_generator_yields_event_as_sse(self):
         """event_generatorがイベントをSSE data:形式でyieldする
 
@@ -234,7 +297,7 @@ class TestActivityStream:
 
         # Arrange
         bus = ActivityBus.get_instance()
-        response = await stream_events()
+        response = await stream_events(replay=0)
         gen = response.body_iterator
 
         # Act: ジェネレータをタスクとして起動（subscribe & queue.get待ち開始）
@@ -264,7 +327,7 @@ class TestActivityStream:
 
         # Arrange
         bus = ActivityBus.get_instance()
-        response = await stream_events()
+        response = await stream_events(replay=0)
         gen = response.body_iterator
 
         # Act: ジェネレータをタスクとして起動
@@ -297,7 +360,7 @@ class TestActivityStream:
             raise TimeoutError
 
         with patch.object(asyncio, "wait_for", side_effect=mock_wait_for):
-            response = await stream_events()
+            response = await stream_events(replay=0)
             gen = response.body_iterator
 
             # Act: ジェネレータを1回進める
@@ -318,7 +381,7 @@ class TestActivityStream:
         from colonyforge.api.routes.activity import stream_events
 
         # Act
-        response = await stream_events()
+        response = await stream_events(replay=0)
 
         # Assert: SSE用ヘッダが設定されている
         assert response.media_type == "text/event-stream"
@@ -342,7 +405,7 @@ class TestActivityStream:
         bus = ActivityBus.get_instance()
         initial_count = len(bus._subscribers)
 
-        response = await stream_events()
+        response = await stream_events(replay=0)
         gen = response.body_iterator
 
         # ジェネレータをタスクとして起動（subscribe完了を待つ）

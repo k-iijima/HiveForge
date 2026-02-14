@@ -3,6 +3,9 @@
  */
 
 import axios, { AxiosInstance } from 'axios';
+import * as http from 'http';
+import * as https from 'https';
+import { URL } from 'url';
 
 export interface Run {
     run_id: string;
@@ -298,6 +301,72 @@ export class ColonyForgeClient {
 
     getStreamUrl(): string {
         return `${this.client.defaults.baseURL}/activity/stream`;
+    }
+
+    /**
+     * SSEストリームを購読し、イベント到着時にコールバックを呼ぶ。
+     * replay パラメータで接続時に直近イベントを受信する。
+     *
+     * @returns abort関数。呼ぶとストリームを切断する。
+     */
+    subscribeSSE(
+        onEvent: (event: ActivityEvent) => void,
+        onError?: (err: Error) => void,
+        replay: number = 50,
+    ): () => void {
+        const streamUrl = `${this.getStreamUrl()}?replay=${replay}`;
+        const parsed = new URL(streamUrl);
+        const transport = parsed.protocol === 'https:' ? https : http;
+        let destroyed = false;
+        let req: http.ClientRequest | undefined;
+
+        const connect = (): void => {
+            if (destroyed) { return; }
+            req = transport.get(streamUrl, { headers: { 'Accept': 'text/event-stream' } }, (res) => {
+                if (!res || res.statusCode !== 200) {
+                    onError?.(new Error(`SSE connection failed: ${res?.statusCode}`));
+                    // 5秒後にリトライ
+                    if (!destroyed) { setTimeout(connect, 5000); }
+                    return;
+                }
+                res.setEncoding('utf-8');
+                let buffer = '';
+                res.on('data', (chunk: string) => {
+                    buffer += chunk;
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const event = JSON.parse(line.slice(6)) as ActivityEvent;
+                                onEvent(event);
+                            } catch {
+                                // JSON parse error — skip
+                            }
+                        }
+                    }
+                });
+                res.on('end', () => {
+                    // 接続断 → リトライ
+                    if (!destroyed) { setTimeout(connect, 3000); }
+                });
+                res.on('error', (err: Error) => {
+                    onError?.(err);
+                    if (!destroyed) { setTimeout(connect, 5000); }
+                });
+            });
+            req.on('error', (err: Error) => {
+                onError?.(err);
+                if (!destroyed) { setTimeout(connect, 5000); }
+            });
+        };
+
+        connect();
+
+        return () => {
+            destroyed = true;
+            req?.destroy();
+        };
     }
 
     // Hive API

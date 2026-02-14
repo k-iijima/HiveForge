@@ -38,9 +38,11 @@ export class HiveMonitorPanel {
     public static currentPanel: HiveMonitorPanel | undefined;
     private readonly _panel: vscode.WebviewPanel;
     private _disposables: vscode.Disposable[] = [];
-    private _refreshInterval: NodeJS.Timeout | undefined;
+    private _sseAbort: (() => void) | undefined;
+    private _debounceTimer: NodeJS.Timeout | undefined;
     private _htmlInitialized = false;
-    private static readonly REFRESH_INTERVAL_MS = 2000;
+    private _pendingEvents: ActivityEvent[] = [];
+    private static readonly DEBOUNCE_MS = 300;
 
     private constructor(
         panel: vscode.WebviewPanel,
@@ -49,15 +51,15 @@ export class HiveMonitorPanel {
         this._panel = panel;
         this._initHtml();
         this._update();
-        this._startAutoRefresh();
+        this._startSSE();
 
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
         this._panel.onDidChangeViewState(
             e => {
                 if (e.webviewPanel.visible) {
-                    this._startAutoRefresh();
+                    this._startSSE();
                 } else {
-                    this._stopAutoRefresh();
+                    this._stopSSE();
                 }
             },
             null,
@@ -109,7 +111,7 @@ export class HiveMonitorPanel {
 
     public dispose(): void {
         HiveMonitorPanel.currentPanel = undefined;
-        this._stopAutoRefresh();
+        this._stopSSE();
         this._panel.dispose();
         while (this._disposables.length) {
             const x = this._disposables.pop();
@@ -117,16 +119,34 @@ export class HiveMonitorPanel {
         }
     }
 
-    private _startAutoRefresh(): void {
-        if (this._refreshInterval) { return; }
-        this._refreshInterval = setInterval(() => this._update(), HiveMonitorPanel.REFRESH_INTERVAL_MS);
+    private _startSSE(): void {
+        if (this._sseAbort) { return; }
+        this._sseAbort = this.client.subscribeSSE(
+            (_event: ActivityEvent) => {
+                // SSEイベント到着時にデバウンスで更新
+                this._scheduleUpdate();
+            },
+            (err: Error) => {
+                console.warn('[HiveMonitor] SSE error:', err.message);
+            },
+        );
     }
 
-    private _stopAutoRefresh(): void {
-        if (this._refreshInterval) {
-            clearInterval(this._refreshInterval);
-            this._refreshInterval = undefined;
+    private _stopSSE(): void {
+        if (this._sseAbort) {
+            this._sseAbort();
+            this._sseAbort = undefined;
         }
+        if (this._debounceTimer) {
+            clearTimeout(this._debounceTimer);
+            this._debounceTimer = undefined;
+        }
+    }
+
+    /** SSEイベント到着からDEBOUNCE_MS後に画面更新 */
+    private _scheduleUpdate(): void {
+        if (this._debounceTimer) { clearTimeout(this._debounceTimer); }
+        this._debounceTimer = setTimeout(() => this._update(), HiveMonitorPanel.DEBOUNCE_MS);
     }
 
     private async _update(): Promise<void> {

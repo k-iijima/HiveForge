@@ -220,12 +220,17 @@ async def seed_demo_data() -> dict[str, Any]:
 
 
 @router.get("/stream")
-async def stream_events() -> StreamingResponse:
+async def stream_events(
+    replay: int = Query(default=50, ge=0, le=500),
+) -> StreamingResponse:
     """SSEでアクティビティイベントをリアルタイム配信
 
     Server-Sent Events (SSE) ストリーム。
-    VS Code拡張のAgent Monitorパネルが接続して
-    リアルタイムにエージェント活動を表示する。
+    接続時に直近 replay 件のイベントを即送信し、
+    以降はリアルタイムに新規イベントを配信する。
+
+    Args:
+        replay: 接続時に送信する直近イベント数（0で無効）
     """
 
     async def event_generator() -> AsyncGenerator[str, None]:
@@ -235,6 +240,14 @@ async def stream_events() -> StreamingResponse:
         async def handler(event: ActivityEvent) -> None:
             await queue.put(event)
 
+        # replay: 既存イベントを先に送信
+        if replay > 0:
+            recent = bus.get_recent_events(limit=replay)
+            for past_event in recent:
+                data = json.dumps(past_event.to_dict(), ensure_ascii=False)
+                yield f"data: {data}\n\n"
+
+        # subscribe は replay 送信後に行う（重複回避）
         bus.subscribe(handler)
 
         try:
