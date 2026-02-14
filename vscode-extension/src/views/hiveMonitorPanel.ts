@@ -81,6 +81,9 @@ export class HiveMonitorPanel {
                     case 'selectColony':
                         vscode.commands.executeCommand('colonyforge.selectColony', message.colonyId);
                         break;
+                    case 'focusAgent':
+                        this._focusTmuxAgent(message.agentId);
+                        break;
                 }
             },
             null,
@@ -150,6 +153,33 @@ export class HiveMonitorPanel {
     private _scheduleUpdate(): void {
         if (this._debounceTimer) { clearTimeout(this._debounceTimer); }
         this._debounceTimer = setTimeout(() => this._update(), HiveMonitorPanel.DEBOUNCE_MS);
+    }
+
+    /** tmux で対象エージェントのペインにフォーカスする */
+    private _focusTmuxAgent(agentId: string): void {
+        // "🐝 Colony Monitor" ターミナルを探す
+        const monTerminal = vscode.window.terminals.find(t => t.name === '🐝 Colony Monitor');
+        if (!monTerminal) {
+            // ターミナルがなければ新規作成してコマンド実行
+            const t = vscode.window.createTerminal({ name: '🐝 tmux focus', hideFromUser: false });
+            t.show();
+            t.sendText(`tmux select-window -t colonyforge-monitor && tmux select-pane -t colonyforge-monitor -T "🔍 ${agentId}" 2>/dev/null; tmux run-shell 'for p in $(tmux list-panes -s -t colonyforge-monitor -F "#{pane_index}:#{pane_title}"); do case "$p" in *"${agentId}"*) tmux select-pane -t colonyforge-monitor:"$(echo $p | cut -d: -f1)" ;; esac; done'`);
+            return;
+        }
+        // 既存のターミナルで tmux コマンドを送信
+        // tmuxセッション内では直接キー入力でtmuxにコマンドを送れないので、
+        // 別のシェルからtmuxにコマンドを発行する
+        const t = vscode.window.createTerminal({
+            name: '🔍 Agent Focus',
+            hideFromUser: true,
+        });
+        // tmuxセッション內の全ペインを走査して、pane_title にagent_idを含むペインを選択
+        t.sendText([
+            `tmux list-panes -s -t colonyforge-monitor -F '#{window_index}:#{pane_index}:#{pane_title}' 2>/dev/null | while IFS=: read -r win pane title; do`,
+            `  case "$title" in *"${agentId}"*) tmux select-window -t colonyforge-monitor:"$win" && tmux select-pane -t colonyforge-monitor:"$win"."$pane"; break ;; esac`,
+            `done`,
+            `exit`,
+        ].join('\n'));
     }
 
     private async _update(): Promise<void> {
@@ -248,11 +278,21 @@ export class HiveMonitorPanel {
         <button class="tab" role="tab" aria-selected="false" aria-controls="tab-activity" data-tab="activity">Activity</button>
     </div>
     <div class="tab-content active" id="tab-overview" role="tabpanel" aria-labelledby="tab-overview">
-        <div class="container" id="treeContainer">
-            <div class="loading">
-                <div class="spinner"></div>
-                <div>接続中...</div>
+        <div class="container" id="treeViewport">
+            <div class="tree-canvas" id="treeCanvas">
+                <div id="treeContainer">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <div>接続中...</div>
+                    </div>
+                </div>
             </div>
+        </div>
+        <div class="zoom-controls">
+            <button class="zoom-btn" id="btnZoomIn" title="拡大">＋</button>
+            <button class="zoom-btn" id="btnZoomReset" title="リセット">●</button>
+            <button class="zoom-btn" id="btnZoomOut" title="縮小">－</button>
+            <span class="zoom-label" id="zoomLabel">100%</span>
         </div>
     </div>
     <div class="tab-content" id="tab-kpi" role="tabpanel" aria-labelledby="tab-kpi">
@@ -401,7 +441,7 @@ export class HiveMonitorPanel {
             h += renderSpeechBubble(latestEv);
 
             // エージェントノード
-            h += '<div class="node agent-node ' + roleCls + ' ' + sc + '">';
+            h += '<div class="node agent-node ' + roleCls + ' ' + sc + '" data-agent-id="' + esc(agent.agent_id) + '">';
             h += '<div class="node-icon">' + icon + '</div>';
             h += '<div class="node-label">' + esc(shortId) + '</div>';
             if (latestEv) {
@@ -719,6 +759,98 @@ export class HiveMonitorPanel {
         // グローバル関数（onclick用）
         window.selectHive = function(id) { vscodeApi.postMessage({ command: 'selectHive', hiveId: id }); };
         window.selectColony = function(id) { vscodeApi.postMessage({ command: 'selectColony', colonyId: id }); };
+        window.focusAgent = function(id) { vscodeApi.postMessage({ command: 'focusAgent', agentId: id }); };
+
+        // --- ズーム＆パン ---
+        const viewport = document.getElementById('treeViewport');
+        const canvas = document.getElementById('treeCanvas');
+        let scale = 1;
+        let panX = 0, panY = 0;
+        let isDragging = false;
+        let dragStartX = 0, dragStartY = 0;
+        let panStartX = 0, panStartY = 0;
+        const MIN_SCALE = 0.2, MAX_SCALE = 3.0;
+
+        function applyTransform() {
+            canvas.style.transform = 'translate(' + panX + 'px, ' + panY + 'px) scale(' + scale + ')';
+            document.getElementById('zoomLabel').textContent = Math.round(scale * 100) + '%';
+        }
+
+        // ホイールズーム
+        viewport.addEventListener('wheel', function(e) {
+            e.preventDefault();
+            const rect = viewport.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+            const prevScale = scale;
+            const delta = e.deltaY > 0 ? 0.9 : 1.1;
+            scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale * delta));
+            // ポインタ位置を中心にズーム
+            panX = mx - (mx - panX) * (scale / prevScale);
+            panY = my - (my - panY) * (scale / prevScale);
+            applyTransform();
+        }, { passive: false });
+
+        // ドラッグパン
+        viewport.addEventListener('mousedown', function(e) {
+            if (e.button !== 0) return;
+            // ノードクリックはドラッグにしない
+            if (e.target.closest('.node')) return;
+            isDragging = true;
+            dragStartX = e.clientX;
+            dragStartY = e.clientY;
+            panStartX = panX;
+            panStartY = panY;
+            viewport.classList.add('grabbing');
+            e.preventDefault();
+        });
+        window.addEventListener('mousemove', function(e) {
+            if (!isDragging) return;
+            panX = panStartX + (e.clientX - dragStartX);
+            panY = panStartY + (e.clientY - dragStartY);
+            applyTransform();
+        });
+        window.addEventListener('mouseup', function() {
+            isDragging = false;
+            viewport.classList.remove('grabbing');
+        });
+
+        // ズームボタン
+        document.getElementById('btnZoomIn').addEventListener('click', function() {
+            const rect = viewport.getBoundingClientRect();
+            const cx = rect.width / 2, cy = rect.height / 2;
+            const prev = scale;
+            scale = Math.min(MAX_SCALE, scale * 1.2);
+            panX = cx - (cx - panX) * (scale / prev);
+            panY = cy - (cy - panY) * (scale / prev);
+            applyTransform();
+        });
+        document.getElementById('btnZoomOut').addEventListener('click', function() {
+            const rect = viewport.getBoundingClientRect();
+            const cx = rect.width / 2, cy = rect.height / 2;
+            const prev = scale;
+            scale = Math.max(MIN_SCALE, scale * 0.8);
+            panX = cx - (cx - panX) * (scale / prev);
+            panY = cy - (cy - panY) * (scale / prev);
+            applyTransform();
+        });
+        document.getElementById('btnZoomReset').addEventListener('click', function() {
+            scale = 1; panX = 0; panY = 0;
+            applyTransform();
+        });
+
+        // --- エージェントクリックでtmux連携 ---
+        document.addEventListener('click', function(e) {
+            const agentNode = e.target.closest('.agent-node[data-agent-id]');
+            if (!agentNode) return;
+            const agentId = agentNode.getAttribute('data-agent-id');
+            if (!agentId) return;
+            // 選択ハイライト
+            document.querySelectorAll('.agent-node.selected').forEach(n => n.classList.remove('selected'));
+            agentNode.classList.add('selected');
+            // tmux にフォーカス指示
+            window.focusAgent(agentId);
+        });
     })();
     </script>
 </body>
@@ -812,14 +944,69 @@ export class HiveMonitorPanel {
             .stat { font-size: 12px; color: var(--vscode-descriptionForeground); }
             .stat strong { color: var(--vscode-foreground); }
 
-            /* Main container */
+            /* Viewport — clips & receives wheel/drag events */
             .container {
                 flex: 1;
-                overflow: auto;
-                padding: 24px;
-                display: flex;
+                overflow: hidden;
+                position: relative;
+                cursor: grab;
+            }
+            .container.grabbing {
+                cursor: grabbing;
+            }
+
+            /* Canvas — panned & scaled */
+            .tree-canvas {
+                display: inline-flex;
                 justify-content: center;
-                align-items: flex-start;
+                min-width: 100%;
+                min-height: 100%;
+                padding: 24px;
+                transform-origin: 0 0;
+                transition: transform 0.08s ease-out;
+            }
+
+            /* Zoom controls */
+            .zoom-controls {
+                position: absolute;
+                bottom: 12px;
+                right: 12px;
+                display: flex;
+                align-items: center;
+                gap: 4px;
+                background: var(--vscode-editor-background);
+                border: 1px solid var(--vscode-widget-border);
+                border-radius: 6px;
+                padding: 2px 6px;
+                z-index: 10;
+                opacity: 0.85;
+                transition: opacity 0.2s;
+            }
+            .zoom-controls:hover { opacity: 1; }
+            .zoom-btn {
+                width: 24px; height: 24px;
+                font-size: 14px; line-height: 24px;
+                text-align: center;
+                background: none; border: none;
+                color: var(--vscode-foreground);
+                cursor: pointer;
+                border-radius: 4px;
+            }
+            .zoom-btn:hover {
+                background: var(--vscode-list-hoverBackground);
+            }
+            .zoom-label {
+                font-size: 10px;
+                color: var(--vscode-descriptionForeground);
+                min-width: 32px;
+                text-align: center;
+            }
+
+            /* Selected agent highlight */
+            .agent-node.selected {
+                outline: 2px solid var(--vscode-focusBorder);
+                outline-offset: 2px;
+                box-shadow: 0 0 12px rgba(0, 120, 212, 0.4);
             }
 
             /* Loading */
