@@ -216,19 +216,63 @@ export class HiveMonitorPanel {
         <h1>🐝 Hive Monitor</h1>
         <div class="stats" id="stats"></div>
     </div>
-    <div class="container" id="treeContainer">
-        <div class="loading">
-            <div class="spinner"></div>
-            <div>接続中...</div>
+    <div class="tab-bar" role="tablist" aria-label="Hive Monitor tabs">
+        <button class="tab active" role="tab" aria-selected="true" aria-controls="tab-overview" data-tab="overview">Overview</button>
+        <button class="tab" role="tab" aria-selected="false" aria-controls="tab-kpi" data-tab="kpi">KPI</button>
+        <button class="tab" role="tab" aria-selected="false" aria-controls="tab-activity" data-tab="activity">Activity</button>
+    </div>
+    <div class="tab-content active" id="tab-overview" role="tabpanel" aria-labelledby="tab-overview">
+        <div class="container" id="treeContainer">
+            <div class="loading">
+                <div class="spinner"></div>
+                <div>接続中...</div>
+            </div>
         </div>
     </div>
-    <div class="kpi-dashboard" id="kpiDashboard" style="display:none"></div>
-    <div class="activity-ticker" id="activityTicker"></div>
+    <div class="tab-content" id="tab-kpi" role="tabpanel" aria-labelledby="tab-kpi">
+        <div class="kpi-dashboard" id="kpiDashboard"></div>
+    </div>
+    <div class="tab-content" id="tab-activity" role="tabpanel" aria-labelledby="tab-activity">
+        <div class="activity-feed" id="activityFeed">
+            <div class="ticker-empty">アクティビティなし</div>
+        </div>
+    </div>
     <div id="errorOverlay" class="error-overlay" style="display:none"></div>
 
     <script>
     (function() {
         const vscodeApi = acquireVsCodeApi();
+
+        // --- タブ切り替えロジック ---
+        let activeTab = 'overview';
+        const tabButtons = document.querySelectorAll('.tab-bar .tab');
+        const tabPanels = document.querySelectorAll('.tab-content');
+
+        function switchTab(tabName) {
+            activeTab = tabName;
+            tabButtons.forEach(btn => {
+                const isActive = btn.getAttribute('data-tab') === tabName;
+                btn.classList.toggle('active', isActive);
+                btn.setAttribute('aria-selected', String(isActive));
+            });
+            tabPanels.forEach(panel => {
+                panel.classList.toggle('active', panel.id === 'tab-' + tabName);
+            });
+            // 状態永続化
+            vscodeApi.setState({ activeTab: tabName });
+        }
+
+        tabButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                switchTab(btn.getAttribute('data-tab'));
+            });
+        });
+
+        // 保存された状態を復元
+        const savedState = vscodeApi.getState();
+        if (savedState && savedState.activeTab) {
+            switchTab(savedState.activeTab);
+        }
 
         function esc(s) {
             const d = document.createElement('div');
@@ -488,9 +532,9 @@ export class HiveMonitorPanel {
                 + '<span class="stat">Workers: <strong>' + totalW + '</strong></span>';
         }
 
-        /** 画面下部のアクティビティティッカー */
+        /** 画面下部のアクティビティティッカー → Activityタブのフィード */
         function renderTicker(events) {
-            const el = document.getElementById('activityTicker');
+            const el = document.getElementById('activityFeed');
             if (!events || events.length === 0) {
                 el.innerHTML = '<div class="ticker-empty">アクティビティなし</div>';
                 return;
@@ -526,8 +570,7 @@ export class HiveMonitorPanel {
         /** KPIダッシュボード描画 */
         function renderKPI(ev) {
             const el = document.getElementById('kpiDashboard');
-            if (!ev) { el.style.display = 'none'; return; }
-            el.style.display = 'block';
+            if (!ev) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">📊</div><div class="empty-text">KPIデータなし</div></div>'; return; }
 
             const kpi = ev.kpi || {};
             const collab = ev.collaboration || {};
@@ -617,8 +660,8 @@ export class HiveMonitorPanel {
                     cachedAllEvents = msg.allEvents || [];
                     renderTree(msg.hives);
                     renderStats(msg.hives);
-                    renderTicker(msg.recentEvents);
-                    if (msg.evaluation) { renderKPI(msg.evaluation); }
+                    renderTicker(msg.allEvents || msg.recentEvents);
+                    renderKPI(msg.evaluation);
                     break;
                 case 'showError':
                     showError(msg.message);
@@ -647,6 +690,51 @@ export class HiveMonitorPanel {
                 display: flex;
                 flex-direction: column;
                 overflow: hidden;
+            }
+
+            /* Tab bar */
+            .tab-bar {
+                display: flex;
+                gap: 0;
+                border-bottom: 1px solid var(--vscode-widget-border);
+                background: var(--vscode-titleBar-activeBackground, var(--vscode-editor-background));
+                flex-shrink: 0;
+                padding: 0 16px;
+            }
+            .tab {
+                padding: 8px 16px;
+                font-size: 12px;
+                font-weight: 500;
+                color: var(--vscode-descriptionForeground);
+                background: none;
+                border: none;
+                border-bottom: 2px solid transparent;
+                cursor: pointer;
+                transition: color 0.15s, border-color 0.15s;
+                font-family: var(--vscode-font-family);
+            }
+            .tab:hover {
+                color: var(--vscode-foreground);
+            }
+            .tab:focus-visible {
+                outline: 1px solid var(--vscode-focusBorder);
+                outline-offset: -1px;
+            }
+            .tab.active {
+                color: var(--vscode-foreground);
+                border-bottom-color: var(--vscode-focusBorder);
+                font-weight: 600;
+            }
+
+            /* Tab content panels */
+            .tab-content {
+                display: none;
+                flex: 1;
+                overflow: auto;
+                flex-direction: column;
+            }
+            .tab-content.active {
+                display: flex;
             }
 
             /* Header */
@@ -982,14 +1070,12 @@ export class HiveMonitorPanel {
                 .loading-spinner { animation: none; }
             }
 
-            /* Activity Ticker (bottom bar) */
-            .activity-ticker {
-                flex-shrink: 0;
-                max-height: 160px;
+            /* Activity Feed (tab) */
+            .activity-feed {
+                flex: 1;
                 overflow-y: auto;
-                border-top: 1px solid var(--vscode-widget-border);
-                background: var(--vscode-sideBar-background, var(--vscode-editor-background));
-                padding: 4px 8px;
+                background: var(--vscode-editor-background);
+                padding: 8px 12px;
             }
             .ticker-empty {
                 text-align: center; padding: 8px;
@@ -1048,11 +1134,9 @@ export class HiveMonitorPanel {
 
             /* KPI Dashboard */
             .kpi-dashboard {
-                flex-shrink: 0;
-                border-top: 1px solid var(--vscode-widget-border);
-                background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+                flex: 1;
+                background: var(--vscode-editor-background);
                 padding: 12px 16px;
-                max-height: 320px;
                 overflow-y: auto;
             }
             .kpi-header {
