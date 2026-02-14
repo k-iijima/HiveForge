@@ -452,3 +452,35 @@ class TestClarifyGeneratorGenerate:
         # Assert
         assert result.questions[0].question_type == QuestionType.SINGLE_CHOICE
         assert result.questions[0].options == ["はい", "いいえ", "未定"]
+
+
+class TestProcessQuestions:
+    """_process_questions ユニットテスト."""
+
+    def test_invalid_question_type_falls_back_to_free_text(self) -> None:
+        """無効な question_type は FREE_TEXT にフォールバックされる.
+
+        safety-side fallback: 未知の question_type を FREE_TEXT に変換して
+        質問生成を継続する。
+        """
+        from colonyforge.requirement_analysis.clarify_generator import (
+            _process_questions,
+        )
+
+        # Arrange: 不正な question_type 文字列を含む生データ
+        raw = [
+            {
+                "question_id": "Q1",
+                "text": "テスト質問",
+                "question_type": "invalid_type_xxx",
+                "options": [],
+            }
+        ]
+
+        # Act
+        result = _process_questions(raw)
+
+        # Assert: 無効な型は FREE_TEXT にフォールバック
+        assert len(result) == 1
+        assert result[0].question_type == QuestionType.FREE_TEXT
+        assert result[0].text == "テスト質問"

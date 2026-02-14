@@ -14,6 +14,14 @@ from typing import Any
 from ulid import ULID
 
 
+class ToolExecutionError(Exception):
+    """ツール実行時のエラー."""
+
+    def __init__(self, message: str, tool_id: str = "") -> None:
+        super().__init__(message)
+        self.tool_id = tool_id
+
+
 class ToolCategory(StrEnum):
     """ツールカテゴリ"""
 
@@ -183,6 +191,7 @@ class ToolExecutor:
         )
 
         # 開始通知
+        # 安全側フォールバック: リスナー障害がツール実行全体を停止させない保護
         for started_listener in self._on_started:
             with contextlib.suppress(Exception):
                 started_listener(invocation)
@@ -207,9 +216,8 @@ class ToolExecutor:
             result.status = ToolStatus.TIMEOUT
             result.error = f"Timeout after {tool.timeout_seconds}s"
 
-        except Exception as e:
-            result.status = ToolStatus.FAILED
-            result.error = str(e)
+        except Exception as exc:
+            raise ToolExecutionError(str(exc), tool_id=tool_id) from exc
 
         finally:
             result.completed_at = datetime.now()
@@ -220,6 +228,7 @@ class ToolExecutor:
         self._results[result.result_id] = result
 
         # 完了通知
+        # 安全側フォールバック: リスナー障害がツール実行全体を停止させない保護
         for completed_listener in self._on_completed:
             with contextlib.suppress(Exception):
                 completed_listener(result)

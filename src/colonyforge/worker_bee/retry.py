@@ -16,6 +16,14 @@ from ulid import ULID
 T = TypeVar("T")
 
 
+class RetryExhaustedError(Exception):
+    """全リトライが失敗した場合に発生する例外."""
+
+    def __init__(self, message: str, attempts: list["RetryAttempt"]) -> None:
+        super().__init__(message)
+        self.attempts = attempts
+
+
 class RetryStrategy(StrEnum):
     """リトライ戦略"""
 
@@ -197,6 +205,7 @@ class RetryExecutor:
                 result.attempts.append(attempt)
 
                 # タイムアウト通知
+                # 安全側フォールバック: リスナー障害がリトライ実行全体を停止させない保護
                 for timeout_listener in self._on_timeout:
                     with contextlib.suppress(Exception):
                         timeout_listener(attempt.error)
@@ -221,6 +230,7 @@ class RetryExecutor:
                     break
 
             # リトライ通知
+            # 安全側フォールバック: リスナー障害がリトライ実行全体を停止させない保護
             for retry_listener in self._on_retry:
                 with contextlib.suppress(Exception):
                     retry_listener(attempt)
@@ -233,32 +243,11 @@ class RetryExecutor:
         end_time = datetime.now()
         result.total_duration_ms = (end_time - start_time).total_seconds() * 1000
 
-        return result
-
-    async def execute_with_fallback(
-        self,
-        operation: Callable[..., T],
-        fallback: Callable[..., T],
-        timeout_config: TimeoutConfig | None = None,
-        *args: Any,
-        **kwargs: Any,
-    ) -> RetryResult:
-        """フォールバック付き実行"""
-        result = await self.execute(operation, timeout_config, *args, **kwargs)
-
         if not result.success:
-            try:
-                if asyncio.iscoroutinefunction(fallback):
-                    fallback_result = await fallback(*args, **kwargs)
-                else:
-                    fallback_result = fallback(*args, **kwargs)
-
-                result.result = fallback_result
-                result.success = True
-                result.error = None
-
-            except Exception as e:
-                result.error = f"Fallback failed: {e}"
+            raise RetryExhaustedError(
+                result.error or "All retries exhausted",
+                attempts=result.attempts,
+            )
 
         return result
 

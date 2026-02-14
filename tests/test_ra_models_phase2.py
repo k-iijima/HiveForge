@@ -708,3 +708,74 @@ class TestImpactReport:
         report = ImpactReport(changed_id="REQ001", cascade_depth=0)
         with pytest.raises(ValidationError):
             report.changed_id = "REQ002"  # type: ignore[misc]
+
+
+# ---------------------------------------------------------------------------
+# SpecDraft ヘルパーメソッドのテスト
+# ---------------------------------------------------------------------------
+
+
+class TestSpecDraftCriteriaMethods:
+    """SpecDraft.get_criteria_text / get_all_criteria_texts の検証."""
+
+    def test_get_criteria_text_with_str(self) -> None:
+        """str 形式の受入基準テキストをそのまま返す."""
+        from colonyforge.requirement_analysis.models import SpecDraft
+
+        # Arrange: str 受入基準を持つ SpecDraft
+        draft = SpecDraft(
+            draft_id="d-1",
+            version=1,
+            goal="テスト目標",
+            acceptance_criteria=["AC1", "AC2"],
+        )
+
+        # Act
+        text = draft.get_criteria_text(0)
+
+        # Assert
+        assert text == "AC1"
+
+    def test_get_criteria_text_with_acceptance_criterion(self) -> None:
+        """AcceptanceCriterion 形式の受入基準から .text を返す."""
+        from colonyforge.requirement_analysis.models import (
+            AcceptanceCriterion,
+            SpecDraft,
+        )
+
+        # Arrange: AcceptanceCriterion オブジェクトを含む SpecDraft
+        ac = AcceptanceCriterion(text="計測可能AC", measurable=True, metric="ms")
+        draft = SpecDraft(
+            draft_id="d-2",
+            version=1,
+            goal="テスト目標",
+            acceptance_criteria=[ac],
+        )
+
+        # Act
+        text = draft.get_criteria_text(0)
+
+        # Assert
+        assert text == "計測可能AC"
+
+    def test_get_all_criteria_texts_mixed(self) -> None:
+        """str と AcceptanceCriterion が混在するリストから全テキストを取得."""
+        from colonyforge.requirement_analysis.models import (
+            AcceptanceCriterion,
+            SpecDraft,
+        )
+
+        # Arrange: 混合リスト
+        ac = AcceptanceCriterion(text="構造化AC", measurable=False)
+        draft = SpecDraft(
+            draft_id="d-3",
+            version=1,
+            goal="テスト目標",
+            acceptance_criteria=["文字列AC", ac, "もう1つ"],
+        )
+
+        # Act
+        texts = draft.get_all_criteria_texts()
+
+        # Assert
+        assert texts == ["文字列AC", "構造化AC", "もう1つ"]

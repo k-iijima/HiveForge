@@ -1097,6 +1097,7 @@ import pytest  # noqa: E402
 from colonyforge.worker_bee.tools import (  # noqa: E402
     ToolCategory,
     ToolDefinition,
+    ToolExecutionError,
     ToolExecutor,
     ToolResult,
     ToolStatus,
@@ -1220,7 +1221,7 @@ class TestToolExecutor:
 
     @pytest.mark.asyncio
     async def test_execute_error(self):
-        """例外発生"""
+        """例外発生時にToolExecutionErrorを検出"""
         executor = ToolExecutor()
 
         def error_handler():
@@ -1229,10 +1230,11 @@ class TestToolExecutor:
         tool = ToolDefinition(name="error")
         executor.register_tool(tool, error_handler)
 
-        result = await executor.execute(tool.tool_id, {})
+        with pytest.raises(ToolExecutionError) as exc_info:
+            await executor.execute(tool.tool_id, {})
 
-        assert result.status == ToolStatus.FAILED
-        assert "Something went wrong" in result.error
+        assert "Something went wrong" in str(exc_info.value)
+        assert exc_info.value.tool_id == tool.tool_id
 
     def test_unregister_tool(self):
         """ツール登録解除"""
@@ -1340,6 +1342,34 @@ class TestToolExecutor:
 
         # Assert
         assert result is None
+
+    @pytest.mark.asyncio
+    async def test_echo_handler_returns_echo_message(self):
+        """echo_handler はメッセージをエコー文字列で返す."""
+        from colonyforge.worker_bee.tools import echo_handler
+
+        # Arrange: 任意のメッセージ
+        message = "hello world"
+
+        # Act
+        result = await echo_handler(message)
+
+        # Assert
+        assert result == "Echo: hello world"
+
+    @pytest.mark.asyncio
+    async def test_sleep_handler_returns_slept_message(self):
+        """sleep_handler はスリープ後にメッセージを返す."""
+        from colonyforge.worker_bee.tools import sleep_handler
+
+        # Arrange: 0秒（即座に完了）
+        seconds = 0
+
+        # Act
+        result = await sleep_handler(seconds)
+
+        # Assert
+        assert result == "Slept for 0s"
 
     @pytest.mark.asyncio
     async def test_execute_by_name_not_found(self):
@@ -1526,6 +1556,7 @@ class TestWorkerProcessManagerCoverageGaps:
 # Retry Executor テスト
 from colonyforge.worker_bee.retry import (  # noqa: E402
     RetryExecutor,
+    RetryExhaustedError,
     RetryPolicy,
     RetryStrategy,
     TimeoutConfig,
@@ -1637,7 +1668,7 @@ class TestRetryExecutor:
 
     @pytest.mark.asyncio
     async def test_execute_max_retries_exceeded(self):
-        """リトライ上限"""
+        """リトライ上限超過時にRetryExhaustedErrorを検出"""
         policy = RetryPolicy(
             strategy=RetryStrategy.FIXED,
             max_retries=2,
@@ -1649,15 +1680,15 @@ class TestRetryExecutor:
         async def always_fail():
             raise ValueError("Always fails")
 
-        result = await executor.execute(always_fail)
+        with pytest.raises(RetryExhaustedError) as exc_info:
+            await executor.execute(always_fail)
 
-        assert not result.success
-        assert "Always fails" in result.error
-        assert result.attempt_count == 3  # 初回 + 2回リトライ
+        assert "Always fails" in str(exc_info.value)
+        assert len(exc_info.value.attempts) == 3  # 初回 + 2回リトライ
 
     @pytest.mark.asyncio
     async def test_execute_timeout(self):
-        """タイムアウト"""
+        """タイムアウト時にRetryExhaustedErrorを検出"""
         executor = RetryExecutor(create_no_retry_policy())
 
         async def slow_op():
@@ -1665,26 +1696,26 @@ class TestRetryExecutor:
             return "done"
 
         timeout = TimeoutConfig(timeout_seconds=0.1)
-        result = await executor.execute(slow_op, timeout)
 
-        assert not result.success
-        assert "Timeout" in result.error
+        with pytest.raises(RetryExhaustedError) as exc_info:
+            await executor.execute(slow_op, timeout)
+
+        assert "Timeout" in str(exc_info.value)
+        assert len(exc_info.value.attempts) == 1
 
     @pytest.mark.asyncio
-    async def test_execute_with_fallback(self):
-        """フォールバック"""
+    async def test_retry_exhausted_error_has_attempts(self):
+        """RetryExhaustedErrorに全試行情報が含まれる"""
         executor = RetryExecutor(create_no_retry_policy())
 
         async def fail_op():
             raise ValueError("Failed")
 
-        async def fallback_op():
-            return "fallback"
+        with pytest.raises(RetryExhaustedError) as exc_info:
+            await executor.execute(fail_op)
 
-        result = await executor.execute_with_fallback(fail_op, fallback_op)
-
-        assert result.success
-        assert result.result == "fallback"
+        assert len(exc_info.value.attempts) == 1
+        assert exc_info.value.attempts[0].error == "Failed"
 
     @pytest.mark.asyncio
     async def test_listeners(self):
@@ -1702,7 +1733,8 @@ class TestRetryExecutor:
         async def fail_op():
             raise ValueError("error")
 
-        await executor.execute(fail_op)
+        with pytest.raises(RetryExhaustedError):
+            await executor.execute(fail_op)
 
         assert len(retries) == 2  # 2回リトライ
 
@@ -1775,40 +1807,40 @@ class TestRetryExecutorAdditional:
     """RetryExecutorの追加テスト（未カバー分岐）"""
 
     @pytest.mark.asyncio
-    async def test_execute_fallback_failure(self):
-        """フォールバックも失敗する場合"""
+    async def test_retry_exhausted_preserves_last_error(self):
+        """リトライ全失敗時に最後のエラーが保存される"""
         executor = RetryExecutor(create_no_retry_policy())
 
         async def fail_op():
             raise ValueError("Primary failed")
 
-        async def failing_fallback():
-            raise RuntimeError("Fallback also failed")
-
         # Act
-        result = await executor.execute_with_fallback(fail_op, failing_fallback)
+        with pytest.raises(RetryExhaustedError) as exc_info:
+            await executor.execute(fail_op)
 
         # Assert
-        assert not result.success
-        assert "Fallback failed" in result.error
+        assert "Primary failed" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_execute_with_sync_fallback(self):
-        """同期フォールバック関数"""
-        executor = RetryExecutor(create_no_retry_policy())
+    async def test_retry_exhausted_with_multiple_attempts(self):
+        """複数回リトライ後の失敗で全試行が記録される"""
+        policy = RetryPolicy(
+            strategy=RetryStrategy.FIXED,
+            max_retries=2,
+            initial_delay=0.01,
+            jitter=False,
+        )
+        executor = RetryExecutor(policy)
 
         async def fail_op():
-            raise ValueError("Primary failed")
-
-        def sync_fallback():
-            return "sync fallback result"
+            raise RuntimeError("Persistent error")
 
         # Act
-        result = await executor.execute_with_fallback(fail_op, sync_fallback)
+        with pytest.raises(RetryExhaustedError) as exc_info:
+            await executor.execute(fail_op)
 
-        # Assert
-        assert result.success
-        assert result.result == "sync fallback result"
+        # Assert: 3回分の試行が記録される
+        assert len(exc_info.value.attempts) == 3
 
     @pytest.mark.asyncio
     async def test_timeout_with_retry_behavior(self):
@@ -1855,7 +1887,9 @@ class TestRetryExecutorAdditional:
             await asyncio.sleep(10)
 
         timeout = TimeoutConfig(timeout_seconds=0.05)
-        await executor.execute(slow_op, timeout)
+
+        with pytest.raises(RetryExhaustedError):
+            await executor.execute(slow_op, timeout)
 
         # Assert
         assert len(timeouts) == 1
@@ -2159,3 +2193,166 @@ class TestWorkerBeeAgentRunnerPromptContext:
         assert runner.agent_info is not None
         assert runner.agent_info.role == AgentRole.WORKER_BEE
         assert runner.agent_info.agent_id == worker_bee.worker_id
+
+
+# ---------------------------------------------------------------------------
+# WorkerProcessManager.start_health_check_loop テスト (L233-244)
+# ---------------------------------------------------------------------------
+
+
+class TestStartHealthCheckLoop:
+    """start_health_check_loop のカバレッジを向上させる."""
+
+    @pytest.mark.asyncio
+    async def test_loop_checks_health_and_stops(self) -> None:
+        """ループが check_health を呼び、_running=False で停止する."""
+        from unittest.mock import patch
+
+        from colonyforge.worker_bee.process import (
+            WorkerPoolConfig,
+            WorkerProcess,
+            WorkerProcessManager,
+            WorkerProcessState,
+        )
+
+        # Arrange: 稼働中の Worker を持つマネージャーを用意
+        config = WorkerPoolConfig(health_check_interval=0.1, auto_restart=False)
+        mgr = WorkerProcessManager(config=config)
+        worker = WorkerProcess(
+            process_id="pid-1",
+            worker_id="w1",
+            colony_id="c1",
+            state=WorkerProcessState.RUNNING,
+        )
+        mgr._workers["pid-1"] = worker
+
+        iteration_count = 0
+
+        async def _fake_sleep(_seconds: float) -> None:
+            nonlocal iteration_count
+            iteration_count += 1
+            # 1回目のイテレーション後にループを停止
+            mgr._running = False
+
+        # Act
+        with patch("asyncio.sleep", new=_fake_sleep):
+            await mgr.start_health_check_loop()
+
+        # Assert: ループが1回実行されて停止した
+        assert mgr._running is False
+        assert iteration_count == 1
+
+    @pytest.mark.asyncio
+    async def test_loop_triggers_restart_on_unhealthy(self) -> None:
+        """ヘルスチェック失敗時に auto_restart=True の場合 restart_worker が呼ばれる."""
+        from unittest.mock import AsyncMock, patch
+
+        from colonyforge.worker_bee.process import (
+            WorkerPoolConfig,
+            WorkerProcess,
+            WorkerProcessManager,
+            WorkerProcessState,
+        )
+
+        # Arrange
+        config = WorkerPoolConfig(
+            health_check_interval=0.1,
+            auto_restart=True,
+        )
+        mgr = WorkerProcessManager(config=config)
+        worker = WorkerProcess(
+            process_id="pid-2",
+            worker_id="w2",
+            colony_id="c2",
+            state=WorkerProcessState.RUNNING,
+            restart_count=0,
+            max_restarts=3,
+        )
+        mgr._workers["pid-2"] = worker
+
+        # check_health が False を返すようモック
+        mgr.check_health = AsyncMock(return_value=False)
+        mgr.restart_worker = AsyncMock(return_value=None)
+
+        async def _fake_sleep(_seconds: float) -> None:
+            mgr._running = False
+
+        # Act
+        with patch("asyncio.sleep", new=_fake_sleep):
+            await mgr.start_health_check_loop()
+
+        # Assert: restart_worker が呼ばれた
+        mgr.check_health.assert_called_once_with("pid-2")
+        mgr.restart_worker.assert_called_once_with("pid-2")
+
+    @pytest.mark.asyncio
+    async def test_loop_skips_non_running_workers(self) -> None:
+        """稼働中でない Worker はヘルスチェックをスキップする."""
+        from unittest.mock import AsyncMock, patch
+
+        from colonyforge.worker_bee.process import (
+            WorkerPoolConfig,
+            WorkerProcess,
+            WorkerProcessManager,
+            WorkerProcessState,
+        )
+
+        # Arrange
+        config = WorkerPoolConfig(health_check_interval=0.1, auto_restart=True)
+        mgr = WorkerProcessManager(config=config)
+        stopped_worker = WorkerProcess(
+            process_id="pid-3",
+            worker_id="w3",
+            colony_id="c3",
+            state=WorkerProcessState.STOPPED,
+        )
+        mgr._workers["pid-3"] = stopped_worker
+        mgr.check_health = AsyncMock()
+
+        async def _fake_sleep(_seconds: float) -> None:
+            mgr._running = False
+
+        # Act
+        with patch("asyncio.sleep", new=_fake_sleep):
+            await mgr.start_health_check_loop()
+
+        # Assert: 停止済み Worker に対して check_health は呼ばれない
+        mgr.check_health.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_loop_skips_restart_when_cannot_restart(self) -> None:
+        """can_restart() が False の場合は restart_worker を呼ばない."""
+        from unittest.mock import AsyncMock, patch
+
+        from colonyforge.worker_bee.process import (
+            WorkerPoolConfig,
+            WorkerProcess,
+            WorkerProcessManager,
+            WorkerProcessState,
+        )
+
+        # Arrange
+        config = WorkerPoolConfig(health_check_interval=0.1, auto_restart=True)
+        mgr = WorkerProcessManager(config=config)
+        worker = WorkerProcess(
+            process_id="pid-4",
+            worker_id="w4",
+            colony_id="c4",
+            state=WorkerProcessState.RUNNING,
+            restart_count=3,
+            max_restarts=3,  # can_restart() → False
+        )
+        mgr._workers["pid-4"] = worker
+        mgr.check_health = AsyncMock(return_value=False)
+        mgr.restart_worker = AsyncMock()
+
+        async def _fake_sleep(_seconds: float) -> None:
+            mgr._running = False
+
+        # Act
+        with patch("asyncio.sleep", new=_fake_sleep):
+            await mgr.start_health_check_loop()
+
+        # Assert: check_health は呼ばれるが restart_worker は呼ばれない
+        mgr.check_health.assert_called_once()
+        mgr.restart_worker.assert_not_called()
