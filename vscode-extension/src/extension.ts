@@ -13,7 +13,6 @@ import { DecisionsProvider } from './providers/decisionsProvider';
 import { ColonyForgeClient } from './client';
 import { registerRunCommands, registerRequirementCommands, registerFilterCommands, registerTaskCommands, registerDecisionCommands, Providers, registerHiveCommands, setHiveTreeProvider, registerColonyCommands, setHiveTreeProviderForColony } from './commands';
 import { HiveTreeDataProvider } from './views/hiveTreeView';
-import { AgentMonitorPanel } from './views/agentMonitorPanel';
 import { HiveMonitorPanel } from './views/hiveMonitorPanel';
 import { registerChatParticipant } from './chatHandler';
 
@@ -69,10 +68,14 @@ export function activate(context: vscode.ExtensionContext) {
         })
     );
 
-    // Agent Monitor コマンド
+    // Agent Monitor コマンド (deprecated: v0.3.0 で Hive Monitor に統合予定)
     context.subscriptions.push(
         vscode.commands.registerCommand('colonyforge.showAgentMonitor', () => {
-            AgentMonitorPanel.createOrShow(context.extensionUri, client);
+            vscode.window.showInformationMessage(
+                'Agent Monitor は Hive Monitor に統合されました。Hive Monitor を開きます。',
+                'OK'
+            );
+            HiveMonitorPanel.createOrShow(context.extensionUri, client);
         })
     );
 

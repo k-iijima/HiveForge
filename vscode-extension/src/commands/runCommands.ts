@@ -9,7 +9,7 @@ import { TasksProvider } from '../providers/tasksProvider';
 import { RequirementsProvider } from '../providers/requirementsProvider';
 import { EventsProvider } from '../providers/eventsProvider';
 import { DecisionsProvider } from '../providers/decisionsProvider';
-import { DashboardPanel } from '../views/dashboardPanel';
+import { HiveMonitorPanel } from '../views/hiveMonitorPanel';
 
 import { RunItem } from '../providers/runsProvider';
 import { HiveEvent } from '../client';
@@ -51,7 +51,8 @@ function showDashboard(context: vscode.ExtensionContext, client: ColonyForgeClie
         providers.requirements.refresh();
         providers.events.refresh();
     }
-    DashboardPanel.createOrShow(context.extensionUri, client);
+    // deprecated: DashboardPanel → HiveMonitor に統合 (v0.3.0)
+    HiveMonitorPanel.createOrShow(context.extensionUri, client);
 }
 
 async function startRun(client: ColonyForgeClient, refresh: () => void): Promise<void> {
