@@ -10,6 +10,7 @@ import argparse
 import json
 import os
 import subprocess
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -739,9 +740,9 @@ class TestRouteEventToLayout:
         route_event_to_layout(event, layout)
 
         # Assert
-        queen_content = layout.colonies["col-fe"].queen_log.read_text()
+        queen_content = Path(layout.colonies["col-fe"].queen_log).read_text()
         assert "queen thinking" in queen_content
-        overview_content = layout.overview_log.read_text()
+        overview_content = Path(layout.overview_log).read_text()
         assert "queen thinking" in overview_content
 
     def test_worker_event_routed_to_worker_log(self, tmp_path):
@@ -759,7 +760,7 @@ class TestRouteEventToLayout:
         route_event_to_layout(event, layout)
 
         # Assert
-        w1_content = layout.colonies["col-fe"].worker_logs["w-1"].read_text()
+        w1_content = Path(layout.colonies["col-fe"].worker_logs["w-1"]).read_text()
         assert "running tool" in w1_content
 
     def test_beekeeper_event_routed_to_standalone(self, tmp_path):
@@ -777,7 +778,7 @@ class TestRouteEventToLayout:
         route_event_to_layout(event, layout)
 
         # Assert
-        bk_content = layout.standalone_logs["bk-A"].read_text()
+        bk_content = Path(layout.standalone_logs["bk-A"]).read_text()
         assert "assigning hive" in bk_content
 
     def test_unknown_agent_without_colony_goes_to_standalone(self, tmp_path):
