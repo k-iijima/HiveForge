@@ -8,10 +8,8 @@ from __future__ import annotations
 
 import asyncio
 import json
-import random
-
-from typing import Any
 from collections.abc import AsyncGenerator
+from typing import Any
 
 from fastapi import APIRouter, Query
 from fastapi.responses import StreamingResponse
