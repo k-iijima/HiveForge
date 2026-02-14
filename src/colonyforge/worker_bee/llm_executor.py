@@ -7,7 +7,12 @@ WorkerBeeMCPServer に mix-in される。
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from ..core import AkashicRecord
+    from ..core.config import LLMConfig
+    from .models import WorkerContext
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +26,20 @@ class LLMExecutorMixin:
     - handle_report_progress(), handle_receive_task()
     - handle_complete_task(), handle_fail_task()
     """
+
+    if TYPE_CHECKING:
+        worker_id: str
+        ar: AkashicRecord
+        context: WorkerContext
+        llm_config: LLMConfig | None
+
+        async def handle_report_progress(self, arguments: dict[str, Any]) -> dict[str, Any]: ...
+        async def handle_receive_task(self, arguments: dict[str, Any]) -> dict[str, Any]: ...
+        async def handle_complete_task(self, arguments: dict[str, Any]) -> dict[str, Any]: ...
+        async def handle_fail_task(self, arguments: dict[str, Any]) -> dict[str, Any]: ...
+
+    _llm_client: Any = None
+    _agent_runner: Any = None
 
     async def _get_llm_client(self) -> Any:
         """LLMクライアントを取得（遅延初期化）"""

@@ -360,7 +360,7 @@ class RAStateMachine(StateMachine):
                     f"Valid outcomes: {list(self._GUARD_GATE_OUTCOMES.keys())}"
                 )
             self.current_state = target
-            return target  # type: ignore[return-value]
+            return target
 
         result = super().transition(event)
         return result  # type: ignore[return-value]

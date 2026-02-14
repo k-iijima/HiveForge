@@ -201,10 +201,9 @@ class ContextForager:
             goal = event.payload.get("goal", "")
             score = self._relevance_score(goal, keywords)
             if score > 0.0:
-                outcome = event.payload.get(
-                    "outcome",
-                    _RUN_OUTCOME_MAP.get(event.type, "UNKNOWN"),  # type: ignore[arg-type]
-                )
+                event_type = EventType(event.type) if isinstance(event.type, str) else event.type
+                default_outcome = _RUN_OUTCOME_MAP.get(event_type, "UNKNOWN")
+                outcome: str = event.payload.get("outcome", default_outcome)
                 results.append(
                     RunRef(
                         run_id=event.id,

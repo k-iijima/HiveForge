@@ -18,7 +18,8 @@ from typing import Any
 from ..core import AkashicRecord
 from ..core.config import LLMConfig
 from ..core.models.action_class import TrustLevel
-from ..worker_bee.server import WorkerBeeMCPServer, WorkerState
+from ..worker_bee.models import WorkerState
+from ..worker_bee.server import WorkerBeeMCPServer
 from .execution import ExecutionMixin
 from .pipeline_execution import PipelineExecutionMixin
 from .task_runner import TaskRunnerMixin

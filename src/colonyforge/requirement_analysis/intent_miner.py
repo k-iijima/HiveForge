@@ -121,4 +121,5 @@ def _parse_json_response(content: str) -> dict[str, Any]:
     match = re.search(r"```(?:json)?\s*\n?(.*?)\n?\s*```", content, re.DOTALL)
     json_str = match.group(1).strip() if match else content.strip()
 
-    return json.loads(json_str)
+    result: dict[str, Any] = json.loads(json_str)
+    return result

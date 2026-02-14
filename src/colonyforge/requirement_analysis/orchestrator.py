@@ -538,7 +538,7 @@ class RAOrchestrator:
 
         prev_hash = self.events[-1].hash if self.events else None
 
-        event = event_class(
+        event = event_class(  # type: ignore[call-arg]  # subclass provides type default
             payload=event_payload,
             prev_hash=prev_hash,
         )
