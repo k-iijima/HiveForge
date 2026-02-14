@@ -36,7 +36,7 @@ governance:
 # -----------------------------------------------------------------------------
 llm:
   provider: "openai"              # プロバイダー名（上記リストから選択）
-  model: "gpt-4o"                 # 使用モデル名
+  model: "gpt-5"                 # 使用モデル名
   api_key_env: "OPENAI_API_KEY"   # APIキーを格納する環境変数名
   max_tokens: 4096                # 最大トークン数
   temperature: 0.2                # 生成温度（0.0-2.0、低いほど決定的）

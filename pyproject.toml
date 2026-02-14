@@ -43,6 +43,7 @@ dev = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.23.0",
     "pytest-benchmark>=4.0.0",
+    "pytest-bdd>=8.0.0",
     "pytest-cov>=4.1.0",
     "pytest-rerunfailures>=14.0.0",
     "pytest-timeout>=2.2.0",
@@ -51,6 +52,7 @@ dev = [
     "mypy>=1.8.0",
     "types-PyYAML>=6.0.0",
     "pyautogui>=0.9.54",
+    "doorstop>=3.0",
 ]
 
 vlm = ["anthropic>=0.18.0", "playwright>=1.41.0", "pyautogui>=0.9.54"]
