@@ -20,6 +20,7 @@ import subprocess
 import sys
 import time
 from collections.abc import Iterator
+from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 # アイコン定義
@@ -132,6 +133,14 @@ def run_single_terminal(server_url: str) -> None:
     print(f"{_DIM}SSE: {stream_url}{_RESET}")
     print(f"{_DIM}Ctrl+C で終了{_RESET}")
     print("─" * 60)
+
+    # 既存イベントを表示
+    recent = _fetch_recent_events(server_url)
+    if recent:
+        print(f"{_DIM}--- 直近 {len(recent)} 件 ---{_RESET}")
+        for event in recent:
+            print(format_event(event))
+        print(f"{_DIM}--- リアルタイム ---{_RESET}")
 
     try:
         for event in iter_sse_events(stream_url):
@@ -276,6 +285,19 @@ def _create_monitor_session(agent_ids: list[str]) -> dict[str, str]:
 # =============================================================================
 
 
+def _fetch_recent_events(server_url: str, limit: int = 50) -> list[dict[str, object]]:
+    """GET /activity/recent から既存イベントを取得する。"""
+    url = f"{server_url.rstrip('/')}/activity/recent?limit={limit}"
+    try:
+        req = Request(url)
+        with urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            events: list[dict[str, object]] = data.get("events", [])
+            return events
+    except Exception:
+        return []
+
+
 def _fetch_initial_agents(server_url: str) -> list[str]:
     """初期のアクティブエージェント一覧を取得する。"""
     url = f"{server_url.rstrip('/')}/activity/agents"
@@ -358,6 +380,18 @@ def run_tmux_monitor(server_url: str) -> None:
     print("   Ctrl+C でイベントルーティングを停止します。")
     print()
 
+    # 既存イベントをペインに表示
+    recent = _fetch_recent_events(server_url)
+    for event in recent:
+        agent = event.get("agent", {})
+        if not isinstance(agent, dict):
+            agent = {}
+        agent_id_r: str = str(agent.get("agent_id", "?"))
+        formatted_r = format_event(event, color=False)
+        _write_to_log(overview_log, formatted_r)
+        if agent_id_r in agent_logs:
+            _write_to_log(agent_logs[agent_id_r], formatted_r)
+
     # SSE ストリームを購読してペインにルーティング
     try:
         for event in iter_sse_events(stream_url):
@@ -417,10 +451,38 @@ def run_tmux_monitor(server_url: str) -> None:
 # =============================================================================
 
 
+def _seed_server(server_url: str) -> bool:
+    """POST /activity/seed を呼んでデモデータを投入する。
+
+    Returns:
+        成功したら True
+    """
+    url = f"{server_url.rstrip('/')}/activity/seed"
+    try:
+        req = Request(url, data=b"{}", method="POST")
+        req.add_header("Content-Type", "application/json")
+        with urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            agents = data.get("agents_registered", 0)
+            events = data.get("events_emitted", 0)
+            print(f"   \U0001f331 Seed: {agents} agents, {events} events")
+            return True
+    except (URLError, OSError) as exc:
+        print(
+            f"{_DIM}[monitor] seed 失敗: {exc}{_RESET}",
+            file=sys.stderr,
+        )
+        return False
+
+
 def monitor_main(args: argparse.Namespace) -> None:
     """monitor コマンドのエントリポイント。"""
     server_url: str = args.server_url
     no_tmux: bool = args.no_tmux
+    seed: bool = getattr(args, "seed", False)
+
+    if seed:
+        _seed_server(server_url)
 
     if no_tmux:
         run_single_terminal(server_url)

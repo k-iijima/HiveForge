@@ -62,6 +62,11 @@ def main() -> None:
         action="store_true",
         help="tmuxを使わず単一ターミナルで出力",
     )
+    monitor_parser.add_argument(
+        "--seed",
+        action="store_true",
+        help="デモ用エージェント・イベントを自動投入してから開始",
+    )
 
     # record-decision コマンド
     decision_parser = subparsers.add_parser(

@@ -22,11 +22,14 @@ from colonyforge.monitor import (
     _create_monitor_session,
     _fetch_hierarchy,
     _fetch_initial_agents,
+    _fetch_recent_events,
     _kill_session,
+    _seed_server,
     _session_exists,
     _write_to_log,
     format_event,
     monitor_main,
+    run_single_terminal,
     run_tmux_monitor,
 )
 
@@ -404,6 +407,130 @@ class TestFetchHierarchy:
 
 
 # =============================================================================
+# _fetch_recent_events テスト
+# =============================================================================
+
+
+class TestFetchRecentEvents:
+    """既存イベント取得のテスト"""
+
+    @patch("colonyforge.monitor.urlopen")
+    def test_returns_events(self, mock_urlopen):
+        """APIから既存イベント一覧を取得できる"""
+        # Arrange: 2件のイベントを返すレスポンス
+        response_data = {
+            "events": [
+                {
+                    "event_id": "e1",
+                    "activity_type": "agent.started",
+                    "agent": {"agent_id": "w-1", "role": "worker_bee"},
+                    "summary": "started",
+                    "timestamp": "2026-01-01T00:00:00Z",
+                },
+                {
+                    "event_id": "e2",
+                    "activity_type": "llm.request",
+                    "agent": {"agent_id": "w-1", "role": "worker_bee"},
+                    "summary": "thinking",
+                    "timestamp": "2026-01-01T00:00:01Z",
+                },
+            ]
+        }
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = json.dumps(response_data).encode("utf-8")
+        mock_resp.__enter__ = MagicMock(return_value=mock_resp)
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value = mock_resp
+
+        # Act
+        result = _fetch_recent_events("http://localhost:8000")
+
+        # Assert: 2件取得できる
+        assert len(result) == 2
+        assert result[0]["event_id"] == "e1"
+        assert result[1]["event_id"] == "e2"
+
+    @patch("colonyforge.monitor.urlopen")
+    def test_returns_empty_on_error(self, mock_urlopen):
+        """APIエラー時は空リストを返す"""
+        # Arrange
+        mock_urlopen.side_effect = ConnectionError("refused")
+
+        # Act
+        result = _fetch_recent_events("http://localhost:9999")
+
+        # Assert
+        assert result == []
+
+    @patch("colonyforge.monitor.urlopen")
+    def test_passes_limit_parameter(self, mock_urlopen):
+        """limit パラメータがURLに含まれる"""
+        # Arrange
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = json.dumps({"events": []}).encode()
+        mock_resp.__enter__ = MagicMock(return_value=mock_resp)
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value = mock_resp
+
+        # Act
+        _fetch_recent_events("http://localhost:8000", limit=10)
+
+        # Assert: URLにlimit=10が含まれる
+        call_args = mock_urlopen.call_args
+        req = call_args[0][0]
+        assert "limit=10" in req.full_url
+
+
+# =============================================================================
+# run_single_terminal 既存イベント表示テスト
+# =============================================================================
+
+
+class TestRunSingleTerminalRecentEvents:
+    """単一ターミナルモードで既存イベントが表示されるテスト"""
+
+    @patch("colonyforge.monitor.iter_sse_events")
+    @patch("colonyforge.monitor._fetch_recent_events")
+    def test_shows_recent_events_on_startup(self, mock_fetch_recent, mock_iter_sse, capsys):
+        """起動時に既存イベントが表示される"""
+        # Arrange: 既存イベント2件、SSEは空
+        mock_fetch_recent.return_value = [
+            {
+                "event_id": "e1",
+                "activity_type": "agent.started",
+                "agent": {"agent_id": "w-1", "role": "worker_bee"},
+                "summary": "started",
+                "timestamp": "2026-01-01T00:00:00Z",
+            },
+        ]
+        mock_iter_sse.return_value = iter([])  # SSEは即終了
+
+        # Act
+        run_single_terminal("http://localhost:8000")
+
+        # Assert: 既存イベントが出力に含まれる
+        captured = capsys.readouterr()
+        assert "直近 1 件" in captured.out
+        assert "w-1" in captured.out
+        assert "started" in captured.out
+
+    @patch("colonyforge.monitor.iter_sse_events")
+    @patch("colonyforge.monitor._fetch_recent_events")
+    def test_no_recent_header_when_empty(self, mock_fetch_recent, mock_iter_sse, capsys):
+        """既存イベントがない場合はヘッダーを表示しない"""
+        # Arrange
+        mock_fetch_recent.return_value = []
+        mock_iter_sse.return_value = iter([])
+
+        # Act
+        run_single_terminal("http://localhost:8000")
+
+        # Assert
+        captured = capsys.readouterr()
+        assert "直近" not in captured.out
+
+
+# =============================================================================
 # monitor_main テスト
 # =============================================================================
 
@@ -553,3 +680,109 @@ class TestCLIIntegration:
             assert args.server_url == "http://custom:9000"
         finally:
             sys.argv = original_argv
+
+    @patch("colonyforge.cli.run_monitor")
+    def test_monitor_seed_flag(self, mock_run_monitor):
+        """--seed フラグが正しく渡される"""
+        # Arrange
+        import sys
+
+        original_argv = sys.argv
+
+        try:
+            sys.argv = [
+                "colonyforge",
+                "monitor",
+                "--no-tmux",
+                "--seed",
+            ]
+
+            # Act
+            from colonyforge.cli import main
+
+            main()
+
+            # Assert
+            args = mock_run_monitor.call_args[0][0]
+            assert args.seed is True
+        finally:
+            sys.argv = original_argv
+
+
+# =============================================================================
+# _seed_server テスト
+# =============================================================================
+
+
+class TestSeedServer:
+    """_seed_server のテスト"""
+
+    @patch("colonyforge.monitor.urlopen")
+    def test_seed_success(self, mock_urlopen):
+        """seed成功時にTrueを返し、エージェント数・イベント数を表示する"""
+        # Arrange
+        response_data = json.dumps(
+            {"status": "ok", "agents_registered": 7, "events_emitted": 30}
+        ).encode()
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = response_data
+        mock_resp.__enter__ = MagicMock(return_value=mock_resp)
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value = mock_resp
+
+        # Act
+        result = _seed_server("http://localhost:8000")
+
+        # Assert
+        assert result is True
+        mock_urlopen.assert_called_once()
+
+    @patch("colonyforge.monitor.urlopen")
+    def test_seed_connection_error(self, mock_urlopen):
+        """接続エラー時にFalseを返す"""
+        # Arrange
+        from urllib.error import URLError
+
+        mock_urlopen.side_effect = URLError("Connection refused")
+
+        # Act
+        result = _seed_server("http://localhost:9999")
+
+        # Assert
+        assert result is False
+
+    @patch("colonyforge.monitor.run_single_terminal")
+    @patch("colonyforge.monitor._seed_server")
+    def test_monitor_main_with_seed(self, mock_seed, mock_single):
+        """--seed 指定時に _seed_server が呼ばれる"""
+        # Arrange
+        args = argparse.Namespace(
+            server_url="http://localhost:8000",
+            no_tmux=True,
+            seed=True,
+        )
+
+        # Act
+        monitor_main(args)
+
+        # Assert
+        mock_seed.assert_called_once_with("http://localhost:8000")
+        mock_single.assert_called_once()
+
+    @patch("colonyforge.monitor.run_single_terminal")
+    @patch("colonyforge.monitor._seed_server")
+    def test_monitor_main_without_seed(self, mock_seed, mock_single):
+        """--seed 未指定時は _seed_server が呼ばれない"""
+        # Arrange
+        args = argparse.Namespace(
+            server_url="http://localhost:8000",
+            no_tmux=True,
+            seed=False,
+        )
+
+        # Act
+        monitor_main(args)
+
+        # Assert
+        mock_seed.assert_not_called()
+        mock_single.assert_called_once()
