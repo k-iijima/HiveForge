@@ -98,7 +98,7 @@ ColonyForge のユーザー（開発者）は **Beekeeper** を通じてシス�
 | **KPI** | KPI ゲージ 15 本 + Outcomes + Failure Classes + Colony セレクタ | Hive Monitor (renderKPI) + **新規** | `/kpi/evaluation`, `/kpi/colonies`, **新規**: `/kpi/event-counters` |
 | **Activity** | 左:階層ツリー + 右:Activity ログ（2ペイン） | Agent Monitor | `/activity/hierarchy`, `/activity/recent` |
 
-### 2.4 ビジュアル強化 — 吹き出し (Speech Bubble) UI
+### 2.3 ビジュアル強化 — 吹き出し (Speech Bubble) UI
 
 > **「何が行われているか見えること」は開発者 UX において最重要要素である。**
 
@@ -156,7 +156,25 @@ ColonyForge のユーザー（開発者）は **Beekeeper** を通じてシス�
 - 各エージェントノード（Queen / Worker）の**上部**に表示
 - Colony レベルの吹き出しは Colony ノードの上部
 - 最新 1 件のみ表示（複数吹き出しのフラッディングを防止）
-- summary テキストを 30 文字で truncate
+- summary テキストを 30 **grapheme cluster** 単位で truncate（日本語・絵文字で崩れない）
+
+#### セキュリティ要件
+
+- `summary` の HTML 差し込みは **必ず `esc()` 関数でエスケープ**
+- `innerHTML` への直接代入は禁止、`textContent` 経由に統一
+- XSS テスト: `summary` に `<script>alert(1)</script>` が来てもテキスト表示されること
+
+#### アクセシビリティ要件
+
+- **色だけで状態差を表さない**: アイコン＋ラベル併記で視覚障害者にも状態が伝わる
+- **`prefers-reduced-motion` 対応**: パルスアニメーションを無効にするモード
+
+```css
+@media (prefers-reduced-motion: reduce) {
+    .bubble-ongoing { animation: none; }
+    .status-indicator.active { animation: none; }
+}
+```
 
 #### エージェントノードの可視化強化
 
@@ -174,7 +192,7 @@ Beekeeper ─── Hive ─── Colony ──┬── Queen (フルノード
 - 吹き出し（最新アクティビティ）
 - ロールアイコン（👑 / 🐝）
 
-### 2.3 ユーザー動線 (To-Be)
+### 2.4 ユーザー動線 (To-Be)
 
 ```
 ユーザー
@@ -211,8 +229,16 @@ AR イベントストアから Guard/Sentinel/Escalation カウンターを**自
 async def get_event_counters(
     colony_id: str | None = Query(default=None),
     run_id: str | None = Query(default=None),
+    from_ts: datetime | None = Query(default=None, description="集計開始日時 (inclusive)"),
+    to_ts: datetime | None = Query(default=None, description="集計終了日時 (exclusive)"),
 ) -> dict[str, int]:
     """ARイベントから品質ゲートカウンターを自動集計
+
+    集計スコープ:
+        1. run_id 指定時: 当該 Run のイベントのみ
+        2. colony_id + 期間指定時: 当該 Colony の期間内イベント
+        3. colony_id のみ: 当該 Colony の全期間
+        4. 全未指定: 400 Bad Request（無制限走査を防止）
 
     Returns:
         guard_pass_count, guard_conditional_count, guard_fail_count,
@@ -223,6 +249,21 @@ async def get_event_counters(
         referee_selected_count, referee_candidate_count
     """
 ```
+
+**集計スコープのバリデーション:**
+
+| `run_id` | `colony_id` | `from_ts` / `to_ts` | 挙動 |
+|----------|-------------|---------------------|------|
+| 指定     | 任意        | 任意                | run_id のイベントのみ集計 |
+| 未指定   | 指定        | 指定                | colony_id + 期間で集計 |
+| 未指定   | 指定        | 未指定              | colony_id の全期間 |
+| 未指定   | 未指定      | -                   | **400 Bad Request** |
+
+**重複イベント対策:**
+
+- `event_id` ベースの**一意性保証**により二重カウントを防止
+- AR イベントストアへの書き込み時に `event_id` の UNIQUE 制約を保証
+- 集計クエリでは `DISTINCT event_id` を使用し、再送・再読込による二重加算を排除
 
 **集計対象イベント（EventType → カウンター）:**
 
@@ -240,29 +281,104 @@ async def get_event_counters(
 
 **false_alarm 判定**: `sentinel.alert_raised` イベントの payload に `false_alarm: true` フィールドが存在する場合にカウント。存在しない場合は 0。
 
-#### 3.1.2 `GET /kpi/evaluation` の拡張
+#### 3.1.2 `GET /kpi/evaluation` の拡張 — `count_mode` 導入
 
-カウンターパラメータが**全て 0 の場合**（＝フロントエンドが渡さない場合）、  
-内部で `get_event_counters()` を呼び出して自動補完する。
+従来の `auto_count: bool` フラグでは「意図的に 0 を渡した」と「未指定で 0」の区別がつかない。  
+これを `count_mode` パラメータで明確化する。
 
 ```python
+from enum import Enum
+
+class CountMode(str, Enum):
+    AUTO = "auto"      # ARイベントからのみ集計（手動カウンタ無視）
+    MANUAL = "manual"  # 入力値をそのまま使用
+    MIXED = "mixed"    # 手動値を優先、None の項目だけ自動補完
+
 @router.get("/evaluation")
 async def get_evaluation_summary(
     colony_id: str | None = Query(default=None),
-    # ...既存カウンターパラメータ（すべて default=0 のまま）...
-    auto_count: bool = Query(default=True, description="ARイベントから自動集計する"),
+    run_id: str | None = Query(default=None),
+    count_mode: CountMode = Query(default=CountMode.AUTO, description="カウンタ集計モード"),
+    # 全カウンターパラメータを Optional[int] = None に変更
+    guard_pass_count: int | None = Query(default=None),
+    guard_conditional_count: int | None = Query(default=None),
+    guard_fail_count: int | None = Query(default=None),
+    guard_total_count: int | None = Query(default=None),
+    guard_reject_count: int | None = Query(default=None),
+    sentinel_alert_count: int | None = Query(default=None),
+    sentinel_false_alarm_count: int | None = Query(default=None),
+    total_monitoring_periods: int | None = Query(default=None),
+    escalation_count: int | None = Query(default=None),
+    decision_count: int | None = Query(default=None),
+    referee_selected_count: int | None = Query(default=None),
+    referee_candidate_count: int | None = Query(default=None),
 ) -> dict[str, Any]:
-    if auto_count and all(v == 0 for v in [guard_pass_count, ...]):
-        counters = await get_event_counters(colony_id=colony_id)
-        # counters でパラメータを上書き
+    if count_mode == CountMode.AUTO:
+        counters = await get_event_counters(
+            colony_id=colony_id, run_id=run_id
+        )
+        # 全カウンターをイベント集計値で上書き
+    elif count_mode == CountMode.MIXED:
+        auto = await get_event_counters(
+            colony_id=colony_id, run_id=run_id
+        )
+        # None の項目だけ自動補完、手動値があればそちらを優先
+        guard_pass_count = guard_pass_count if guard_pass_count is not None else auto["guard_pass_count"]
+        # ... 同様に全項目 ...
+    # MANUAL: 入力値をそのまま使用（None は 0 として扱う）
 ```
 
-**後方互換性**: 既存の手動カウンター渡しも引き続き動作。`auto_count=False` で無効化可能。
+**モード別の動作:**
+
+| `count_mode` | 動作 | ユースケース |
+|-------------|------|-------------|
+| `auto`（デフォルト） | AR イベントからのみ自動集計。手動パラメータ無視 | 通常の Web UI からの利用 |
+| `manual` | 入力値をそのまま使用。`None` は 0 扱い | テスト、外部システム連携 |
+| `mixed` | 手動値を優先し、`None` の項目だけ自動補完 | 部分的に外部カウンタを持つケース |
+
+**後方互換性**: デフォルトが `auto` なので、既存のカウンタ未指定呼び出しは自動集計に移行。  
+明示的に 0 を渡す場合は `count_mode=manual` を指定すれば意図が保たれる。
 
 #### 3.1.3 Failure Class 詳細エンドポイント
 
 既にバックエンドの `EvaluationSummary.failure_classes` に `dict[FailureClass, int]` が含まれている。  
 フロントエンド側の描画追加のみ（バックエンド変更不要）。
+
+**将来互換性（Enum 追加時の安全策）:**
+
+- フロントエンドは**未知のキー**を `Other` バケットに退避して表示
+- 表示順は**重大度順**で固定（`LOGIC > INTEGRATION > CONFIG > ENVIRONMENT > FLAKY > OTHER`）
+- 0 件のカテゴリは**畳んで非表示**（UI のノイズ削減）
+- バックエンドの `FailureClass` Enum に新値が追加されてもフロントが壊れない
+
+#### 3.1.4 KPI 整合性の不変条件
+
+API レスポンスの内部整合性を**バックエンドテストで保証**する。  
+これにより集計ロジックのバグを早期検出する。
+
+| 不変条件 | 意味 |
+|---------|------|
+| `guard_total_count == guard_pass_count + guard_conditional_count + guard_fail_count` | Guard 結果は 3 分類の合計と一致 |
+| `guard_reject_count <= guard_fail_count` | reject は fail の部分集合 |
+| `sentinel_false_alarm_count <= sentinel_alert_count` | 誤報はアラートの部分集合 |
+| `decision_count >= referee_selected_count` | 選定は意思決定の部分集合 |
+
+```python
+# tests/test_kpi_event_counters.py に追加
+def test_kpi_invariants(counters: dict[str, int]):
+    """KPIカウンターの不変条件を検証"""
+    # Arrange: counters は get_event_counters() の戻り値
+
+    # Assert: 不変条件
+    assert counters["guard_total_count"] == (
+        counters["guard_pass_count"]
+        + counters["guard_conditional_count"]
+        + counters["guard_fail_count"]
+    )
+    assert counters["guard_reject_count"] <= counters["guard_fail_count"]
+    assert counters["sentinel_false_alarm_count"] <= counters["sentinel_alert_count"]
+    assert counters["decision_count"] >= counters["referee_selected_count"]
+```
 
 ### 3.2 フロントエンド変更
 
@@ -353,49 +469,63 @@ async def get_evaluation_summary(
 </div>
 ```
 
-**データフロー (To-Be):**
+**データフロー (To-Be) — タブ別更新頻度分離:**
+
+| タブ | 更新頻度 | 理由 |
+|------|---------|------|
+| Monitor / Activity | 2秒 | リアルタイム監視が目的 |
+| KPI | 10秒 or 手動 Refresh | 集計値は高頻度更新不要 |
+| **非表示タブ** | **取得抑制** | バックグラウンド負荷削減 |
 
 ```
 _update() {
-    // 共通データ（全タブで必要）
-    const [hierarchy, events] = await Promise.all([
-        client.getActivityHierarchy(),
-        client.getRecentActivity(50),
-    ]);
+    const activeTab = currentTab; // 'monitor' | 'kpi' | 'activity'
 
-    // KPI データ（KPI タブ用、失敗しても他タブに影響なし）
-    let evaluation = null;
-    try {
-        evaluation = await client.getEvaluation(selectedColonyId);
-    } catch { /* ignore */ }
+    // Monitor / Activity タブがアクティブ時のみ取得
+    if (activeTab === 'monitor' || activeTab === 'activity') {
+        const [hierarchy, events] = await Promise.all([
+            client.getActivityHierarchy(),
+            client.getRecentActivity(50),
+        ]);
+        postMessage({ command: 'updateMonitor', hives, recentEvents, hierarchy });
+    }
+
+    // KPI タブがアクティブ時のみ取得（10秒間隔 or 手動）
+    if (activeTab === 'kpi' && (now - lastKpiFetch > 10_000 || forceRefresh)) {
+        const evaluation = await client.getEvaluation(
+            selectedColonyId, CountMode.AUTO
+        );
+        postMessage({ command: 'updateKPI', evaluation, colonies });
+        lastKpiFetch = now;
+    }
 
     // Colony 一覧（初回 or Colony セレクタ更新時のみ）
     if (!coloniesLoaded) {
         colonies = await client.getKPIColonies();
         coloniesLoaded = true;
     }
-
-    postMessage({
-        command: 'updateData',
-        hives,              // Monitor タブ用
-        recentEvents,       // Monitor (Ticker) + Activity (ログ) 用
-        hierarchy,          // Activity (階層ツリー) 用
-        evaluation,         // KPI タブ用
-        colonies,           // Colony セレクタ用
-    });
 }
 ```
 
+**セキュリティ要件 (XSS 防止):**
+
+- 全てのユーザー由来テキスト（`summary`, `agent_id`, `colony_id` 等）は `esc()` 関数でエスケープ
+- `esc()` は `textContent` → `innerHTML` 変換で実装（DOM パーサーによる安全なエスケープ）
+- `innerHTML` への直接代入はエスケープ済みテンプレートのみ許可
+
 #### 3.2.5 client.ts 変更
 
-`getEvaluation()` メソッドに `auto_count` パラメータ対応を追加:
+`getEvaluation()` メソッドに `count_mode` パラメータ対応を追加:
 
 ```typescript
-async getEvaluation(colonyId?: string): Promise<EvaluationSummary> {
+async getEvaluation(
+    colonyId?: string,
+    countMode: 'auto' | 'manual' | 'mixed' = 'auto',
+): Promise<EvaluationSummary> {
     const response = await this.client.get<EvaluationSummary>('/kpi/evaluation', {
         params: {
             ...(colonyId ? { colony_id: colonyId } : {}),
-            auto_count: true,  // ← 追加
+            count_mode: countMode,  // ← auto_count から変更
         },
     });
     return response.data;
@@ -420,13 +550,20 @@ Dashboard ボタン → Hive Monitor ボタンへのリダイレクト:
 | テストファイル | テスト内容 |
 |---------------|-----------|
 | `tests/test_kpi_event_counters.py` | `GET /kpi/event-counters` — 各 EventType のカウント正確性 |
-| `tests/test_kpi.py` (追加) | `auto_count=True` 時の evaluation 自動集計 |
+| `tests/test_kpi_event_counters_scope.py` | run_id 指定時に他 run が混ざらない、期間境界 (inclusive/exclusive) 確認 |
+| `tests/test_kpi_event_counters_idempotency.py` | 重複イベント入力時の集計安定性 |
+| `tests/test_kpi_evaluation_modes.py` | `count_mode=auto/manual/mixed` 各動作検証 |
+| `tests/test_kpi.py` (追加) | KPI 不変条件検証 (`guard_total == pass + conditional + fail` 等) |
 
 #### 3.3.2 フロントエンド変更テスト
 
 | テストファイル | 変更内容 |
-|---------------|---------|
+|---------------|--------|
 | `vscode-extension/src/test/hiveMonitorPanel.test.ts` | タブ切替、Colony セレクタ、Activity 2 ペイン |
+| 　　　(同上) | タブ切替で更新対象 API が変わること |
+| 　　　(同上) | 非表示タブで不要ポーリングしないこと |
+| 　　　(同上) | colony selector 変更時に KPI のみ再取得すること |
+| 　　　(同上) | **XSS防止**: summary に `<script>alert(1)</script>` が来てもテキスト表示 |
 | `vscode-extension/src/test/dashboardPanel.test.ts` | **削除** |
 | `vscode-extension/src/test/agentMonitorPanel.test.ts` | **削除** |
 | `vscode-extension/src/test/extension.test.ts` | Dashboard/AgentMonitor コマンド削除に対応 |
@@ -439,10 +576,11 @@ Dashboard ボタン → Hive Monitor ボタンへのリダイレクト:
 
 | Step | 内容 | TDD |
 |------|------|-----|
-| 1-1 | `test_kpi_event_counters.py` 作成 | RED |
-| 1-2 | `GET /kpi/event-counters` 実装 | GREEN |
-| 1-3 | `GET /kpi/evaluation` に `auto_count` 追加 | GREEN |
-| 1-4 | リファクタ + コミット | REFACTOR |
+| 1-1 | `test_kpi_event_counters.py` 作成（スコープ・重複・不変条件含む） | RED |
+| 1-2 | `GET /kpi/event-counters` 実装（from_ts/to_ts/dedup含む） | GREEN |
+| 1-3 | `GET /kpi/evaluation` に `count_mode` 追加 | GREEN |
+| 1-4 | `test_kpi_evaluation_modes.py` 追加 | RED → GREEN |
+| 1-5 | リファクタ + コミット | REFACTOR |
 
 ### Phase 2: フロントエンド統合
 
@@ -451,7 +589,7 @@ Dashboard ボタン → Hive Monitor ボタンへのリダイレクト:
 | 2-1 | hiveMonitorPanel.ts にタブ UI 追加 | - |
 | 2-2 | Activity タブ統合（Agent Monitor 2 ペイン移植） | - |
 | 2-3 | KPI タブ改善（Colony セレクタ + Failure Classes） | - |
-| 2-4 | client.ts に `auto_count` 対応 | - |
+| 2-4 | client.ts に `count_mode` 対応 | - |
 | 2-5 | dashboardPanel.ts / agentMonitorPanel.ts 削除 | - |
 | 2-6 | package.json / extension.ts / commands 整理 | - |
 | 2-7 | テスト更新 | - |
@@ -491,12 +629,22 @@ Dashboard ボタン → Hive Monitor ボタンへのリダイレクト:
 | extension.ts 変更 | -15 行 |
 | **純増減** | **≈ −490 行** |
 
-### 5.3 破壊的変更
+### 5.3 破壊的変更 — 3段階廃止戦略
 
-| 変更 | 影響 | 緩和策 |
-|------|------|--------|
-| `colonyforge.showDashboard` コマンド廃止 | キーバインド設定している場合 | HiveMonitor にリダイレクト（1バージョン） |
-| `colonyforge.showAgentMonitor` コマンド廃止 | 同上 | 同上 |
+| バージョン | `showDashboard` | `showAgentMonitor` | 対応 |
+|---------|----------------|-------------------|------|
+| **vNext** | コマンドID維持 + Hive Monitor にリダイレクト + 通知「Hive Monitorへ統合されました」 | 同左 | contributions に `@deprecated` 表記 |
+| **vNext+1** | contributions から削除（メニュー・パレット非表示） | 同左 | コマンド登録自体は残しリダイレクト継続 |
+| **vNext+2** | コマンド登録自体を削除 | 同左 | 完全廃止 |
+
+**各バージョンでのユーザー体験:**
+
+```
+vNext:   ユーザーが showDashboard を実行
+         → Hive Monitor が開く + 情報メッセージ「このコマンドは Hive Monitor に統合されました」
+vNext+1: ユーザーはコマンドパレットで見つけられないが、キーバインドは継続動作
+vNext+2: キーバインドも無効（コマンド未登録）
+```
 
 ---
 
