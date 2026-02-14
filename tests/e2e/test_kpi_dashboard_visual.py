@@ -308,6 +308,25 @@ def _get_container_ip() -> str:
     return "172.18.0.5"
 
 
+class _NoKeepAliveHandler(http.server.SimpleHTTPRequestHandler):
+    """Keep-alive接続を無効化してCI安定性を向上させるHTTPハンドラ.
+
+    HTTP/1.1のkeep-alive接続ではブラウザが切断するまで
+    readline()でブロックし、pytest-timeoutに引っかかる。
+    HTTP/1.0に戻すことでリクエスト毎にコネクションを閉じる。
+    """
+
+    protocol_version = "HTTP/1.0"
+
+    def log_message(self, format: str, *args: object) -> None:  # noqa: A002
+        """テスト出力を汚さないようログを抑制."""
+
+    def setup(self) -> None:
+        """ソケットにタイムアウトを設定してハング防止."""
+        self.connection.settimeout(10)
+        super().setup()
+
+
 @pytest.fixture
 def kpi_http_server(kpi_html_path: str) -> Generator[str, None, None]:
     """テスト用HTMLをHTTPで配信するフィクスチャ
@@ -316,7 +335,7 @@ def kpi_http_server(kpi_html_path: str) -> Generator[str, None, None]:
     HTTP経由でテストHTMLを提供する必要がある。
     """
     test_dir = str(Path(__file__).parent)
-    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=test_dir)
+    handler = functools.partial(_NoKeepAliveHandler, directory=test_dir)
 
     # 空きポートを自動割り当て
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -324,7 +343,7 @@ def kpi_http_server(kpi_html_path: str) -> Generator[str, None, None]:
         port = s.getsockname()[1]
 
     httpd = http.server.HTTPServer(("0.0.0.0", port), handler)
-    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True, name="kpi-test-http")
     thread.start()
 
     container_ip = _get_container_ip()
@@ -415,7 +434,9 @@ class TestKPIDashboardSnapshot:
         assert "Saved" in text or "Captured" in text
 
     @pytest.mark.asyncio
-    async def test_snapshot_contains_kpi_dashboard_title(self, agent_ui_server, kpi_http_server: str):
+    async def test_snapshot_contains_kpi_dashboard_title(
+        self, agent_ui_server, kpi_http_server: str
+    ):
         """スナップショットに「KPI Dashboard」タイトルが含まれることを確認"""
         # Arrange: ページに遷移してJSレンダリング待機
         await agent_ui_server._handle_navigate({"url": kpi_http_server})
@@ -532,7 +553,9 @@ class TestKPIDashboardSnapshot:
         assert "3 colonies" in snapshot, f"Missing colony count: {snapshot[:300]}"
 
     @pytest.mark.asyncio
-    async def test_snapshot_contains_all_section_headers(self, agent_ui_server, kpi_http_server: str):
+    async def test_snapshot_contains_all_section_headers(
+        self, agent_ui_server, kpi_http_server: str
+    ):
         """全セクションヘッダーが存在することを確認
 
         Task Performance, Collaboration Quality, Gate Accuracy,
