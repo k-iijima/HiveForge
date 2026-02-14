@@ -48,14 +48,29 @@ class OllamaClient:
         self.timeout = timeout
 
     async def is_available(self) -> bool:
-        """Ollamaが利用可能かチェック"""
+        """Ollamaが利用可能かチェック
+
+        Returns:
+            True: Ollama APIに接続でき、200が返る
+            False: 接続失敗（原因はログに出力）
+        """
         try:
             async with httpx.AsyncClient(timeout=5) as client:
                 response = await client.get(f"{self.base_url}/api/tags")
                 return response.status_code == 200
-        except httpx.HTTPError as e:
-            # ネットワーク接続失敗は「利用不可」として返す（安全側フォールバック）
-            logger.debug("Ollama is not available: %s", e)
+        except httpx.ConnectError as exc:
+            # ネットワーク接続失敗（Ollama未起動・ホスト不正等）—安全側フォールバック
+            logger.debug("Ollama接続失敗 (ConnectError): %s url=%s", exc, self.base_url)
+            return False
+        except httpx.TimeoutException as exc:
+            # タイムアウト
+            logger.debug("Ollamaタイムアウト: %s url=%s", exc, self.base_url)
+            return False
+        except httpx.HTTPError as exc:
+            # その他のHTTPエラー
+            logger.debug(
+                "Ollama HTTPエラー (%s): %s url=%s", type(exc).__name__, exc, self.base_url
+            )
             return False
 
     async def list_models(self) -> list[str]:

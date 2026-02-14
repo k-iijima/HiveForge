@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -18,6 +19,8 @@ from colonyforge.vlm_tester.vlm_providers import (
     MultiProviderVLMClient,
     VLMAnalysisResult,
 )
+
+logger = logging.getLogger(__name__)
 
 # VLM API呼び出しのタイムアウト（秒）
 # AnthropicProvider側にも60秒のタイムアウトがあるが、安全策として設定
@@ -146,29 +149,46 @@ class HybridAnalyzer:
         VLM API呼び出しにはVLM_TIMEOUT_SECONDSのタイムアウトを設定し、
         タイムアウトまたは例外発生時はNoneを返す。
         """
-        try:
-            coro: Any
-            if level == AnalysisLevel.VLM_OLLAMA:
+        import httpx
+
+        coro: Any
+        if level == AnalysisLevel.VLM_OLLAMA:
+            self._stats["vlm_ollama"] += 1
+            coro = self.vlm_client.analyze(image_data, prompt, provider_name="ollama")
+        elif level == AnalysisLevel.VLM_CLOUD:
+            self._stats["vlm_cloud"] += 1
+            coro = self.vlm_client.analyze(image_data, prompt, provider_name="anthropic")
+        else:
+            # HYBRID: 利用可能なプロバイダーを自動選択
+            available = self.vlm_client.get_available_providers()
+            if "ollama" in available:
                 self._stats["vlm_ollama"] += 1
                 coro = self.vlm_client.analyze(image_data, prompt, provider_name="ollama")
-            elif level == AnalysisLevel.VLM_CLOUD:
+            elif "anthropic" in available:
                 self._stats["vlm_cloud"] += 1
                 coro = self.vlm_client.analyze(image_data, prompt, provider_name="anthropic")
             else:
-                # HYBRID: 利用可能なプロバイダーを自動選択
-                available = self.vlm_client.get_available_providers()
-                if "ollama" in available:
-                    self._stats["vlm_ollama"] += 1
-                    coro = self.vlm_client.analyze(image_data, prompt, provider_name="ollama")
-                elif "anthropic" in available:
-                    self._stats["vlm_cloud"] += 1
-                    coro = self.vlm_client.analyze(image_data, prompt, provider_name="anthropic")
-                else:
-                    return None
+                return None
+
+        try:
             return await asyncio.wait_for(coro, timeout=VLM_TIMEOUT_SECONDS)
         except TimeoutError:
+            # VLM分析はオプショナル: タイムアウト時はローカル結果のみで継続
+            logger.warning(
+                "VLM分析タイムアウト (level=%s, timeout=%ss)", level.value, VLM_TIMEOUT_SECONDS
+            )
             return None
-        except Exception:
+        except httpx.HTTPError as exc:
+            # ネットワーク/HTTP エラー: 原因を構造化ログに出力
+            logger.warning(
+                "VLM分析HTTPエラー (level=%s, %s): %s", level.value, type(exc).__name__, exc
+            )
+            return None
+        except (ValueError, RuntimeError) as exc:
+            # プロバイダー設定エラー（APIキー未設定等）
+            logger.warning(
+                "VLM分析設定エラー (level=%s, %s): %s", level.value, type(exc).__name__, exc
+            )
             return None
 
     def _extract_text_from_local(self, local_results: dict[str, AnalysisResult]) -> str:

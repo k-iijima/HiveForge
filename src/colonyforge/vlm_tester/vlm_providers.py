@@ -6,10 +6,13 @@
 from __future__ import annotations
 
 import base64
+import logging
 import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -67,14 +70,31 @@ class OllamaProvider(VLMProvider):
         return "ollama"
 
     def is_available(self) -> bool:
-        """Ollamaが利用可能かどうかを確認"""
+        """Ollamaが利用可能かどうかを確認
+
+        Returns:
+            True: Ollama APIに接続でき、200が返る
+            False: 接続失敗（原因はログに出力）
+        """
         import httpx
 
         try:
             with httpx.Client(timeout=2.0) as client:
                 response = client.get(f"{self.base_url}/api/tags")
                 return response.status_code == 200
-        except Exception:
+        except httpx.ConnectError as exc:
+            # ネットワーク接続失敗（Ollama未起動・ホスト不正等）
+            logger.debug("Ollama接続失敗 (ConnectError): %s url=%s", exc, self.base_url)
+            return False
+        except httpx.TimeoutException as exc:
+            # タイムアウト
+            logger.debug("Ollamaタイムアウト: %s url=%s", exc, self.base_url)
+            return False
+        except httpx.HTTPError as exc:
+            # その他のHTTPエラー
+            logger.debug(
+                "Ollama HTTPエラー (%s): %s url=%s", type(exc).__name__, exc, self.base_url
+            )
             return False
 
     async def analyze(self, image_data: bytes, prompt: str) -> VLMAnalysisResult:
