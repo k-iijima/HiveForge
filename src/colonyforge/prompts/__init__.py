@@ -33,16 +33,20 @@ from __future__ import annotations
 
 from colonyforge.prompts.agents import (
     BEEKEEPER_SYSTEM,
+    FORAGER_BEE_SYSTEM,
     QUEEN_BEE_SYSTEM,
+    SCOUT_BEE_SYSTEM,
     WORKER_BEE_SYSTEM,
     get_prompt_from_config,
     get_system_prompt,
 )
 from colonyforge.prompts.loader import (
     BeekeeperConfig,
+    ForagerBeeConfig,
     PromptLoader,
     PromptTemplate,
     QueenBeeConfig,
+    ScoutBeeConfig,
     WorkerBeeConfig,
     get_prompt_loader,
 )
@@ -67,6 +71,8 @@ __all__ = [
     "WORKER_BEE_SYSTEM",
     "QUEEN_BEE_SYSTEM",
     "BEEKEEPER_SYSTEM",
+    "FORAGER_BEE_SYSTEM",
+    "SCOUT_BEE_SYSTEM",
     # Task decomposition
     "TASK_DECOMPOSITION_SYSTEM",
     # Tool retry
@@ -85,5 +91,7 @@ __all__ = [
     "QueenBeeConfig",
     "WorkerBeeConfig",
     "BeekeeperConfig",
+    "ForagerBeeConfig",
+    "ScoutBeeConfig",
     "get_prompt_loader",
 ]

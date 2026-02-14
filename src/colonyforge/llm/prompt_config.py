@@ -11,10 +11,12 @@ from __future__ import annotations
 # Re-export everything from the canonical location
 from colonyforge.prompts.loader import (  # noqa: F401  — re-export
     BeekeeperConfig,
+    ForagerBeeConfig,
     LLMConfig,
     PromptLoader,
     PromptTemplate,
     QueenBeeConfig,
+    ScoutBeeConfig,
     WorkerBeeConfig,
     get_prompt_loader,
 )
@@ -25,6 +27,8 @@ __all__ = [
     "QueenBeeConfig",
     "WorkerBeeConfig",
     "BeekeeperConfig",
+    "ForagerBeeConfig",
+    "ScoutBeeConfig",
     "PromptLoader",
     "get_prompt_loader",
 ]

@@ -83,6 +83,33 @@ class BeekeeperConfig(BaseModel):
     llm: LLMConfig | None = Field(None, description="LLM settings override (optional)")
 
 
+class ForagerBeeConfig(BaseModel):
+    """Forager Bee YAML configuration schema."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(default="default", description="Forager Bee name")
+    description: str | None = Field(None, description="Description")
+    prompt: PromptTemplate = Field(..., description="Prompt template")
+    llm: LLMConfig | None = Field(None, description="LLM settings override (optional)")
+
+
+class ScoutBeeConfig(BaseModel):
+    """Scout Bee YAML configuration schema."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(default="default", description="Scout Bee name")
+    description: str | None = Field(None, description="Description")
+    prompt: PromptTemplate = Field(..., description="Prompt template")
+    llm: LLMConfig | None = Field(None, description="LLM settings override (optional)")
+    min_episodes: int = Field(default=5, ge=1, description="Minimum episodes for recommendation")
+    top_k: int = Field(default=10, ge=1, description="Max similar episodes to retrieve")
+    min_similarity: float = Field(
+        default=0.3, ge=0.0, le=1.0, description="Minimum similarity threshold"
+    )
+
+
 # ---------------------------------------------------------------------------
 # PromptLoader
 # ---------------------------------------------------------------------------
@@ -175,6 +202,36 @@ class PromptLoader:
             data = yaml.safe_load(f)
 
         return BeekeeperConfig.model_validate(data)
+
+    def load_forager_bee_config(
+        self,
+        hive_id: str = "0",
+        colony_id: str = "0",
+    ) -> ForagerBeeConfig | None:
+        """Load Forager Bee configuration."""
+        path = self._find_config_file("forager_bee.yml", hive_id, colony_id)
+        if path is None:
+            return None
+
+        with open(path, encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+
+        return ForagerBeeConfig.model_validate(data)
+
+    def load_scout_bee_config(
+        self,
+        hive_id: str = "0",
+        colony_id: str = "0",
+    ) -> ScoutBeeConfig | None:
+        """Load Scout Bee configuration."""
+        path = self._find_config_file("scout_bee.yml", hive_id, colony_id)
+        if path is None:
+            return None
+
+        with open(path, encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+
+        return ScoutBeeConfig.model_validate(data)
 
     def ensure_default_prompts(self, hive_id: str = "0", colony_id: str = "0") -> None:
         """Create default prompt files if they don't exist."""

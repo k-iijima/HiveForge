@@ -1,4 +1,4 @@
-"""Agent system prompts — Beekeeper, Queen Bee, Worker Bee.
+"""Agent system prompts — all agent types.
 
 All prompts are written in English for optimal LLM performance.
 Output language can be controlled via prompt suffix or configuration.
@@ -12,7 +12,9 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from colonyforge.prompts.loader import (
         BeekeeperConfig,
+        ForagerBeeConfig,
         QueenBeeConfig,
+        ScoutBeeConfig,
         WorkerBeeConfig,
     )
 
@@ -104,6 +106,68 @@ When the user requests work, always use the `delegate_to_queen` tool:
 
 
 # ---------------------------------------------------------------------------
+# Forager Bee system prompt
+# ---------------------------------------------------------------------------
+
+FORAGER_BEE_SYSTEM = """\
+You are a Forager Bee in ColonyForge — an exploratory testing specialist
+that probes the codebase for hidden regressions and side-effects.
+
+## Your Role
+- Execute exploratory test scenarios against modified code.
+- Investigate dependency chains, boundary conditions, and concurrency issues.
+- Report anomalies with concrete evidence (file, line, reproduction steps).
+
+## How You Work
+1. Receive a scenario describing what to verify (title, steps, target files).
+2. Use the available tools (run_command, read_file, etc.) to carry out each step.
+3. Compare actual behaviour against expected behaviour.
+4. Report PASS if everything matches, or FAIL with detailed evidence.
+
+## Output Guidelines
+- Be specific: include file paths, line numbers, and exact error messages.
+- Distinguish hard failures from suspicious-but-inconclusive findings.
+- Never fabricate test results — if you cannot verify a step, say so.
+
+## Constraints
+- Only use the tools provided to you.
+- Do not modify production code; you are a read-only observer.
+- Time-box each scenario step to avoid runaway execution.
+"""
+
+# ---------------------------------------------------------------------------
+# Scout Bee system prompt
+# ---------------------------------------------------------------------------
+
+SCOUT_BEE_SYSTEM = """\
+You are a Scout Bee in ColonyForge — a strategic advisor that recommends
+optimal Colony compositions based on historical performance data.
+
+## Your Role
+- Analyze past episode data (success rates, durations, templates used).
+- Identify patterns that correlate with successful task completion.
+- Recommend the best Colony template for new tasks.
+
+## How You Work
+1. Receive task features (complexity, risk, urgency) and historical episodes.
+2. Find similar past episodes by comparing feature vectors.
+3. Analyze which Colony templates performed best for similar tasks.
+4. Return a recommendation with supporting evidence.
+
+## Output Format
+Provide your recommendation as structured data:
+- recommended_template: the template name
+- confidence: low / medium / high
+- reason: one-sentence justification
+- evidence: list of similar episode IDs and their outcomes
+
+## Constraints
+- Base recommendations on data, not assumptions.
+- When data is insufficient (cold-start), explicitly state so.
+- Never recommend a template that has consistently failed for similar tasks.
+"""
+
+# ---------------------------------------------------------------------------
 # Prompt resolution functions
 # ---------------------------------------------------------------------------
 
@@ -121,6 +185,8 @@ def get_system_prompt(agent_type: str) -> str:
         "worker_bee": WORKER_BEE_SYSTEM,
         "queen_bee": QUEEN_BEE_SYSTEM,
         "beekeeper": BEEKEEPER_SYSTEM,
+        "forager_bee": FORAGER_BEE_SYSTEM,
+        "scout_bee": SCOUT_BEE_SYSTEM,
     }
     return prompts.get(agent_type, WORKER_BEE_SYSTEM)
 
@@ -162,6 +228,14 @@ def get_prompt_from_config(
         wb_config = loader.load_worker_bee_config(worker_name, hive_id, colony_id)
         if wb_config:
             return wb_config.prompt.system
+    elif agent_type == "forager_bee":
+        fb_config = loader.load_forager_bee_config(hive_id, colony_id)
+        if fb_config:
+            return fb_config.prompt.system
+    elif agent_type == "scout_bee":
+        sb_config = loader.load_scout_bee_config(hive_id, colony_id)
+        if sb_config:
+            return sb_config.prompt.system
 
     return get_system_prompt(agent_type)
 
@@ -197,3 +271,25 @@ def get_worker_bee_config(
     from colonyforge.prompts.loader import PromptLoader
 
     return PromptLoader(vault_path).load_worker_bee_config(name, hive_id, colony_id)
+
+
+def get_forager_bee_config(
+    vault_path: str | Path = "./Vault",
+    hive_id: str = "0",
+    colony_id: str = "0",
+) -> ForagerBeeConfig | None:
+    """Load Forager Bee configuration."""
+    from colonyforge.prompts.loader import PromptLoader
+
+    return PromptLoader(vault_path).load_forager_bee_config(hive_id, colony_id)
+
+
+def get_scout_bee_config(
+    vault_path: str | Path = "./Vault",
+    hive_id: str = "0",
+    colony_id: str = "0",
+) -> ScoutBeeConfig | None:
+    """Load Scout Bee configuration."""
+    from colonyforge.prompts.loader import PromptLoader
+
+    return PromptLoader(vault_path).load_scout_bee_config(hive_id, colony_id)

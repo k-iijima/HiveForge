@@ -12,19 +12,25 @@ import pytest
 
 from colonyforge.llm.prompt_config import (
     BeekeeperConfig,
+    ForagerBeeConfig,
     LLMConfig,
     PromptLoader,
     PromptTemplate,
     QueenBeeConfig,
+    ScoutBeeConfig,
     WorkerBeeConfig,
 )
 from colonyforge.llm.prompts import (
     BEEKEEPER_SYSTEM,
+    FORAGER_BEE_SYSTEM,
     QUEEN_BEE_SYSTEM,
+    SCOUT_BEE_SYSTEM,
     WORKER_BEE_SYSTEM,
     get_beekeeper_config,
+    get_forager_bee_config,
     get_prompt_from_config,
     get_queen_bee_config,
+    get_scout_bee_config,
     get_system_prompt,
     get_worker_bee_config,
 )
@@ -613,3 +619,217 @@ prompt:
         # Assert
         assert config is not None
         assert config.name == "main"
+
+
+# =============================================================================
+# Forager Bee / Scout Bee プロンプト設定テスト
+# =============================================================================
+
+
+class TestForagerBeeConfig:
+    """ForagerBeeConfigスキーマのテスト"""
+
+    def test_minimal_forager_config(self):
+        """最小限のForager Bee設定を作成できる
+
+        nameとpromptのみで構築可能。
+        """
+        # Arrange & Act
+        config = ForagerBeeConfig(
+            name="forager",
+            prompt=PromptTemplate(system="You are a forager bee."),
+        )
+
+        # Assert
+        assert config.name == "forager"
+        assert config.prompt.system == "You are a forager bee."
+        assert config.description is None
+        assert config.llm is None
+
+    def test_full_forager_config(self):
+        """全フィールドを指定したForager Bee設定"""
+        # Arrange & Act
+        config = ForagerBeeConfig(
+            name="forager-advanced",
+            description="Advanced exploratory testing",
+            prompt=PromptTemplate(system="You are a forager."),
+            llm=LLMConfig(model="gpt-4o"),
+        )
+
+        # Assert
+        assert config.name == "forager-advanced"
+        assert config.description == "Advanced exploratory testing"
+        assert config.llm is not None
+        assert config.llm.model == "gpt-4o"
+
+
+class TestScoutBeeConfig:
+    """ScoutBeeConfigスキーマのテスト"""
+
+    def test_minimal_scout_config(self):
+        """最小限のScout Bee設定を作成できる"""
+        # Arrange & Act
+        config = ScoutBeeConfig(
+            name="scout",
+            prompt=PromptTemplate(system="You are a scout."),
+        )
+
+        # Assert
+        assert config.name == "scout"
+        assert config.prompt.system == "You are a scout."
+        assert config.min_episodes == 5  # default
+        assert config.top_k == 10  # default
+        assert config.min_similarity == 0.3  # default
+
+    def test_full_scout_config(self):
+        """全フィールドを指定したScout Bee設定"""
+        # Arrange & Act
+        config = ScoutBeeConfig(
+            name="scout-custom",
+            description="Strategic advisor",
+            prompt=PromptTemplate(system="You are a scout bee."),
+            llm=LLMConfig(model="gpt-4o"),
+            min_episodes=10,
+            top_k=20,
+            min_similarity=0.5,
+        )
+
+        # Assert
+        assert config.min_episodes == 10
+        assert config.top_k == 20
+        assert config.min_similarity == 0.5
+        assert config.llm.model == "gpt-4o"
+
+
+class TestGetSystemPromptForagerScout:
+    """Forager/Scout用のget_system_promptテスト"""
+
+    def test_forager_bee_prompt(self):
+        """forager_beeのプロンプトを取得"""
+        # Act
+        prompt = get_system_prompt("forager_bee")
+
+        # Assert
+        assert prompt == FORAGER_BEE_SYSTEM
+
+    def test_scout_bee_prompt(self):
+        """scout_beeのプロンプトを取得"""
+        # Act
+        prompt = get_system_prompt("scout_bee")
+
+        # Assert
+        assert prompt == SCOUT_BEE_SYSTEM
+
+    def test_forager_prompt_contains_exploratory(self):
+        """Forager Beeプロンプトにexploratory testing関連キーワードが含まれる"""
+        # Assert
+        assert "exploratory" in FORAGER_BEE_SYSTEM.lower()
+
+    def test_scout_prompt_contains_colony(self):
+        """Scout Beeプロンプトにcolony composition関連キーワードが含まれる"""
+        # Assert
+        assert "colony" in SCOUT_BEE_SYSTEM.lower()
+
+
+class TestGetPromptFromConfigForagerScout:
+    """Forager/Scout用のget_prompt_from_configテスト"""
+
+    @pytest.fixture
+    def temp_vault(self, tmp_path: Path) -> Path:
+        vault = tmp_path / "Vault"
+        vault.mkdir()
+        return vault
+
+    def test_forager_returns_default_when_no_config(self, temp_vault: Path):
+        """設定ファイルがない場合はデフォルトForagerプロンプトを返す"""
+        # Act
+        prompt = get_prompt_from_config("forager_bee", vault_path=temp_vault)
+
+        # Assert
+        assert prompt == FORAGER_BEE_SYSTEM
+
+    def test_scout_returns_default_when_no_config(self, temp_vault: Path):
+        """設定ファイルがない場合はデフォルトScoutプロンプトを返す"""
+        # Act
+        prompt = get_prompt_from_config("scout_bee", vault_path=temp_vault)
+
+        # Assert
+        assert prompt == SCOUT_BEE_SYSTEM
+
+
+class TestForagerScoutConfigHelpers:
+    """Forager/Scout設定取得ヘルパーのテスト"""
+
+    @pytest.fixture
+    def temp_vault(self, tmp_path: Path) -> Path:
+        vault = tmp_path / "Vault"
+        vault.mkdir()
+        return vault
+
+    def test_get_forager_bee_config(self, temp_vault: Path):
+        """get_forager_bee_config関数でForager Bee設定を取得"""
+        # Arrange
+        colony_dir = temp_vault / "hives" / "0" / "colonies" / "0"
+        colony_dir.mkdir(parents=True)
+        (colony_dir / "forager_bee.yml").write_text(
+            """
+name: forager
+prompt:
+  system: You are a test forager.
+""",
+            encoding="utf-8",
+        )
+
+        # Act
+        config = get_forager_bee_config(vault_path=temp_vault)
+
+        # Assert
+        assert config is not None
+        assert config.name == "forager"
+
+    def test_get_scout_bee_config(self, temp_vault: Path):
+        """get_scout_bee_config関数でScout Bee設定を取得"""
+        # Arrange
+        colony_dir = temp_vault / "hives" / "0" / "colonies" / "0"
+        colony_dir.mkdir(parents=True)
+        (colony_dir / "scout_bee.yml").write_text(
+            """
+name: scout
+prompt:
+  system: You are a test scout.
+min_episodes: 10
+top_k: 20
+""",
+            encoding="utf-8",
+        )
+
+        # Act
+        config = get_scout_bee_config(vault_path=temp_vault)
+
+        # Assert
+        assert config is not None
+        assert config.name == "scout"
+        assert config.min_episodes == 10
+        assert config.top_k == 20
+
+    def test_get_forager_config_falls_back_to_package_default(self, temp_vault: Path):
+        """Vault内にforager_bee.ymlがなくてもパッケージデフォルトが返る
+
+        _find_config_fileがpackage defaults/forager_bee.ymlを見つけるため、
+        Noneにはならない。
+        """
+        # Act
+        config = get_forager_bee_config(vault_path=temp_vault)
+
+        # Assert: パッケージデフォルトが返る
+        assert config is not None
+        assert config.name == "default"
+
+    def test_get_scout_config_falls_back_to_package_default(self, temp_vault: Path):
+        """Vault内にscout_bee.ymlがなくてもパッケージデフォルトが返る"""
+        # Act
+        config = get_scout_bee_config(vault_path=temp_vault)
+
+        # Assert: パッケージデフォルトが返る
+        assert config is not None
+        assert config.name == "default"
